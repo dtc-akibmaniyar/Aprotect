@@ -1,0 +1,772 @@
+:host {
+    --font-family-primary: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    
+    /* Font Sizes */
+    --font-size-title: 1.75rem; /* 28px */
+    --font-size-instruction: 0.9rem; /* 14.4px */
+    --font-size-section-label: 0.875rem; /* 14px */
+    --font-size-field-label: 0.75rem; /* 12px */
+    --font-size-input: 0.9rem; /* 14.4px */
+    --font-size-status: 0.85rem; /* 13.6px */
+    --font-size-button: 0.875rem; /* 14px */
+    --font-size-help: 0.8rem; /* 12.8px */
+    
+    /* Font Weights */
+    --font-weight-title: 700;
+    --font-weight-section: 700;
+    --font-weight-field-label: 600;
+    --font-weight-status: 500;
+    --font-weight-button: 600;
+    --font-weight-regular: 400;
+    
+    /* Colors */
+    --color-title: #1a1a1a;
+    --color-instruction: #4a4a4a;
+    --color-section-label: #2c2c2c;
+    --color-field-label: #666666;
+    --color-input: #1a1a1a;
+    --color-success: #28a745;
+    --color-warning: #ffc107;
+    --color-help: #6c757d;
+    
+    /* Line Heights */
+    --line-height-instruction: 1.5;
+    --line-height-normal: 1.4;
+    
+    /* Override SLDS border-radius for sharp corners */
+    --slds-c-input-radius-border: 0;
+    --slds-c-button-radius-border: 0;
+    
+    /* Override SLDS border color for light grey borders */
+    --slds-c-input-color-border: #d0d0d0;
+    --slds-c-input-color-border-focus: #d0d0d0;
+    --slds-c-input-color-border-hover: #d0d0d0;
+    --slds-c-combobox-color-border: #d0d0d0;
+    --slds-c-combobox-color-border-focus: #d0d0d0;
+    --slds-c-combobox-color-border-hover: #d0d0d0;
+    --slds-c-textarea-color-border: #d0d0d0;
+    --slds-c-textarea-color-border-focus: #d0d0d0;
+    --slds-c-textarea-color-border-hover: #d0d0d0;
+    --slds-c-button-color-border: #d0d0d0;
+}
+.customer-tab {
+    background-color: #FFFFFF;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+    /* max-width: 1000px; */
+    margin: 0 auto;
+    padding-right: 28px;
+    padding-left: 28px;
+}
+
+/* Top Navigation Buttons - Back and Next */
+.top-navigation-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1rem;
+    gap: 1rem;
+}
+
+.nav-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 1.5rem;
+    border-radius: 0;
+    background: #ffffff;
+    border: 1px solid #d0d0d0;
+    color: #4a4a4a;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.nav-button:hover,
+.nav-button:focus {
+    background: #f8f9fa;
+    border-color: #b0b0b0;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+.nav-button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.nav-button:focus-visible {
+    outline: 2px solid #1e88ff;
+    outline-offset: 2px;
+}
+
+.nav-button.back-button {
+    order: 1; /* Back button on the left */
+}
+
+.nav-button.next-button {
+    order: 2; /* Next button on the right */
+}
+
+.button-label {
+    line-height: 1;
+}
+
+/* Top header bar */
+
+.page-header {
+    margin-bottom: 20px;
+    background: #FFFFFF;
+    border: 1px solid #C1C1C1;
+    box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    gap: 12px;
+}
+
+.page-header-inner {
+    display: flex;
+    align-items: flex-start;
+    background-color: #ffffff;
+    padding: 0;
+    box-shadow: none;
+    flex: 1;
+}
+
+.header-icon-wrapper {
+    margin-right: 16px;
+    flex-shrink: 0;
+}
+
+.header-avatar {
+    width: 48px;
+    height: 48px;
+    /* border-radius: 50%; */
+    /* background-color: #4f7db0; */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-svg {
+    width: 28px;
+    height: 28px;
+    fill: #ffffff;
+}
+
+.header-text {
+    flex: 1;
+}
+
+.header-title {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #2870b9;
+    margin-bottom: 6px;
+}
+
+.header-subtitle {
+    font-size: 12px;
+    color: #666666;
+    line-height: 1.4;
+}
+
+/* Error message */
+
+.error-message {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border-radius: 3px;
+    background-color: #fde4e0;
+    border: 1px solid #f5bbb0;
+    font-size: 12px;
+    color: #c23d34;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Cards wrapper */
+
+.cards-wrapper {
+    width: 100%;
+}
+
+/* Section card – main white boxes */
+
+/* .section-card {
+    background-color: #ffffff;
+    border-radius: 2px;
+    border: 1px solid #ddd;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    padding: 20px;
+    margin-bottom: 16px;
+} */
+
+.section-card {
+    background: #FFFFFF;
+    box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+    background-color: #FFFFFF;
+    padding: 20px;
+    margin-bottom: 16px;
+    border: 1px solid #C1C1C1;
+    border-radius: 8px;
+}
+
+/* Section header row (big 1,2 and title) */
+
+.section-header-row {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.section-number {
+    font-size: 48px;
+    font-weight: 700;
+    color: #5b8cc1;
+    margin-right: 16px;
+    line-height: 1;
+    min-width: 50px;
+}
+
+.section-heading-area {
+    padding-top: 6px;
+}
+
+.section-heading {
+    font-size: 20px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #5184B7;
+    letter-spacing: 0.5px;
+}
+
+/* Section body generic layout */
+
+.section-body {
+    margin-left: 0;
+}
+
+/* Rows / grid */
+
+.row {
+    display: grid;
+    grid-column-gap: 16px;
+    grid-row-gap: 10px;
+    margin-bottom: 12px;
+}
+
+.row-three {
+    grid-template-columns: 120px 1fr 1fr;
+}
+
+.row-four {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.row-five {
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+}
+
+.row-two {
+    grid-template-columns: 1fr 1fr;
+}
+
+.row-license {
+    grid-template-columns: 1fr 1.5fr;
+    align-items: flex-start;
+}
+
+.field-block {
+    display: flex;
+    flex-direction: column;
+}
+
+.field-block.full {
+    grid-column: 1 / -1;
+}
+
+.field-block.small {
+    max-width: 120px;
+}
+
+.field-block.address-field {
+    min-width: 0;
+}
+
+/* Labels */
+
+/* .field-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #333333;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+} */
+
+/* Override SLDS input styling to remove rounded corners */
+.slds-input {
+    border-radius: 0 !important;
+    border-color: #d0d0d0 !important;
+}
+
+/* Form Fields */
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.field-label {
+    font-size: var(--font-size-field-label);
+    font-weight: var(--font-weight-field-label);
+    color: var(--color-field-label);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.required {
+    color: #d32f2f;
+}
+
+.info-icon {
+    color: var(--color-help);
+    cursor: help;
+}
+
+.input-field {
+    font-size: var(--font-size-input);
+    font-weight: var(--font-weight-regular);
+    color: var(--color-input);
+}
+
+/* Remove rounded corners from Lightning Input Fields */
+lightning-input .slds-input,
+lightning-input input,
+lightning-combobox .slds-select,
+lightning-combobox .slds-combobox__input,
+lightning-combobox select,
+lightning-combobox input,
+lightning-textarea .slds-textarea,
+lightning-textarea textarea {
+    border-radius: 0 !important;
+    border-color: #d0d0d0 !important;
+}
+
+/* Remove rounded corners from Lightning Buttons */
+lightning-button .slds-button,
+lightning-button button,
+lightning-button-icon .slds-button_icon,
+lightning-button-icon button {
+    border-radius: 0 !important;
+}
+
+/* Global SLDS class overrides for all input fields and buttons */
+.slds-input,
+.slds-select,
+.slds-textarea,
+.slds-combobox__input,
+.slds-combobox__input input,
+.slds-form-element__control .slds-input,
+.slds-form-element__control .slds-select,
+.slds-form-element__control .slds-textarea,
+.slds-button,
+.slds-button_neutral,
+.slds-button_brand,
+.slds-button_icon,
+.slds-button_icon-container,
+.slds-button_icon-inverse {
+    border-radius: 0 !important;
+}
+
+/* Set light grey borders for all input fields */
+.slds-input,
+.slds-select,
+.slds-textarea,
+.slds-combobox__input,
+.slds-combobox__input input,
+.slds-form-element__control .slds-input,
+.slds-form-element__control .slds-select,
+.slds-form-element__control .slds-textarea {
+    border-color: #d0d0d0 !important;
+}
+
+/* Target combobox dropdown and input wrapper */
+.slds-combobox,
+.slds-combobox__form-element,
+.slds-combobox__input-value,
+.slds-combobox__input {
+    border-radius: 0 !important;
+    border-color: #d0d0d0 !important;
+}
+
+/* Target all input types */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="email"],
+input[type="tel"],
+input[type="url"],
+select,
+textarea {
+    border-radius: 0 !important;
+    border-color: #d0d0d0 !important;
+}
+
+/* Plain HTML inputs to mimic PDF */
+
+/* .plain-input {
+    border: 1px solid #cccccc;
+    border-radius: 2px;
+    min-height: 28px;
+    padding: 4px 6px;
+    box-sizing: border-box;
+    font-size: 12px;
+    font-family: Arial, sans-serif;
+    background-color: #ffffff;
+}
+
+.plain-input:focus {
+    outline: none;
+    border-color: #2870b9;
+    box-shadow: 0 0 3px rgba(40, 112, 185, 0.3);
+} */
+
+/* Lightning input reset so they look like plain boxes */
+
+.lightning-input-reset {
+    --sds-c-input-color-border: #cccccc;
+    --sds-c-input-color-border-focus: #2870b9;
+    --sds-c-input-shadow: none;
+    --sds-c-input-shadow-focus: 0 0 3px rgba(40, 112, 185, 0.3);
+    --sds-c-input-spacing-horizontal: 0.375rem;
+    --sds-c-input-spacing-vertical: 0.25rem;
+    --sds-c-input-font-size: 12px;
+    --sds-c-input-sizing-min-height: 28px;
+}
+
+/* Select input styling to match plain inputs */
+
+/* select.plain-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    padding-right: 28px;
+} */
+
+/* Consent text / checkbox */
+
+.consent-block {
+    padding: 0;
+}
+
+.consent-inner {
+    /* border: 1px solid #cccccc; */
+    /* border-radius: 2px; */
+    padding: 8px 10px;
+    font-size: 14px;
+    /* color: #555555; */
+    line-height: 1.4;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background-color: #ffffff;
+}
+
+.consent-checkbox {
+    margin-top: 2px;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.consent-text {
+    flex: 1;
+}
+
+/* Add secondary owner row */
+
+.add-secondary-row {
+    display: flex;
+    align-items: center;
+    margin: 8px 10px 16px;
+    padding-left: 0;
+    font-size: 12px;
+}
+
+.add-icon {
+    width: 26.98px;
+    height: 27.61px;
+    /* border-radius: 50%;
+    border: 2px solid #2870b9;
+    color: #2870b9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700; */
+    margin-right: 8px;
+    /* flex-shrink: 0; */
+}
+
+.add-text {
+    font-size: 20px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #5184B7;
+    letter-spacing: 0.3px;
+}
+
+/* Company card header text (bottom section) */
+
+.company-card {
+    padding: 20px;
+}
+
+.company-header {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #5184B7;
+    margin-bottom: 14px;
+    letter-spacing: 0.5px;
+}
+
+/* Company consent row */
+
+.company-consent-row {
+    grid-template-columns: 1fr;
+    margin-top: 8px;
+}
+
+.company-consent-inner {
+    /* border: 1px solid #cccccc; */
+    /* border-radius: 2px; */
+    padding: 8px 10px;
+    font-size: 14px;
+    /* color: #555555; */
+    line-height: 1.4;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background-color: #ffffff;
+}
+
+/* Custom lookup (you already had, just keep styles that match) */
+
+/* .custom-lookup {
+    position: relative;
+}
+
+.lookup-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #d9dbdd;
+    border-top: none;
+    border-radius: 0 0 2px 2px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 1000;
+} */
+
+/* .lookup-option {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f3f3;
+    font-size: 12px;
+}
+
+.lookup-option:hover {
+    background-color: #f9f9f9;
+}
+
+.option-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.option-details {
+    font-size: 10px;
+    color: #777;
+    margin-top: 2px;
+}
+
+.no-results {
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #999;
+    text-align: center;
+    font-style: italic;
+}
+
+.selected-account {
+    margin-top: 4px;
+    padding: 6px 8px;
+    border-radius: 2px;
+    border: 1px solid #d9dbdd;
+    background-color: #f9f9f9;
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    gap: 6px;
+}
+
+.selected-account lightning-icon {
+    flex-shrink: 0;
+}
+
+.account-name {
+    flex: 1;
+} */
+
+/* Buttons */
+
+.action-buttons {
+    margin-top: 24px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 24px;
+    padding-left: 28px;
+    padding-right: 28px;
+    background-color: #ffffff;
+}
+
+.back-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 1.9rem;
+    border-radius: 0;
+    background: #ffffff;
+    border: 1px solid #d0d0d0;
+    color: #4a4a4a;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.back-button:hover,
+.back-button:focus {
+    background: #f8f9fa;
+    border-color: #b0b0b0;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+.back-button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.back-button:focus-visible {
+    outline: 2px solid #1e88ff;
+    outline-offset: 2px;
+}
+
+.back-label {
+    line-height: 1;
+}
+
+.continue-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 1.9rem;
+    border-radius: 0;
+    background: #1e88ff;
+    border: 1px solid #1a78e0;
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    margin-left: auto;
+}
+
+.continue-button:hover,
+.continue-button:focus {
+    background: #1b7de6;
+    border-color: #166ac6;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+    transform: translateY(-1px);
+}
+
+.continue-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.continue-button:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+}
+
+.continue-label {
+    line-height: 1;
+}
+
+.next-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 1.9rem;
+    border-radius: 0;
+    background: #ffffff;
+    border: 1px solid #d0d0d0;
+    color: #4a4a4a;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.next-button:hover,
+.next-button:focus {
+    background: #f8f9fa;
+    border-color: #b0b0b0;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+.next-button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.next-button:focus-visible {
+    outline: 2px solid #1e88ff;
+    outline-offset: 2px;
+}
+
+.next-label {
+    line-height: 1;
+}

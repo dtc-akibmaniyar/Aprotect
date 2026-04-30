@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>66.0</apiVersion>
+    <isExposed>true</isExposed>
+    <targets>
+        <target>lightning__FlowScreen</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__FlowScreen">
+            <property name="availableServicesJson"    type="String"  label="Available Services (JSON)"                role="inputOnly"  />
+            <property name="selectedApplicationIds"   type="String"  label="Selected Application IDs (comma-separated)" role="inputOnly"  />
+            <property name="remittanceFormId"         type="String"  label="Created Remittance Form ID"               role="outputOnly" />
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

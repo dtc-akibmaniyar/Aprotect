@@ -1,0 +1,93 @@
+<template>
+    <div class="markup-container">
+        <div class="header">
+            <h2 class="title">Dealer Packages (Hierarchy)</h2>
+            <p class="subtitle">Dealer Package → Tier → Term</p>
+        </div>
+
+        <template if:true={isLoading}>
+            <div class="state-box">
+                <lightning-spinner alternative-text="Loading dealer packages..." size="small"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:true={hasError}>
+            <div class="state-box error">
+                {error}
+            </div>
+        </template>
+
+        <template if:true={hasPackages}>
+            <lightning-accordion allow-multiple-sections-open class="package-accordion">
+                <template for:each={packages} for:item="pkg">
+                    <lightning-accordion-section
+                        key={pkg.Id}
+                        name={pkg.Id}
+                        label={pkg.packageLabel}
+                    >
+                        <div class="meta-row">
+                            <span class="pill">Record Type: {pkg.recordType}</span>
+                            <span class="pill">Tiers: {pkg.tierCount}</span>
+                            <span class="pill">Terms: {pkg.termCount}</span>
+                        </div>
+
+                        <template if:true={pkg.tiers.length}>
+                            <lightning-accordion allow-multiple-sections-open class="tier-accordion">
+                                <template for:each={pkg.tiers} for:item="tier">
+                                    <lightning-accordion-section
+                                        key={tier.Id}
+                                        name={tier.Id}
+                                        label={tier.displayLabel}
+                                    >
+                                        <template if:true={tier.terms.length}>
+                                            <lightning-accordion allow-multiple-sections-open class="term-accordion">
+                                                <template for:each={tier.terms} for:item="term">
+                                                    <lightning-accordion-section
+                                                        key={term.Id}
+                                                        name={term.Id}
+                                                        label={term.termName}
+                                                    >
+                                                        <div class="term-grid">
+                                                            <div class="field">
+                                                                <div class="label">Net Cost</div>
+                                                                <div class="value">{term.netCost}</div>
+                                                            </div>
+                                                            <div class="field">
+                                                                <div class="label">Markup</div>
+                                                                <div class="value">{term.markupType} {term.markup}</div>
+                                                            </div>
+                                                            <div class="field">
+                                                                <div class="label">Total Price</div>
+                                                                <div class="value">{term.totalPrice}</div>
+                                                            </div>
+                                                        </div>
+                                                    </lightning-accordion-section>
+                                                </template>
+                                            </lightning-accordion>
+                                        </template>
+
+                                        <template if:false={tier.terms.length}>
+                                            <div class="state-box muted">No terms found for this tier.</div>
+                                        </template>
+                                    </lightning-accordion-section>
+                                </template>
+                            </lightning-accordion>
+                        </template>
+
+                        <template if:false={pkg.tiers.length}>
+                            <div class="state-box muted">No tiers found for this package.</div>
+                        </template>
+                    </lightning-accordion-section>
+                </template>
+            </lightning-accordion>
+        </template>
+
+        <template if:false={hasPackages}>
+            <template if:false={isLoading}>
+                <template if:false={hasError}>
+                    <div class="state-box muted">No dealer packages found.</div>
+                </template>
+            </template>
+        </template>
+    </div>
+</template>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>66.0</apiVersion>
+    <isExposed>true</isExposed>
+    <targets>
+        <target>lightning__RecordPage</target>
+        <target>lightning__AppPage</target>
+        <target>lightning__FlowScreen</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__RecordPage,lightning__AppPage">
+            <property name="recordIds" type="String" label="Application Record IDs (comma-separated)" />
+        </targetConfig>
+        <targetConfig targets="lightning__FlowScreen">
+            <property name="dealerId"               type="String"  label="Dealer Account ID"                         role="inputOnly"  />
+            <property name="includeWarranty"         type="Boolean" label="Include Extended Warranty"                 role="inputOnly"  />
+            <property name="includeTireRim"          type="Boolean" label="Include Tire &amp; Rim"                   role="inputOnly"  />
+            <property name="includeLoanProtection"   type="Boolean" label="Include Car Loan Protection"               role="inputOnly"  />
+            <property name="remittanceFormId"        type="String"  label="Created Remittance Form ID"                role="outputOnly" />
+            <property name="selectedApplicationIds"  type="String"  label="Selected Application IDs (comma-separated)" role="outputOnly" />
+            <property name="availableServicesJson"   type="String"  label="Available Services JSON"                   role="outputOnly" />
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

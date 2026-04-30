@@ -1,0 +1,216 @@
+<template>
+    <lightning-card title="Create Allocation Remittance" icon-name="standard:payment_gateway">
+
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Loading" size="small" variant="brand"></lightning-spinner>
+        </template>
+
+        <div class="slds-var-p-around_medium">
+
+            <!-- ═══════════════════════════════════════════════════════════════
+                 FLOW CONTEXT: Step 3 — Select Applications
+                 Dealer and services already chosen in earlier flow screens.
+                 ═══════════════════════════════════════════════════════════════ -->
+            <template if:true={isFlowContext}>
+
+                <!-- Search bar — always visible -->
+                <div class="slds-m-bottom_small">
+                    <lightning-input
+                        type="search"
+                        label="Search"
+                        placeholder="Search by application # or customer name..."
+                        value={searchTerm}
+                        onchange={handleSearch}>
+                    </lightning-input>
+                </div>
+
+                <template if:false={isLoading}>
+
+                    <template if:true={hasApplications}>
+                        <p class="slds-text-body_small slds-m-bottom_x-small">
+                            {selectedCount} selected — scroll to load more
+                        </p>
+
+                        <!-- Fixed-height scrollable container for the datatable -->
+                        <div class="datatable-container">
+                            <lightning-datatable
+                                key-field="applicationId"
+                                data={applications}
+                                columns={columns}
+                                selected-rows={selectedAppIds}
+                                onrowselection={handleRowSelection}
+                                enable-infinite-loading
+                                onloadmore={handleLoadMore}
+                                is-loading={isLoadingMore}
+                                load-more-offset="50"
+                                sorted-by={sortedBy}
+                                sorted-direction={sortedDirection}
+                                onsort={handleSort}>
+                            </lightning-datatable>
+                        </div>
+                    </template>
+
+                    <template if:false={hasApplications}>
+                        <div class="slds-box slds-theme_shade slds-p-around_medium slds-text-align_center">
+                            <p>No eligible applications found for the selected services.</p>
+                        </div>
+                    </template>
+
+                    <template if:true={errorMessage}>
+                        <div class="slds-box slds-theme_alert-texture slds-m-top_small">
+                            <p class="slds-text-color_error">{errorMessage}</p>
+                        </div>
+                    </template>
+
+                    <div class="slds-m-top_medium slds-grid slds-grid_align-end slds-grid_vertical-align-center" style="gap: 8px;">
+                        <lightning-button
+                            label="Previous"
+                            variant="neutral"
+                            onclick={handleFlowBack}>
+                        </lightning-button>
+                        <template if:true={hasApplications}>
+                            <lightning-button
+                                label="Next"
+                                variant="brand"
+                                icon-name="utility:chevronright"
+                                onclick={handleFlowNext}
+                                disabled={isNextDisabled}>
+                            </lightning-button>
+                        </template>
+                    </div>
+
+                </template>
+            </template>
+
+            <!-- ═══════════════════════════════════════════════════════════════
+                 STANDALONE CONTEXT: Service selection → preview → create
+                 ═══════════════════════════════════════════════════════════════ -->
+            <template if:false={isFlowContext}>
+
+                <!-- Step 1: Service Type Selection -->
+                <template if:false={showConfirmationModal}>
+                    <p class="slds-text-body_regular slds-m-bottom_small">
+                        Select which service types to include in this Allocation Remittance.
+                        Only unpaid line items of the selected types will be linked.
+                    </p>
+
+                    <fieldset class="slds-form-element">
+                        <legend class="slds-form-element__label slds-text-title_caps">Service Types</legend>
+                        <div class="slds-form-element__control">
+                            <template for:each={serviceTypeOptions} for:item="option">
+                                <span key={option.value} class="slds-checkbox slds-m-right_medium">
+                                    <input
+                                        type="checkbox"
+                                        id={option.value}
+                                        name="serviceType"
+                                        value={option.value}
+                                        checked={option.checked}
+                                        onchange={handleServiceTypeChange} />
+                                    <label class="slds-checkbox__label" for={option.value}>
+                                        <span class="slds-checkbox_faux"></span>
+                                        <span class="slds-form-element__label">{option.label}</span>
+                                    </label>
+                                </span>
+                            </template>
+                        </div>
+                    </fieldset>
+
+                    <template if:true={errorMessage}>
+                        <div class="slds-box slds-theme_alert-texture slds-m-top_small">
+                            <p class="slds-text-color_error">{errorMessage}</p>
+                        </div>
+                    </template>
+
+                    <div class="slds-m-top_medium">
+                        <lightning-button
+                            label="Preview Allocation"
+                            variant="brand"
+                            icon-name="utility:preview"
+                            onclick={handlePreview}
+                            disabled={isPreviewDisabled}>
+                        </lightning-button>
+                    </div>
+                </template>
+
+                <!-- Step 2: Confirmation Preview -->
+                <template if:true={showConfirmationModal}>
+                    <div class="slds-m-bottom_small">
+                        <lightning-button
+                            label="Back"
+                            variant="neutral"
+                            icon-name="utility:chevronleft"
+                            onclick={handleBack}>
+                        </lightning-button>
+                    </div>
+
+                    <h2 class="slds-text-heading_small slds-m-bottom_small">
+                        Allocation Remittance Preview
+                    </h2>
+                    <p class="slds-text-body_small slds-m-bottom_medium">
+                        Services selected: <strong>{selectedServiceLabels}</strong>
+                    </p>
+
+                    <template if:true={hasConfirmationData}>
+                        <!-- Application Rows -->
+                        <template for:each={confirmationData} for:item="application">
+                            <div key={application.applicationId} class="slds-box slds-m-bottom_small">
+                                <div class="slds-grid slds-gutters">
+                                    <!-- Application Info -->
+                                    <div class="slds-col slds-size_1-of-2">
+                                        <p><strong>App #:</strong> {application.applicationNumber}</p>
+                                        <p><strong>Customer:</strong> {application.customerName}</p>
+                                        <p><strong>Vehicle:</strong> {application.vehicleName}</p>
+                                        <p><strong>VIN:</strong> {application.vehicleVin}</p>
+                                    </div>
+                                    <!-- Line Items -->
+                                    <div class="slds-col slds-size_1-of-2">
+                                        <template for:each={application.lineItems} for:item="li">
+                                            <div key={li.packageId} class="slds-grid slds-justify_space-between">
+                                                <span>{li.serviceName}</span>
+                                                <span>{li.formattedPrice}</span>
+                                            </div>
+                                        </template>
+                                        <div class="slds-border_top slds-m-top_x-small slds-p-top_x-small slds-grid slds-justify_space-between">
+                                            <strong>Application Total:</strong>
+                                            <strong>{application.formattedTotal}</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Grand Total -->
+                        <div class="slds-box slds-theme_shade slds-m-top_small slds-grid slds-justify_space-between">
+                            <strong>Remittance Grand Total:</strong>
+                            <strong>{grandTotal}</strong>
+                        </div>
+
+                        <template if:true={errorMessage}>
+                            <div class="slds-box slds-theme_alert-texture slds-m-top_small">
+                                <p class="slds-text-color_error">{errorMessage}</p>
+                            </div>
+                        </template>
+
+                        <div class="slds-m-top_medium">
+                            <lightning-button
+                                label="Confirm & Create Allocation Remittance"
+                                variant="brand"
+                                icon-name="utility:check"
+                                onclick={handleConfirmCreate}
+                                disabled={isCreating}>
+                            </lightning-button>
+                        </div>
+                    </template>
+
+                    <template if:false={hasConfirmationData}>
+                        <div class="slds-box slds-theme_shade slds-p-around_medium slds-text-align_center">
+                            <p>No unpaid line items found for the selected service types.</p>
+                        </div>
+                    </template>
+                </template>
+
+            </template>
+
+        </div>
+    </lightning-card>
+</template>

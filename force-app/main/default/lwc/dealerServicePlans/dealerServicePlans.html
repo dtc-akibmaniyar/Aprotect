@@ -1,0 +1,28 @@
+<template>
+    <div class="service-plans-container">
+        <!-- HEADER -->
+        <div class="header-bar">
+            <h2>SERVICE PLANS</h2>
+            <!-- <div class="notification-badge">N</div> -->
+        </div>
+
+        <!-- SERVICE GRID -->
+        <div class="plans-grid">
+            <template for:each={cards} for:item="card">
+                <div key={card.id} class={card.cardClass} data-id={card.id}>
+                    <img src={card.img} alt={card.title} class="plan-image" />
+                    <div class="btn-row">
+                        <button class="plan-btn" data-action="view" onclick={handleClick}>VIEW PLANS</button>
+                        <button class="plan-btn" data-action="download" onclick={handleClick}>
+                            <img src={staticResources.downloadIcon} alt="download"/>
+                            DOWNLOAD BROCHURE
+                        </button>
+                    </div>
+                    <div class="btn-row">
+                        <button class="plan-btn" data-action="sample" onclick={handleClick}>VIEW SAMPLE VEHICLE SERVICE AGREEMENT</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</template>

@@ -1,0 +1,162 @@
+<template>
+    <div class="application-list-container">
+        <!-- Page Header with Refresh Button -->
+        <div class="slds-page-header">
+            <div class="slds-page-header__row">
+                <div class="slds-page-header__col-title">
+                    <div class="slds-media">
+                        <div class="slds-media__figure">
+                            <span class="slds-icon_container slds-icon-standard-opportunity">
+                                <lightning-icon icon-name="standard:opportunity" size="medium"></lightning-icon>
+                            </span>
+                        </div>
+                        <div class="slds-media__body">
+                            <div class="slds-page-header__name">
+                                <div class="slds-page-header__name-title">
+                                    <h1>
+                                        <span class="slds-page-header__title">{title}</span>
+                                    </h1>
+                                </div>
+                            </div>
+                            <p class="slds-page-header__name-meta">{description}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="slds-page-header__col-actions">
+                    <div class="slds-page-header__controls">
+                        <div class="slds-page-header__control">
+                            <div class="slds-grid slds-grid_vertical-align-center slds-gutters_small app-list-toolbar">
+                                <div class="slds-col search-col">
+                                    <lightning-input
+                                        type="search"
+                                        value={searchTerm}
+                                        placeholder="Search applications (name, vehicle, status)"
+                                        oninput={handleSearchChange}
+                                        onchange={handleSearchChange}
+                                        class="search-input">
+                                    </lightning-input>
+                                </div>
+                                <div class="slds-col actions-col">
+                                    <lightning-button-group>
+                                        <lightning-button 
+                                            label="New Application" 
+                                            variant="brand" 
+                                            onclick={handleNewApplication}
+                                            icon-name="utility:add">
+                                        </lightning-button>
+                                        <lightning-button 
+                                            label="Refresh" 
+                                            variant="neutral" 
+                                            onclick={handleRefresh}
+                                            icon-name="utility:refresh"
+                                            class={refreshButtonClass}
+                                            disabled={refreshLoading}>
+                                        </lightning-button>
+                                    </lightning-button-group>
+                                </div>
+                                <div if:true={lastRefreshTime} class="slds-col time-col">
+                                    <div class="slds-text-body_small slds-text-color_weak time-text">
+                                        Last refreshed: {lastRefreshTime}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div if:true={loading} class="loading-container">
+            <lightning-spinner alternative-text="Loading applications..." size="medium"></lightning-spinner>
+            <p>Loading applications...</p>
+        </div>
+        
+        <!-- Refresh Loading State -->
+        <div if:true={refreshLoading} class="refresh-loading-container">
+            <lightning-spinner alternative-text="Refreshing applications..." size="small"></lightning-spinner>
+            <p>Refreshing applications...</p>
+        </div>
+
+        <!-- Error State -->
+        <div if:true={showError} class="error-container">
+            <lightning-icon icon-name="utility:error" size="medium" class="slds-m-bottom_small"></lightning-icon>
+            <h3>Error Loading Applications</h3>
+            <p>{errorMessage}</p>
+            <lightning-button 
+                label="Try Again" 
+                variant="brand" 
+                onclick={handleRefresh}
+                class="slds-m-top_medium">
+            </lightning-button>
+        </div>
+
+        <!-- Applications Table -->
+        <div if:true={showApplicationsTable}>
+            <div if:true={filteredApplications.length} class="slds-table_header-fixed_container">
+                <div class="slds-scrollable_y">
+                    <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                        <thead>
+                            <tr>
+                                <th scope="col">
+                                    <div class="slds-truncate" title="Application Name">Application Name</div>
+                                </th>
+                                <th scope="col">
+                                    <div class="slds-truncate" title="Vehicle Name">Vehicle Name</div>
+                                </th>
+                                <th scope="col">
+                                    <div class="slds-truncate" title="Created Date">Created Date</div>
+                                </th>
+                                <th scope="col">
+                                    <div class="slds-truncate" title="Status">Status</div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template for:each={filteredApplications} for:item="app">
+                                <tr key={app.Id}>
+                                    <td>
+                                        <a href="#" 
+                                           class="application-name-link"
+                                           onclick={handleApplicationClick} 
+                                           data-id={app.Id}>
+                                            {app.Name}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <div class="slds-truncate" title={app.VehicleName}>
+                                            {app.VehicleName}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="slds-truncate" title={app.CreatedDate}>
+                                            {app.CreatedDate}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class={app.statusClass}>
+                                            {app.Status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div if:false={filteredApplications.length} class="empty-state">
+                <lightning-icon icon-name="standard:opportunity" size="large"></lightning-icon>
+                <h3>{emptyTitle}</h3>
+                <p>{emptyMessage}</p>
+                <lightning-button 
+                    label="Create New Application" 
+                    variant="brand" 
+                    onclick={handleNewApplication}
+                    class="slds-m-top_medium">
+                </lightning-button>
+            </div>
+        </div>
+    </div>
+</template>

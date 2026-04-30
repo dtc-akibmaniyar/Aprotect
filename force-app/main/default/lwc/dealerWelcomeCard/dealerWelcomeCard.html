@@ -1,0 +1,18 @@
+<template>
+    <div class="welcome-container">
+        <template if:true={isLoading}>
+                <lightning-spinner class="loading-spinner" alternative-text="Loading" size="medium"></lightning-spinner>
+        </template>
+        <template if:false={isLoading}>
+            <template if:true={dealerLogoUrl}>
+                <div class="logo-section">
+                    <img src={dealerLogoUrl} alt="Dealer Logo" class="dealer-logo" />
+                </div>
+            </template>
+            <div class="welcome-text">
+                <span class="welcome">Welcome,&nbsp;</span>
+                <span class="dealer-name">{dealerName}</span>
+            </div>
+        </template>
+    </div>
+</template>

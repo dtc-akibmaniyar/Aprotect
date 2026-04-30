@@ -1,0 +1,209 @@
+/* Page background */
+body {
+    background-color: #f4f6f9;
+    margin: 0;
+    padding: 0;
+}
+
+/* Logo styles */
+.logo-container {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 20px 0;
+}
+
+.logo-image {
+    max-width: 200px;
+    height: auto;
+}
+
+.logo-image:hover {
+    transform: scale(1.05);
+    transition: transform 0.3s ease;
+}
+
+/* Form description styles */
+.form-description {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 0 20px;
+}
+
+.form-title {
+    font-size: 24px;
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+
+
+.form-subtitle {
+    font-size: 16px;
+    color: #7f8c8d;
+    line-height: 1.4;
+    text-align: left;  /* Changed from center to left */
+    padding-left: 50px;
+}
+
+.form-separator {
+    border-bottom: 1px solid #eee;
+    margin: 20px auto;
+    width: 80%;
+}
+
+/* Custom styling for inputs */
+.custom-input {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 100% !important;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease;
+}
+
+.custom-input:focus {
+    border-color: #1589ee;
+    outline: none;
+    box-shadow: 0 0 5px rgba(21, 137, 238, 0.3);
+}
+
+/* Style for labels */
+.custom-label {
+    font-size: 14px;
+    color: #444;
+    margin-bottom: 5px;
+    font-weight: 500;
+    text-align: left;
+    width: 100%;
+}
+
+/* Enhanced button styling */
+.custom-button {
+    background-color: #1abc9c;
+    color: white;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 25px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.custom-button:hover {
+    background-color: #16a085;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+.custom-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.button-container {
+    margin-top: 30px;
+    text-align: center;
+}
+
+/* Container styling */
+.input-container {
+    margin: 20px 20%;
+    padding: 30px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    width: 60%;
+}
+
+/* Currency symbol styling */
+.currency-input {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.currency-input:before {
+    content: '$';
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #666;
+}
+
+.currency-input input {
+    padding-left: 25px;
+}
+
+/* Grid layout styles */
+.grid-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+
+.grid-item {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.input-group {
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 300px;
+}
+
+/* Error message styling */
+.errorMsg {
+    color: #e74c3c;
+    font-size: 14px;
+    margin-top: 5px;
+    text-align: left;
+}
+
+/* Success message styling */
+.successMsg {
+    color: #2ecc71;
+    font-size: 14px;
+    margin-top: 5px;
+    text-align: center;
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+    .input-container {
+        margin: 20px 10%;
+        width: 80%;
+    }
+}
+
+@media (max-width: 768px) {
+    .input-container {
+        margin: 20px 5%;
+        width: 90%;
+        padding: 15px;
+    }
+    
+    .grid-container {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .form-title {
+        font-size: 20px;
+    }
+    
+    .form-subtitle {
+        font-size: 14px;
+    }
+}

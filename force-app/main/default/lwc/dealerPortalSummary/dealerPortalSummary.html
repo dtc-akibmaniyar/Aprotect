@@ -1,0 +1,418 @@
+<template>
+  <div class="summary-grid">
+    <template if:true={loading}>
+      <div class="loading-indicator">
+          <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+      </div>
+    </template>
+
+    <!-- <template if:false={loading}> -->
+      <template if:true={error}>
+        <div class="slds-p-around_medium">
+          <div class="slds-notify slds-notify_alert slds-theme_alert-texture slds-theme_error" role="alert">
+            <h2>{error}</h2>
+          </div>
+        </div>
+      </template>
+
+      <template if:false={error}>
+        <!-- Page Header -->
+        <div class="page-header">
+          <div class="header-left">
+            <!-- <div class="header-icon"> -->
+              <svg width="29" height="38" viewBox="0 0 29 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_34_2151)">
+<path d="M26.9337 0H1.41647C0.645743 0 0 0.842427 0 1.84791V35.4363C0 36.4418 0.645743 37.2842 1.41647 37.2842H19.5181L28.3502 25.4902V1.84791C28.3502 0.842427 27.7045 0 26.9337 0ZM6.62407 9.18518C6.62407 9.02213 6.76989 8.85908 6.95736 8.85908H21.2262C21.4137 8.85908 21.5595 8.99495 21.5595 9.18518V12.3647C21.5595 12.5277 21.4137 12.6908 21.2262 12.6908H6.97819C6.79072 12.6908 6.64491 12.5549 6.64491 12.3647V9.18518H6.62407ZM6.62407 15.8702C6.62407 15.7072 6.76989 15.5441 6.95736 15.5441H21.2262C21.4137 15.5441 21.5595 15.68 21.5595 15.8702V19.0497C21.5595 19.2128 21.4137 19.3758 21.2262 19.3758H6.97819C6.79072 19.3758 6.64491 19.24 6.64491 19.0497V15.8702H6.62407ZM16.9351 25.4359C16.9351 25.5989 16.831 25.762 16.706 25.762H6.87404C6.74906 25.762 6.64491 25.6261 6.64491 25.4359V22.2564C6.64491 22.0933 6.74906 21.9303 6.87404 21.9303H16.706C16.831 21.9303 16.9351 22.0662 16.9351 22.2564V25.4359ZM19.4348 34.1863V25.1913H26.3297L19.4348 34.1863Z" fill="#5184B7"/>
+</g>
+<defs>
+<clipPath id="clip0_34_2151">
+<rect width="28.3502" height="37.2842" fill="white"/>
+</clipPath>
+</defs>
+</svg>
+
+
+
+            <!-- </div> -->
+            <div class="header-wrapper">
+              <h1 class="header-title">APPLICATION SUMMARY</h1>
+              <p class="header-subtitle">Please review the details of the application below. Please note once the application is submitted and payment has been remitted, all cancellations must be requested through A-Protect.</p>
+              <template if:true={summaryData.application}>
+                <div class="header-metadata-wrapper">
+                  <div class="app-id">
+                    <div class="app-id-label">APPLICATION ID # (AP#)</div>
+                    <div class="app-id-value">{summaryData.application.Name}</div>
+                  </div>
+                  <div class="entry-date-info">
+                    <div><strong>Entry Date/Time:</strong> {formattedPurchaseDate}</div>
+                    <div><strong>Dealer Sales Rep:</strong> {summaryData.salesPersonName}</div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>        <!-- APPLICATION INFORMATION Header -->
+        <div class="App-Info-header">APPLICATION INFORMATION</div>
+
+        <!-- CUSTOMER INFORMATION Section -->
+        <div class="section-header">
+            CUSTOMER INFORMATION
+            <template if:false={isLocked}>
+                <button class="edit-section-btn" data-tab="customer" onclick={handleEditSection} title="Edit Customer Information">
+                    <lightning-icon icon-name="utility:edit" size="x-small"></lightning-icon>
+                </button>
+            </template>
+        </div>
+        
+        <div class="info-grid">
+          <div class="info-column">
+            <div class="info-column-title">CUSTOMER/LESSEE:</div>
+            <template if:true={summaryData.customerLessee}>
+              <template if:true={summaryData.customerLessee.fullName}>
+                <div class="info-column-text-bold">{summaryData.customerLessee.fullName}</div>
+                <div class="info-column-text">{summaryData.customerLessee.street}</div>
+                <div class="info-column-text">{summaryData.customerLessee.formattedAddress}</div>
+                <div class="info-column-text-with-margin">Phone: {summaryData.customerLessee.phone}</div>
+                <div class="info-column-text">E-mail: {summaryData.customerLessee.email}</div>
+              </template>
+            </template>
+            
+          </div>
+
+          <div class="info-column">
+            <div class="info-column-title">CUSTOMER/CO-LESSEE:</div>
+            <template if:true={summaryData.customerCoLessee}>
+              <template if:true={summaryData.customerCoLessee.name}>
+                <div class="info-column-text-bold">{summaryData.customerCoLessee.name}</div>
+                <div class="info-column-text">{summaryData.customerCoLessee.street}</div>
+                <div class="info-column-text">{summaryData.customerCoLessee.formattedAddress}</div>
+                <div class="info-column-text-with-margin">Phone: {summaryData.customerCoLessee.businessPhone}</div>
+                <div class="info-column-text">E-mail: {summaryData.customerCoLessee.email}</div>
+              </template>
+            </template>
+          </div>
+
+          <div class="info-column">
+            <div class="info-column-title">COMPANY/BUSINESS INFO:</div>
+            <template if:true={summaryData.company}>
+              <div class="info-column-text-bold">{summaryData.company.companyName}</div>
+              <div class="info-column-text">License #: {summaryData.company.licenseNumber}</div>
+              <template if:true={summaryData.company.formattedAddress}>
+                <div class="info-column-text">{summaryData.company.formattedAddress}</div>
+              </template>
+              <div class="info-column-text-with-margin">Phone: {summaryData.company.phone}</div>
+              <div class="info-column-text">E-mail: {summaryData.company.email}</div>
+            </template>
+          </div>
+        </div>
+
+        <!-- VEHICLE INFORMATION Section -->
+        <div class="section-header">
+            VEHICLE INFORMATION
+            <template if:false={isLocked}>
+                <button class="edit-section-btn" data-tab="vehicle" onclick={handleEditSection} title="Edit Vehicle Information">
+                    <lightning-icon icon-name="utility:edit" size="x-small"></lightning-icon>
+                </button>
+            </template>
+        </div>
+        
+        <div class="vehicle-info-grid">
+          <div class="vehicle-section-full">
+            <div class="vehicle-section-title">VEHICLE SPECIFICATIONS:</div>
+            <template if:true={summaryData.vehicle}>
+              <template if:true={summaryData.vehicle.specifications}>
+                <div class="vehicle-content-wrapper">
+                  <div class="vehicle-labels-column">
+                    <div class="vehicle-label">Year/Make/Model/Trim:</div>
+                    <div class="vehicle-label">VIN #:</div>
+                    <div class="vehicle-label">Odometer:</div>
+                    <div class="vehicle-label">Purchase Price:</div>
+                    <div class="vehicle-label">Delivery Date:</div>
+                    <div class="vehicle-label">Use:</div>
+                    <div class="vehicle-label">Engine:</div>
+                    <div class="vehicle-label">Transmission:</div>
+                    <div class="vehicle-label">Fuel:</div>
+                    <div class="vehicle-label">Drive:</div>
+                    <div class="vehicle-label">Body Type:</div>
+                    <div class="vehicle-label">Color:</div>
+                    <div class="vehicle-label">GVWR:</div>
+                  </div>
+                  <div class="vehicle-values-column">
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.yearMakeModel}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.vin}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.odometer} {summaryData.vehicle.specifications.odometerUnit}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.formattedPurchasePrice}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.deliveryDate}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.commercialBusinessUse}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.engine}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.transmission}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.fuelType}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.drive}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.bodyType}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.color}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.specifications.gvwr}</div>
+                  </div>
+                </div>
+              </template>
+            </template>
+          </div>
+
+          <div class="vehicle-section-full">
+            <div class="vehicle-section-title">MANUFACTURER WARRANTY:</div>
+            <template if:true={summaryData.vehicle}>
+              <template if:true={summaryData.vehicle.warranty}>
+                <div class="vehicle-content-wrapper">
+                  <div class="vehicle-labels-column">
+                    <div class="vehicle-label">Factory Warranty Type:</div>
+                    <div class="vehicle-label">Factory Warranty Term:</div>
+                    <div class="vehicle-label">In-Service Date:</div>
+                  </div>
+                  <div class="vehicle-values-column">
+                    <div class="vehicle-value">{summaryData.vehicle.warranty.factoryWarrantyType}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.warranty.coverageTerm}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.warranty.inServiceDate}</div>
+                  </div>
+                </div>
+              </template>
+            </template>
+
+            <!-- <div class="vehicle-section-title" style="margin-top:12px;">TIRE &amp; RIM DETAILS:</div>
+            <template if:true={summaryData.vehicle}>
+              <template if:true={summaryData.vehicle.tireRimDetails}>
+                <div class="vehicle-content-wrapper">
+                  <div class="vehicle-labels-column">
+                    <div class="vehicle-label">Tire Brand:</div>
+                    <div class="vehicle-label">Tire Type:</div>
+                    <div class="vehicle-label">Tread Depth:</div>
+                    <div class="vehicle-label">Rim Brand:</div>
+                    <div class="vehicle-label">Rim Size:</div>
+                    <div class="vehicle-label">Rim Type:</div>
+                  </div>
+                  <div class="vehicle-values-column">
+                    <div class="vehicle-value">{summaryData.vehicle.tireRimDetails.tireBrand}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.tireRimDetails.tireType}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.tireRimDetails.treadDepth} {summaryData.vehicle.tireRimDetails.treadDepthUnit}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.tireRimDetails.rimBrand}</div>
+                    <div class="vehicle-value">{summaryData.vehicle.tireRimDetails.rimSize} {summaryData.vehicle.tireRimDetails.rimSizeUnit}</div>
+                    <div class="vehicle-value"></div>
+                  </div>
+                </div>
+              </template>
+            </template> -->
+          </div>
+        </div>
+
+        <!-- DEALERSHIP INFORMATION and LIEN HOLDER/LENDER INFO Section -->
+        <div class="dealership-lien-grid">
+          <div class="dealership-info-column">
+            <div class="section-header">
+                DEALERSHIP INFORMATION
+            </div>
+            <template if:true={summaryData.dealershipInfo}>
+              <div class="vehicle-content-wrapper">
+                <div class="vehicle-values-column">
+                  <div class="vehicle-value-bold">{summaryData.dealershipInfo.dealerName}</div>
+                  <div class="vehicle-value">{summaryData.dealershipInfo.street}</div>
+                  <div class="vehicle-value">{summaryData.dealershipInfo.formattedAddress}</div>
+                  <div class="vehicle-value" style="margin-top: 10px;">Phone: {summaryData.dealershipInfo.phone}</div>
+                  <div class="vehicle-value">E-mail: {summaryData.dealershipInfo.email}</div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div class="lien-holder-info-column">
+            <div class="section-header">
+                LIEN HOLDER/LENDER INFO
+                <template if:false={isLocked}>
+                    <button class="edit-section-btn" data-tab="gap" onclick={handleEditSection} title="Edit Lien Holder / Loan Protection">
+                        <lightning-icon icon-name="utility:edit" size="x-small"></lightning-icon>
+                    </button>
+                </template>
+            </div>
+            <template if:true={summaryData.lienHolderInfo}>
+              <div class="vehicle-content-wrapper">
+                <div class="vehicle-labels-column">
+                  <div class="vehicle-label">Financial Institution:</div>
+                  <div class="vehicle-label">Address:</div>
+                </div>
+                <div class="vehicle-values-column">
+                  <div class="vehicle-value">{summaryData.lienHolderInfo.lenderName}</div>
+                  <div class="vehicle-value">{summaryData.lienHolderInfo.street}</div>
+                </div>
+              </div>
+            </template>
+
+            <div class="vehicle-section-title">FINANCED VEHICLE LOAN DETAILS:</div>
+            <template if:true={summaryData.financedVehicleLoans}>
+              <div class="vehicle-content-wrapper">
+                <div class="vehicle-labels-column">
+                  <div class="vehicle-label">Financed Loan Term:</div>
+                  <div class="vehicle-label">Total Amount Financed:</div>
+                  <div class="vehicle-label">Interest Rate (APR %):</div>
+                  <div class="vehicle-label">Down Payment Amount:</div>
+                  <div class="vehicle-label">Trade-in Vehicle:</div>
+                  <div class="vehicle-label">Lien Payout on Trade In:</div>
+                </div>
+                <div class="vehicle-values-column">
+                  <div class="vehicle-value">{summaryData.financedVehicleLoans.loanTerm}</div>
+                  <div class="vehicle-value">{summaryData.financedVehicleLoans.formattedAmountFinanced}</div>
+                  <div class="vehicle-value">{summaryData.financedVehicleLoans.interestRate}</div>
+                  <div class="vehicle-value">{summaryData.financedVehicleLoans.formattedDownPayment}</div>
+                  <div class="vehicle-value">{summaryData.financedVehicleLoans.tradeInVehicle}</div>
+                  <div class="vehicle-value">{summaryData.financedVehicleLoans.formattedTradeInLienPayout}</div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- WARRANTY PACKAGES Section -->
+        <template if:true={summaryData.applicationPackages}>
+          <template for:each={summaryData.applicationPackages} for:item="recordTypeWrapper">
+            <template for:each={recordTypeWrapper.packages} for:item="packageWrapper">
+              <div class="package-section" key={packageWrapper.packageHeaderName}>
+                <div class="package-header">
+                    {packageWrapper.packageHeaderName}
+                    <template if:false={isLocked}>
+                        <button class="edit-section-btn edit-section-btn--dark" data-recordtype={recordTypeWrapper.recordTypeName} onclick={handleEditSection} title="Edit this package">
+                            <lightning-icon icon-name="utility:edit" size="x-small"></lightning-icon>
+                        </button>
+                    </template>
+                </div>
+                
+                <div class="package-content">
+                  <div class="package-details-grid">
+                    <div class="package-details-column">
+                      <div class="package-detail-row">
+                        <span class="package-detail-label">Plan Name:</span>
+                        <span class="package-detail-value">{packageWrapper.planName}</span>
+                      </div>
+                      <div class="package-detail-row">
+                        <span class="package-detail-label">Coverage Term:</span>
+                        <span class="package-detail-value">{packageWrapper.coverageTerm}</span>
+                      </div>
+                    </div>
+
+                    <div class="package-details-column">
+                      <div class="package-detail-row">
+                        <span class="package-detail-label">Retail Cost:</span>
+                        <span class="package-detail-value">{packageWrapper.formattedRetailCost}</span>
+                      </div>
+                      <div class="package-detail-row">
+                        <span class="package-detail-label">Tax:</span>
+                        <span class="package-detail-value">{packageWrapper.formattedTax}</span>
+                      </div>
+                      <div class="package-detail-row">
+                        <span class="package-detail-label">Total:</span>
+                        <span class="package-detail-value">{packageWrapper.formattedTotal}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="options-section">
+                    <div class="options-header">Additional Options Purchased:</div>
+                    <div class="options-pills-container">
+                      <template if:true={packageWrapper.additionalOptionsPurchased.length}>
+                        <template for:each={packageWrapper.additionalOptionsPurchased} for:item="option">
+                          <span class="option-pill" key={option}>{option}</span>
+                        </template>
+                      </template>
+                      <!-- <template if:false={packageWrapper.additionalOptionsPurchased.length}>
+                        <span class="no-options">None</span>
+                      </template> -->
+                    </div>
+                  </div>
+
+                  <div class="contract-details-section">
+                    <div class="contract-detail-row">
+                      <span class="contract-detail-label">Contract Start Date:</span>
+                      <span class="contract-detail-value">{packageWrapper.contractStartDate}</span>
+                    </div>
+                    <div class="contract-detail-row">
+                      <span class="contract-detail-label">Contract Expiry Date:</span>
+                      <span class="contract-detail-value">{packageWrapper.contractExpiryDate}</span>
+                    </div>
+                    <div class="contract-detail-row">
+                      <span class="contract-detail-label">Contract Start Odometer:</span>
+                      <span class="contract-detail-value">{packageWrapper.contractStartOdometer} {packageWrapper.contractStartOdometerUnit}</span>
+                    </div>
+                    <div class="contract-detail-row">
+                      <span class="contract-detail-label">Contract Expiry Odometer:</span>
+                      <span class="contract-detail-value">{packageWrapper.contractExpiryOdometer} {packageWrapper.contractExpiryOdometerUnit}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </template>
+        </template>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons-container">
+          <button
+            type="button"
+            class="back-button"
+            onclick={handleBack}
+            aria-label="Back">
+            <span class="back-label">Back</span>
+          </button>
+          <template if:false={isLocked}>
+            <template if:false={isApplicationOrActive}>
+              <button
+                class="save-quote-button"
+                onclick={handleSaveAsQuote}
+                disabled={saveAsQuoteButtonDisabled}
+            >SAVE AS QUOTE</button>
+            </template>
+            
+            <!-- <button
+              class="save-quote-button"
+              onclick={handleCreatePdf}
+              disabled={isBusy}
+            >CREATE PDF</button> -->
+            <button
+              class="preview-pdf-button"
+              onclick={handlePreviewPdf}
+              disabled={isBusy}
+            >PREVIEW PDF</button>
+            <button
+              class="submit-button"
+              onclick={handleSubmitApplication}
+              disabled={isSubmitButtonDisabled}
+            >SUBMIT</button>
+          </template>
+          <template if:true={isLocked}>
+            <button
+              class="preview-pdf-button"
+              onclick={handlePreviewPdf}
+              disabled={isBusy}
+            >PREVIEW PDF</button>
+          </template>
+        </div>
+
+        <!-- File Upload Component -->
+        <!-- <c-reusable-file-upload
+            record-id={effectiveApplicationId}
+            title="Quote"
+            upload-label="Upload PDF Documents"
+            accepted-file-types=".pdf"
+            onfilesloaded={handleFilesLoaded}>
+        </c-reusable-file-upload> -->
+
+        <!-- PDF Preview Component -->
+        <!-- <c-dealer-portal-p-d-f-preview
+          application-id={effectiveApplicationId}>
+        </c-dealer-portal-p-d-f-preview> -->
+        <!-- Show remittance form only when Application_Status__c = 'Submitted' or 'Active' -->
+        <template if:true={isApplicationOrActive}>
+          <div class="remittance-form-wrapper">
+            <c-dealer-postal-remitance-form 
+              record-ids={applicationIdList}
+              bulk-mode=false>
+            </c-dealer-postal-remitance-form>
+          </div>
+        </template>
+      </template>
+  </div>
+</template>

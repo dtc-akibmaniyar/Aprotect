@@ -1,0 +1,103 @@
+<apex:page controller="ClaimCostUpdateController" showHeader="false" sidebar="false" docType="html-5.0">
+    <apex:stylesheet value="{!URLFOR($Resource.ClaimFormStyles)}"/>
+    
+    <apex:form >
+        <div class="input-container">
+            <!-- Logo Section -->
+            <div class="logo-container">
+                <apex:image url="{!URLFOR($Resource.AProtectLogo)}" 
+                           styleClass="logo-image"
+                           alt="Company Logo"/>
+            </div>
+              <!-- Form Description -->
+            <div class="form-description">
+                <div class="form-title">Repair Cost for Workshops</div>
+            </div>
+            
+            <div class="form-separator"></div>
+            <apex:pageMessages />
+            
+            <div class="grid-container">
+                <!-- Left Column -->
+                <div class="grid-item">
+                    <div class="input-group">
+                        <div class="custom-label">Estimated Repair Cost</div>
+                        <div class="currency-input">
+                            <apex:input type="text" 
+                                       value="{!estimatedRepairCost}" 
+                                       required="true" 
+                                       styleClass="custom-input"
+                                       html-step="0.01"
+                                       html-pattern="^\d*\.?\d{0,2}$"
+                                       onkeypress="return isDecimalKey(event)"/>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <div class="custom-label">Shop Supplies</div>
+                        <div class="currency-input">
+                            <apex:input type="text" 
+                                       value="{!shopSupplies}" 
+                                       required="true"
+                                       styleClass="custom-input"
+                                       html-step="0.01"
+                                       html-pattern="^\d*\.?\d{0,2}$"
+                                       onkeypress="return isDecimalKey(event)"/>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right Column -->
+                <div class="grid-item">
+                    <div class="input-group">
+                        <div class="custom-label">Labor Cost</div>
+                        <div class="currency-input">
+                            <apex:input type="text" 
+                                       value="{!laborCost}" 
+                                       required="true"
+                                       styleClass="custom-input"
+                                       html-step="0.01"
+                                       html-pattern="^\d*\.?\d{0,2}$"
+                                       onkeypress="return isDecimalKey(event)"/>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <div class="custom-label">Wholesale Price</div>
+                        <div class="currency-input">
+                            <apex:input type="text" 
+                                       value="{!wholesalePrice}" 
+                                       required="true"
+                                       styleClass="custom-input"
+                                       html-step="0.01"
+                                       html-pattern="^\d*\.?\d{0,2}$"
+                                       onkeypress="return isDecimalKey(event)"/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="button-container">
+                <apex:commandButton value="Submit" 
+                                  action="{!submitClaim}" 
+                                  styleClass="custom-button"/>
+            </div>
+        </div>
+    </apex:form>
+
+    <script>
+        function isDecimalKey(evt) {
+            var charCode = (evt.which) ? evt.which : evt.keyCode;
+            if (charCode != 46 && charCode > 31 
+                && (charCode < 48 || charCode > 57))
+                return false;
+            
+            // Only one decimal point allowed
+            var input = evt.target;
+            if (charCode == 46 && input.value.indexOf('.') > -1)
+                return false;
+            
+            return true;
+        }
+    </script>
+</apex:page>

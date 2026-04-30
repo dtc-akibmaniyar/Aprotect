@@ -1,0 +1,190 @@
+<template>
+    <!-- Bulk Mode: Show only the Create button -->
+    <template if:true={bulkModeBoolean}>
+        <div>
+<button class="dp-new-btn" onclick={handleCreateRemittanceForm} aria-label="Create Remittance Form" disabled={isCreating}>
+            <span class="dp-new-icon" aria-hidden="true">
+                <svg width="39" height="39" viewBox="0 0 49 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g clip-path="url(#clip0_34_1268)">
+                        <path d="M6.94684 40.0994V36.4186H19.4346C19.6827 35.1195 20.0962 33.907 20.5924 32.7378H6.94684V29.0569H22.8253C23.9418 27.6712 25.265 26.4587 26.7536 25.506H6.94684V21.8252H31.5089V23.514C32.6253 23.2542 33.7831 23.1243 34.9409 23.1243C36.0987 23.1243 37.3806 23.2975 38.5384 23.5573V2.03528C38.5384 0.909382 37.67 0 36.5949 0H11.9916L0 12.8613V48.7602C0 49.8861 0.868354 50.7955 1.94346 50.7955H23.2802C20.7992 47.9374 19.2692 44.2133 19.1451 40.0994H6.94684ZM21.0886 14.3769H31.5089V18.0577H21.0886V14.3769ZM13.4388 4.33039V13.0345H5.16878L13.4388 4.33039Z" fill="#5184B8"/>
+                        <path d="M45.1131 30.2263C39.9029 24.77 31.4675 24.77 26.2987 30.2263C21.0886 35.6825 21.0886 44.5166 26.2987 49.9295C31.5088 55.3858 39.9443 55.3858 45.1131 49.9295C50.3232 44.4732 50.3232 35.6392 45.1131 30.2263ZM42.5493 40.8357C42.5493 41.1821 42.2599 41.4853 41.9291 41.4853H37.1325V46.6384C37.1325 46.9849 36.843 47.288 36.5122 47.288H34.8168C34.8168 47.288 34.486 47.2014 34.4033 47.1148C34.3206 47.0282 34.2379 46.855 34.2379 46.6817V41.5286H29.4413C29.4413 41.5286 29.1105 41.442 29.0278 41.3554C28.9038 41.2255 28.8624 41.0955 28.8624 40.9223V39.4067C28.8624 39.4067 28.9451 39.0603 29.0278 38.9736C29.1105 38.887 29.2759 38.8004 29.4413 38.8004H34.2379V33.6473C34.2379 33.3008 34.5274 32.9977 34.8582 32.9977H36.5536C36.5536 32.9977 36.8844 33.0843 36.9671 33.1709C37.0911 33.3008 37.1325 33.4307 37.1325 33.604V38.7571H41.9291C42.2599 38.7571 42.5493 39.0603 42.5493 39.4067V40.9223V40.8357Z" fill="#80C52C"/>
+                    </g>
+                    <defs>
+                        <clipPath id="clip0_34_1268">
+                            <rect width="49" height="54" fill="white"/>
+                        </clipPath>
+                    </defs>
+                </svg>
+            </span>
+            <span class="dp-new-text">
+                <span class="dp-new-top">CREATE</span>
+                <span class="dp-new-bottom">REMITTANCE FORM</span>
+            </span>
+        </button>
+        </div>
+        
+    </template>
+
+    <!-- Single Mode: Show the full card -->
+    <template if:false={bulkModeBoolean}>
+    <lightning-card variant="Narrow" title="Remittance Form" icon-name="standard:document">
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Loading" size="small" variant="brand"></lightning-spinner>
+        </template>
+        
+        <div slot="actions">
+                <template if:true={showCreateButton}>
+                    <lightning-button 
+                        label="Create Remittance Form"
+                        icon-name="utility:add"
+                        variant="brand"
+                        onclick={handleCreateRemittanceForm}
+                        disabled={isCreating}>
+                    </lightning-button>
+                </template>
+
+        </div>
+        
+        <div class="slds-var-p-around_small">
+                <template if:false={isLoading}>
+                    <template if:true={hasRecords}>
+                        <lightning-datatable 
+                            key-field="Id"
+                            data={remittanceFormList}
+                            columns={columns}
+                            hide-checkbox-column="true"
+                            row-number-offset=0
+                            class="slds-m-top_medium">
+                        </lightning-datatable>
+                    </template>
+
+                    <template if:false={hasRecords}>
+                        <div class="slds-box slds-theme_shade slds-p-around_medium slds-text-align_center">
+                            <p class="slds-text-body_small">No remittance form records found.</p>
+                        </div>
+                    </template>
+
+                    <template if:true={errorMessage}>
+                        <div class="slds-box slds-theme_alert-texture slds-m-top_medium slds-border_left_4">
+                            <p class="slds-text-body_small slds-text-color_error">
+                                <strong>Error:</strong> {errorMessage}
+                            </p>
+                        </div>
+                    </template>
+                </template>
+        </div>
+    </lightning-card>
+        </template>
+
+    <!-- Confirmation Modal for Bulk Mode -->
+    <template if:true={showConfirmationModal}>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+        <div class="remittance-modal" role="dialog" aria-labelledby="modal-heading">
+            <div class="remittance-modal-container">
+                <!-- Header Section -->
+                <div class="remittance-modal-header">
+                    <button 
+                        class="remittance-close-btn"
+                        title="Close dialog"
+                        onclick={handleCancelModal}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M18 6L6 18M6 6l12 12" stroke="#666" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Content Section -->
+                <div class="remittance-modal-content">
+                    <!-- Title -->
+                    <h1 class="remittance-form-title">Remittance Form</h1>
+
+                    <!-- Column Headers -->
+                    <div class="remittance-columns-header">
+                        <div class="remittance-col-header application-col-header">APPLICATION</div>
+                        <div class="remittance-col-header invoice-col-header">INVOICE DETAILS</div>
+                    </div>
+
+                    <!-- Data Rows -->
+                    <div class="remittance-rows-container">
+                        <template for:each={confirmationData} for:item="application">
+                            <div key={application.applicationId} class="remittance-data-row">
+                                <!-- Application Column -->
+                                <div class="remittance-app-col">
+                                    <div class="app-info">
+                                        <div class="app-info-item app-id-row">
+                                            <strong>Application ID #</strong>
+                                            <div>{application.applicationNumber}</div>
+                                            <lightning-button
+                                                variant="destructive"
+                                                label="Delete"
+                                                title="Delete application from remittance"
+                                                icon-name="utility:close"
+                                                class="slds-m-left_x-small remove-btn"
+                                                data-application-id={application.applicationId}
+                                                onclick={handleRemoveApplication}
+                                                disabled={disableRemove}>
+                                            </lightning-button>
+                                        </div>
+                                        <div class="app-info-item">
+                                            <strong>Customer Name</strong>
+                                            <div>{application.customerName}</div>
+                                        </div>
+                                        <div class="app-info-item">
+                                            <strong>Vehicle Year/Make/Model/Trim</strong>
+                                            <div>{application.vehicleInfo}</div>
+                                        </div>
+                                        <div class="app-info-item">
+                                            <strong>VIN #</strong>
+                                            <div>{application.vin}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Invoice Details Column -->
+                                <div class="remittance-invoice-col">
+                                    <div class="invoice-details">
+                                        <template for:each={application.packageList} for:item="pkg">
+                                            <template if:true={pkg.isSelected}>
+                                                <div key={pkg.id} class="invoice-item">
+                                                    <span class="invoice-label">{pkg.name}:</span>
+                                                    <span class="invoice-value">{pkg.formattedAmount}</span>
+                                                </div>
+                                            </template>
+                                        </template>
+                                        <div class="invoice-divider"></div>
+                                        <div class="invoice-item">
+                                            <span class="invoice-label">Sub Total:</span>
+                                            <span class="invoice-value">{application.formattedSubTotal}</span>
+                                        </div>
+                                        <template if:true={application.applicationTaxAmount}>
+                                            <div class="invoice-item">
+                                                <span class="invoice-label">Tax ({application.applicationTaxPercentage}%):</span>
+                                                <span class="invoice-value">{application.formattedApplicationTaxAmount}</span>
+                                            </div>
+                                        </template>
+                                        <div class="invoice-total">
+                                            <span class="invoice-label"><strong>Total:</strong></span>
+                                            <span class="invoice-value"><strong>{application.formattedTotalDue}</strong></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Summary Section -->
+                    <div class="remittance-summary">
+                        <div class="summary-row total-row">
+                            <span>Remittance Form Total: {formTotal}</span>
+                        </div>
+                    </div>
+
+                    <!-- Continue Button -->
+                    <button class="continue-btn" onclick={handleConfirmCreate} disabled={isCreating}>
+                        Continue to Remittance Form
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+</template>

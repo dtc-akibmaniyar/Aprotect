@@ -1,0 +1,69 @@
+<template>
+    <lightning-card>
+        <div class="slds-p-around_medium">
+            <!-- Add refresh button in the header -->
+            <!--<lightning-button-icon
+                slot="actions"
+                icon-name="utility:refresh"
+                variant="border-filled"
+                alternative-text="Refresh"
+                title="Refresh"
+                onclick={handleRefresh}
+                disabled={isLoading}>
+            </lightning-button-icon>-->
+            <!-- Loading Spinner -->
+            <template if:true={isLoading}>
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </template>
+
+            <!-- Error Display -->
+            <template if:true={error}>
+                <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                    <h2>{error}</h2>
+                </div>
+            </template>
+
+            <!-- Quick Add Form -->
+            <div class="slds-grid slds-gutters slds-m-bottom_medium">
+                <div class="slds-col">
+                    <lightning-combobox
+                        label="Select Option"
+                        value={newOption.optionId}
+                        options={availableOptions}
+                        onchange={handleOptionChange}>
+                    </lightning-combobox>
+                </div>
+                <div class="slds-col">
+                    <lightning-textarea
+                        label="Inclusion Text"
+                        value={newOption.inclusionText}
+                        onchange={handleInclusionTextChange}>
+                    </lightning-textarea>
+                </div>
+                <div class="slds-col">
+                    <lightning-textarea
+                        label="Exclusion Text"
+                        value={newOption.exclusionText}
+                        onchange={handleExclusionTextChange}>
+                    </lightning-textarea>
+                </div>
+                <div class="slds-col slds-align-bottom">
+                    <lightning-button 
+                        label="Add" 
+                        variant="brand"
+                        onclick={handleSave}
+                        class="slds-m-top_medium">
+                    </lightning-button>
+                </div>
+            </div>
+
+            <!-- Existing Options Table -->
+            <lightning-datatable
+                key-field="id"
+                data={packageOptions}
+                columns={columns}
+                hide-checkbox-column>
+            </lightning-datatable>
+        </div>
+    </lightning-card>
+</template>

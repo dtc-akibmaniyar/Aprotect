@@ -1,0 +1,260 @@
+<apex:page standardController="Application__c" extensions="ApplicationPDFExtension" renderAs="pdf" applyBodyTag="false" showHeader="false">
+
+    <head>
+        <style type="text/css" media="print">
+            @page {
+                size: letter;
+                /* margin: 1.2in 0.5in 0.75in 0.5in; */
+                /* size: A4;    */
+                border: 1px solid black;
+
+                
+
+                @bottom-center {
+                    content: element(footer);
+                }
+            }
+            
+
+           
+
+            div.footer {
+                display: block;
+                padding: 5px;
+                position: running(footer);
+                background: #5184B7;
+                color: white;
+                font-size: 8px;
+                text-align: center;
+            }
+
+            .pagenumber:before {
+                content: counter(page);
+            }
+
+            .pagecount:before {
+                content: counter(pages);
+            }
+        </style>
+    </head>
+
+    <style type="text/css">
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+
+    <div class="footer">
+        <div>A-Protect Warranty Corporation | Toll Free: 1-866-660-4444 | (416) 661-7444 | www.a-protectwarranty.com | info@a-protectwarranty.com</div>
+    </div>
+
+    <div class="content">
+        <!-- =================== REPEAT ENTIRE PAGE PER PACKAGE =================== -->
+        <apex:repeat value="{!recordTypeWrappersList}" var="recordTypeWrapper">
+            <apex:repeat value="{!recordTypeWrapper.packages}" var="wrapper">
+                <!-- UNIFIED HEADER WITH PACKAGE LOGO -->
+                <div style="width:100%; height:100px; background:#5184B7; color:white; margin-bottom:2px;">
+                    <table style="width:100%; border-collapse:collapse; background:#5184B7; color:white;">
+                        <tr>
+                            <td style="width:25%; padding:6px; vertical-align:middle; text-align:center;">
+                                <!-- PACKAGE LOGO - MIDDLE -->
+                                <apex:outputPanel rendered="{!wrapper.hasPackageLogo}">
+                                    <img src="{!wrapper.packageLogoUrl}" style="max-height:50px; max-width:120px; width:auto; height:auto; object-fit:contain;" />
+                                </apex:outputPanel>
+                                <apex:outputPanel rendered="{!NOT(wrapper.hasPackageLogo)}">
+                                    <div style="background:white; color:#5184B7; padding:8px 6px; text-align:center; font-size:7px; font-weight:bold; border-radius:2px;">
+                                        <div style="border:2px solid #5184B7; padding:2px;">
+                                            A-PROTECT<br />WARRANTY CORPORATION
+                                        </div>
+                                        <div style="background:#FFCC00; color:#5184B7; padding:2px; margin-top:2px; font-size:6px;">
+                                            EXTENDED LIMITED WARRANTY
+                                        </div>
+                                    </div>
+                                </apex:outputPanel>
+                            </td>
+                            <td style="width:50%; text-align:right; vertical-align:middle; padding:4px;">
+                                <!-- CONTACT INFORMATION - RIGHT MOST -->
+                                <div style="font-size:8px; line-height:1.1; font-weight:normal;">
+                                    FOR CLAIMS &amp; OTHER GENERAL INQUIRIES: CONTACT<br />
+                                    TOLL FREE: 1-866-660-4444 • LOCAL: (416) 661-7444<br />
+                                    E-MAIL: INFO@A-PROTECTWARRANTY.COM<br />
+                                    WWW.A-PROTECTWARRANTY.COM
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="width:100%; font-family:Arial, sans-serif; color:#000; font-size:11px; background:#fff; padding:0; margin:0;">
+
+                    <!-- APPLICATION ID ROW -->
+                    <div style="text-align:right; padding:2px 8px; background:#fff;">
+                        <span style="font-weight:bold; color:#333; font-size:9px;">Application ID #:</span>
+                        <span style="font-weight:bold; color:#EB001B; font-size:12px;">{!Application__c.Name}</span>
+                    </div>
+
+                    <!-- CUSTOMER INFORMATION SECTION -->
+                    <div style="background:#5184B7; color:white; padding:4px 8px; font-weight:bold; font-size:10px; margin-top:2px;">CUSTOMER INFORMATION</div>
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr>
+                            <td style="width:33%; padding:4px; vertical-align:top; font-size:9px;">
+                                <div style="font-weight:bold; margin-bottom:2px;">CUSTOMER/LESSEE:</div>
+                                <div style="font-weight:bold;">{!Application__c.Customer_First_Name__c} {!Application__c.Customer_Last_Name__c}</div>
+                                <div>{!Application__c.Customer_Address__c}</div>
+                                <div>Phone: {!Application__c.Customer_Phone__c}</div>
+                                <div>E-mail: {!Application__c.Customer_Email__c}</div>
+                            </td>
+                            <td style="width:33%; padding:4px; vertical-align:top; font-size:9px;">
+                                <div style="font-weight:bold; margin-bottom:2px;">CUSTOMER/CO-LESSEE:</div>
+                                <div style="font-weight:bold;">{!Application__c.Co_Buyer__r.Name}</div>
+                                <div>{!Application__c.Co_Buyer__r.BillingStreet}</div>
+                                <div>Phone: {!Application__c.Co_Buyer__r.Phone}</div>
+                                <div>E-mail: {!Application__c.Co_Buyer__r.PersonEmail}</div>
+                            </td>
+                            <td style="width:34%; padding:4px; vertical-align:top; font-size:9px;">
+                                <div style="font-weight:bold; margin-bottom:2px;">COMPANY/BUSINESS INFO:</div>
+                                <div style="font-weight:bold;">{!Application__c.Customer_Name__r.Name}</div>
+                                <div>License #: {!Application__c.Customer_Name__r.License_Number__c}</div>
+                                <div>Phone: {!Application__c.Customer_Phone__c}</div>
+                                <div>E-mail: {!Application__c.Customer_Email__c}</div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- VEHICLE INFORMATION SECTION -->
+                    <div style="background:#5184B7; color:white; padding:4px 8px; font-weight:bold; font-size:10px; margin-top:2px;">VEHICLE INFORMATION</div>
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr>
+                            <td style="width:50%; padding:4px; vertical-align:top; font-size:9px;">
+                                <div style="font-weight:bold; margin-bottom:2px;">VEHICLE SPECIFICATIONS:</div>
+                                <div><strong style="display:inline-block; width:100px;">Year/Make/Model:</strong> {!Application__c.Vehicle_Year__c} {!Application__c.Vehicle_Make__c} {!Application__c.Vehicle_Model__c}</div>
+                                <div><strong style="display:inline-block; width:100px;">VIN #:</strong> {!Application__c.Vehicle_VIN__c}</div>
+                                <div><strong style="display:inline-block; width:100px;">Odometer:</strong> {!Application__c.Odometer__c} {!Application__c.Odometer_Unit__c}</div>
+                                <div><strong style="display:inline-block; width:100px;">Purchase Price:</strong> ${!Application__c.Vehicle_Purchase_Price__c}</div>
+                                <div><strong style="display:inline-block; width:100px;">Delivery Date:</strong> {!Application__c.Vehicle__r.Delivery_Date__c}</div>
+                                <div><strong style="display:inline-block; width:100px;">Use:</strong> {!Application__c.Vehicle__r.Type_Of_Commercial_Use__c}</div>
+                                <div><strong style="display:inline-block; width:100px;">Engine:</strong> {!Application__c.Vehicle__r.Engine__c}</div>
+                                <div><strong style="display:inline-block; width:100px;">Transmission:</strong> {!Application__c.Vehicle_Transmission__c}</div>
+                                <div><strong style="display:inline-block; width:100px;">Fuel:</strong> {!Application__c.Vehicle__r.Fuel_Type__c}</div>
+                                <div><strong style="display:inline-block; width:100px;">Drive:</strong> {!Application__c.Vehicle__r.Drive_Type__c}</div>
+                                <div><strong style="display:inline-block; width:100px;">Body Type:</strong> {!Application__c.Vehicle__r.Body_Type__c}</div>
+                                <div><strong style="display:inline-block; width:100px;">Color:</strong> {!Application__c.Vehicle__r.Color__c}</div>
+                                <div><strong style="display:inline-block; width:100px;">GVWR:</strong> {!Application__c.Vehicle__r.GVWR__c}</div>
+                            </td>
+                            <td style="width:50%; padding:4px; vertical-align:top; font-size:9px;">
+                                <div style="font-weight:bold; margin-bottom:2px;">MANUFACTURER WARRANTY:</div>
+                                <div><strong style="display:inline-block; width:130px;">Factory Warranty Type:</strong> {!Application__c.Vehicle__r.Manufacturer_Warranty_Type__c}</div>
+                                <div><strong style="display:inline-block; width:130px;">Factory Warranty Term:</strong> {!Application__c.Vehicle__r.Warranty_Term__c}</div>
+                                <div style="font-size:10px;"><strong style="display:inline-block; width:130px;">In-Service Date:</strong> {!Application__c.Vehicle__r.In_Service_Date__c}</div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- DEALERSHIP AND LIEN HOLDER SECTION -->
+                    <table style="width:100%; border-collapse:collapse; margin-top:2px;">
+                        <tr>
+                            <td style="width:50%; padding:4px; vertical-align:top; font-size:9px;">
+                                <div style="background:#5184B7; color:white; padding:3px 5px; font-weight:bold; margin-bottom:4px;">DEALERSHIP INFORMATION</div>
+                                <div style="font-weight:bold;">{!Application__c.Dealer_Name__r.Name}</div>
+                                <div>{!Application__c.Dealer_Name__r.BillingStreet}</div>
+                                <div>{!Application__c.Dealer_Name__r.BillingCity}, {!Application__c.Dealer_Name__r.BillingState} {!Application__c.Dealer_Name__r.BillingPostalCode}</div>
+                            </td>
+                            <td style="width:50%; padding:4px; vertical-align:top; font-size:9px;">
+                                <div style="background:#5184B7; color:white; padding:3px 5px; font-weight:bold; margin-bottom:4px;">LIEN HOLDER/LENDER INFO</div>
+                                <div><strong style="display:inline-block; width:130px;">Financial Institution:</strong> {!Application__c.Financial_Institution_Lender__c}</div>
+                                <div><strong style="display:inline-block; width:130px;">Address:</strong> {!Application__c.Lender_Address__c}</div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- WARRANTY SELECTIONS SECTION -->
+                    <div style="background:#595959; color:white; padding:6px 10px; font-weight:bold; font-size:11px; margin-top:8px;">WARRANTY SELECTIONS</div>
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr>
+                            <td style="width:50%; padding:4px; vertical-align:top; font-size:9px;">
+                                <div><strong style="display:inline-block; width:100px;">Plan Name:</strong> {!wrapper.pkg.Package__r.Name}</div>
+                                <div><strong style="display:inline-block; width:100px;">Coverage Term:</strong> {!wrapper.pkg.Package_Term__r.Name}</div>
+                            </td>
+                            <td style="width:50%; padding:4px; vertical-align:top; font-size:9px;">
+                                <div><strong style="display:inline-block; width:180px;">Contract Start Date:</strong> {!wrapper.contractStartDate}</div>
+                                <div><strong style="display:inline-block; width:180px;">Contract Expiry Date:</strong> {!wrapper.contractEndDate}</div>
+                                <div><strong style="display:inline-block; width:180px;">Contract Start Odometer:</strong> {!wrapper.pkg.Odometer_Start__c} KM</div>
+                                <div><strong style="display:inline-block; width:180px;">Contract Expiry Odometer:</strong> {!wrapper.pkg.Odometer_End__c} KM</div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- ADDITIONAL OPTIONS PURCHASED -->
+                    <div style="padding:8px 10px; font-size:9px; min-height: 100px; max-height: 200px;">
+                        <div style="font-weight:bold; font-size:10px; margin-bottom:6px;">Additional Options Purchased:</div>
+                        <apex:repeat value="{!wrapper.includedOptions}" var="option">
+                            <span style="display:inline-block; background:#2E75B5; color:white; padding:4px 8px; margin:2px 4px 2px 0; border-radius:12px; font-size:9px;">{!option.Option__c}</span>
+                        </apex:repeat>
+                    </div>
+
+                    <!-- TERMS & CONDITIONS -->
+                    <div style="background:#5184B7; color:white; padding:4px 8px; font-weight:bold; font-size:10px; margin-top:2px; text-align:center;">TERMS &amp; CONDITIONS</div>
+                    <div style="height: 150px;border:1px solid #d9e2ef; border-top:none; padding:14px; font-size:10.5px; line-height:1.5; color:#333; text-align:justify;">
+
+                    </div>
+
+                    <!-- SIGNATURE + FEES SECTION -->
+                    <table style="width:100%; border-collapse:collapse; margin-top:12px; font-family:Arial, sans-serif;">
+                        <tr>
+
+                            <!-- LEFT 60% : SIGNATURE + DATE -->
+                            <td style="width:50%; vertical-align:top;">
+                                <table style="width:100%; border-collapse:collapse;">
+
+                                    <!-- HEADER ROW -->
+                                    <tr>
+                                        <td style="width:50%; background:#5184B7; color:white;
+                               text-align:center; font-size:9px; font-weight:bold;
+                               padding:6px; border:1px solid #4f6f93;">
+                                            CUSTOMER SIGNATURE
+                                        </td>
+
+                                        <!-- SMALLER SEPARATOR -->
+                                        <td style="width:2%;"></td>
+
+                                        <td style="width:38%; background:#5184B7; color:white;
+                               text-align:center; font-size:9px; font-weight:bold;
+                               padding:6px; border:1px solid #4f6f93;">
+                                            DATE
+                                        </td>
+                                    </tr>
+
+                                    <!-- INPUT ROW -->
+                                    <tr>
+                                        <td style="height:45px; border:1px solid #d9e2ef;"></td>
+
+                                        <!-- THINNER VERTICAL LINE -->
+                                        <td style="border-left:1px solid #d9e2ef;"></td>
+
+                                        <td style="height:45px; border:1px solid #d9e2ef;"></td>
+                                    </tr>
+
+                                </table>
+                            </td>
+
+                            <!-- RIGHT 40% : INLINE FEES (TOP ALIGNED) -->
+                            <td style="width:50%; vertical-align:top; padding-top:6px; padding-right:10px;">
+                                <div style="font-size:9px; font-weight:bold; text-align:right;">  
+                                    <span style="margin-left:5px;">Contract Premium (Ex Tax): ${!wrapper.pkg.Contract_Premium_Price_Without_Tax__c}</span>
+                                    <span style="margin-left:5px;">Tax({!wrapper.pkg.Tax_Percentage__c}%): ${!wrapper.pkg.Tax_Amount__c}</span>
+                                    <span style="margin-left:5px;">Total: ${!wrapper.pkg.Contract_Premium_Price__c}</span>
+                                </div>
+                            </td>
+
+                        </tr>
+                    </table>
+
+
+                </div>
+                <!-- <div style="page-break-after:always;"></div> -->
+            </apex:repeat>
+        </apex:repeat>
+    </div>
+</apex:page>

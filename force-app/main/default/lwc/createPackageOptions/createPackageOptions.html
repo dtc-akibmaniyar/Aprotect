@@ -1,0 +1,340 @@
+<template>
+    <!-- Basic placeholder content; customize as needed -->
+    <lightning-card>
+        <div class="slds-p-around_medium">
+            <template if:true={hasRecordInfo}>
+                <template if:true={showAdditionalOptionsTable}>
+                    <div class="slds-m-top_medium">
+                        <div class="slds-m-bottom_medium">
+                            <p class="slds-text-heading_small">
+                                <strong>{displayName}</strong> - Selection Type: <strong class="selection-type-text">{displaySelectionType}</strong>
+                            </p>
+                        </div>
+                        
+                        <!-- Table for Package_Term__c records -->
+                        <template if:true={isFromPackageTerm}>
+                            <div class="table-wrapper">
+                            <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                                <thead>
+                                    <tr class="slds-line-height_reset">
+                                        <th scope="col" class="col-serial">
+                                            <div class="slds-truncate" title="S.No">S.No</div>
+                                        </th>
+                                        <th scope="col" class="col-option required-header">
+                                            <div class="slds-truncate" title="Option">Option <abbr class="slds-required" title="required">*</abbr></div>
+                                        </th>
+                                        <th scope="col" class="col-text">
+                                            <div class="slds-truncate" title="Inclusion Text">Inclusion Text</div>
+                                        </th>
+                                        <th scope="col" class="col-text">
+                                            <div class="slds-truncate" title="Exclusion Text">Exclusion Text</div>
+                                        </th>
+                                        <th scope="col" class="col-price required-header">
+                                            <div class="slds-truncate" title="Price">Price <abbr class="slds-required" title="required">*</abbr></div>
+                                        </th>
+                                        <th scope="col" class="col-actions">
+                                            <div class="slds-truncate" title="Actions">Actions</div>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template for:each={tableRows} for:item="row">
+                                        <tr key={row.id}>
+                                            <td data-label="S.No" style="text-align: center;">
+                                                {row.serialNumber}
+                                            </td>
+                                            <td data-label="Option">
+                                                <lightning-combobox
+                                                    data-row-id={row.id}
+                                                    value={row.optionId}
+                                                    options={optionsForCombobox}
+                                                    onchange={handleOptionChange}
+                                                    placeholder="Select Option">
+                                                </lightning-combobox>
+                                            </td>
+                                            <td data-label="Inclusion Text">
+                                                <lightning-textarea
+                                                    data-row-id={row.id}
+                                                    value={row.inclusionText}
+                                                    onchange={handleInclusionTextChange}
+                                                    placeholder="Enter inclusion text"
+                                                    max-length="32768">
+                                                </lightning-textarea>
+                                            </td>
+                                            <td data-label="Exclusion Text">
+                                                <lightning-textarea
+                                                    data-row-id={row.id}
+                                                    value={row.exclusionText}
+                                                    onchange={handleExclusionTextChange}
+                                                    placeholder="Enter exclusion text"
+                                                    max-length="32768">
+                                                </lightning-textarea>
+                                            </td>
+                                            <td data-label="Price">
+                                                <lightning-input
+                                                    type="number"
+                                                    formatter="currency"
+                                                    data-row-id={row.id}
+                                                    value={row.price}
+                                                    onchange={handlePriceChange}
+                                                    placeholder="0.00">
+                                                </lightning-input>
+                                            </td>
+                                            <td data-label="Actions">
+                                                <lightning-button-icon
+                                                    icon-name="utility:delete"
+                                                    alternative-text="Remove Row"
+                                                    title="Remove Row"
+                                                    data-row-id={row.id}
+                                                    onclick={removeRow}>
+                                                </lightning-button-icon>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            </div>
+                        </template>
+                        
+                        <!-- Table for Package__c records (Total Loss Coverage) -->
+                        <template if:false={isFromPackageTerm}>
+                            <div class="table-wrapper">
+                            <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                                <thead>
+                                    <tr class="slds-line-height_reset">
+                                        <th scope="col" class="col-serial">
+                                            <div class="slds-truncate" title="S.No">S.No</div>
+                                        </th>
+                                        <th scope="col" class="col-category required-header">
+                                            <div class="slds-truncate" title="Category">Category <abbr class="slds-required" title="required">*</abbr></div>
+                                        </th>
+                                        <th scope="col" class="col-value">
+                                            <div class="slds-truncate" title="Minimum Value">Minimum Value</div>
+                                        </th>
+                                        <th scope="col" class="col-value">
+                                            <div class="slds-truncate" title="Maximum Value">Maximum Value</div>
+                                        </th>
+                                        <th scope="col" class="col-price required-header">
+                                            <div class="slds-truncate" title="Price">Price <abbr class="slds-required" title="required">*</abbr></div>
+                                        </th>
+                                        <th scope="col" class="col-actions">
+                                            <div class="slds-truncate" title="Actions">Actions</div>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template for:each={tableRows} for:item="row">
+                                        <tr key={row.id}>
+                                            <td data-label="S.No" style="text-align: center;">
+                                                {row.serialNumber}
+                                            </td>
+                                            <td data-label="Category">
+                                                <lightning-combobox
+                                                    data-row-id={row.id}
+                                                    value={row.category}
+                                                    options={categoryOptionsForCombobox}
+                                                    onchange={handleCategoryChange}
+                                                    placeholder="Select Category">
+                                                </lightning-combobox>
+                                                <template if:true={row.errorMessage}>
+                                                    <div class="slds-text-color_error slds-m-top_x-small" style="font-size: 0.75rem;">
+                                                        {row.errorMessage}
+                                                    </div>
+                                                </template>
+                                            </td>
+                                            <td data-label="Minimum Value">
+                                                <lightning-input
+                                                    type="number"
+                                                    data-row-id={row.id}
+                                                    value={row.minimumValue}
+                                                    onchange={handleMinimumValueChange}
+                                                    placeholder="0">
+                                                </lightning-input>
+                                            </td>
+                                            <td data-label="Maximum Value">
+                                                <lightning-input
+                                                    type="number"
+                                                    data-row-id={row.id}
+                                                    value={row.maximumValue}
+                                                    onchange={handleMaximumValueChange}
+                                                    placeholder="0">
+                                                </lightning-input>
+                                            </td>
+                                            <td data-label="Price">
+                                                <lightning-input
+                                                    type="number"
+                                                    formatter="currency"
+                                                    data-row-id={row.id}
+                                                    value={row.price}
+                                                    onchange={handlePriceChange}
+                                                    placeholder="0.00">
+                                                </lightning-input>
+                                            </td>
+                                            <td data-label="Actions">
+                                                <lightning-button-icon
+                                                    icon-name="utility:delete"
+                                                    alternative-text="Remove Row"
+                                                    title="Remove Row"
+                                                    data-row-id={row.id}
+                                                    onclick={removeRow}>
+                                                </lightning-button-icon>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            </div>
+                        </template>
+                        
+                        <div class="slds-m-top_medium slds-grid slds-grid_align-spread">
+                            <div>
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Add Row"
+                                    icon-name="utility:add"
+                                    onclick={addRow}>
+                                </lightning-button>
+                            </div>
+                            <div>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Save"
+                                    title="Save Package Options"
+                                    onclick={handleSave}
+                                    disabled={isSaving}>
+                                </lightning-button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                
+                <template if:true={showIncludedOptionsTable}>
+                    <div class="slds-m-top_medium">
+                        <div class="slds-m-bottom_medium">
+                            <p class="slds-text-heading_small">
+                                <strong>{displayName}</strong> - Selection Type: <strong class="selection-type-text">{displaySelectionType}</strong>
+                            </p>
+                        </div>
+                        
+                        <div class="table-wrapper">
+                        <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                            <thead>
+                                <tr class="slds-line-height_reset">
+                                    <th scope="col" class="col-serial">
+                                        <div class="slds-truncate" title="S.No">S.No</div>
+                                    </th>
+                                    <th scope="col" class="col-option required-header">
+                                        <div class="slds-truncate" title="Option">Option <abbr class="slds-required" title="required">*</abbr></div>
+                                    </th>
+                                    <th scope="col" class="col-text">
+                                        <div class="slds-truncate" title="Inclusion Text">Inclusion Text</div>
+                                    </th>
+                                    <th scope="col" class="col-text">
+                                        <div class="slds-truncate" title="Exclusion Text">Exclusion Text</div>
+                                    </th>
+                                    <th scope="col" class="col-actions">
+                                        <div class="slds-truncate" title="Actions">Actions</div>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={tableRows} for:item="row">
+                                    <tr key={row.id}>
+                                        <td data-label="S.No" style="text-align: center;">
+                                            {row.serialNumber}
+                                        </td>
+                                        <td data-label="Option">
+                                            <lightning-combobox
+                                                data-row-id={row.id}
+                                                value={row.optionId}
+                                                options={optionsForCombobox}
+                                                onchange={handleOptionChange}
+                                                placeholder="Select Option">
+                                            </lightning-combobox>
+                                        </td>
+                                        <td data-label="Inclusion Text">
+                                            <lightning-textarea
+                                                data-row-id={row.id}
+                                                value={row.inclusionText}
+                                                onchange={handleInclusionTextChange}
+                                                placeholder="Enter inclusion text"
+                                                max-length="32768">
+                                            </lightning-textarea>
+                                        </td>
+                                        <td data-label="Exclusion Text">
+                                            <lightning-textarea
+                                                data-row-id={row.id}
+                                                value={row.exclusionText}
+                                                onchange={handleExclusionTextChange}
+                                                placeholder="Enter exclusion text"
+                                                max-length="32768">
+                                            </lightning-textarea>
+                                        </td>
+                                        <td data-label="Actions">
+                                            <lightning-button-icon
+                                                icon-name="utility:delete"
+                                                alternative-text="Remove Row"
+                                                title="Remove Row"
+                                                data-row-id={row.id}
+                                                onclick={removeRow}>
+                                            </lightning-button-icon>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                        </div>
+                        
+                        <div class="slds-m-top_medium slds-grid slds-grid_align-spread">
+                            <div>
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Add Row"
+                                    icon-name="utility:add"
+                                    onclick={addIncludedRow}>
+                                </lightning-button>
+                            </div>
+                            <div>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Save"
+                                    title="Save Package Options"
+                                    onclick={handleSave}
+                                    disabled={isSaving}>
+                                </lightning-button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </template>
+            <template if:true={isLoadingRecordInfo}>
+                <p>
+                    Loading record information...
+                </p>
+            </template>
+            <template if:true={recordInfoError}>
+                <p>
+                    Error loading record information: {recordInfoErrorMessage}
+                </p>
+                <p>
+                    Record ID: {displayRecordId}
+                </p>
+            </template>
+            <template if:false={hasRecordInfo}>
+                <template if:false={isLoadingRecordInfo}>
+                    <template if:false={recordInfoError}>
+                        <p>
+                            Record information not available.
+                        </p>
+                        <p>
+                            Record ID: {displayRecordId}
+                        </p>
+                        <p>
+                            Please ensure the Flow is passing the recordId parameter to this component.
+                        </p>
+                    </template>
+                </template>
+            </template>
+        </div>
+    </lightning-card>
+</template>

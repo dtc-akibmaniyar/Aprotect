@@ -1,0 +1,839 @@
+<template>
+    <div class="vehicle-tab">
+        <!-- Top Navigation Buttons -->
+        <div class="top-navigation-buttons">
+            <template if:true={isLocked}>
+                <button
+                    type="button"
+                    class="nav-button next-button"
+                    onclick={handleNext}
+                    aria-label="Next">
+                    <span class="button-label">Next</span>
+                </button>
+            </template>
+        </div>
+
+        <!-- Header Section -->
+        <div class="form-header">
+            <div class="header-left">
+                <div class="header-icon">
+                    <svg class="header-svg" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true">
+                    <g transform="translate(0,512) scale(0.1,-0.1)" fill="#5184b8" stroke="none">
+                        <path d="M1326 4224 c-69 -22 -133 -68 -166 -121 -16 -25 -117 -266 -226 -537 -195 -488 -196 -491 -241 -526 -88 -69 -176 -201 -217 -323 -72 -216 -57 -576 36 -867 56 -174 106 -243 216 -297 l57 -28 1765 0 1765 0 63 29 c91 42 151 112 191 220 119 329 142 697 61 946 -36 110 -86 188 -180 282 l-87 87 -199 497 c-186 464 -202 501 -246 549 -29 32 -68 62 -100 76 l-53 24 -1195 2 c-1047 2 -1201 0 -1244 -13z m2278 -296 c29 -26 266 -615 266 -662 0 -17 -11 -39 -29 -57 l-29 -29 -1255 0 -1255 0 -31 26 c-24 20 -31 34 -31 62 0 47 234 636 263 663 20 18 51 19 1048 19 l1028 0 25 -22z m-2288 -1390 c65 -34 134 -111 157 -174 23 -66 22 -135 -2 -165 -19 -24 -22 -24 -243 -27 -276 -4 -314 0 -375 41 -58 39 -91 99 -99 183 -8 77 1 129 27 155 19 19 31 20 252 17 230 -3 232 -3 283 -30z m3093 6 c17 -22 21 -41 21 -108 -1 -121 -38 -193 -125 -239 -37 -21 -57 -22 -292 -25 -276 -4 -306 1 -319 54 -23 91 47 236 143 295 71 44 98 48 330 49 l222 0 20 -26z m-1054 -19 c14 -13 25 -28 25 -34 0 -30 -144 -398 -162 -413 -19 -17 -66 -18 -668 -18 -622 0 -648 1 -664 19 -19 21 -156 381 -156 411 0 10 12 28 26 39 26 21 33 21 801 21 l774 0 24 -25z"/>
+                        <path d="M360 3437 c-104 -29 -164 -94 -164 -176 1 -57 22 -98 77 -151 42 -41 185 -120 216 -120 9 0 51 35 94 77 76 74 81 82 128 200 27 68 49 125 49 128 0 2 -30 14 -67 26 -84 27 -265 35 -333 16z"/>
+                        <path d="M4485 3435 c-63 -13 -135 -40 -135 -49 0 -3 21 -58 46 -122 45 -111 50 -119 130 -198 l84 -83 49 18 c113 39 211 112 248 183 23 42 21 114 -2 154 -56 94 -239 137 -420 97z"/>
+                        <path d="M660 1258 c0 -123 5 -239 10 -259 12 -42 51 -82 102 -103 31 -13 85 -16 300 -16 245 0 264 1 305 21 29 14 52 35 68 63 24 42 25 47 25 249 l0 207 -307 0 c-318 0 -402 8 -472 45 l-31 16 0 -223z"/>
+                        <path d="M4417 1463 c-67 -35 -155 -43 -470 -43 l-308 0 3 -217 c3 -212 4 -219 27 -252 47 -65 74 -71 371 -71 292 0 322 6 368 65 38 48 43 89 40 317 l-3 216 -28 -15z"/>
+                    </g>
+                </svg>
+                </div>
+                <div class="header-content">
+                    <h1 class="main-title">VEHICLE INFORMATION</h1>
+                    <p class="instruction-text">Enter the full and accurate vehicle details to ensure all eligible protection plans appear. The system uses this information to determine which plans are available. Incomplete or incorrect entries may prevent plans from showing. Double-check the VIN and mileage before continuing.</p>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- Error Modal -->
+        <template if:true={showError}>
+            <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header">
+                        <lightning-button-icon 
+                            icon-name="utility:close" 
+                            onclick={closeErrorModal} 
+                            alternative-text="close" 
+                            variant="bare-inverse" 
+                            class="slds-modal__close">
+                        </lightning-button-icon>
+                        <h2 class="slds-text-heading_medium slds-hyphenate">
+                            <lightning-icon icon-name="utility:error" size="small" variant="error" class="slds-m-right_x-small"></lightning-icon>
+                            Error
+                        </h2>
+                    </header>
+                    <div class="slds-modal__content slds-p-around_medium">
+                        <p>{errorMessage}</p>
+                    </div>
+                    <footer class="slds-modal__footer">
+                        <lightning-button 
+                            variant="neutral" 
+                            label="OK" 
+                            onclick={closeErrorModal}>
+                        </lightning-button>
+                    </footer>
+                </div>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+
+        <!-- More Information Modal -->
+        <template if:true={showMoreInfoModal}>
+            <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header">
+                        <lightning-button-icon 
+                            icon-name="utility:close" 
+                            onclick={closeMoreInfoModal} 
+                            alternative-text="close" 
+                            variant="bare-inverse" 
+                            class="slds-modal__close">
+                        </lightning-button-icon>
+                        <h2 class="slds-text-heading_medium slds-hyphenate">
+                            <lightning-icon icon-name="utility:info" size="small" variant="inverse" class="slds-m-right_x-small"></lightning-icon>
+                            Vehicle Details — {vehicleCategory}
+                        </h2>
+                    </header>
+                    <div class="slds-modal__content slds-p-around_medium">
+                        <template if:true={hasAdditionalInfo}>
+                            <div class="additional-info-container">
+                                <template for:each={additionalInfoSections} for:item="section">
+                                    <div key={section.key} class="info-section">
+                                        <h3 class="info-section-title">{section.title}</h3>
+                                        <div class="info-grid">
+                                            <template for:each={section.items} for:item="item">
+                                                <div key={item.key} class="info-item">
+                                                    <span class="info-label">{item.label}:</span>
+                                                    <span class="info-value">{item.value}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template if:false={hasAdditionalInfo}>
+                            <div class="no-additional-info">
+                                <lightning-icon icon-name="utility:info" size="small" class="slds-m-right_x-small"></lightning-icon>
+                                <span>No additional vehicle information available from VIN decoder.</span>
+                            </div>
+                        </template>
+                    </div>
+                    <footer class="slds-modal__footer">
+                        <lightning-button 
+                            variant="neutral" 
+                            label="Close" 
+                            onclick={closeMoreInfoModal}>
+                        </lightning-button>
+                    </footer>
+                </div>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+
+        <!-- Success Message -->
+        <template if:true={showSuccess}>
+            <div class="slds-notify slds-notify_alert slds-theme_success" role="alert">
+                <span class="slds-assistive-text">Success</span>
+                <lightning-icon icon-name="utility:success" size="x-small" variant="inverse" class="slds-m-right_x-small"></lightning-icon>
+                <h2>{successMessage}</h2>
+                <div class="slds-notify__close">
+                    <lightning-button-icon 
+                        icon-name="utility:close" 
+                        onclick={closeSuccessMessage} 
+                        alternative-text="close" 
+                        variant="bare-inverse" 
+                        size="x-small">
+                    </lightning-button-icon>
+                </div>
+            </div>
+        </template>
+
+        <!-- Main Form Container -->
+        <div class="form-container">
+            <!-- VIN Decoder Section -->
+            <div class="form-section vin-decoder-section">
+                <h3 class="section-title">VEHICLE IDENTIFICATION NUMBER (VIN #)</h3>
+                <div class="form-row vin-row">
+                    <div class="form-field vin-field">
+                        <lightning-input
+                            type="text"
+                            name="vehicleIdentificationNumberVIN"
+                            value={vehicleData.vehicleIdentificationNumberVIN}  
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            class="input-field"
+                            variant="label-hidden"
+                            placeholder="Enter VIN to search">
+                        </lightning-input>
+                    </div>
+                    <div class="vin-buttons-container">
+                        <div class="form-field vin-button-field">
+                            <button type="button" class="custom-button search-button" disabled={fieldDisabled} onclick={handleSearch}>
+                                <lightning-icon icon-name="utility:search" size="x-small" class="button-icon"></lightning-icon>
+                                <span class="button-text">Search VIN #</span>
+                            </button>
+                        </div>
+                        <div class="form-field vin-button-field">
+                            <button type="button" class="custom-button view-details-button" onclick={handleShowMoreInfo} disabled={isVehicleDataDisabled}>
+                                <span class="button-text">View Vehicle Details</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- VIN Status Messages -->
+                <div class="vin-status-container">
+                    <template if:true={vinDecodeSuccess}>
+                        <div class="vin-status-message vin-success">
+                            <lightning-icon icon-name="utility:success" size="x-small" variant="success"></lightning-icon>
+                            <span>V.I.N # successfully decoded!</span>
+                        </div>
+                    </template>
+                    <template if:true={vinDecodeWarning}>
+                        <div class="vin-status-message vin-warning">
+                            <lightning-icon icon-name="utility:warning" size="x-small" variant="warning"></lightning-icon>
+                            <span>V.I.N # not found. Please enter details manually.</span>
+                        </div>
+                    </template>
+                </div>
+                
+                <template if:true={loading}>
+                    <div class="loading-indicator">
+                        <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Vehicle Details Section - All fields combined -->
+            <div class="form-section vehicle-details-section">
+                <!-- Vehicle Type — system-set, read-only -->
+                <div class="form-row vehicle-type-row">
+                    <div class="form-field vehicle-type-field">
+                        <label class="field-label">VEHICLE TYPE</label>
+                        <lightning-combobox
+                            name="vehicleCategory"
+                            value={vehicleCategory}
+                            options={vehicleCategoryOptions}
+                            disabled
+                            variant="label-hidden"
+                            class="input-field">
+                        </lightning-combobox>
+                    </div>
+                </div>
+                <!-- First Row: Stock ID, Year, Make, Model, Trim -->
+                <div class="form-row vehicle-basic-row">
+                    <div class="form-field">
+                        <label class="field-label">STOCK ID #</label>
+                        <lightning-input
+                            type="text" 
+                            name="stockNumber"
+                            value={vehicleData.stockNumber}
+                            onchange={handleInputChange}
+                            class="input-field"
+                            disabled={fieldDisabled}
+                            variant="label-hidden">
+                        </lightning-input>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">YEAR <span class="required">*</span></label>
+                        <lightning-combobox
+                            name="year"
+                            value={vehicleData.year}
+                            options={yearOptions}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            required
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-combobox>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">MAKE <span class="required">*</span></label>
+                        <lightning-input
+                            type="text"
+                            name="make"
+                            value={vehicleData.make}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            required
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-input>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">MODEL <span class="required">*</span></label>
+                        <lightning-input
+                            type="text"
+                            name="model"
+                            value={vehicleData.model}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            required
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-input>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">TRIM <span class="required">*</span></label>
+                        <lightning-input
+                            type="text"
+                            name="trim"
+                            value={vehicleData.trim}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            required
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-input>
+                    </div>
+                </div>
+                <!-- Second Row: Engine, Transmission, Fuel, Drive, Body Style, Colour, GVWR -->
+                <h3 class="section-title">VEHICLE DETAILS:</h3>
+                <div class="form-row vehicle-details-row">
+                    <div class="form-field">
+                        <label class="field-label">ENGINE</label>
+                        <lightning-input
+                            type="text"
+                            name="engine"
+                            value={vehicleData.engine}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-input>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">TRANSMISSION</label>
+                        <lightning-input
+                            type="text"
+                            name="transmission"
+                            value={vehicleData.transmission}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-input>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">FUEL</label>
+                        <lightning-combobox
+                            name="fuelType"
+                            value={vehicleData.fuelType}
+                            options={fuelTypeOptions}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-combobox>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">DRIVE</label>
+                        <lightning-combobox
+                            name="driveType"
+                            value={vehicleData.driveType}
+                            options={driveTypeOptions}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-combobox>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">BODY STYLE</label>
+                        <lightning-combobox
+                            name="bodyStyle"
+                            value={vehicleData.bodyStyle}
+                            options={bodyStyleOptions}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-combobox>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">COLOUR</label>
+                        <lightning-input
+                            type="text"
+                            name="color"
+                            value={vehicleData.color}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-input>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">GVWR</label>
+                        <lightning-input
+                            type="number"
+                            name="gvwr"
+                            value={vehicleData.gvwr}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-input>
+                    </div>
+                                </div>
+
+                <!-- Third Row: Odometer, Purchase Price, Delivery Date, Usage Type -->
+                <div class="form-row purchase-odometer-row">
+                    <div class="form-field">
+                        <label class="field-label">ODOMETER <span class="required">*</span>
+                            <lightning-icon icon-name="utility:info" size="xx-small" class="info-icon"></lightning-icon>
+                        </label>
+                        <lightning-input
+                            type="number"
+                            name="odometerReading"
+                            value={vehicleData.odometerReading}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            required
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-input>
+                        <div class="radio-group-container odometer-units">
+                            <lightning-radio-group
+                                name="odometerUnit"
+                                options={odometerOptions}
+                                value={vehicleData.odometerUnit}
+                                type="radio"
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="odometer-radio-group">
+                            </lightning-radio-group>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">PURCHASE PRICE <span class="required">*</span>
+                            <lightning-icon icon-name="utility:info" size="xx-small" class="info-icon"></lightning-icon>
+                        </label>
+                        <div class="input-with-unit">
+                            <span class="currency-prefix">$</span>
+                            <lightning-input
+                                type="number"
+                                name="purchasePrice"
+                                value={vehicleData.purchasePrice}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                required
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">DELIVERY DATE
+                            <lightning-icon icon-name="utility:date_input" size="xx-small" class="info-icon"></lightning-icon>
+                        </label>
+                        <lightning-input
+                            type="date"
+                            name="deliveryDate"
+                            value={vehicleData.deliveryDate}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-input>
+                    </div>
+                                         <div class="form-field usage-type-field">
+                         <label class="field-label">USAGE TYPE
+                             <lightning-icon icon-name="utility:info" size="xx-small" class="info-icon"></lightning-icon>
+                         </label>
+                         <div class="usage-type-radio-group">
+                             <lightning-radio-group
+                                 name="usageType"
+                                 options={usageTypeOptions}
+                                 value={vehicleData.usageType}
+                                 type="radio"
+                                 onchange={handleUsageTypeChange}
+                                 disabled={fieldDisabled}
+                                 class="usage-radio-group">
+                             </lightning-radio-group>
+                         </div>
+                        <div class="checkbox-container">
+                            <!-- <lightning-input
+                                type="checkbox"
+                                label="Branded/Rebuilt"
+                                name="isBrandedRebuilt"
+                                checked={vehicleData.isBrandedRebuilt}      
+                                onchange={handleInputChange}
+                                class="branded-checkbox">
+                            </lightning-input> -->
+                        </div>
+                     </div>
+                </div>
+
+                <!-- Powersports Specifications — only visible when vehicle is Powersports -->
+                <template if:true={isPowersports}>
+                    <!-- HOURS/USAGE — standalone row -->
+                    <div class="form-row powersports-hours-row">
+                        <div class="form-field">
+                            <label class="field-label">HOURS/USAGE</label>
+                            <div class="input-with-unit">
+                                <lightning-input
+                                    type="number"
+                                    name="hoursUsage"
+                                    value={vehicleData.hoursUsage}
+                                    onchange={handleInputChange}
+                                    disabled={fieldDisabled}
+                                    class="input-field"
+                                    variant="label-hidden">
+                                </lightning-input>
+                                <span class="unit-badge">HRS</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Vehicle Specs grid -->
+                    <div class="powersports-specs-header">
+                        <span class="section-title" style="margin:0; border:none; padding:0">VEHICLE SPECIFICATIONS</span>
+                        <span class="powersports-badge">POWERSPORTS</span>
+                    </div>
+                    <div class="form-row powersports-specs-row">
+                        <div class="form-field">
+                            <label class="field-label">ENGINE TYPE</label>
+                            <lightning-input
+                                type="text"
+                                name="engine"
+                                value={vehicleData.engine}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                        <div class="form-field">
+                            <label class="field-label">ENGINE CC</label>
+                            <lightning-input
+                                type="number"
+                                name="engineCC"
+                                value={vehicleData.engineCC}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                        <div class="form-field">
+                            <label class="field-label">COOLING TYPE</label>
+                            <lightning-input
+                                type="text"
+                                name="coolingType"
+                                value={vehicleData.coolingType}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                        <div class="form-field">
+                            <label class="field-label">FUEL TYPE</label>
+                            <lightning-combobox
+                                name="fuelType"
+                                value={vehicleData.fuelType}
+                                options={fuelTypeOptions}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-combobox>
+                        </div>
+                        <div class="form-field placeholder-field">
+                            <label class="field-label">—</label>
+                            <lightning-input
+                                type="text"
+                                variant="label-hidden"
+                                disabled
+                                class="input-field">
+                            </lightning-input>
+                        </div>
+                        <div class="form-field placeholder-field">
+                            <label class="field-label">—</label>
+                            <lightning-input
+                                type="text"
+                                variant="label-hidden"
+                                disabled
+                                class="input-field">
+                            </lightning-input>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Manufacturer Warranty Section -->
+            <div class="form-section manufacturer-warranty-section">
+                <h3 class="section-title manufacturer-warranty-title">
+                    <div class="section-title-content">
+                        <div class="section-icon-wrapper">
+                            <svg width="18px" height="18px" viewBox="-1.7 0 20.4 20.4" xmlns="http://www.w3.org/2000/svg" class="section-icon-svg">
+                                <circle cx="8.5" cy="10.283" r="7.917" fill="#5184b8"/>
+                                <path d="M13.458 10.293a.792.792 0 0 0-.792-.792H9.284V6.12a.792.792 0 1 0-1.583 0V9.5H4.32a.792.792 0 0 0 0 1.584H7.7v3.382a.792.792 0 0 0 1.583 0v-3.382h3.382a.792.792 0 0 0 .792-.791z" fill="#ffffff"/>
+                            </svg>
+                        </div>
+                        <span>{manufacturerWarrantySectionTitle}</span>
+                    </div>
+                </h3>
+                <div class="warranty-content">
+                    <div class="form-row warranty-fields-row">
+                        <div class="form-field warranty-type-field">
+                            <label class="field-label">
+                                MANUFACTURER WARRANTY (Type)
+                                <template if:true={isManufacturerWarrantyTypeRequired}>
+                                    <span class="required">*</span>
+                                </template>
+                            </label>
+                            <lightning-combobox
+                                name="manufacturerWarrantyType"
+                                value={vehicleData.manufacturerWarrantyType}
+                                options={manufacturerWarrantyTypeOptions}
+                                onchange={handleInputChange}
+                                required={isManufacturerWarrantyTypeRequired}
+                                disabled={manufacturerWarrantyTypeDisabled}
+                                class="input-field"
+                                variant="label-hidden"
+                                placeholder="Select warranty type">
+                            </lightning-combobox>
+                        </div>
+                        <div class="form-field warranty-term-field">
+                            <label class="field-label">
+                                TERM (LENGTH*)
+                                <template if:true={isWarrantyTermRequired}>
+                                    <span class="required">*</span>
+                                </template>
+                            </label>
+                            <lightning-combobox
+                                name="warrantyTerm"
+                                value={vehicleData.warrantyTerm}
+                                options={warrantyTermOptions}
+                                onchange={handleInputChange}
+                                required={isWarrantyTermRequired}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden"
+                                placeholder="Select warranty term">
+                            </lightning-combobox>
+                        </div>
+                        <div class="form-field warranty-date-field">
+                            <label class="field-label">
+                                IN-SERVICE DATE
+                                <template if:true={isWarrantyInServiceDateRequired}>
+                                    <span class="required">*</span>
+                                </template>
+                            </label>
+                            <lightning-input
+                                type="date"
+                                name="warrantyInServiceDate"
+                                value={vehicleData.warrantyInServiceDate}
+                                onchange={handleInputChange}
+                                required={isWarrantyInServiceDateRequired}
+                                disabled={warrantyInServiceDateDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+                         <!-- Dealer/Retailer Comments Section -->
+             <div class="form-section dealer-comments-section">
+                 <h3 class="section-title">DEALER/RETAILER COMMENTS</h3>
+                <p class="comments-instruction">Write your notes or remarks about this vehicle's sale - for example, any special terms, conditions, or details discussed with the customer. <strong>Important:</strong> By default, these comments will not appear on the printed application.</p>
+                <div class="form-row comments-row">
+                    <div class="form-field comments-field">
+                        <label class="field-label">COMMENTS</label>
+                        <lightning-textarea
+                            name="dealerCommentsNotes"
+                            value={applicationData.dealerCommentsNotes}
+                            onchange={handleApplicationInputChange}
+                            disabled={fieldDisabled}
+                            class="comments-textarea">
+                        </lightning-textarea>
+                    </div>
+                </div>
+                <div class="form-row comments-checkbox-row">
+                    <div class="form-field">
+                        <lightning-input
+                            type="checkbox"
+                            label="Show comments on the Printed Application"
+                            name="showCommentsOnPrint"
+                            checked={applicationData.showCommentsOnPrint}
+                            onchange={handleApplicationInputChange}
+                            disabled={fieldDisabled}
+                            class="comments-checkbox">
+                        </lightning-input>
+                    </div>
+                </div>
+            </div>
+
+                         <!-- Dealership/Retailer Information Section -->
+             <div class="form-section dealership-info-section">
+                 <h3 class="section-title">DEALERSHIP/RETAILER INFORMATION</h3>
+                 <div class="form-row dealership-row">
+                     <div class="dealership-left-column">
+                         <div class="form-field">
+                             <label class="field-label">DEALERSHIP NAME</label>
+                             <lightning-input
+                                 type="text"
+                                 name="dealershipName"
+                                 value={applicationData.dealershipName}
+                                 disabled
+                                 class="input-field"
+                                 variant="label-hidden">
+                             </lightning-input>
+                         </div>
+                        <div class="form-field">
+                            <label class="field-label">DEALERSHIP ADDRESS / CITY • PROVINCE • POSTAL</label>
+                            <lightning-textarea
+                                name="dealershipAddressCombined"
+                                value={dealershipAddressDisplay}
+                                disabled
+                                class="input-field combined-address-textarea"
+                                variant="label-hidden">
+                            </lightning-textarea>
+                        </div>
+                     </div>
+                     <div class="dealership-right-column">
+                         <div class="form-field">
+                             <label class="field-label">SALES REPRESENTATIVE</label>
+                             <lightning-combobox
+                                 name="salesRepresentative"
+                                 value={applicationData.salesRepresentative}
+                                 options={salesRepOptions}
+                                 onchange={handleSalesRepChange}
+                                 disabled={fieldDisabled}
+                                 class="input-field"
+                                 variant="label-hidden"
+                                 placeholder="Select sales representative">
+                             </lightning-combobox>
+                         </div>
+                         <div class="form-field">
+                             <label class="field-label">DEALER SALES ID/LICENSE #</label>
+                             <lightning-input
+                                 type="text"
+                                 name="dealerSalesId"
+                                 value={applicationData.dealerSalesId}
+                                 disabled
+                                 class="input-field"
+                                 variant="label-hidden">
+                             </lightning-input>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+
+            <!-- Date Sold and In Service Date (Legacy fields kept for compatibility) -->
+            <div class="form-section legacy-fields-section" style="display: none;">
+                <div class="form-row">
+                    <div class="form-field">
+                        <label class="field-label">Date Sold <span class="required">*</span></label>
+                        <lightning-input
+                            type="date"
+                            name="dateSold"
+                            value={vehicleData.dateSold}
+                            onchange={handleInputChange}
+                            required
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-input>
+                    </div>
+                    <div class="form-field">
+                        <label class="field-label">In Service Date</label>      
+                        <lightning-input
+                            type="date"
+                            name="inServiceDate"
+                            value={vehicleData.inServiceDate}
+                            onchange={handleInputChange}
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-input>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+             <template if:false={isLocked}>
+                <div class="action-buttons">
+                    <button
+                        type="button"
+                        class="continue-button"
+                        onclick={handleContinue}
+                        aria-label=" Save & Continue">
+                        <span class="continue-label">Save & Continue</span>
+                    </button>
+                </div>
+             </template>
+            
+        </div>
+
+        <!-- Loading Spinner -->
+        <template if:true={loading}>
+            <div class="spinner-container">
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <!-- Commercial Use Dialog Modal -->
+        <template if:true={showCommercialDialog}>
+            <div class="modal-backdrop">
+                <div class="modal-container commercial-modal">
+                    <div class="modal-header">
+                        <h2>Vehicle Commercial Use</h2>
+                    </div>
+                    <div class="modal-body">
+                        <p class="commercial-description">
+                            "Commercial Purposes" means and/or refers to any Covered vehicle that is used to conduct business and/or is titled or registered to a business such as, but not limited to: courier delivery, driving school, limousine, taxi, shuttle, livery, emergency services, mobile home, rental, delivery of large parcels or goods, food delivery, computer repair, snow plowing, towing and vehicle carrier and any other similar or related usage, as deemed solely by Global.
+                        </p>
+                        
+                        <div class="commercial-options">
+                            <div data-id="NON-COMMERCIAL" onclick={selectCommercialOption} class={getNonCommercialClass}>
+                                <div class="option-icon">
+                                    <lightning-icon icon-name="utility:check" size="small" class={getNonCommercialIconClass}></lightning-icon>
+                                </div>
+                                <div class="option-image">
+                                    <lightning-icon icon-name="utility:user" size="large"></lightning-icon>
+                                </div>
+                                <div class="option-label">NON-COMMERCIAL</div>
+                                <div class="option-description">Personal use only. Vehicle not used for business purposes other than commuting to and from work.</div>
+                            </div>
+                            
+                            <div data-id="LIGHT" onclick={selectCommercialOption} class={getLightClass}>
+                                <div class="option-icon">
+                                    <lightning-icon icon-name="utility:check" size="small" class={getLightIconClass}></lightning-icon>
+                                </div>
+                                <div class="option-image">
+                                    <lightning-icon icon-name="utility:truck" size="large"></lightning-icon>
+                                </div>
+                                <div class="option-label">LIGHT</div>
+                                <div class="option-description">Vehicles that are used for business purposes such as real estate, sales, etc. Not used to carry tools or equipment.</div>
+                            </div>
+                            
+                            <div data-id="MEDIUM" onclick={selectCommercialOption} class={getMediumClass}>
+                                <div class="option-icon">
+                                    <lightning-icon icon-name="utility:check" size="small" class={getMediumIconClass}></lightning-icon>
+                                </div>
+                                <div class="option-image">
+                                    <lightning-icon icon-name="utility:truck" size="large"></lightning-icon>
+                                </div>
+                                <div class="option-label">MEDIUM</div>
+                                <div class="option-description">Vehicles used for service or delivery: plumber, electrician, catering, etc. Carrying tools or equipment.</div>
+                            </div>
+                            
+                            <div data-id="HEAVY" onclick={selectCommercialOption} class={getHeavyClass}>
+                                <div class="option-icon">
+                                    <lightning-icon icon-name="utility:check" size="small" class={getHeavyIconClass}></lightning-icon>
+                                </div>
+                                <div class="option-image">
+                                    <lightning-icon icon-name="utility:truck" size="large"></lightning-icon>
+                                </div>
+                                <div class="option-label">HEAVY</div>
+                                <div class="option-description">Construction vehicles, dump trucks, cement trucks, tow trucks, etc. used for specific industry purposes.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <lightning-button 
+                            label="Close" 
+                            variant="neutral" 
+                            onclick={closeCommercialDialog}
+                            class="close-button">
+                        </lightning-button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+    </div>
+</template>

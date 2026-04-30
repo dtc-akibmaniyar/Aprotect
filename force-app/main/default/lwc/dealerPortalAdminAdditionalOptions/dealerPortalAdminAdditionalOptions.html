@@ -1,0 +1,378 @@
+<template>
+    <div class="additional-options-container">
+        <!-- Header Section -->
+        <div class="page-header">
+            <div class="header-content">
+                <h1 class="page-title">
+                    <lightning-icon icon-name="utility:add" size="medium" class="title-icon"></lightning-icon>
+                    Additional Options Markup Management
+                </h1>
+                <p class="page-subtitle">Configure pricing and markup for additional warranty options</p>
+            </div>
+        </div>
+
+        <!-- Bulk Update Section -->
+        <div class="bulk-update-section">
+            <div class="section-card">
+                <div class="card-header">
+                    <h3 class="card-title">Bulk Update</h3>
+                    <p class="card-description">Apply the same markup to all additional options</p>
+                </div>
+                <div class="card-content">
+                    <div class="bulk-form">
+                        <div class="form-group">
+                            <label class="form-label">Default Markup</label>
+                            <div class="markup-input-row">
+                                <select 
+                                    name="default-markup-type"
+                                    onchange={handleDefaultMarkupTypeChange}
+                                    class="markup-type-select"
+                                    data-default-value={defaultMarkupType}>
+                                    <option value="">None</option>
+                                    <option value="$">$</option>
+                                    <option value="%">%</option>
+                                </select>
+                                <div class="markup-input-container">
+                                    <template if:true={isDefaultDollar}>
+                                        <span class="currency-prefix">$</span>
+                                    </template>
+                                    <template if:true={isDefaultDollar}>
+                                        <input 
+                                            type="number" 
+                                            name="default-markup"
+                                            value={defaultMarkup}
+                                            onchange={handleDefaultMarkupChange}
+                                            class="markup-input"
+                                            placeholder="0.00"
+                                            step="0.01"
+                                            min="0">
+                                    </template>
+                                    <template if:false={isDefaultDollar}>
+                                        <input 
+                                            type="number" 
+                                            name="default-markup"
+                                            value={defaultMarkup}
+                                            onchange={handleDefaultMarkupChange}
+                                            class="markup-input"
+                                            placeholder="0"
+                                            step="1"
+                                            min="0">
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                        <lightning-button 
+                            label="Apply to All Options" 
+                            variant="brand" 
+                            onclick={applyDefaultMarkup}
+                            class="bulk-button">
+                        </lightning-button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Packages Section -->
+        <div class="packages-section">
+            <!-- Loading State -->
+            <template if:true={isLoading}>
+                <div class="loading-container">
+                    <lightning-spinner alternative-text="Loading packages..." size="medium"></lightning-spinner>
+                    <p class="loading-text">Loading packages...</p>
+                </div>
+            </template>
+            
+            <!-- Error State -->
+            <template if:true={error}>
+                <div class="error-container">
+                    <lightning-icon icon-name="utility:error" size="medium" class="error-icon"></lightning-icon>
+                    <h3 class="error-title">Error loading packages</h3>
+                    <p class="error-message">{error}</p>
+                </div>
+            </template>
+            
+            <!-- Record Type Sections -->
+            <template if:false={isLoading}>
+                <!-- No Packages Message -->
+                <template if:true={noPackagesAvailable}>
+                    <div class="no-packages-container">
+                        <lightning-icon icon-name="utility:info" size="medium" class="info-icon"></lightning-icon>
+                        <h3 class="no-packages-title">No Additional Options Available</h3>
+                        <p class="no-packages-message">There are currently no packages with additional options to manage.</p>
+                    </div>
+                </template>
+                
+                <!-- Record Type Sections -->
+                <template if:false={noPackagesAvailable}>
+                    <template for:each={packagesByRecordType} for:item="recordTypeGroup">
+                    <div key={recordTypeGroup.recordType} class="record-type-section">
+                        <div class="record-type-header">
+                            <h2 class="record-type-title">{recordTypeGroup.recordType}</h2>
+                            <span class="record-type-count">{recordTypeGroup.packages.length} Package(s)</span>
+                        </div>
+                        
+                        <div class="record-type-content">
+                            <template for:each={recordTypeGroup.packages} for:item="pkg">
+                                <div key={pkg.Id} class="accordion-item">
+                                    <div class="accordion-header" onclick={togglePackage} data-package-id={pkg.Id}>
+                                        <div class="accordion-title">
+                                            <h3 class="package-name">{pkg.PackageName}</h3>
+                                            <span class="package-count">
+                                                <template if:true={pkg.terms.length}>{pkg.terms.length} Terms</template>
+                                                <template if:true={pkg.categories.length}>{pkg.categories.length} Categories</template>
+                                            </span>
+                                        </div>
+                                        <div class="accordion-toggle">
+                                            <lightning-icon icon-name={pkg.toggleIcon} size="small"></lightning-icon>
+                                        </div>
+                                    </div>
+                                    
+                                    <div if:true={pkg.isVisible} class="accordion-content">
+                                        <!-- Terms within Package -->
+                                        <template for:each={pkg.terms} for:item="term">
+                                            <div key={term.Id} class="term-accordion-item">
+                                                <div class="term-accordion-header" onclick={toggleTerm} data-term-id={term.Id}>
+                                                    <div class="term-accordion-title">
+                                                        <h4 class="term-name">{term.termName}</h4>
+                                                    </div>
+                                                    <div class="term-accordion-toggle">
+                                                        <lightning-icon icon-name={term.toggleIcon} size="small"></lightning-icon>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div if:true={term.isVisible} class="term-accordion-content">
+                                                    <!-- Term Level Update Section -->
+                                                    <div class="term-update-section">
+                                                        <div class="term-update-header">
+                                                            <h5 class="term-update-title">Update All Options in {term.termName}</h5>
+                                                        </div>
+                                                        <div class="term-update-form">
+                                                            <div class="form-group">
+                                                                <label class="form-label">Term Markup ($)</label>
+                                                                <div class="markup-input-container">
+                                                                    <span class="currency-prefix">$</span>
+                                                                    <input 
+                                                                        type="number" 
+                                                                        data-term-id={term.Id}
+                                                                        value={term.termMarkup}
+                                                                        onchange={handleTermMarkupChange}
+                                                                        onkeydown={handleMarkupKeydown}
+                                                                        class="markup-input"
+                                                                        placeholder="0.00"
+                                                                        step="0.01"
+                                                                        min="0">
+                                                                </div>
+                                                            </div>
+                                                            <lightning-button 
+                                                                variant="brand" 
+                                                                label="Update All Options"
+                                                                data-term-id={term.Id}
+                                                                onclick={updateTermMarkup}
+                                                                class="term-update-button">
+                                                            </lightning-button>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <!-- Options within Term -->
+                                                    <template for:each={term.options} for:item="option">
+                                                        <div key={option.Id} class="option-item">
+                                                            <div class="option-info">
+                                                                <div class="option-header">
+                                                                    <h5 class="option-name">{option.optionName}</h5>
+                                                                </div>
+                                                                
+                                                                <div class="pricing-row">
+                                                                    <div class="price-group">
+                                                                        <label class="price-label">Base Cost</label>
+                                                                        <div class="price-value">${option.netCost}</div>
+                                                                    </div>
+                                                                    
+                                                                    <div class="price-group">
+                                                                        <label class="price-label">Markup</label>
+                                                                        <div class="markup-input-row">
+                                                                            <select 
+                                                                                name="option-markup-type"
+                                                                                data-option-id={option.Id}
+                                                                                onchange={handleOptionMarkupTypeChange}
+                                                                                class="markup-type-select"
+                                                                                data-option-value={option.markupType}>
+                                                                                <option value="">None</option>
+                                                                                <option value="$">$</option>
+                                                                                <option value="%">%</option>
+                                                                            </select>
+                                                                            <div class="markup-input-container">
+                                                                                <template if:true={option.isDollar}>
+                                                                                    <span class="currency-prefix">$</span>
+                                                                                </template>
+                                                                                <template if:true={option.isDollar}>
+                                                                                    <input 
+                                                                                        type="number" 
+                                                                                        data-option-id={option.Id}
+                                                                                        value={option.dealerMarkup}
+                                                                                        onchange={handleOptionMarkupChange}
+                                                                                        onkeydown={handleMarkupKeydown}
+                                                                                        class="markup-input"
+                                                                                        placeholder="0.00"
+                                                                                        step="0.01"
+                                                                                        min="0">
+                                                                                </template>
+                                                                                <template if:false={option.isDollar}>
+                                                                                    <input 
+                                                                                        type="number" 
+                                                                                        data-option-id={option.Id}
+                                                                                        value={option.dealerMarkup}
+                                                                                        onchange={handleOptionMarkupChange}
+                                                                                        onkeydown={handleMarkupKeydown}
+                                                                                        class="markup-input"
+                                                                                        placeholder="0"
+                                                                                        step="1"
+                                                                                        min="0">
+                                                                                </template>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div class="price-group">
+                                                                        <label class="price-label">Total Price</label>
+                                                                        <div class="price-value total">${option.totalPrice}</div>
+                                                                    </div>
+                                                                    
+                                                                    <div class="action-group">
+                                                                        <lightning-button 
+                                                                            variant="brand" 
+                                                                            label="Update"
+                                                                            data-option-id={option.Id}
+                                                                            onclick={updateMarkup}
+                                                                            class="update-button">
+                                                                        </lightning-button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                    
+                                                    <!-- No Options Message -->
+                                                    <template if:false={term.options.length}>
+                                                        <div class="no-options-message">
+                                                            <lightning-icon icon-name="utility:info" size="small" class="info-icon"></lightning-icon>
+                                                            <span>No additional options available for this term</span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        
+                                        <!-- Categories for Total Loss packages -->
+                                        <template for:each={pkg.categories} for:item="category">
+                                            <div key={category.categoryName} class="term-accordion-item">
+                                                <div class="term-accordion-header" onclick={toggleCategory} data-category-name={category.categoryName}>
+                                                    <div class="term-accordion-title">
+                                                        <h4 class="term-name">{category.categoryName}</h4>
+                                                        <div class="term-badge">
+                                                            <span class="duration">{category.options.length} Option(s)</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="term-accordion-toggle">
+                                                        <lightning-icon icon-name={category.toggleIcon} size="small"></lightning-icon>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div if:true={category.isVisible} class="term-accordion-content">
+                                                    <!-- Options within Category -->
+                                                    <template for:each={category.options} for:item="option">
+                                                        <div key={option.Id} class="option-item">
+                                                            <div class="option-info">
+                                                                <div class="option-header">
+                                                                    <h5 class="option-name">{option.optionName}</h5>
+                                                                </div>
+                                                                
+                                                                <div class="pricing-row">
+                                                                    <div class="price-group">
+                                                                        <label class="price-label">Base Cost</label>
+                                                                        <div class="price-value">${option.netCost}</div>
+                                                                    </div>
+                                                                    
+                                                                    <div class="price-group">
+                                                                        <label class="price-label">Markup</label>
+                                                                        <div class="markup-input-row">
+                                            <select 
+                                                name="option-markup-type"
+                                                data-option-id={option.Id}
+                                                onchange={handleOptionMarkupTypeChange}
+                                                class="markup-type-select">
+                                                <option value="">None</option>
+                                                <option value="$">$</option>
+                                                <option value="%">%</option>
+                                            </select>
+                                                                            <div class="markup-input-container">
+                                                                                <template if:true={option.isDollar}>
+                                                                                    <span class="currency-prefix">$</span>
+                                                                                </template>
+                                                                                <template if:true={option.isDollar}>
+                                                                                    <input 
+                                                                                        type="number" 
+                                                                                        data-option-id={option.Id}
+                                                                                        value={option.dealerMarkup}
+                                                                                        onchange={handleOptionMarkupChange}
+                                                                                        onkeydown={handleMarkupKeydown}
+                                                                                        class="markup-input"
+                                                                                        placeholder="0.00"
+                                                                                        step="0.01"
+                                                                                        min="0">
+                                                                                </template>
+                                                                                <template if:false={option.isDollar}>
+                                                                                    <input 
+                                                                                        type="number" 
+                                                                                        data-option-id={option.Id}
+                                                                                        value={option.dealerMarkup}
+                                                                                        onchange={handleOptionMarkupChange}
+                                                                                        onkeydown={handleMarkupKeydown}
+                                                                                        class="markup-input"
+                                                                                        placeholder="0"
+                                                                                        step="1"
+                                                                                        min="0">
+                                                                                </template>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div class="price-group">
+                                                                        <label class="price-label">Total Price</label>
+                                                                        <div class="price-value total">${option.totalPrice}</div>
+                                                                    </div>
+                                                                    
+                                                                    <div class="action-group">
+                                                                        <lightning-button 
+                                                                            variant="brand" 
+                                                                            label="Update"
+                                                                            data-option-id={option.Id}
+                                                                            onclick={updateMarkup}
+                                                                            class="update-button">
+                                                                        </lightning-button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                    
+                                                    <!-- No Options Message -->
+                                                    <template if:false={category.options.length}>
+                                                        <div class="no-options-message">
+                                                            <lightning-icon icon-name="utility:info" size="small" class="info-icon"></lightning-icon>
+                                                            <span>No additional options available for this category</span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+                </template>
+            </template>
+        </div>
+    </div>
+</template>

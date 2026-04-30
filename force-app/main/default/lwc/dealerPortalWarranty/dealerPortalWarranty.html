@@ -1,0 +1,678 @@
+<template>
+    <div class="warranty-page">
+        <!-- Top Navigation Buttons -->
+        <div class="top-navigation-buttons">
+            <button
+                type="button"
+                class="nav-button back-button"
+                onclick={handleBack}
+                aria-label="Back">
+                <span class="button-label">Back</span>
+            </button>
+            <button
+                type="button"
+                class="nav-button skip-button"
+                onclick={handleSkip}
+                aria-label={skipButtonLabel}>
+                <span class="button-label">{skipButtonLabel}</span>
+            </button>
+        </div>
+
+        <div class="warranty-hero">
+            <div class="warranty-hero__media">
+                <img src={carImageWarranty} alt="Extended warranty protection" class="warranty-hero__media-image" />
+            </div>
+            <div class="warranty-hero__content">
+                <div class="warranty-hero__header-row">
+                    <h1>ADD EXTENDED WARRANTY PLAN</h1>
+                    <div class="warranty-hero__header-actions">
+                        <template if:true={isQuoteStatus}>
+                            <button class="convert-to-app-btn" onclick={handleConvertToApplication} title="Convert this quote to a pending application">Convert to Application</button>
+                        </template>
+                    </div>
+                </div>
+                <p>Enter the full and accurate vehicle details to ensure all eligible protection plans appear. The system uses this information to determine which plans are available. Incomplete or incorrect entries may prevent plans from showing. Double-check the VIN and mileage before continuing.</p>
+            </div>
+            <div class="warranty-hero__image"></div>
+        </div>
+
+        <div class="warranty-container" data-render-key={renderKey}>
+                <div class="slds-grid slds-wrap details-grid">
+                    <!-- Left Column - All Packages with Terms -->
+                    <div class="slds-col slds-size_8-of-12 warranty-left-column">
+                        <!-- Option Help Modal -->
+                        <template if:true={showHelpModal}>
+                            <div class="help-modal-overlay" onclick={closeHelpModal}>
+                                <div class="help-modal" onclick={stopPropagation}>
+                                    <div class="help-modal-header">
+                                        <h3 class="help-modal-title">
+                                            <lightning-icon icon-name="utility:info" size="small"></lightning-icon>
+                                            {helpModalTitle}
+                                        </h3>
+                                        <button class="help-modal-close" onclick={closeHelpModal}>
+                                            <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                                        </button>
+                                    </div>
+                                    <div class="help-modal-content">
+                                        <p class="help-modal-text">{helpModalText}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="programs-container">
+                            <template if:true={showNoPackageDisclaimer}>
+                                <div class="no-packages-message">
+                                    <lightning-icon icon-name="utility:warning" size="medium" variant="warning"></lightning-icon>
+                                    <h3>This Dealer has no Extended Warranty Service Plans available</h3>
+                                    <p>There are no Extended Warranty plans configured for this dealer. You may continue to the next section.</p>
+                                </div>
+                            </template>
+                            <template if:true={showVehicleNotEligibleDisclaimer}>
+                                <div class="no-packages-message">
+                                    <lightning-icon icon-name="utility:warning" size="medium" variant="warning"></lightning-icon>
+                                    <h3>This vehicle does not qualify for any Extended Warranty Service Plans</h3>
+                                    <p>None of the available plans are eligible for this vehicle. You may continue to the next section.</p>
+                                </div>
+                            </template>
+                            <template if:true={showPackageList}>
+                            <div class="program-wrapper">
+                                <div class="program-content">
+                                    <div class="warranty-terms-section">
+                                        <div class="terms-scroll-container">
+                                            <template for:each={planTypeGroupsWithPackageTerms} for:item="group">
+                                                <div key={group.key} class="plan-type-group">
+                                                    <div class={group.headerClass}>{group.label}</div>
+                                                    <template if:true={group.hasDescription}>
+                                                        <div class="plan-type-group-description" data-description={group.description}></div>
+                                                    </template>
+                                                    <lightning-accordion allow-multiple-sections-open class="terms-accordion">
+                                                        <template for:each={group.packagesWithTerms} for:item="pkg">
+                                                            <lightning-accordion-section
+                                                                key={pkg.id}
+                                                                name={pkg.id}
+                                                                label={pkg.name}
+                                                                class="package-accordion-section">
+                                                        <!-- NEW: Show tiers if available, otherwise fall back to terms -->
+                                                        <template if:true={pkg.hasTiers}>
+                                                            <lightning-accordion allow-multiple-sections-open class="tier-accordion">
+                                                                <template for:each={pkg.tiers} for:item="tier">
+                                                                    <lightning-accordion-section 
+                                                                        key={tier.id}
+                                                                        name={tier.id}
+                                                                        label={tier.name}
+                                                                        class="tier-accordion-section">
+                                                                        <template if:true={tier.hasTerms}>
+                                                                            <div class="term-group term-group-two-column">
+                                                                                <template for:each={tier.terms} for:item="term">
+                                                                                    <template if:false={fieldDisabled}>
+                                                                                        <button 
+                                                                                            key={term.id}
+                                                                                            type="button"
+                                                                                            class={term.rowClass}
+                                                                                            data-term={term.id}
+                                                                                            data-package={term.packageId}
+                                                                                            onclick={handleWarrantyTermSelection}>
+                                                                                            <div class="term-row-left">
+                                                                                                <div class="term-row-title">{term.name}</div>
+                                                                                            </div>
+                                                                                            <div class="term-row-right">
+                                                                                                <span class="term-row-price">{term.price}</span>
+                                                                                            </div>
+                                                                                        </button>
+                                                                                    </template>
+                                                                                    <template if:true={fieldDisabled}>
+                                                                                        <button 
+                                                                                            key={term.id}
+                                                                                            type="button"
+                                                                                            class={term.rowClass}
+                                                                                            data-term={term.id}
+                                                                                            data-package={term.packageId}>
+                                                                                            <div class="term-row-left">
+                                                                                                <div class="term-row-title">{term.name}</div>
+                                                                                            </div>
+                                                                                            <div class="term-row-right">
+                                                                                                <span class="term-row-price">{term.price}</span>
+                                                                                            </div>
+                                                                                        </button>
+                                                                                    </template>
+                                                                                </template>
+                                                                            </div>
+                                                                        </template>
+                                                                        <template if:false={tier.hasTerms}>
+                                                                            <div class="no-terms-message">
+                                                                                <lightning-icon icon-name="utility:warning" size="small" variant="warning"></lightning-icon>
+                                                                                <span>No terms available for this tier.</span>
+                                                                            </div>
+                                                                        </template>
+                                                                    </lightning-accordion-section>
+                                                                </template>
+                                                            </lightning-accordion>
+                                                        </template>
+                                                        
+                                                        <!-- Fallback: Show terms directly if no tiers (backward compatibility) -->
+                                                        <template if:false={pkg.hasTiers}>
+                                                            <template if:true={pkg.hasTerms}>
+                                                                <div class="term-group term-group-two-column">
+                                                                    <template for:each={pkg.terms} for:item="term">
+                                                                        <template if:false={fieldDisabled}>
+                                                                            <button 
+                                                                                key={term.id}
+                                                                                type="button"
+                                                                                class={term.rowClass}
+                                                                                data-term={term.id}
+                                                                                data-package={term.packageId}
+                                                                                onclick={handleWarrantyTermSelection}>
+                                                                                <div class="term-row-left">
+                                                                                    <div class="term-row-title">{term.name}</div>
+                                                                                </div>
+                                                                                <div class="term-row-right">
+                                                                                    <span class="term-row-price">{term.price}</span>
+                                                                                </div>
+                                                                            </button>
+                                                                        </template>
+                                                                        <template if:true={fieldDisabled}>
+                                                                            <button 
+                                                                                key={term.id}
+                                                                                type="button"
+                                                                                class={term.rowClass}
+                                                                                data-term={term.id}
+                                                                                data-package={term.packageId}>
+                                                                                <div class="term-row-left">
+                                                                                    <div class="term-row-title">{term.name}</div>
+                                                                                </div>
+                                                                                <div class="term-row-right">
+                                                                                    <span class="term-row-price">{term.price}</span>
+                                                                                </div>
+                                                                            </button>
+                                                                        </template>
+                                                                    </template>
+                                                                </div>
+                                                            </template>
+                                                            
+                                                            <template if:false={pkg.hasTerms}>
+                                                                <div class="no-terms-message">
+                                                                    <lightning-icon icon-name="utility:warning" size="small" variant="warning"></lightning-icon>
+                                                                    <span>No warranty terms available for this package.</span>
+                                                                </div>
+                                                            </template>
+                                                        </template>
+                                                    </lightning-accordion-section>
+                                                        </template>
+                                                    </lightning-accordion>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Right Column - Vehicle Details, Price and Options -->
+                    <div class="slds-col slds-size_4-of-12 warranty-right-column">
+                        <!-- Vehicle Details Panel (Top Right) -->
+                        <template if:true={vehicleData.year}>
+                            <div class="vehicle-details-panel">
+                                <div class="vehicle-details-content">
+                                    <!-- Left: Car Icon -->
+                                    <div class="vehicle-icon-container">
+                                        <svg class="vehicle-svg" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true">
+                                            <g transform="translate(0,512) scale(0.1,-0.1)" fill="#5184b8" stroke="none">
+                                                <path d="M1326 4224 c-69 -22 -133 -68 -166 -121 -16 -25 -117 -266 -226 -537 -195 -488 -196 -491 -241 -526 -88 -69 -176 -201 -217 -323 -72 -216 -57 -576 36 -867 56 -174 106 -243 216 -297 l57 -28 1765 0 1765 0 63 29 c91 42 151 112 191 220 119 329 142 697 61 946 -36 110 -86 188 -180 282 l-87 87 -199 497 c-186 464 -202 501 -246 549 -29 32 -68 62 -100 76 l-53 24 -1195 2 c-1047 2 -1201 0 -1244 -13z m2278 -296 c29 -26 266 -615 266 -662 0 -17 -11 -39 -29 -57 l-29 -29 -1255 0 -1255 0 -31 26 c-24 20 -31 34 -31 62 0 47 234 636 263 663 20 18 51 19 1048 19 l1028 0 25 -22z m-2288 -1390 c65 -34 134 -111 157 -174 23 -66 22 -135 -2 -165 -19 -24 -22 -24 -243 -27 -276 -4 -314 0 -375 41 -58 39 -91 99 -99 183 -8 77 1 129 27 155 19 19 31 20 252 17 230 -3 232 -3 283 -30z m3093 6 c17 -22 21 -41 21 -108 -1 -121 -38 -193 -125 -239 -37 -21 -57 -22 -292 -25 -276 -4 -306 1 -319 54 -23 91 47 236 143 295 71 44 98 48 330 49 l222 0 20 -26z m-1054 -19 c14 -13 25 -28 25 -34 0 -30 -144 -398 -162 -413 -19 -17 -66 -18 -668 -18 -622 0 -648 1 -664 19 -19 21 -156 381 -156 411 0 10 12 28 26 39 26 21 33 21 801 21 l774 0 24 -25z"/>
+                                                <path d="M360 3437 c-104 -29 -164 -94 -164 -176 1 -57 22 -98 77 -151 42 -41 185 -120 216 -120 9 0 51 35 94 77 76 74 81 82 128 200 27 68 49 125 49 128 0 2 -30 14 -67 26 -84 27 -265 35 -333 16z"/>
+                                                <path d="M4485 3435 c-63 -13 -135 -40 -135 -49 0 -3 21 -58 46 -122 45 -111 50 -119 130 -198 l84 -83 49 18 c113 39 211 112 248 183 23 42 21 114 -2 154 -56 94 -239 137 -420 97z"/>
+                                                <path d="M660 1258 c0 -123 5 -239 10 -259 12 -42 51 -82 102 -103 31 -13 85 -16 300 -16 245 0 264 1 305 21 29 14 52 35 68 63 24 42 25 47 25 249 l0 207 -307 0 c-318 0 -402 8 -472 45 l-31 16 0 -223z"/>
+                                                <path d="M4417 1463 c-67 -35 -155 -43 -470 -43 l-308 0 3 -217 c3 -212 4 -219 27 -252 47 -65 74 -71 371 -71 292 0 322 6 368 65 38 48 43 89 40 317 l-3 216 -28 -15z"/>
+                                            </g>
+                                        </svg>
+                                    </div>
+                                    
+                                    <!-- Right: Vehicle Information -->
+                                    <div class="vehicle-info-container">
+                                        <div class="vehicle-model-name">{vehicleDisplayName}</div>
+                                        <template if:true={vehicleData.vin}>
+                                            <div class="vehicle-detail-text">{vehicleData.vin}</div>
+                                        </template>
+                                        <template if:true={vehicleData.odometer}>
+                                            <div class="vehicle-detail-text">Odometer: {formattedOdometer}</div>
+                                        </template>
+                                        <template if:true={vehicleData.purchasePrice}>
+                                            <div class="vehicle-detail-text">Purchase Price: {formattedPurchasePrice}</div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <!-- Selected Plan Section -->
+                        <template if:true={selectedDealerPackage}>
+                            <div class="selected-plan-section">
+                                <h4 class="section-heading">SELECTED PLAN:</h4>
+                                <div class="selected-plan-box">
+                                    <span class="selected-plan-text">{selectedPlanDisplay}</span>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <!-- Coverage Term Selected Section -->
+                        <template if:true={selectedWarrantyTerm}>
+                            <div class="coverage-term-section">
+                                <h4 class="section-heading">COVERAGE TERM SELECTED:</h4>
+                                <div class="coverage-term-box">
+                                    <span class="coverage-term-text">
+                                        {selectedTermName}
+                                    </span>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Deferral Option - shown when a term is selected; disabled if term does not allow deferral or manufacturer warranty expired -->
+                        <template if:true={showDeferralOption}>
+                            <div class="deferral-option-section">
+                                <div class="deferral-container">
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="DEFERRAL OPTION"
+                                        name="deferralOption"
+                                        checked={deferralOption}
+                                        onchange={handleDeferralOptionChange}
+                                        disabled={deferralOptionDisabled}
+                                        class="deferral-checkbox">
+                                    </lightning-input>
+                                    <lightning-helptext
+                                        content="Elect to have the A-Protect Extended Warranty coverage begin after the expiration of the Manufacturer's or Factory Warranty.">
+                                    </lightning-helptext>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="price-summary-section">
+                            <h4 class="section-heading">PRICE:</h4>
+                            <div class="price-summary-box">
+                                <!-- Read mode: click to edit -->
+                                <template if:false={isPriceEditMode}>
+                                    <span class="price-summary-value price-clickable" onclick={handlePriceClick} title="Click to override price">
+                                        {formattedPrice}
+                                        <svg class="price-edit-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                        </svg>
+                                    </span>
+                                </template>
+                                <!-- Edit mode: inline number input -->
+                                <template if:true={isPriceEditMode}>
+                                    <div class="price-override-wrap">
+                                        <input
+                                            type="number"
+                                            class="price-override-input"
+                                            value={priceOverrideInput}
+                                            onchange={handlePriceOverrideChange}
+                                            onblur={handlePriceOverrideBlur}
+                                            onkeydown={handlePriceOverrideKeyDown}
+                                            min="0"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                </template>
+                                <button class="price-breakdown-inline" title="View Price Breakdown" onclick={showPriceBreakdownModal}>
+                                    <lightning-icon icon-name="utility:info" size="xx-small"></lightning-icon>
+                                </button>
+                            </div>
+                            <!-- Custom price badge -->
+                            <template if:true={isPriceOverridden}>
+                                <div class="price-override-badge-row">
+                                    <span class="price-override-badge">Custom Price</span>
+                                    <button class="price-reset-btn" onclick={handleResetPriceOverride} title="Reset to calculated price">Reset</button>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <!-- INCLUDES Section -->
+                        <template if:true={selectedDealerPackage}>
+                            <div class="includes-section">
+                                <h4 class="includes-heading">INCLUDES:</h4>
+                                <div class="includes-list">
+                                    <template for:each={selectedPackageOptions} for:item="option">
+                                        <div key={option.id} class="includes-item-card">
+                                            <div class="includes-check-icon">
+                                                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="24" height="24" viewBox="0 0 256 256" xml:space="preserve" class="green-tick-svg">
+                                                    <g style="stroke: none; stroke-width: 0; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: none; fill-rule: nonzero; opacity: 1;" transform="translate(1.4065934065934016 1.4065934065934016) scale(2.81 2.81)">
+                                                        <path d="M 89.328 2.625 L 89.328 2.625 c -1.701 -2.859 -5.728 -3.151 -7.824 -0.568 L 46.532 45.173 c -0.856 1.055 -2.483 0.997 -3.262 -0.115 l -8.382 -11.97 c -2.852 -4.073 -8.789 -4.335 -11.989 -0.531 l 0 0 c -2.207 2.624 -2.374 6.403 -0.408 9.211 l 17.157 24.502 c 2.088 2.982 6.507 2.977 8.588 -0.011 l 4.925 -7.07 L 89.135 7.813 C 90.214 6.272 90.289 4.242 89.328 2.625 z" style="stroke: none; stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: rgb(111,178,6); fill-rule: nonzero; opacity: 1;" transform=" matrix(1 0 0 1 0 0) " stroke-linecap="round"/>
+                                                        <path d="M 45 90 C 20.187 90 0 69.813 0 45 C 0 20.187 20.187 0 45 0 c 6.072 0 11.967 1.19 17.518 3.538 c 2.034 0.861 2.986 3.208 2.125 5.242 c -0.859 2.035 -3.207 2.987 -5.242 2.126 C 54.842 8.978 49.996 8 45 8 C 24.598 8 8 24.598 8 45 c 0 20.402 16.598 37 37 37 c 20.402 0 37 -16.598 37 -37 c 0 -3.248 -0.42 -6.469 -1.249 -9.573 c -0.57 -2.134 0.698 -4.327 2.832 -4.897 c 2.133 -0.571 4.326 0.698 4.896 2.833 C 89.488 37.14 90 41.055 90 45 C 90 69.813 69.813 90 45 90 z" style="stroke: none; stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: rgb(111,178,6); fill-rule: nonzero; opacity: 1;" transform=" matrix(1 0 0 1 0 0) " stroke-linecap="round"/>
+                                                    </g>
+                                                </svg>
+                                            </div>
+                                            <span class="includes-item-text">{option.optionName}</span>
+                                            <template if:true={option.inclusion}>
+                                                <button 
+                                                    class="includes-info-icon-btn" 
+                                                    data-option-id={option.id}
+                                                    data-help-type="inclusion"
+                                                    data-help-text={option.inclusion}
+                                                    onclick={toggleOptionHelp}
+                                                    title="More info">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 40 40" class="info-icon-svg">
+                                                        <path fill="#98ccfd" d="M20,38.5C9.799,38.5,1.5,30.201,1.5,20S9.799,1.5,20,1.5S38.5,9.799,38.5,20S30.201,38.5,20,38.5z"></path>
+                                                        <path fill="#4788c7" d="M20,2c9.925,0,18,8.075,18,18s-8.075,18-18,18S2,29.925,2,20S10.075,2,20,2 M20,1 C9.507,1,1,9.507,1,20s8.507,19,19,19s19-8.507,19-19S30.493,1,20,1L20,1z"></path>
+                                                        <path fill="#fff" d="M20 10A2 2 0 1 0 20 14A2 2 0 1 0 20 10Z"></path>
+                                                        <g>
+                                                            <path fill="#fff" d="M22 29L22 17 17 17 17 18 18 18 18 29 17 29 17 30 23 30 23 29z"></path>
+                                                        </g>
+                                                    </svg>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <!-- ADDITIONAL OPTIONS Section -->
+                        <template if:true={selectedWarrantyTerm}>
+                            <div class="additional-options-section-new">
+                                <h4 class="additional-options-heading">ADDITIONAL OPTIONS</h4>
+                                <div class="additional-options-list-new">
+                                    <!-- Selected Additional Options (from database) -->
+                                    <template if:true={existingAdditionalOptions}>
+                                        <template if:true={existingAdditionalOptions.length}>
+                                            <template for:each={existingAdditionalOptionsDisplay} for:item="option">
+                                                <div key={option.id} class={option.cssClass}>
+                                                    <div class="additional-option-plus-icon">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" class="additional-option-plus-svg">
+                                                            <path fill="#12baf3" d="M352 128C352 110.3 337.7 96 320 96C302.3 96 288 110.3 288 128L288 288L128 288C110.3 288 96 302.3 96 320C96 337.7 110.3 352 128 352L288 352L288 512C288 529.7 302.3 544 320 544C337.7 544 352 529.7 352 512L352 352L512 352C529.7 352 544 337.7 544 320C544 302.3 529.7 288 512 288L352 288L352 128z"/>
+                                                        </svg>
+                                                    </div>
+                                                    <span class={option.textClass}>{option.optionName}</span>
+                                                    <div class="additional-option-right">
+                                                        <span class={option.priceClass}>
+                                                            <template if:true={option.price}>
+                                                                {option.price}
+                                                            </template>
+                                                            <template if:false={option.price}>
+                                                                $ RETAIL
+                                                            </template>
+                                                        </span>
+                                                        <div class="additional-option-d-icon">D</div>
+                                                        <template if:false={fieldDisabled}>
+                                                            <button 
+                                                            type="button"
+                                                            class="additional-option-remove-btn"
+                                                            data-option-id={option.id}
+                                                            disabled={fieldDisabled}
+                                                            onclick={handleRemoveExistingOption}
+                                                            title={option.buttonTitle}>
+                                                            <template if:true={option.isMarkedForRemoval}>
+                                                                <lightning-icon icon-name="utility:undo" size="x-small" variant="success"></lightning-icon>
+                                                            </template>
+                                                            <template if:false={option.isMarkedForRemoval}>
+                                                                <lightning-icon icon-name="utility:close" size="x-small" variant="error"></lightning-icon>
+                                                            </template>
+                                                        </button>
+                                                        </template>
+                                                        
+                                                        <template if:false={fieldDisabled}>
+                                                            <button 
+                                                            type="button"
+                                                            class="additional-option-remove-btn"
+                                                            data-option-id={option.id}
+                                                            disabled={fieldDisabled}
+                                                            title={option.buttonTitle}>
+                                                            <template if:true={option.isMarkedForRemoval}>
+                                                                <lightning-icon icon-name="utility:undo" size="x-small" variant="success"></lightning-icon>
+                                                            </template>
+                                                            <template if:false={option.isMarkedForRemoval}>
+                                                                <lightning-icon icon-name="utility:close" size="x-small" variant="error"></lightning-icon>
+                                                            </template>
+                                                        </button>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </template>
+                                    </template>
+                                    
+                                    <!-- Available Additional Options (all options with checkboxes for selection) -->
+                                    <template if:true={availableAdditionalOptionsDisplay}>
+                                        <template if:true={availableAdditionalOptionsDisplay.length}>
+                                            <template for:each={availableAdditionalOptionsDisplay} for:item="option">
+                                                <div key={option.id} class="additional-option-item-card">
+                                                    <label class="additional-option-label">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            class="additional-option-checkbox"
+                                                            data-option-id={option.id}
+                                                            checked={option.isSelected}
+                                                            disabled={fieldDisabled}
+                                                            onchange={handleAdditionalOptionToggle}
+                                                        />
+                                                        <div class="additional-option-plus-icon">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" class="additional-option-plus-svg">
+                                                                <path fill="#12baf3" d="M352 128C352 110.3 337.7 96 320 96C302.3 96 288 110.3 288 128L288 288L128 288C110.3 288 96 302.3 96 320C96 337.7 110.3 352 128 352L288 352L288 512C288 529.7 302.3 544 320 544C337.7 544 352 529.7 352 512L352 352L512 352C529.7 352 544 337.7 544 320C544 302.3 529.7 288 512 288L352 288L352 128z"/>
+                                                            </svg>
+                                                        </div>
+                                                        <span class="additional-option-item-text">{option.optionName}</span>
+                                                        <div class="additional-option-right">
+                                                            <span class="additional-option-price">
+                                                                <template if:true={option.price}>
+                                                                    {option.price}
+                                                                </template>
+                                                                <template if:false={option.price}>
+                                                                    $ RETAIL
+                                                                </template>
+                                                            </span>
+                                                            <div class="additional-option-d-icon">D</div>
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                            </template>
+                                        </template>
+                                    </template>
+                                    
+                                    <!-- Show message if no options available -->
+                                    <template if:true={hasNoAdditionalOptions}>
+                                        <div class="no-additional-options-message">
+                                            No additional options available for this term.
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                
+                <!-- Error Message -->
+                <template if:true={showError}>
+                    <div class="error-message">
+                        <lightning-icon icon-name="utility:error" size="x-small" variant="error"></lightning-icon>
+                        <span>{errorMessage}</span>
+                    </div>
+                </template>
+                
+                <!-- Decline Warranty Modal -->
+                <template if:true={showDeclineModal}>
+                    <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container">
+                            <header class="slds-modal__header">
+                                <h2 class="slds-text-heading_medium">Decline Warranty</h2>
+                                <button class="slds-button slds-button_icon slds-modal__close" onclick={cancelDeclineWarranty}>
+                                    <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                                </button>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium">
+                                <p>Are you sure you want to decline warranty coverage? This action cannot be undone.</p>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button label="Cancel" variant="neutral" onclick={cancelDeclineWarranty}></lightning-button>
+                                <lightning-button label="Confirm Decline" variant="destructive" onclick={confirmDeclineWarranty}></lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
+                
+                <!-- Warranty Selection Modal -->
+                <template if:true={showWarrantyModal}>
+                    <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+                        <div class="slds-modal__container">
+                            <header class="slds-modal__header">
+                                <h2 class="slds-text-heading_medium">Warranty Coverage Details</h2>
+                                <button class="slds-button slds-button_icon slds-modal__close" onclick={closeWarrantyModal}>
+                                    <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                                </button>
+                            </header>
+                            <div class="slds-modal__content slds-p-around_medium">
+                                <div class="warranty-details">
+                                    <h3>Selected Warranty Package</h3>
+                                    <p><strong>Package:</strong> {selectedDealerPackageName}</p>
+                                    <p><strong>Term:</strong> {selectedWarrantyTermName}</p>
+                                    <p><strong>Price:</strong> {formattedPrice}</p>
+                                </div>
+                            </div>
+                            <footer class="slds-modal__footer">
+                                <lightning-button label="Close" variant="neutral" onclick={closeWarrantyModal}></lightning-button>
+                            </footer>
+                        </div>
+                    </section>
+                    <div class="slds-backdrop slds-backdrop_open"></div>
+                </template>
+                
+                <!-- Price Breakdown Modal -->
+                <template if:true={showPriceModal}>
+                    <div class="price-breakdown-modal-overlay" onclick={hidePriceBreakdownModal}>
+                        <div class="price-breakdown-modal" onclick={stopPropagation}>
+                            <div class="modal-header">
+                                <h3 class="modal-title">Price Breakdown</h3>
+                                <button class="modal-close-btn" onclick={hidePriceBreakdownModal}>
+                                    <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                                </button>
+                            </div>
+                            <div class="modal-content">
+                                <div class="pricing-source-info">
+                                    <template if:true={currentPriceBreakdown.source}>
+                                        <div class="source-label">Pricing Source: {currentPriceBreakdown.source}</div>
+                                    </template>
+                                </div>
+                                <div class="breakdown-section">
+                                    <div class="breakdown-item">
+                                        <span class="breakdown-label">Retail Price (Before Tax):</span>
+                                        <span class="breakdown-value">{currentPriceBreakdown.retailPrice}</span>
+                                    </div>
+                                    <template if:true={additionalOptionsPricing.existingOptionsPrice}>
+                                        <div class="breakdown-item">
+                                            <span class="breakdown-label">Existing Additional Options:</span>
+                                            <span class="breakdown-value">{additionalOptionsPricing.formattedExistingOptionsPrice}</span>
+                                        </div>
+                                    </template>
+                                    <template if:true={additionalOptionsPricing.newOptionsPrice}>
+                                        <div class="breakdown-item">
+                                            <span class="breakdown-label">New Additional Options:</span>
+                                            <span class="breakdown-value">+{additionalOptionsPricing.formattedNewOptionsPrice}</span>
+                                        </div>
+                                    </template>
+                                    <template if:true={currentPriceBreakdown.taxAmount}>
+                                        <div class="breakdown-item">
+                                            <span class="breakdown-label">Tax ({currentPriceBreakdown.taxRate}):</span>
+                                            <span class="breakdown-value">+{currentPriceBreakdown.taxAmount}</span>
+                                        </div>
+                                    </template>
+                                    <div class="breakdown-item total">
+                                        <span class="breakdown-label">Total Price:</span>
+                                        <span class="breakdown-value">{currentPriceBreakdown.totalPrice}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <lightning-button 
+                                    label="Close" 
+                                    variant="brand" 
+                                    onclick={hidePriceBreakdownModal}
+                                    class="close-btn">
+                                </lightning-button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+            </div>
+
+        <!-- Comparison Modal (available in all views) -->
+        <template if:true={showComparisonModal}>
+            <div class="comparison-modal-overlay" onclick={closePackageComparison}>
+                <div class="comparison-modal" onclick={stopPropagation}>
+                    <div class="comparison-modal-header">
+                        <h2 class="comparison-title">
+                            <lightning-icon icon-name="utility:compare" size="small" class="comparison-icon"></lightning-icon>
+                            Compare Warranty Packages
+                        </h2>
+                        <button class="comparison-close-btn" onclick={closePackageComparison}>
+                            <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                        </button>
+                    </div>
+
+                    <div class="comparison-content">
+                        <div class="comparison-card-grid">
+                            <template for:each={comparisonPackages} for:item="pkg">
+                                <div key={pkg.id} class="comparison-card">
+                                    <h3 class="comparison-card__name">{pkg.name}</h3>
+                                    <p class="comparison-card__description">{pkg.description}</p>
+                                    <div class="comparison-card__meta">{pkg.termCount} available {pkg.termLabel}</div>
+                                    <div class="comparison-card__options">
+                                        <h4>Included Options</h4>
+                                        <template if:true={pkg.options.length}>
+                                            <ul>
+                                                <template for:each={pkg.options} for:item="option">
+                                                    <li key={option.id}>{option.name}</li>
+                                                </template>
+                                            </ul>
+                                        </template>
+                                        <template if:false={pkg.options.length}>
+                                            <p class="comparison-card__no-options">No included options listed.</p>
+                                        </template>
+                                    </div>
+                                    <lightning-button
+                                        label={pkg.buttonLabel}
+                                        variant={pkg.buttonVariant}
+                                        class="comparison-card__action"
+                                        data-package-id={pkg.id}
+                                        onclick={selectPackageFromComparison}
+                                        disabled={pkg.buttonDisabled}>
+                                    </lightning-button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Navigation Buttons - Save As Quote and Continue at bottom -->
+        <div class="navigation-buttons">
+            <template if:true={showContinueButton}>
+                <button
+                    type="button"
+                    class="nav-button save-quote-button"
+                    onclick={handleSaveAsQuote}
+                    aria-label="Save As Quote">
+                    <span class="button-label">Save As Quote</span>
+                </button>
+            </template>
+            
+            <template if:true={loading}>
+                <lightning-spinner alternative-text="Loading..." size="small"></lightning-spinner>
+            </template>
+            <template if:true={showContinueButton}>
+                <button
+                    type="button"
+                    class="continue-button"
+                    onclick={handleContinue}
+                    disabled={isContinueDisabled}
+                    aria-label="Save & Continue">
+                    <span class="continue-label">Save & Continue</span>
+                </button>
+            </template>
+        </div>
+    </div>
+</template>

@@ -1,0 +1,341 @@
+<apex:page controller="RemittanceFormPDFController" renderAs="pdf" showHeader="false" sidebar="false" standardStylesheets="false" applyBodyTag="false" applyHtmlTag="false">
+    <html>
+        <head>
+            <style>
+                @page {
+                    size: letter;
+                    margin: 25mm;
+                    @bottom-center {
+                        content: "Page " counter(page) " of " counter(pages);
+                    }
+                }
+                .page-break {
+                    page-break-before: always;
+                }
+                body {
+                    font-family: Arial, sans-serif;
+                    margin: 0;
+                    padding: 0;
+                    color: #333;
+                    font-size: 11px;
+                }
+                .page-content {
+                    padding: 20px;
+                }
+            </style>
+        </head>
+        <body>
+            <!-- PAGE 1: REMITTANCE FORM SUMMARY -->
+            <div class="page-content">
+
+                <!-- HEADER: Remittance Form + ID -->
+                <div style="padding-bottom:8px; margin-bottom:20px;">
+                    <div style="font-size:15px; font-weight:600; color:#5184B8; font-family:Inter, Arial, sans-serif;">
+                        <apex:outputPanel rendered="{!isAllocationRemittance}">Allocation Remittance Form</apex:outputPanel>
+                        <apex:outputPanel rendered="{!!isAllocationRemittance}">Remittance Form</apex:outputPanel>
+                    </div>
+                    <div style="font-size:9px; color:#333; margin-top:2px;">Remittance ID # {!remittanceForm.Name}</div>
+                </div>
+
+                <!-- DATE & STATUS ROW -->
+                <div style="display:table; width:100%; margin-bottom:20px;">
+                    <div style="display:table-cell; width:50%; vertical-align:top;">
+                        <div style="font-size:10px; font-weight:bold; color:#333;">Date:</div>
+                        <div style="font-size:10px; color:#666;">
+                            <apex:outputText rendered="{!remittanceForm.CreatedDate != null}" value="{0,date,MMM dd, yyyy}">
+                                <apex:param value="{!remittanceForm.CreatedDate}"/>
+                            </apex:outputText>
+                        </div>
+                    </div>
+                    <div style="display:table-cell; width:50%; vertical-align:top; text-align:right;">
+                        <div style="font-family:Inter, Arial, sans-serif; font-size:10px; font-weight:600; color:#000000;">Status:</div>
+                        <apex:outputPanel rendered="{!remittanceForm.Status__c == 'Open'}">
+                            <div style="font-family:Inter, Arial, sans-serif; font-size:22px; font-weight:bold; color:#d9534f;">{!remittanceForm.Status__c}</div>
+                        </apex:outputPanel>
+                        <apex:outputPanel rendered="{!remittanceForm.Status__c == 'Partial Paid'}">
+                            <div style="font-family:Inter, Arial, sans-serif; font-size:22px; font-weight:bold; color:#f0ad4e;">{!remittanceForm.Status__c}</div>
+                        </apex:outputPanel>
+                        <apex:outputPanel rendered="{!remittanceForm.Status__c == 'Completed'}">
+                            <div style="font-family:Inter, Arial, sans-serif; font-size:22px; font-weight:bold; color:#5cb85c;">{!remittanceForm.Status__c}</div>
+                        </apex:outputPanel>
+                        <apex:outputPanel rendered="{!remittanceForm.Status__c == 'Cancelled'}">
+                            <div style="font-family:Inter, Arial, sans-serif; font-size:22px; font-weight:bold; color:#d9534f;">{!remittanceForm.Status__c}</div>
+                        </apex:outputPanel>
+                    </div>
+                </div>
+
+                <!-- BILL TO & TOTAL REMITTANCE BALANCE -->
+                <div style="display:table; width:100%; margin-bottom:20px;">
+                    <div style="display:table-cell; width:50%; vertical-align:top;">
+                        <div style="font-size:12px; font-weight:bold; color:#333; margin-bottom:4px;">
+                            <apex:outputPanel rendered="{!remittanceForm.Dealer_Name__r != null}">{!remittanceForm.Dealer_Name__r.Name}</apex:outputPanel>
+                        </div>
+                        <div style="font-size:11px; color:#333; line-height:1.6;">
+                            <apex:outputText escape="false" value="{!remittanceForm.Bill_To__c}"/>
+                        </div>
+                    </div>
+                    <div style="display:table-cell; width:50%; vertical-align:middle; text-align:right;">
+                        <div style="font-size:11px; font-weight:bold; color:#333;">Total Remittance Balance</div>
+                        <div style="font-size:24px; font-weight:bold; color:#333;">
+                            <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!grandTotal}"/></apex:outputText>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- INVOICE SUMMARY TABLE -->
+                <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+                    <tr style="background:#4a7fb5;">
+                        <td style="padding:6px 8px; font-size:8px; font-weight:bold; color:#fff; border:1px solid #3a6a9a;">Application ID</td>
+                        <td style="padding:6px 8px; font-size:8px; font-weight:bold; color:#fff; border:1px solid #3a6a9a;">Customer</td>
+                        <td style="padding:6px 8px; font-size:8px; font-weight:bold; color:#fff; border:1px solid #3a6a9a;">Year/Make/Model/Trim</td>
+                        <td style="padding:6px 8px; font-size:8px; font-weight:bold; color:#fff; border:1px solid #3a6a9a;">VIN #</td>
+                        <td style="padding:6px 8px; font-size:8px; font-weight:bold; color:#fff; border:1px solid #3a6a9a; text-align:right;">Wholesale Cost</td>
+                        <td style="padding:6px 8px; font-size:8px; font-weight:bold; color:#fff; border:1px solid #3a6a9a; text-align:right;">HST</td>
+                        <td style="padding:6px 8px; font-size:8px; font-weight:bold; color:#fff; border:1px solid #3a6a9a; text-align:right;">Total</td>
+                    </tr>
+                    <apex:repeat var="invWithItems" value="{!invoicesWithItems}">
+                        <tr>
+                            <td style="padding:5px 8px; font-size:8px; color:#333; border:1px solid #ddd;">{!invWithItems.invoice.Application_Id__c}</td>
+                            <td style="padding:5px 8px; font-size:8px; color:#333; border:1px solid #ddd;">{!invWithItems.invoice.Customer_Name__c}</td>
+                            <td style="padding:5px 8px; font-size:8px; color:#333; border:1px solid #ddd;">{!invWithItems.invoice.Vehicle_Year__c}/{!invWithItems.invoice.Vehicle_Make__c}/{!invWithItems.invoice.Vehicle_Model__c}/{!invWithItems.invoice.Vehicle_Trim__c}</td>
+                            <td style="padding:5px 8px; font-size:8px; color:#333; border:1px solid #ddd;">{!invWithItems.invoice.Vin__c}</td>
+                            <td style="padding:5px 8px; font-size:8px; color:#333; border:1px solid #ddd; text-align:right;">
+                                <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!invWithItems.invoiceSubTotal}"/></apex:outputText>
+                            </td>
+                            <td style="padding:5px 8px; font-size:8px; color:#333; border:1px solid #ddd; text-align:right;">
+                                <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!invWithItems.invoiceTaxTotal}"/></apex:outputText>
+                            </td>
+                            <td style="padding:5px 8px; font-size:8px; color:#333; border:1px solid #ddd; text-align:right;">
+                                <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!invWithItems.invoiceGrandTotal}"/></apex:outputText>
+                            </td>
+                        </tr>
+                    </apex:repeat>
+                </table>
+
+                <!-- Items Count -->
+                <div style="font-size:9px; font-weight:bold; color:#333; margin-top:4px; margin-bottom:10px;">
+                    <strong>Items:</strong> {!invoicesWithItems.size}
+                </div>
+
+                <!-- BOTTOM TOTALS -->
+                <table style="width:50%; border-collapse:collapse; margin-left:auto;">
+                    <tr>
+                        <td style="padding:6px 10px; font-size:9px; font-weight:bold; color:#333; text-align:right; border-bottom:1px solid #ddd;">Total Remittance Due:</td>
+                        <td style="padding:6px 10px; font-size:9px; color:#333; text-align:right; border-bottom:1px solid #ddd;">
+                            <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!grandTotal}"/></apex:outputText>
+                        </td>
+                    </tr>
+                    <apex:outputPanel layout="none" rendered="{!remittanceForm.Discount_Amount__c != null}">
+                        <tr>
+                            <td style="padding:6px 10px; font-size:9px; font-weight:bold; font-style:italic; color:#333; text-align:right; border-bottom:1px solid #ddd;">(-) Credits Applied:</td>
+                            <td style="padding:6px 10px; font-size:9px; color:#333; text-align:right; border-bottom:1px solid #ddd;">
+                                (<apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!remittanceForm.Discount_Amount__c}"/></apex:outputText>)
+                            </td>
+                        </tr>
+                    </apex:outputPanel>
+                    <tr style="border-top:2px solid #333;">
+                        <td style="padding:8px 10px; font-size:10px; font-weight:bold; color:#333; text-align:right;">Balance Due:</td>
+                        <td style="padding:8px 10px; font-size:11px; font-weight:bold; color:#333; text-align:right;">
+                            <apex:outputText value="${0,number,###,##0.00}">
+                                <apex:param value="{!IF(remittanceForm.Balance__c != null, remittanceForm.Balance__c, IF(remittanceForm.Remittance_Form_Total_After_Discount__c != null, remittanceForm.Remittance_Form_Total_After_Discount__c, grandTotal))}"/>
+                            </apex:outputText>
+                        </td>
+                    </tr>
+                </table>
+
+            </div>
+
+            <!-- PAGES 2+: INDIVIDUAL INVOICES (ONE PER PAGE) -->
+            <apex:outputPanel rendered="{!invoicesWithItems.size > 0}">
+                <apex:repeat var="invWithItems" value="{!invoicesWithItems}" rendered="{!invoicesWithItems.size > 0}">
+                    <div class="page-break page-content">
+
+                        <!-- INVOICE HEADER -->
+                        <div style="border-bottom:2px solid #5184B8; padding-bottom:8px; margin-bottom:20px;">
+                            <div style="font-size:15px; font-weight:600; color:#5184B8; font-family:Inter, Arial, sans-serif;">INVOICE</div>
+                            <div style="font-size:9px; color:#333; margin-top:2px;">Invoice ID # {!invWithItems.invoice.Name}</div>
+                        </div>
+
+                        <!-- DATE & STATUS ROW -->
+                        <div style="display:table; width:100%; margin-bottom:20px;">
+                            <div style="display:table-cell; width:50%; vertical-align:top;">
+                                <div style="font-family:Inter, Arial, sans-serif; font-size:10px; font-weight:600; color:#000;">Date:</div>
+                                <div style="font-size:10px; color:#666;">
+                                    <apex:outputText rendered="{!invWithItems.invoice.CreatedDate != null}" value="{0,date,MMM dd, yyyy}">
+                                        <apex:param value="{!invWithItems.invoice.CreatedDate}"/>
+                                    </apex:outputText>
+                                </div>
+                            </div>
+                            <div style="display:table-cell; width:50%; vertical-align:top; text-align:right;">
+                                <div style="font-family:Inter, Arial, sans-serif; font-size:10px; font-weight:600; color:#000;">Status:</div>
+                                <apex:outputPanel rendered="{!invWithItems.invoice.Status__c == 'Due'}">
+                                    <div style="font-size:22px; font-weight:bold; color:#d9534f;">{!invWithItems.invoice.Status__c}</div>
+                                </apex:outputPanel>
+                                <apex:outputPanel rendered="{!invWithItems.invoice.Status__c == 'Partial Paid'}">
+                                    <div style="font-size:22px; font-weight:bold; color:#f0ad4e;">{!invWithItems.invoice.Status__c}</div>
+                                </apex:outputPanel>
+                                <apex:outputPanel rendered="{!invWithItems.invoice.Status__c == 'Paid'}">
+                                    <div style="font-size:22px; font-weight:bold; color:#5cb85c;">{!invWithItems.invoice.Status__c}</div>
+                                </apex:outputPanel>
+                                <apex:outputPanel rendered="{!invWithItems.invoice.Status__c == 'Cancelled'}">
+                                    <div style="font-size:22px; font-weight:bold; color:#d9534f;">{!invWithItems.invoice.Status__c}</div>
+                                </apex:outputPanel>
+                                <apex:outputPanel rendered="{!invWithItems.invoice.Status__c == null}">
+                                    <div style="font-size:22px; font-weight:bold; color:#999;">N/A</div>
+                                </apex:outputPanel>
+                            </div>
+                        </div>
+
+                        <!-- BILL TO SECTION -->
+                        <div style="display:table; width:100%; margin-bottom:20px;">
+                            <div style="display:table-cell; width:50%; vertical-align:top;">
+                                <div style="font-family:Inter, Arial, sans-serif; font-size:10px; font-weight:600; color:#000; margin-bottom:4px;">Bill to:</div>
+                                <div style="display:table-cell; width:50%; vertical-align:top;">
+                        <div style="font-size:12px; font-weight:bold; color:#333; margin-bottom:4px;">
+                            <apex:outputPanel rendered="{!remittanceForm.Dealer_Name__r != null}">{!remittanceForm.Dealer_Name__r.Name}</apex:outputPanel>
+                        </div>
+                        <div style="font-size:11px; color:#333; line-height:1.6;">
+                            <apex:outputText escape="false" value="{!remittanceForm.Bill_To__c}"/>
+                        </div>
+                    </div>
+                            </div>
+                        </div>
+
+                        <!-- 3-COLUMN INFO TABLE: APPLICATION ID | CUSTOMER INFORMATION | VEHICLE INFORMATION -->
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+                            <tr>
+                                <td style="width:20%; padding:6px 8px; background:#5184B8; color:#fff; font-size:8px; font-weight:bold; text-align:center; border:1px solid #4070a0;">Application Id</td>
+                                <td style="width:40%; padding:6px 8px; background:#5184B8; color:#fff; font-size:8px; font-weight:bold; text-align:center; border:1px solid #4070a0;">CUSTOMER INFORMATION</td>
+                                <td style="width:40%; padding:6px 8px; background:#5184B8; color:#fff; font-size:8px; font-weight:bold; text-align:center; border:1px solid #4070a0;">VEHICLE INFORMATION</td>
+                            </tr>
+                            <tr>
+                                <td style="width:20%; padding:8px; font-size:10px; font-weight:bold; text-align:center; vertical-align:top; border:1px solid #ddd;">
+                                    {!invWithItems.application.Name}
+                                </td>
+                                <td style="width:40%; padding:8px; font-size:9px; vertical-align:top; border:1px solid #ddd; color:#333;">
+                                    <div style="font-weight:bold; font-size:10px; text-transform:uppercase; margin-bottom:3px;">
+                                        {!invWithItems.application.Customer_First_Name__c} {!invWithItems.application.Customer_Last_Name__c}
+                                    </div>
+                                    <apex:outputPanel rendered="{!invWithItems.application.Customer_Address__c != null}">
+                                        <div>{!invWithItems.application.Customer_Address__c}</div>
+                                    </apex:outputPanel>
+                                </td>
+                                <td style="width:40%; padding:8px; font-size:9px; vertical-align:top; border:1px solid #ddd; color:#333;">
+                                    <div style="font-weight:bold; font-size:10px; text-transform:uppercase; margin-bottom:3px;">
+                                        {!invWithItems.application.Vehicle_Year__c}/{!invWithItems.application.Vehicle_Make__c}/{!invWithItems.application.Vehicle_Model__c}
+                                    </div>
+                                    <div>VIN # {!invWithItems.application.Vehicle_VIN__c}</div>
+                                    <apex:outputPanel rendered="{!invWithItems.application.Vehicle__r != null}">
+                                        <div>Delivery Date: <apex:outputText rendered="{!invWithItems.application.Vehicle__r.Delivery_Date__c != null}" value="{0,date,dd-MM-yyyy}"><apex:param value="{!invWithItems.application.Vehicle__r.Delivery_Date__c}"/></apex:outputText></div>
+                                    </apex:outputPanel>
+                                    <div>Odometer: {!invWithItems.application.Odometer__c} {!invWithItems.application.Odometer_Unit__c}</div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- SERVICES SECTION -->
+                        <apex:outputPanel rendered="{!invWithItems.packages.size > 0}">
+                            <table style="width:100%; border-collapse:collapse;">
+                                <tr>
+                                    <td style="padding:6px 8px; background:#5184B8; color:#fff; font-size:8px; font-weight:bold; text-align:center; letter-spacing:1px;">SERVICES</td>
+                                </tr>
+                            </table>
+
+                            <apex:repeat var="pkgWithOpts" value="{!invWithItems.packages}">
+                                <div style="padding:12px 16px; border:1px solid #ddd; border-top:none;">
+                                    <!-- Record Type Name -->
+                                    <apex:outputPanel rendered="{!pkgWithOpts.applicationPackage.RecordType.Name != null}" layout="none">
+                                        <div style="font-size:8px; font-weight:bold; color:#5184B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">{!pkgWithOpts.applicationPackage.RecordType.Name}</div>
+                                    </apex:outputPanel>
+                                    <!-- Package Name + Price -->
+                                    <div style="display:table; width:100%; margin-bottom:4px;">
+                                        <div style="display:table-cell; width:70%; font-weight:bold; font-size:10px; color:#333; text-transform:uppercase;">
+                                            {!pkgWithOpts.applicationPackage.Package__r.Name}
+                                        </div>
+                                        <div style="display:table-cell; width:30%; text-align:right; vertical-align:middle;">
+                                            <apex:repeat var="lineItem" value="{!pkgWithOpts.packageLineItems}">
+                                                <div style="display:table; width:100%;">
+                                                    <span style="display:table-cell; padding-right:6px; font-size:8px; font-weight:bold; text-align:right; white-space:nowrap;">
+                                                        <apex:outputPanel rendered="{!lineItem.Status__c == 'Paid'}">
+                                                            <span style="color:#5cb85c;">{!lineItem.Status__c}</span>
+                                                        </apex:outputPanel>
+                                                        <apex:outputPanel rendered="{!lineItem.Status__c == 'Planned'}">
+                                                            <span style="color:#5184B8;">{!lineItem.Status__c}</span>
+                                                        </apex:outputPanel>
+                                                        <apex:outputPanel rendered="{!lineItem.Status__c == 'Partial Paid'}">
+                                                            <span style="color:#f0ad4e;">{!lineItem.Status__c}</span>
+                                                        </apex:outputPanel>
+                                                        <apex:outputPanel rendered="{!AND(lineItem.Status__c != 'Paid', lineItem.Status__c != 'Planned', lineItem.Status__c != 'Partial Paid')}">
+                                                            <span style="color:#d9534f;">{!lineItem.Status__c}</span>
+                                                        </apex:outputPanel>
+                                                    </span>
+                                                    <span style="display:table-cell; font-size:9px; font-weight:600; color:#5184B8; text-align:right;">
+                                                        <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!lineItem.Contract_Cost_Price__c}"/></apex:outputText>
+                                                    </span>
+                                                </div>
+                                            </apex:repeat>
+                                        </div>
+                                    </div>
+                                    <!-- Package Details -->
+                                    <div style="font-size:9px; color:#333; line-height:1.7;">
+                                        <apex:outputPanel rendered="{!pkgWithOpts.applicationPackage.Package_Term__r != null}">
+                                            <div>Selected Term: {!pkgWithOpts.applicationPackage.Package_Term__r.Name}</div>
+                                        </apex:outputPanel>
+                                        <apex:outputPanel rendered="{!pkgWithOpts.applicationPackage.Contract_Start_Date__c != null}">
+                                            <div>Start Date: <apex:outputText value="{0,date,dd-MM-yyyy}"><apex:param value="{!pkgWithOpts.applicationPackage.Contract_Start_Date__c}"/></apex:outputText></div>
+                                        </apex:outputPanel>
+                                        <apex:outputPanel rendered="{!pkgWithOpts.applicationPackage.Contract_End_Date__c != null}">
+                                            <div>Expiry Date: <apex:outputText value="{0,date,dd-MM-yyyy}"><apex:param value="{!pkgWithOpts.applicationPackage.Contract_End_Date__c}"/></apex:outputText></div>
+                                        </apex:outputPanel>
+                                        <apex:outputPanel rendered="{!pkgWithOpts.applicationPackage.Odometer_Start__c != null}">
+                                            <div>Start Odometer: <apex:outputText value="{0,number,###,##0}"><apex:param value="{!pkgWithOpts.applicationPackage.Odometer_Start__c}"/></apex:outputText> KM</div>
+                                        </apex:outputPanel>
+                                        <apex:outputPanel rendered="{!pkgWithOpts.applicationPackage.Odometer_End__c != null}">
+                                            <div>Expiry Odometer: <apex:outputText value="{0,number,###,##0}"><apex:param value="{!pkgWithOpts.applicationPackage.Odometer_End__c}"/></apex:outputText> KM</div>
+                                        </apex:outputPanel>
+                                    </div>
+                                    <!-- Additional Options -->
+                                    <!-- <apex:outputPanel rendered="{!pkgWithOpts.additionalOptions.size > 0}" layout="none">
+                                        <div style="margin-top:6px; padding-top:6px; border-top:1px solid #eee;">
+                                            <div style="font-size:8px; font-weight:bold; color:#5184B8; text-transform:uppercase; margin-bottom:3px;">Additional Options</div>
+                                            <apex:repeat var="option" value="{!pkgWithOpts.additionalOptions}">
+                                                <div style="display:table; width:100%; font-size:9px; color:#333; margin-bottom:2px;">
+                                                    <div style="display:table-cell; width:70%;">
+                                                        <span style="color:#5184B8; font-weight:bold; margin-right:4px;">+</span> {!option.Option__c}
+                                                    </div>
+                                                    <div style="display:table-cell; width:30%; text-align:right; color:#5184B8; font-weight:600;">
+                                                        <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!option.Net_Cost__c}"/></apex:outputText>
+                                                    </div>
+                                                </div>
+                                            </apex:repeat>
+                                        </div>
+                                    </apex:outputPanel> -->
+                                </div>
+                            </apex:repeat>
+                        </apex:outputPanel>
+
+                        <!-- BOTTOM: QTY & TOTAL -->
+                        <div style="display:table; width:100%; margin-top:10px;">
+                            <div style="display:table-cell; width:50%; vertical-align:bottom;">
+                                <div style="font-size:9px; font-weight:bold; color:#333;">
+                                    <strong>Qty:</strong> {!invWithItems.packages.size}
+                                </div>
+                            </div>
+                            <div style="display:table-cell; width:50%; vertical-align:top;">
+                                <table style="width:100%; border-collapse:collapse; margin-left:auto;">
+                                    <tr>
+                                        <td style="padding:6px 10px; font-size:10px; font-weight:bold; color:#333; text-align:right; border:1px solid #ddd;">Total Amount:</td>
+                                        <td style="padding:6px 10px; font-size:10px; font-weight:bold; color:#333; text-align:right; border:1px solid #ddd;">
+                                            <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!invWithItems.invoiceGrandTotal}"/></apex:outputText>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </apex:repeat>
+            </apex:outputPanel>
+        </body>
+    </html>
+</apex:page>

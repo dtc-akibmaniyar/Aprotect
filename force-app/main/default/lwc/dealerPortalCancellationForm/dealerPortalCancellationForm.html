@@ -1,0 +1,109 @@
+<template>
+    <div class="cancellation-container">
+        <!-- Loading Spinner -->
+        <template if:true={isLoading}>
+            <div class="spinner-container">
+                <lightning-spinner alternative-text="Loading" size="large"></lightning-spinner>
+            </div>
+        </template>
+
+        <!-- Error Message -->
+        <template if:true={error}>
+            <div class="error-message">
+                <p>{error}</p>
+            </div>
+        </template>
+
+        <!-- Main Content -->
+        <template if:false={isLoading}>
+            <template if:false={error}>
+                <div class="main-layout">
+            <!-- Left Side: Vehicle Info Card -->
+            <div class="left-column">
+                <div class="vehicle-card">
+                    <div class="vehicle-icon">
+                        <svg width="50" height="39" viewBox="0 0 50 39" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <g clip-path="url(#clip0_93_380)">
+                                <path
+                                    d="M48.0956 11.0614H45.5679C45.0485 11.0614 44.5983 11.3294 44.2521 11.7504C42.1745 6.96625 38.4003 0.000602552 35.0416 0.000602552H15.3393C11.4958 -0.0759431 7.79086 7.15762 5.88643 11.9417C5.54017 11.4059 5.02078 11.0614 4.43213 11.0614H1.90443C0.865651 11.0614 0 12.1714 0 13.5492C0 14.927 0.865651 16.0369 1.90443 16.0369H4.43213C4.43213 16.0369 4.50139 16.0369 4.57064 16.0369C4.60526 16.6876 4.57064 19.1753 4.57064 19.979V28.6287C4.57064 30.3509 5.36704 31.8436 6.5097 32.5325V36.8956C6.5097 38.0821 7.27147 39.0389 8.17175 39.0389H11.4958C12.3961 39.0389 13.1579 38.0821 13.1579 36.8956V32.9535H37.2922V36.8956C37.2922 38.0821 38.054 39.0389 38.9543 39.0389H42.2784C43.1787 39.0389 43.9404 38.0821 43.9404 36.8956V32.5325C45.0831 31.8436 45.8795 30.3509 45.8795 28.6287V19.979C45.8795 19.1753 45.8103 16.6875 45.8795 16.0752H48.1994C49.2382 16.0752 50.1039 14.9653 50.1039 13.5875C50.1039 12.2096 49.2382 11.0997 48.1994 11.0997L48.0956 11.0614ZM14.4044 25.7582H10.4571C9.41828 25.7582 8.55263 24.6483 8.55263 23.2705C8.55263 21.8927 9.41828 20.7827 10.4571 20.7827H11.0111C12.0499 20.7827 15.374 20.7827 16.3089 23.2705C16.3089 24.6483 15.4432 25.7582 14.4044 25.7582ZM29.7091 29.2793H20.6025C20.187 29.2793 19.8407 28.82 19.8407 28.2842C19.8407 27.7484 20.187 27.2891 20.6025 27.2891H29.7091C30.1247 27.2891 30.4709 27.7484 30.4709 28.2842C30.4709 28.82 30.1247 29.2793 29.7091 29.2793ZM39.7507 25.7582H35.8033C34.7645 25.7582 33.8989 24.6483 33.8989 23.2705C34.8338 20.7827 38.1233 20.7827 39.1967 20.7827H39.7507C40.7895 20.7827 41.6551 21.8927 41.6551 23.2705C41.6551 24.6483 40.7895 25.7582 39.7507 25.7582ZM42.3476 15.6159H7.99862C7.96399 15.3863 7.92936 15.1566 7.92936 14.8887C7.92936 14.8887 11.4958 3.1007 16.1357 3.13897H34.2105C38.331 3.13897 42.4169 14.8887 42.4169 14.8887C42.4169 15.1184 42.4169 15.3863 42.3476 15.6159Z"
+                                    fill="#5184B8" />
+                            </g>
+                            <defs>
+                                <clipPath id="clip0_93_380">
+                                    <rect width="50" height="39" fill="white" />
+                                </clipPath>
+                            </defs>
+                        </svg>
+
+                    </div>
+                    <div class="vehicle-details">
+                        <div class="vehicle-name">{vehicleName}</div>
+                        <div class="vehicle-info">{vehicleVIN}</div>
+                        <div class="vehicle-info">Odometer: {vehicleOdometer}</div>
+                        <div class="vehicle-info">Purchase Price: {vehiclePrice}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Policy Sections -->
+            <div class="right-column">
+              <!-- Privacy Policy Section (Dynamic, Multiple Records) -->
+<!-- Privacy Policy Section (Dynamic, Multiple Records) -->
+<template if:true={privacyPolicies}>
+    <template for:each={privacyPolicies} for:item="policy" for:index="index">
+
+        <!-- Entire Policy Card -->
+        <div key={policy.Id} class="policy-section">
+
+            <!-- Dynamic Title -->
+            <h2 class="policy-title">{policy.Name}</h2>
+
+            <!-- Policy Text -->
+            <lightning-formatted-rich-text
+                value={policy.Policy_Text__c}
+                class="policy-text"
+            ></lightning-formatted-rich-text>
+        </div>
+
+        <!-- Checkbox Outside the Main Policy Section (As Requested) -->
+        <div class="checkbox-container slds-m-left_medium slds-m-bottom_xx-large" key={policy.Id}>
+
+            <input
+                type="checkbox"
+                id={policy.checkboxDomId}
+                class="privacy-checkbox"
+                data-id={policy.Id}
+                onchange={handlePrivacyCheck}
+                checked={policy.accepted}
+            />
+
+            <label for={policy.checkboxDomId} class="checkbox-label">
+                I hereby declare that the above statements are true and request that
+                A-Protect Warranty Corporation proceed with the cancellation.
+            </label>
+
+        </div>
+
+    </template>
+</template>
+ <!-- Action Buttons -->
+        <div class="action-buttons-container">
+          <button
+            class="cancel-button"
+            onclick={handlecancelCancellation}
+          >CANCEL</button>
+          <button
+            class="save-button"
+            onclick={handleCancelApplication}
+            disabled={disableSaveButton}
+          >SAVE</button>
+        </div>
+
+
+
+            </div>
+        </div>
+            </template>
+        </template>
+    </div>
+</template>

@@ -1,0 +1,193 @@
+<apex:page controller="InvoiceDetailPDFController" renderAs="pdf" showHeader="false" sidebar="false" standardStylesheets="false" applyBodyTag="false" applyHtmlTag="false">
+    <html>
+        <head>
+            <style>
+                @page {
+                    size: letter;
+                    margin: 25mm;
+                }
+                body {
+                    font-family: Arial, sans-serif;
+                    margin: 0;
+                    padding: 0;
+                    color: #333;
+                    font-size: 11px;
+                }
+                .page-content {
+                    padding: 20px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="page-content">
+
+                <!-- INVOICE HEADER -->
+                <div style="border-bottom:2px solid #5184B8; padding-bottom:8px; margin-bottom:20px;">
+                    <div style="font-size:15px; font-weight:600; color:#5184B8; font-family:Arial, sans-serif;">INVOICE</div>
+                    <div style="font-size:9px; color:#333; margin-top:2px;">Invoice ID # {!invoice.Name}</div>
+                </div>
+
+                <!-- DATE & STATUS ROW -->
+                <div style="display:table; width:100%; margin-bottom:20px;">
+                    <div style="display:table-cell; width:50%; vertical-align:top;">
+                        <div style="font-size:10px; font-weight:600; color:#000;">Date:</div>
+                        <div style="font-size:10px; color:#666;">
+                            <apex:outputText rendered="{!invoice.CreatedDate != null}" value="{0,date,MMM dd, yyyy}">
+                                <apex:param value="{!invoice.CreatedDate}"/>
+                            </apex:outputText>
+                        </div>
+                    </div>
+                    <div style="display:table-cell; width:50%; vertical-align:top; text-align:right;">
+                        <div style="font-size:10px; font-weight:600; color:#000;">Status:</div>
+                        <apex:outputPanel rendered="{!invoice.Status__c == 'Due'}">
+                            <div style="font-size:22px; font-weight:bold; color:#d9534f;">{!invoice.Status__c}</div>
+                        </apex:outputPanel>
+                        <apex:outputPanel rendered="{!invoice.Status__c == 'Partial Paid'}">
+                            <div style="font-size:22px; font-weight:bold; color:#f0ad4e;">{!invoice.Status__c}</div>
+                        </apex:outputPanel>
+                        <apex:outputPanel rendered="{!invoice.Status__c == 'Paid'}">
+                            <div style="font-size:22px; font-weight:bold; color:#5cb85c;">{!invoice.Status__c}</div>
+                        </apex:outputPanel>
+                        <apex:outputPanel rendered="{!invoice.Status__c == 'Cancelled'}">
+                            <div style="font-size:22px; font-weight:bold; color:#d9534f;">{!invoice.Status__c}</div>
+                        </apex:outputPanel>
+                        <apex:outputPanel rendered="{!AND(invoice.Status__c != 'Due', invoice.Status__c != 'Partial Paid', invoice.Status__c != 'Paid', invoice.Status__c != 'Cancelled')}">
+                            <div style="font-size:22px; font-weight:bold; color:#999;">{!invoice.Status__c}</div>
+                        </apex:outputPanel>
+                    </div>
+                </div>
+
+                <!-- BILL TO -->
+                <div style="margin-bottom:20px;">
+                    <div style="font-size:10px; font-weight:600; color:#000; margin-bottom:4px;">Bill to:</div>
+                    <apex:outputPanel rendered="{!dealerName != null}">
+                        <div style="font-size:12px; font-weight:bold; color:#333; margin-bottom:4px;">{!dealerName}</div>
+                    </apex:outputPanel>
+                    <apex:outputPanel rendered="{!billTo != null}">
+                        <div style="font-size:11px; color:#333; line-height:1.6;">
+                            <apex:outputText escape="false" value="{!billTo}"/>
+                        </div>
+                    </apex:outputPanel>
+                </div>
+
+                <!-- 3-COLUMN INFO TABLE -->
+                <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+                    <tr>
+                        <td style="width:20%; padding:6px 8px; background:#5184B8; color:#fff; font-size:8px; font-weight:bold; text-align:center; border:1px solid #4070a0;">Application Id</td>
+                        <td style="width:40%; padding:6px 8px; background:#5184B8; color:#fff; font-size:8px; font-weight:bold; text-align:center; border:1px solid #4070a0;">CUSTOMER INFORMATION</td>
+                        <td style="width:40%; padding:6px 8px; background:#5184B8; color:#fff; font-size:8px; font-weight:bold; text-align:center; border:1px solid #4070a0;">VEHICLE INFORMATION</td>
+                    </tr>
+                    <tr>
+                        <td style="width:20%; padding:8px; font-size:10px; font-weight:bold; text-align:center; vertical-align:top; border:1px solid #ddd;">
+                            {!invoice.Application__r.Name}
+                        </td>
+                        <td style="width:40%; padding:8px; font-size:9px; vertical-align:top; border:1px solid #ddd; color:#333;">
+                            <div style="font-weight:bold; font-size:10px; text-transform:uppercase; margin-bottom:3px;">
+                                {!invoice.Application__r.Customer_First_Name__c} {!invoice.Application__r.Customer_Last_Name__c}
+                            </div>
+                            <apex:outputPanel rendered="{!invoice.Application__r.Customer_Address__c != null}">
+                                <div>{!invoice.Application__r.Customer_Address__c}</div>
+                            </apex:outputPanel>
+                        </td>
+                        <td style="width:40%; padding:8px; font-size:9px; vertical-align:top; border:1px solid #ddd; color:#333;">
+                            <div style="font-weight:bold; font-size:10px; text-transform:uppercase; margin-bottom:3px;">
+                                {!invoice.Application__r.Vehicle_Year__c}/{!invoice.Application__r.Vehicle_Make__c}/{!invoice.Application__r.Vehicle_Model__c}
+                            </div>
+                            <div>VIN # {!invoice.Application__r.Vehicle_VIN__c}</div>
+                            <apex:outputPanel rendered="{!invoice.Application__r.Odometer__c != null}">
+                                <div>Odometer: <apex:outputText value="{0,number,###,##0}"><apex:param value="{!invoice.Application__r.Odometer__c}"/></apex:outputText> {!invoice.Application__r.Odometer_Unit__c}</div>
+                            </apex:outputPanel>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- SERVICES SECTION -->
+                <apex:outputPanel rendered="{!packages.size > 0}">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr>
+                            <td style="padding:6px 8px; background:#5184B8; color:#fff; font-size:8px; font-weight:bold; text-align:center; letter-spacing:1px;">SERVICES</td>
+                        </tr>
+                    </table>
+
+                    <apex:repeat var="row" value="{!packages}">
+                        <div style="padding:12px 16px; border:1px solid #ddd; border-top:none;">
+                            <!-- Record Type Name -->
+                            <apex:outputPanel rendered="{!row.pkg.RecordType.Name != null}" layout="none">
+                                <div style="font-size:8px; font-weight:bold; color:#5184B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">{!row.pkg.RecordType.Name}</div>
+                            </apex:outputPanel>
+
+                            <!-- Package Name + Line Items -->
+                            <div style="display:table; width:100%; margin-bottom:4px;">
+                                <div style="display:table-cell; width:70%; font-weight:bold; font-size:10px; color:#333; text-transform:uppercase;">
+                                    {!row.pkg.Package__r.Name}
+                                </div>
+                                <div style="display:table-cell; width:30%; text-align:right; vertical-align:middle;">
+                                    <apex:repeat var="li" value="{!row.lineItems}">
+                                        <div style="display:table; width:100%;">
+                                            <span style="display:table-cell; padding-right:6px; font-size:8px; font-weight:bold; text-align:right; white-space:nowrap;">
+                                                <apex:outputPanel rendered="{!li.Status__c == 'Paid'}">
+                                                    <span style="color:#5cb85c;">{!li.Status__c}</span>
+                                                </apex:outputPanel>
+                                                <apex:outputPanel rendered="{!li.Status__c == 'Planned'}">
+                                                    <span style="color:#5184B8;">{!li.Status__c}</span>
+                                                </apex:outputPanel>
+                                                <apex:outputPanel rendered="{!li.Status__c == 'Partial Paid'}">
+                                                    <span style="color:#f0ad4e;">{!li.Status__c}</span>
+                                                </apex:outputPanel>
+                                                <apex:outputPanel rendered="{!AND(li.Status__c != 'Paid', li.Status__c != 'Planned', li.Status__c != 'Partial Paid')}">
+                                                    <span style="color:#d9534f;">{!li.Status__c}</span>
+                                                </apex:outputPanel>
+                                            </span>
+                                            <span style="display:table-cell; font-size:9px; font-weight:600; color:#5184B8; text-align:right;">
+                                                <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!li.Contract_Cost_Price__c}"/></apex:outputText>
+                                            </span>
+                                        </div>
+                                    </apex:repeat>
+                                </div>
+                            </div>
+
+                            <!-- Package Details -->
+                            <div style="font-size:9px; color:#333; line-height:1.7;">
+                                <apex:outputPanel rendered="{!row.pkg.Package_Term__r != null}">
+                                    <div>Selected Term: {!row.pkg.Package_Term__r.Name}</div>
+                                </apex:outputPanel>
+                                <apex:outputPanel rendered="{!row.pkg.Contract_Start_Date__c != null}">
+                                    <div>Start Date: <apex:outputText value="{0,date,dd-MM-yyyy}"><apex:param value="{!row.pkg.Contract_Start_Date__c}"/></apex:outputText></div>
+                                </apex:outputPanel>
+                                <apex:outputPanel rendered="{!row.pkg.Contract_End_Date__c != null}">
+                                    <div>Expiry Date: <apex:outputText value="{0,date,dd-MM-yyyy}"><apex:param value="{!row.pkg.Contract_End_Date__c}"/></apex:outputText></div>
+                                </apex:outputPanel>
+                                <apex:outputPanel rendered="{!row.pkg.Odometer_Start__c != null}">
+                                    <div>Start Odometer: <apex:outputText value="{0,number,###,##0}"><apex:param value="{!row.pkg.Odometer_Start__c}"/></apex:outputText> KM</div>
+                                </apex:outputPanel>
+                                <apex:outputPanel rendered="{!row.pkg.Odometer_End__c != null}">
+                                    <div>Expiry Odometer: <apex:outputText value="{0,number,###,##0}"><apex:param value="{!row.pkg.Odometer_End__c}"/></apex:outputText> KM</div>
+                                </apex:outputPanel>
+                            </div>
+                        </div>
+                    </apex:repeat>
+                </apex:outputPanel>
+
+                <!-- FOOTER: QTY + TOTAL -->
+                <div style="display:table; width:100%; margin-top:10px;">
+                    <div style="display:table-cell; width:50%; vertical-align:bottom;">
+                        <div style="font-size:9px; font-weight:bold; color:#333;">
+                            <strong>Qty:</strong> {!packages.size}
+                        </div>
+                    </div>
+                    <div style="display:table-cell; width:50%; vertical-align:top;">
+                        <table style="width:100%; border-collapse:collapse;">
+                            <tr>
+                                <td style="padding:6px 10px; font-size:10px; font-weight:bold; color:#333; text-align:right; border:1px solid #ddd;">Total Amount:</td>
+                                <td style="padding:6px 10px; font-size:10px; font-weight:bold; color:#333; text-align:right; border:1px solid #ddd;">
+                                    <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!grandTotal}"/></apex:outputText>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </body>
+    </html>
+</apex:page>

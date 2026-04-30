@@ -1,0 +1,53 @@
+<template>
+    <lightning-card title="Create Allocation Remittance" icon-name="standard:payment_gateway">
+
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Loading" size="small" variant="brand"></lightning-spinner>
+        </template>
+
+        <div class="slds-var-p-around_medium">
+
+            <template if:true={hasServices}>
+                <lightning-checkbox-group
+                    name="services"
+                    label="Select Services"
+                    options={serviceOptions}
+                    value={selectedServices}
+                    required
+                    onchange={handleServiceChange}>
+                </lightning-checkbox-group>
+            </template>
+
+            <template if:false={hasServices}>
+                <div class="slds-box slds-theme_shade slds-p-around_medium slds-text-align_center">
+                    <p>No services found for the selected applications. Please go back and select different applications.</p>
+                </div>
+            </template>
+
+            <template if:true={errorMessage}>
+                <div class="slds-box slds-theme_alert-texture slds-m-top_small">
+                    <p class="slds-text-color_error">{errorMessage}</p>
+                </div>
+            </template>
+
+        </div>
+
+        <div class="footer-divider"></div>
+
+        <div class="slds-var-p-horizontal_medium slds-var-p-vertical_small slds-grid slds-grid_align-end footer-buttons">
+            <lightning-button
+                label="Previous"
+                variant="neutral"
+                class="slds-m-right_small"
+                onclick={handlePrevious}>
+            </lightning-button>
+            <lightning-button
+                label="Create Remittance Form"
+                variant="brand"
+                onclick={handleCreate}
+                disabled={isCreateDisabled}>
+            </lightning-button>
+        </div>
+
+    </lightning-card>
+</template>

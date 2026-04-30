@@ -1,0 +1,252 @@
+<apex:page controller="ApplicationSummaryController"
+           
+           applyHtmlTag="false"
+           showHeader="false"
+           standardStylesheets="false"
+           cache="true">
+
+  <html>
+  <head>
+    <meta charset="UTF-8"/>
+    <style>
+      <!-- ---- colors & helpers ---->
+      :root { --blue:#0C2D5A; }
+      .force-print-color{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+      /* ---- page / type ---- */
+      @page { size:A4; margin:14mm 14mm 16mm 14mm; }
+      body  { font-family: Arial, Helvetica, sans-serif; font-size:11px; color:#111; }
+
+      h1.title { font-size:20px; margin:6px 0 6px; text-align:center; letter-spacing:.3px; }
+      .hr { height:0; border-top:1px solid #979797; margin:8px 0 12px; }
+
+      /* ---- header ---- */
+      table.header { width:100%; border-collapse:collapse; }
+      table.header td { vertical-align:top; }
+      .addr { font-size:10px; line-height:1.35; text-align:right; }
+      .pno  { color:#D12A8F; font-size:20px; font-weight:bold; }
+
+      /* ---- section bars ---- */
+      .section { margin:12px 0 10px; }
+      .sec-hd  { background:var(--blue); color:#fff; border:1px solid var(--blue);
+                 padding:7px 10px; font-weight:bold; text-transform:uppercase; }
+      .sec-wrap{ border:1px solid #111; border-top:none; }
+
+      /* ---- data tables ---- */
+      table.grid { width:100%; border-collapse:collapse; }
+      table.grid th, table.grid td { border:1px solid #111; padding:6px 8px; vertical-align:top; }
+      table.grid th { background:#fff; font-weight:bold; }  /* keep cells white per original */
+
+      .two-col { display:flex; gap:14px; }
+      .col { flex:1; }
+      .label { font-weight:bold; }
+      .right { text-align:right; }
+      .small { font-size:10px; }
+      .muted { color:#444; }
+
+      /* ---- keep your original summary panel styling ---- */
+      h2 { font-size:13px; margin:14px 0 6px; text-transform:uppercase; }
+      .summary { border:1px solid #111; padding:10px 12px; margin:8px 0 10px; }
+    </style>
+  </head>
+  <body class="force-print-color">
+
+    <!-- ===== HEADER (as original) ===== -->
+    <table class="header">
+      <tr>
+        <td style="width:55%;">
+          <!-- Left brand block (optional logos)
+               <apex:image url="{!$Resource.CLP_Logo}" width="140"/> -->
+          <div style="height:52px;"></div>
+        </td>
+        <td style="width:45%;" class="addr">
+          <div class="pno">P15111</div>
+          <!-- <apex:image url="{!$Resource.AProtect_Logo}" width="120"/><br/> -->
+          7250 Keele St. Suite 421<br/>
+          Concord, ON<br/>
+          L4K 1Z8<br/><br/>
+          Tel: (416) 661-7444<br/>
+          Fax: (416) 661-7448<br/>
+          Toll Free: 1-866-660-6444
+        </td>
+      </tr>
+    </table>
+
+    <h1 class="title">CAR LOAN PROTECTION APPLICATION</h1>
+    <div class="hr"></div>
+
+    <!-- ===== CUSTOMER / LESSEE (dark-blue bar) ===== -->
+    <div class="section">
+      <div class="sec-hd force-print-color">Customer / Lessee Information</div>
+      <div class="sec-wrap">
+        <table class="grid">
+          <tr>
+            <th>Last Name</th><td>{!VM.lastName}</td>
+            <th>First Name</th><td>{!VM.firstName}</td>
+          </tr>
+          <tr>
+            <th>Address</th><td colspan="3">{!VM.address}</td>
+          </tr>
+          <tr>
+            <th>City</th><td>{!VM.city}</td>
+            <th>Province</th><td>{!VM.province}</td>
+          </tr>
+          <tr>
+            <th>Postal Code</th><td>{!VM.postalCode}</td>
+            <th>Home phone</th><td>{!VM.homePhone}</td>
+          </tr>
+          <tr>
+            <th>Business phone</th><td>{!VM.businessPhone}</td>
+            <th>Email</th><td>{!VM.email}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== VEHICLE (dark-blue bar) ===== -->
+    <div class="section">
+      <div class="sec-hd force-print-color">Vehicle Information</div>
+      <div class="sec-wrap">
+        <table class="grid">
+          <tr>
+            <th>Year</th><td>{!VM.Year}</td>
+            <th>Make</th><td>{!VM.Make}</td>
+          </tr>
+          <tr>
+            <th>Model</th><td>{!VM.Model}</td>
+            <th>Odometer</th><td>{!VM.odometer}</td>
+          </tr>
+          <tr>
+            <th>Purchase Price</th>
+            <td>
+              <apex:outputText value="{0, number, currency}">
+                <apex:param value="{!VM.purchasePrice}"/>
+              </apex:outputText>
+            </td>
+            <th>V.I.N</th><td>{!VM.vin}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== DEALER (dark-blue bar) ===== -->
+    <div class="section">
+      <div class="sec-hd force-print-color">Dealer / Retailer Information</div>
+      <div class="sec-wrap">
+        <table class="grid">
+          <tr>
+            <th>Dealer name</th><td>{!VM.dealerName}</td>
+            <th>Dealer code</th><td>{!VM.dealerCode}</td>
+          </tr>
+          <tr>
+            <th>Dealer phone</th><td>{!VM.dealerPhone}</td>
+            <th>Dealer address</th><td>{!VM.dealerAddress}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ======= SUMMARY (unchanged from your original) ======= -->
+    <h2>Summary</h2>
+    <div class="summary">
+      <div><span class="label">GAP PLUS</span></div>
+      <div>Coverage Term: {!VM.coverageTerm}</div>
+      <div>Amount Financed: {!VM.amountFinancedRange}</div>
+    </div>
+
+    <div class="two-col">
+      <div class="col">
+        <h2>Financial Institution</h2>
+        <div class="small muted">{!IF(ISBLANK(VM.financialInstitution),'',VM.financialInstitution)}</div>
+      </div>
+      <div class="col">
+        <h2>Office Use</h2>
+        <table class="grid">
+          <tr>
+            <th>Charge</th>
+            <td class="right">
+              <apex:outputText value="{0, number, currency}">
+                <apex:param value="{!VM.charge}"/>
+              </apex:outputText>
+            </td>
+          </tr>
+          <tr>
+            <th>HST/GST</th>
+            <td class="right">
+              <apex:outputText value="{0, number, currency}">
+                <apex:param value="{!VM.tax}"/>
+              </apex:outputText>
+            </td>
+          </tr>
+          <tr>
+            <th>Total</th>
+            <td class="right">
+              <apex:outputText value="{0, number, currency}">
+                <apex:param value="{!VM.total}"/>
+              </apex:outputText>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="tight small" style="margin-top:8px;">
+      <p><strong>IMPORTANT:</strong> PLEASE DO NOT ACCEPT INSURANCE OFFERS/SETTLEMENTS WITHOUT CONTACTING A-PROTECT
+      AS IT MAY AFFECT THE OVERALL GAP SETTLEMENT.</p>
+    </div>
+
+    <h2>Terms and Conditions</h2>
+    <div class="small tight">
+      <ol>
+        <li>This Car Loan Protection Application is solely intended as an offer, with all considerations that the information provided above is valid and true.</li>
+        <li>Car Loan Protection coverage commences at the time the Finance Contract is executed. For GAP Coverage/Collision Deductible Programs: The selected coverage term and amount must be equivalent to the Financed Loan Term/Amount.</li>
+        <li>CLAIMS - The Customer must contact A-Protect GAP Coverage during business hours (Monday-Friday) from 9 AM - 5 PM EST at 1.866.660.6444 or 416.661.7444.</li>
+        <li>The Customer must inform and notify A-Protect prior to the acceptance/issuance of any compensation issued by the primary insurer. A list of required documents... (see next page).</li>
+        <li>Police/fire reports must be filed the date of the accident, fire or theft. Standalone occurrence numbers or Self Reporting Collision Reports will not be accepted.</li>
+        <li>Commercial/Business use vehicles are not permitted under the Car Loan Protection Program. *Exclusively for Driver GAP Coverage program, light commercial/business use such as rideshare/delivery purposes are permitted.</li>
+        <li>I hereby certify that I have read, understood and agreed to all the Terms and Conditions set forth on all two (2) pages of this Contract ...</li>
+      </ol>
+    </div>
+
+    <div class="sign-row small">
+      <div>DATE OF PURCHASE: <span class="underline">{!VM.purchaseDate}</span></div>
+      <div>EXPIRATION DATE: <span class="underline">{!VM.expirationDate}</span></div>
+    </div>
+    <div class="sign-row small">
+      <div>SELLING DEALER: <span class="underline">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      <div>APPLICANT: <span class="underline">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+    </div>
+
+    <!-- PAGE 2 -->
+    <div class="page-break"></div>
+
+    <h2>GAP Coverage (Guaranteed Asset Protection) – Service Agreement</h2>
+    <div class="small">
+      <p>A-Protect GAP Coverage is an optional program used for financed/leased vehicles. GAP Coverage is intended to protect you against most of the shortfall on your vehicle’s auto loan due to total loss. A-Protect will reimburse up to the maximum amount as indicated on Liability Coverage (Part 2) ...</p>
+      <h3>Part 1) Definitions</h3>
+      <p class="muted">Actual Cash Value, Amount Financed, Canadian Black Book Value, Claim, Claims Administrator, ... (full list reproduced from the contract)</p>
+
+      <h3>Part 2) Financed Vehicle Coverage</h3>
+      <p>2.1 Commencement and Expiry ... 2.2 Total Qualifying Amount ... 2.3 Loyalty Credit ... 2.4 Primary Insurance Policy ... 2.5 Transfers and Renewals ... 2.6 Cancellation and Termination ...</p>
+
+      <h3>Part 3) GAP Policy Holder Responsibilities</h3>
+      <ul>
+        <li>Continue to make all applicable payments to the Financial Institution after the incident.</li>
+        <li>Maintain the vehicle by adhering to the manufacturer maintenance schedule and keep all original service records.</li>
+        <li>Do not continue to drive the vehicle after any damages or incidents to prevent further damage.</li>
+        <li>Make reasonable efforts to recover a stolen vehicle (if applicable).</li>
+        <li>Provide accurate information to A-Protect and its agents, etc.</li>
+      </ul>
+
+      <h3>Part 4) Claim Procedures</h3>
+      <p>Call the Claims Administrator within 30 days from the date of Total Loss prior to accepting any settlement offers. Provide police report, proof of payment under Primary Insurance, claim report, proof of Outstanding Loan Amount, requisition form. Adjustments may apply for distance allowance overages, prior accidents, etc.</p>
+
+      <h3>Part 5) GAP Coverage Exclusions</h3>
+      <p>Includes (summarized): modified vehicles; no Primary Insurance; loss before delivery; >96 months; repossession; salvage/rebuilt; arrears; unlawful acts; non-Total Loss; unreported theft; >185,000 km; luxury/competition vehicles; nuclear/war/terrorism; commercial use, etc. Terms subject to change without notice.</p>
+
+      <p class="small muted">INITIALS: __________</p>
+    </div>
+
+  </body>
+  </html>
+</apex:page>

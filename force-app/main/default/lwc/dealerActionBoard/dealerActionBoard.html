@@ -1,0 +1,253 @@
+<template>
+    <div class="dashboard-container">
+        <!-- LEFT BUTTON GRID -->
+        <div class="button-grid">
+            <!-- BUILD QUOTE -->
+            <button class="tile" type="button" data-action="build-quote" onclick={handleClick}>
+                <div class="icon">
+                        <img src={staticResources.buildQuote} alt="Build Quote" class="tile-image" />
+                </div>
+                <p>BUILD QUOTE</p>
+            </button>
+
+            <!-- ADD NEW APPLICATION -->
+            <button class="tile" type="button" data-action="add-new-application" onclick={handleClick}>
+                <div class="icon">
+                    <img src={staticResources.addNewApplication} alt="Add New Application" class="tile-image" />
+                </div>
+                <p>ADD NEW APPLICATION</p>
+            </button>
+
+            <!-- VIEW QUOTES -->
+            <button class="tile" type="button" data-action="view-quotes" onclick={handleClick}>
+                <div class="icon">
+                    <img src={staticResources.viewQuoteAndViewApplication} alt="View Quotes" class="tile-image" />
+                </div>
+                <p>VIEW QUOTES</p>
+            </button>
+
+            <!-- VIEW APPLICATIONS -->
+            <button class="tile" type="button" data-action="view-applications" onclick={handleClick}>
+                <div class="icon">
+                    <img src={staticResources.viewQuoteAndViewApplication} alt="View Applications" class="tile-image" />
+                </div>
+                <p>VIEW APPLICATIONS</p>
+            </button>
+
+            <!-- MAKE A PAYMENT -->
+            <button class="tile" type="button" data-action="make-a-payment" onclick={handleClick}>
+                <div class="icon">
+                    <img src={staticResources.makePayment} alt="Make A Payment" class="tile-image" />
+                </div>
+                <p>MAKE A PAYMENT</p>
+            </button>
+
+            <!-- DEALER SUPPORT -->
+            <button class="tile" type="button" data-action="dealer-support" onclick={handleClick}>
+                <div class="icon">
+                    <img src={staticResources.dealerSuppost} alt="Dealer Support" class="tile-image" />
+                </div>
+                <p>DEALER SUPPORT</p>
+            </button>
+        </div>
+
+        <!-- RIGHT MESSAGE BOARD -->
+        <div class="message-board">
+            <div class="board-header">
+                <h2>MESSAGE BOARD</h2>
+            </div>
+            <div class="board-tabs">
+                <button class={aProtectTabClass} data-tab="aprotect" onclick={handleTabClick}>A-Protect Notices</button>
+                <button class={dealerTabClass} data-tab="dealer" onclick={handleTabClick}>Dealer Notices</button>
+            </div>
+            <div class="board-body">
+                <template if:true={isAProtectTab}>
+                    <template if:true={hasCompanyNotices}>
+                        <template for:each={formattedCompanyNotices} for:item="notice">
+                            <div key={notice.Id} class="notice-item">
+                                <span class="notice-date">{notice.formattedDate}</span>
+                                <lightning-formatted-rich-text value={notice.Notice_Message__c}></lightning-formatted-rich-text>
+                            </div>
+                        </template>
+                    </template>
+                    <template if:false={hasCompanyNotices}>
+                        <p class="empty-msg">No notices available.</p>
+                    </template>
+                </template>
+                <template if:true={isDealerTab}>
+                    <template if:true={hasDealerNotices}>
+                        <template for:each={formattedDealerNotices} for:item="notice">
+                            <div key={notice.Id} class="notice-item">
+                                <span class="notice-date">{notice.formattedDate}</span>
+                                <lightning-formatted-rich-text value={notice.Notice_Message__c}></lightning-formatted-rich-text>
+                            </div>
+                        </template>
+                    </template>
+                    <template if:false={hasDealerNotices}>
+                        <p class="empty-msg">No dealer notices available.</p>
+                    </template>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Make Payment Modal -->
+    <template if:true={showMakePaymentModal}>
+        <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="modal-heading-make-payment" class="slds-modal slds-fade-in-open">
+            <div class="make-payment-modal">
+                <!-- Close button -->
+                <button class="mpm-close-btn" onclick={handleCloseMakePaymentModal} aria-label="Close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="#444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+
+                <!-- Title -->
+                <div class="mpm-title-area">
+                    <h2 class="mpm-title" id="modal-heading-make-payment">Remittance Form</h2>
+                </div>
+
+                <!-- Content -->
+                <div class="make-payment-modal-content">
+                    <template if:true={isLoadingApplications}>
+                        <div class="no-apps-msg">
+                            <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+                        </div>
+                    </template>
+                    <template if:false={isLoadingApplications}>
+                        <template if:true={hasUnpaidApplications}>
+                            <!-- Table -->
+                            <div class="rf-table">
+                                <!-- Column Headers -->
+                                <div class="rf-table-header">
+                                    <div class="rf-col-app">
+                                        <input type="checkbox" class="rf-select-all" checked={isAllAppsSelected} onchange={handleSelectAllApps} title="Select all" />
+                                        APPLICATION
+                                    </div>
+                                    <div class="rf-col-invoice">INVOICE DETAILS</div>
+                                </div>
+
+                                <!-- Application Rows -->
+                                <template for:each={applicationsWithSelection} for:item="app">
+                                    <div key={app.id} class="rf-table-row">
+                                        <!-- Left: Application info -->
+                                        <div class="rf-col-app rf-app-cell">
+                                            <div class="rf-app-id-row">
+                                                <input
+                                                    type="checkbox"
+                                                    class="rf-row-checkbox"
+                                                    data-id={app.id}
+                                                    checked={app.isSelected}
+                                                    onchange={handleAppCheckboxChange}
+                                                />
+                                                <span class="rf-label">Application ID #</span>
+                                                <span class="rf-value">{app.appNumber}</span>
+                                            </div>
+                                            <div class="rf-app-detail">
+                                                <span class="rf-label">Customer Name</span>
+                                                <span class="rf-value">{app.customerName}</span>
+                                            </div>
+                                            <div class="rf-app-detail">
+                                                <span class="rf-label">Vehicle Year/Make/Model/Trim</span>
+                                                <span class="rf-value">{app.vehicleInfo}</span>
+                                            </div>
+                                            <div class="rf-app-detail">
+                                                <span class="rf-label">VIN #</span>
+                                                <span class="rf-value">{app.vin}</span>
+                                            </div>
+                                        </div>
+                                        <!-- Right: Invoice details -->
+                                        <div class="rf-col-invoice rf-invoice-cell">
+                                            <template for:each={app.packages} for:item="pkg">
+                                                <div key={pkg.id} class="rf-invoice-line">
+                                                    <span class="rf-inv-label">{pkg.name}:</span>
+                                                    <span class="rf-inv-value">{pkg.formattedPrice}</span>
+                                                </div>
+                                            </template>
+                                            <div class="rf-invoice-divider"></div>
+                                            <div class="rf-invoice-line">
+                                                <span class="rf-inv-label">Sub Total:</span>
+                                                <span class="rf-inv-value">{app.formattedSubTotal}</span>
+                                            </div>
+                                            <div class="rf-invoice-line rf-invoice-total">
+                                                <span class="rf-inv-label"><strong>Total:</strong></span>
+                                                <span class="rf-inv-value"><strong>{app.formattedTotal}</strong></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- Remittance Form Total -->
+                            <div class="rf-grand-total">
+                                <strong>Remittance Form Total: {remittanceFormTotalFormatted}</strong>
+                            </div>
+                        </template>
+                        <template if:false={hasUnpaidApplications}>
+                            <p class="no-apps-msg">No unpaid submitted applications found.</p>
+                        </template>
+                    </template>
+                </div>
+
+                <!-- Footer -->
+                <div class="make-payment-modal-footer">
+                    <button class="btn-create-remittance" onclick={handleCreateRemittanceForm} disabled={isCreateRemittanceDisabled}>
+                        <template if:false={isCreatingRemittance}>Continue to Remittance Form</template>
+                        <template if:true={isCreatingRemittance}>Creating...</template>
+                    </button>
+                </div>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open" onclick={handleCloseMakePaymentModal}></div>
+    </template>
+
+    <!-- New Quote Modal -->
+    <template if:true={showNewQuoteModal}>
+        <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="modal-heading-new-quote" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container Create-New-modal">
+                <button class="modal-close-btn" onclick={handleCloseNewQuoteModal} aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <div class="slds-p-left_medium slds-p-right_medium slds-p-top_medium">
+                    <h2 id="modal-heading-new-quote" class="modal-title">Create New Quote</h2>
+                </div>
+                <div class="slds-p-left_medium slds-p-right_medium">
+                    <p class="cancellation-message">
+                        Would you like to create a new quote?
+                    </p>
+                </div>
+                <div class="slds-p-left_medium slds-p-right_medium slds-p-top_medium">
+                    <button class="modal-btn-continue slds-p-around_x-small" onclick={handleContinueToCreateQuote}>Continue to Create New Quote</button>
+                </div>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open" onclick={handleCloseNewQuoteModal}></div>
+    </template>
+
+    <!-- New Application Modal -->
+    <template if:true={showNewApplicationModal}>
+        <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="modal-heading-new-application" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container Create-New-modal">
+                <button class="modal-close-btn" onclick={handleCloseNewApplicationModal} aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <div class="slds-p-left_medium slds-p-right_medium slds-p-top_medium">
+                    <h2 id="modal-heading-new-application" class="modal-title">Create New Application</h2>
+                </div>
+                <div class="slds-p-left_medium slds-p-right_medium">
+                    <p class="cancellation-message">
+                        Would you like to create a new application?
+                    </p>
+                </div>
+                <div class="slds-p-left_medium slds-p-right_medium slds-p-top_medium">
+                    <button class="modal-btn-continue slds-p-around_x-small" onclick={handleContinueToCreateApplication}>Continue to Create New Application</button>
+                </div>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open" onclick={handleCloseNewApplicationModal}></div>
+    </template>
+</template>

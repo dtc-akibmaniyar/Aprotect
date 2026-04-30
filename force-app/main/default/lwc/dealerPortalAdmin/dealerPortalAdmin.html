@@ -1,0 +1,26 @@
+<template>
+    <div class="admin-container">
+        <h1 class="admin-title">ADMINISTRATION</h1>
+        
+        <!-- Tab Navigation -->
+        <div class="tab-container">
+            <ul class="tabs">
+                <template for:each={tabs} for:item="tab">
+                    <li key={tab.value} class={tab.tabClass} onclick={handleTabClick} data-id={tab.value}>
+                        {tab.label}
+                    </li>
+                </template>
+            </ul>
+        </div>
+        
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- Markup Tab -->
+            <template if:true={isMarkupTab}>
+                <c-dealer-portal-admin-unified-markup></c-dealer-portal-admin-unified-markup>
+            </template>
+            
+            <!-- Future Tabs Content Will Go Here -->
+        </div>
+    </div>
+</template>

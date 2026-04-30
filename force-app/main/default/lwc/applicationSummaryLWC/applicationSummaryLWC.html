@@ -1,0 +1,44 @@
+<template>
+    <div class="summary-container">
+        <div class="summary-box">
+            <h3>SUMMARY</h3>
+            <ul class="summary-list">
+                <li>Package Plan Type: {packagePlanType}</li>
+                <li>Package: {package}</li>
+                <li>Package Tier: {packageTier}</li>
+                <li>Package Term: {packageTerm}</li>
+            </ul>
+
+            <h3>INCLUDED OPTIONS</h3>
+<template if:true={hasIncludedOptions}>
+    <ul class="options-list">
+        <template for:each={includedOptions} for:item="option">
+            <li key={option.Id}>
+                <a href={option.recordUrl} 
+                   onclick={handleOptionClick} 
+                   data-id={option.Id} 
+                   class="option-link">
+                    {option.Option__c}
+                </a>
+            </li>
+        </template>
+    </ul>
+</template>
+<template if:false={hasIncludedOptions}>
+    <p class="no-options">No included options</p>
+</template>
+
+            <h3>ADDITIONAL OPTIONS</h3>
+            <template if:true={hasOptionalOptions}>
+                <ul class="options-list">
+                    <template for:each={optionalOptions} for:item="option">
+                        <li key={option.Id}>{option.Option__c}</li>
+                    </template>
+                </ul>
+            </template>
+            <template if:false={hasOptionalOptions}>
+                <p class="no-options">No optional options</p>
+            </template>
+        </div>
+    </div>
+</template>

@@ -1,0 +1,97 @@
+<template>
+    <lightning-card  variant="Narrow"  title={title} icon-name="standard:document">
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Loading" size="small" variant="brand"></lightning-spinner>
+        </template>
+        <lightning-button variant="brand" label="Send Applications" title="Send Email" icon-name="utility:email"
+            onclick={handleSendEmail} slot="actions" >
+        </lightning-button>
+        
+        <div class="slds-var-p-around_small">
+            <lightning-datatable
+                key-field="id"
+                data={dataList}
+                columns={columnsList}
+                onrowselection={handleRowSelection}>
+            </lightning-datatable>
+        </div>
+
+        <!-- Envelope Status Related List -->
+        <div class="slds-var-p-around_small">
+            <c-envelope-status-related-list></c-envelope-status-related-list>
+        </div>
+    </lightning-card>
+
+    <!-- DocuSign Modal -->
+    <template if:true={showDocuSignModal}>
+        <!-- Modal Backdrop -->
+        <div class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="width: 600px;">
+                <!-- Modal Header -->
+                <div class="slds-modal__header">
+                    <h2 id="modal-heading-01" class="slds-modal__title slds-hyphenate">Send Documents</h2>
+                    <button class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse" title="Close dialog" onclick={handleCloseModal}>
+                        <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                        <span class="slds-assistive-text">Close</span>
+                    </button>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="slds-modal__content slds-var-p-around_medium">
+                    <!-- Signer Information -->
+                    <div class="slds-form-element">
+                        <div class="slds-form-element__control">
+                            <lightning-input disabled="true" label="Signer Email" type="email" id="signerEmail"
+                                value={signerEmail} onchange={handleSignerEmailChange}></lightning-input>
+                        </div>
+                    </div>
+
+                    <div class="slds-form-element">
+                        <div class="slds-form-element__control">
+                            <lightning-input disabled="true" label="Signer Name" type="text" id="signerName"
+                                value={signerName} onchange={handleSignerNameChange}></lightning-input>
+                        </div>
+                    </div>
+
+                    <!-- <div class="slds-form-element">
+                        <label class="slds-form-element__label">
+                            <abbr class="slds-required">*</abbr> Signing Type
+                        </label>
+                        <div class="slds-form-element__control">
+                            <lightning-radio-group name="signingType" options={signingTypeOptions}
+                                value={selectedSigningType} onchange={handleSigningTypeChange}></lightning-radio-group>
+                        </div>
+                    </div> -->
+
+                    <!-- <template if:true={isEmbeddedSigning}>
+                        <div class="slds-form-element">
+                            <label class="slds-form-element__label" for="returnUrl">Return URL (Optional)</label>
+                            <div class="slds-form-element__control">
+                                <lightning-input type="url" id="returnUrl" placeholder="https://your-portal.com"
+                                    value={returnUrl} onchange={handleReturnUrlChange}></lightning-input>
+                            </div>
+                        </div>
+                    </template> -->
+
+                    <!-- <div class="slds-form-element">
+                        <div class="slds-form-element__control">
+                            <label class="slds-checkbox">
+                                <input type="checkbox" id="useEnvelopeWithTabs" checked={useEnvelopeWithTabs} onchange={handleUseEnvelopeWithTabsChange}/>
+                                <span class="slds-checkbox_faux"></span>
+                                <span class="slds-form-element__label">Use sendEnvelopeWithTabs Method (Test with Signature & Date Tabs)</span>
+                            </label>
+                        </div>
+                    </div> -->
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="slds-modal__footer">
+                    <lightning-button class="slds-m-right_small" variant="neutral" label="Cancel" onclick={handleCloseModal}></lightning-button>
+                    <lightning-button variant="brand" label="Send" onclick={handleSendDocuSign}></lightning-button>
+                </div>
+            </div>
+        </div>
+        <!-- Modal Backdrop Overlay -->
+        <div class="slds-backdrop slds-backdrop_open" onclick={handleCloseModal}></div>
+    </template>
+</template>

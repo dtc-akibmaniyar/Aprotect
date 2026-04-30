@@ -1,0 +1,32 @@
+<aura:component implements="force:appHostable,flexipage:availableForAllPageTypes,force:hasRecordId,force:lightningQuickAction">
+    <aura:handler event="force:refreshView" action="{!c.doInit}"/>
+    <aura:attribute name="recordId" type="String" />
+    
+    <div class="slds-card">
+        <!-- Header with refresh button -->
+        <div class="slds-card__header slds-grid">
+            <div class="slds-media slds-media_center slds-has-flexi-truncate">
+                <div class="slds-media__body">
+                    <h2 class="slds-card__header-title">Package Options</h2>
+                </div>
+                <div class="slds-no-flex">
+                    <lightning:button 
+                        label="Refresh"
+                        iconName="utility:refresh"
+                        iconPosition="left"
+                        variant="neutral"
+                        onclick="{!c.handleManualRefresh}"/>
+                </div>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="slds-card__body">
+            <c:bulkPackageOptionLWC 
+                aura:id="lwcComponent"
+                recordId="{!v.recordId}"
+                onrefresh="{!c.handleRefresh}">
+            </c:bulkPackageOptionLWC>
+        </div>
+    </div>
+</aura:component>

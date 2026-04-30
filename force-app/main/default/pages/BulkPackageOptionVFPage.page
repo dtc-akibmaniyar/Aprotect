@@ -1,0 +1,43 @@
+<apex:page controller="BulkPackageOptionController" lightningStylesheets="true">
+    <apex:form >
+        <apex:pageBlock title="Bulk Package Option Creation">
+            
+            <!-- Buttons Section -->
+            <apex:pageBlockButtons >
+                <apex:commandButton value="Save All" action="{!saveRecords}" rerender="recordsTable,messagesPanel"/>
+                <apex:commandButton value="Add Row" action="{!addRow}" rerender="recordsTable"/>
+            </apex:pageBlockButtons>
+            
+            <apex:pageMessages id="messagesPanel"/>
+            
+            <!-- Records Table -->
+            <apex:pageBlockTable value="{!packageOptionList}" var="po" id="recordsTable">
+                
+                <!-- Selection Type -->
+                <apex:column headerValue="Selection Type">
+                    <apex:selectList value="{!po.selectionType}" size="1">
+                        <apex:selectOptions value="{!selectionTypeOptions}"/>
+                    </apex:selectList>
+                </apex:column>
+                
+                <!-- Option Lookup -->
+                <apex:column headerValue="Option">
+                    <apex:inputField value="{!po.packageOption.Option__c}"/>
+                </apex:column>
+                
+                <!-- Price -->
+                <apex:column headerValue="Price">
+                    <apex:inputField value="{!po.packageOption.Price__c}"/>
+                </apex:column>
+                
+                <!-- Remove Button -->
+                <apex:column headerValue="Action">
+                    <apex:commandButton value="Remove" action="{!removeRow}" rerender="recordsTable">
+                        <apex:param name="rowIndex" value="{!po.index}" assignTo="{!selectedRowIndex}"/>
+                    </apex:commandButton>
+                </apex:column>
+                
+            </apex:pageBlockTable>
+        </apex:pageBlock>
+    </apex:form>
+</apex:page>

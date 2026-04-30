@@ -1,0 +1,506 @@
+/* Typography System - CSS Custom Properties */
+:host {
+    display: block;
+    max-width: 100%;
+    overflow-x: hidden;
+    --font-family-primary: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    
+    /* Font Sizes */
+    --font-size-title: 1.75rem; /* 28px */
+    --font-size-instruction: 0.9rem; /* 14.4px */
+    --font-size-section-label: 0.875rem; /* 14px */
+    --font-size-field-label: 0.75rem; /* 12px */
+    --font-size-input: 0.9rem; /* 14.4px */
+    --font-size-status: 0.85rem; /* 13.6px */
+    --font-size-button: 0.875rem; /* 14px */
+    --font-size-help: 0.8rem; /* 12.8px */
+    
+    /* Font Weights */
+    --font-weight-title: 700;
+    --font-weight-section: 700;
+    --font-weight-field-label: 600;
+    --font-weight-status: 500;
+    --font-weight-button: 600;
+    --font-weight-regular: 400;
+    
+    /* Colors */
+    --color-title: #1a1a1a;
+    --color-instruction: #4a4a4a;
+    --color-section-label: #2c2c2c;
+    --color-field-label: #666666;
+    --color-input: #1a1a1a;
+    --color-success: #28a745;
+    --color-warning: #ffc107;
+    --color-help: #6c757d;
+    
+    /* Line Heights */
+    --line-height-instruction: 1.5;
+    --line-height-normal: 1.4;
+    
+    /* Override SLDS border-radius for sharp corners */
+    --slds-c-input-radius-border: 0;
+    --slds-c-button-radius-border: 0;
+    
+    /* Override SLDS border color for light grey borders */
+    --slds-c-input-color-border: #d0d0d0;
+    --slds-c-input-color-border-focus: #d0d0d0;
+    --slds-c-input-color-border-hover: #d0d0d0;
+    --slds-c-combobox-color-border: #d0d0d0;
+    --slds-c-combobox-color-border-focus: #d0d0d0;
+    --slds-c-combobox-color-border-hover: #d0d0d0;
+    --slds-c-textarea-color-border: #d0d0d0;
+    --slds-c-textarea-color-border-focus: #d0d0d0;
+    --slds-c-textarea-color-border-hover: #d0d0d0;
+    --slds-c-button-color-border: #d0d0d0;
+}
+
+/* Remove rounded corners from Lightning Input Fields */
+lightning-input .slds-input,
+lightning-input input,
+lightning-combobox .slds-select,
+lightning-combobox .slds-combobox__input,
+lightning-combobox select,
+lightning-combobox input,
+lightning-textarea .slds-textarea,
+lightning-textarea textarea {
+    border-radius: 0 !important;
+    border-color: #d0d0d0 !important;
+}
+
+/* Remove rounded corners from Lightning Buttons */
+lightning-button .slds-button,
+lightning-button button,
+lightning-button-icon .slds-button_icon,
+lightning-button-icon button {
+    border-radius: 0 !important;
+}
+
+/* Global SLDS class overrides for all input fields and buttons */
+.slds-input,
+.slds-select,
+.slds-textarea,
+.slds-combobox__input,
+.slds-combobox__input input,
+.slds-form-element__control .slds-input,
+.slds-form-element__control .slds-select,
+.slds-form-element__control .slds-textarea,
+.slds-button,
+.slds-button_neutral,
+.slds-button_brand,
+.slds-button_icon,
+.slds-button_icon-container,
+.slds-button_icon-inverse {
+    border-radius: 0 !important;
+}
+
+/* Set light grey borders for all input fields */
+.slds-input,
+.slds-select,
+.slds-textarea,
+.slds-combobox__input,
+.slds-combobox__input input,
+.slds-form-element__control .slds-input,
+.slds-form-element__control .slds-select,
+.slds-form-element__control .slds-textarea {
+    border-color: #d0d0d0 !important;
+}
+
+/* Target combobox dropdown and input wrapper */
+.slds-combobox,
+.slds-combobox__form-element,
+.slds-combobox__input-value,
+.slds-combobox__input {
+    border-radius: 0 !important;
+    border-color: #d0d0d0 !important;
+}
+
+/* Target all input types */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="email"],
+input[type="tel"],
+input[type="url"],
+select,
+textarea {
+    border-radius: 0 !important;
+    border-color: #d0d0d0 !important;
+}
+
+/* Card styling */
+lightning-card {
+    font-family: var(--font-family-primary);
+}
+
+lightning-card .slds-card {
+    border-radius: 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Table wrapper - fit within screen flow, no horizontal scroll */
+.table-wrapper {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: visible;
+}
+
+/* Table styling - fits container */
+.slds-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+    max-width: 100%;
+    table-layout: fixed;
+}
+
+.slds-table th {
+    background-color: #5184b8;
+    font-size: var(--font-size-field-label);
+    font-weight: var(--font-weight-field-label);
+    color: #ffffff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.5rem 0.4rem;
+    border-bottom: 2px solid #3d6a9e;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Header alignment: center for serial and actions, left for rest */
+.slds-table th.col-option .slds-truncate,
+.slds-table th.col-category .slds-truncate,
+.slds-table th.col-text .slds-truncate,
+.slds-table th.col-value .slds-truncate,
+.slds-table th.col-price .slds-truncate {
+    text-align: left !important;
+}
+
+/* Match header padding for Option/Inclusion/Exclusion so headers align with fields */
+.slds-table th.col-option,
+.slds-table th.col-category,
+.slds-table th.col-text,
+.slds-table th.col-value,
+.slds-table th.col-price {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+}
+
+.slds-table td {
+    padding: 0.5rem 0.4rem;
+    border-bottom: 1px solid #e0e0e0;
+    vertical-align: top;
+    word-wrap: break-word;
+    overflow: hidden;
+}
+
+.slds-table_bordered {
+    border: 1px solid #e0e0e0;
+    border-radius: 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.slds-table_bordered th,
+.slds-table_bordered td {
+    border-right: 1px solid #e0e0e0;
+}
+
+.slds-table_bordered th:last-child,
+.slds-table_bordered td:last-child {
+    border-right: none;
+}
+
+/* Column widths - percentage-based to fit screen flow (no horizontal scroll) */
+.col-serial {
+    width: 6% !important;
+    min-width: 2.5rem;
+    text-align: center !important;
+}
+
+.col-option {
+    width: 18% !important;
+    min-width: 0;
+    text-align: left !important;
+}
+
+.col-category {
+    width: 20% !important;
+    min-width: 0;
+    text-align: left !important;
+}
+
+.col-text {
+    width: 26% !important;
+    min-width: 0;
+    text-align: left !important;
+}
+
+.col-value {
+    width: 14% !important;
+    min-width: 0;
+    text-align: left !important;
+}
+
+.col-price {
+    width: 12% !important;
+    min-width: 0;
+    text-align: left !important;
+}
+
+.col-actions {
+    width: 8% !important;
+    min-width: 2.5rem;
+    text-align: center !important;
+}
+
+/* Required asterisk in column headers */
+.slds-table th.required-header .slds-required,
+.slds-table th .slds-required {
+    color: #ffffff;
+    font-weight: 700;
+    text-decoration: none;
+    margin-left: 2px;
+}
+
+/* Ensure table cells respect width and don't cause overflow */
+.slds-table td {
+    max-width: 0;
+}
+
+.slds-table td > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
+
+/* Center serial number column - header and cell */
+.slds-table th.col-serial,
+.slds-table th.col-serial .slds-truncate {
+    text-align: center !important;
+}
+
+.slds-table td:first-child {
+    text-align: center !important;
+    font-weight: 600;
+    color: #666666;
+    vertical-align: middle;
+}
+
+/* Center actions column - header and cell */
+.slds-table th.col-actions,
+.slds-table th.col-actions .slds-truncate {
+    text-align: center !important;
+}
+
+.slds-table td:last-child {
+    text-align: center !important;
+    vertical-align: middle;
+}
+
+/* Center the delete icon (action button) in actions cell */
+.slds-table td:last-child lightning-button-icon {
+    display: inline-block;
+}
+
+/* Option, Inclusion, Exclusion - exact alignment: same padding, no extra margins */
+.slds-table td:not(:first-child):not(:last-child) {
+    text-align: left !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    vertical-align: top;
+}
+
+/* Zero out margins on form elements so Option/Inclusion/Exclusion line up */
+.slds-table td:not(:first-child):not(:last-child) lightning-combobox,
+.slds-table td:not(:first-child):not(:last-child) lightning-input,
+.slds-table td:not(:first-child):not(:last-child) lightning-textarea {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: left;
+}
+
+.slds-table td:not(:first-child):not(:last-child) lightning-combobox .slds-form-element,
+.slds-table td:not(:first-child):not(:last-child) lightning-input .slds-form-element,
+.slds-table td:not(:first-child):not(:last-child) lightning-textarea .slds-form-element {
+    margin: 0 !important;
+    width: 100% !important;
+}
+
+.slds-table td:not(:first-child):not(:last-child) .slds-form-element__control,
+.slds-table td:not(:first-child):not(:last-child) .slds-combobox__form-element,
+.slds-table td:not(:first-child):not(:last-child) .slds-form-element__label {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.slds-table td:not(:first-child):not(:last-child) .slds-form-element__control {
+    display: block;
+    width: 100%;
+}
+
+.slds-table td:not(:first-child):not(:last-child) input,
+.slds-table td:not(:first-child):not(:last-child) textarea,
+.slds-table td:not(:first-child):not(:last-child) .slds-input,
+.slds-table td:not(:first-child):not(:last-child) .slds-textarea,
+.slds-table td:not(:first-child):not(:last-child) .slds-combobox__input {
+    text-align: left !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+}
+
+/* Hide any label/helper in table to keep Option/Inclusion/Exclusion rows aligned */
+.slds-table td:not(:first-child):not(:last-child) .slds-form-element__label,
+.slds-table td:not(:first-child):not(:last-child) .slds-form-element__help {
+    display: none !important;
+}
+
+/* Align combobox inner input with textarea/input - remove extra wrapper padding */
+.slds-table td .slds-combobox .slds-combobox__form-element,
+.slds-table td .slds-combobox .slds-listbox {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* Better spacing for form elements in table - allow shrink for flow screen */
+.slds-table td lightning-combobox,
+.slds-table td lightning-input,
+.slds-table td lightning-textarea {
+    width: 100%;
+    min-width: 0;
+}
+
+.slds-table td lightning-combobox .slds-form-element,
+.slds-table td lightning-input .slds-form-element,
+.slds-table td lightning-textarea .slds-form-element {
+    width: 100%;
+    min-width: 0;
+}
+
+.slds-table td .slds-form-element__control,
+.slds-table td .slds-combobox__form-element {
+    min-width: 0;
+}
+
+/* Display name and selection type */
+.slds-text-heading_small {
+    font-size: var(--font-size-section-label);
+    font-weight: var(--font-weight-section);
+    color: var(--color-section-label);
+    margin-bottom: 1rem;
+}
+
+/* Selection type text - red color */
+.selection-type-text {
+    color: #c23934 !important;
+    font-weight: 700;
+}
+
+/* Button styling */
+lightning-button .slds-button {
+    font-size: var(--font-size-button);
+    font-weight: var(--font-weight-button);
+    border-radius: 0;
+    transition: all 0.2s ease;
+}
+
+lightning-button .slds-button_brand {
+    background-color: #1e88ff;
+    border-color: #1a78e0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+lightning-button .slds-button_brand:hover {
+    background-color: #1b7de6;
+    border-color: #166ac6;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+lightning-button .slds-button_neutral {
+    background-color: #ffffff;
+    border-color: #d0d0d0;
+    color: #1a1a1a;
+}
+
+lightning-button .slds-button_neutral:hover {
+    background-color: #f8f9fa;
+    border-color: #b0b0b0;
+}
+
+lightning-button-icon .slds-button_icon {
+    border-radius: 0;
+    border-color: #d0d0d0;
+}
+
+lightning-button-icon .slds-button_icon:hover {
+    background-color: #f8f9fa;
+}
+
+/* Textarea styling */
+lightning-textarea .slds-textarea {
+    font-size: var(--font-size-input);
+    font-family: var(--font-family-primary);
+    border-radius: 0;
+    border-color: #d0d0d0;
+    min-height: 80px;
+}
+
+/* Input field styling */
+lightning-input .slds-input {
+    font-size: var(--font-size-input);
+    font-family: var(--font-family-primary);
+    border-radius: 0;
+    border-color: #d0d0d0;
+    min-height: 2.5rem;
+}
+
+/* Combobox styling */
+lightning-combobox .slds-combobox__input {
+    font-size: var(--font-size-input);
+    font-family: var(--font-family-primary);
+    border-radius: 0;
+    border-color: #d0d0d0;
+    min-height: 2.5rem;
+}
+
+/* Grid layout for buttons */
+.slds-grid_align-spread {
+    align-items: center;
+}
+
+/* Error message styling */
+.slds-text-color_error {
+    color: #c23934 !important;
+    font-weight: 500;
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    line-height: 1.3;
+}
+
+/* Table row hover effect */
+.slds-table tbody tr:hover {
+    background-color: #f8f9fa;
+    transition: background-color 0.15s ease;
+}
+
+/* Better visual separation */
+.slds-table tbody tr:not(:last-child) td {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .slds-table {
+        font-size: 0.875rem;
+    }
+    
+    .slds-table th,
+    .slds-table td {
+        padding: 0.5rem;
+    }
+}

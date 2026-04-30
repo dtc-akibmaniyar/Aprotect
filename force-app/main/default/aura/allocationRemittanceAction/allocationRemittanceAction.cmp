@@ -1,0 +1,37 @@
+<aura:component implements="lightning:actionOverride,force:lightningQuickAction" access="global">
+
+    <aura:attribute name="showFlow" type="Boolean" default="true" />
+
+    <aura:handler name="init" value="{!this}" action="{!c.doInit}" />
+
+    <aura:if isTrue="{!v.showFlow}">
+
+        <div style="height: 640px;">
+
+            <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+
+                <div class="slds-modal__container" style="width:60%; max-width:60%;">
+
+                    <header class="slds-modal__header slds-modal__header_empty">
+
+                        <lightning:buttonIcon iconName="utility:close" class="slds-modal__close" onclick="{!c.closeFlowModal}"/>
+
+                    </header>
+
+                    <div class="slds-modal__content slds-p-around_medium">
+
+                        <lightning:flow aura:id="allocationFlow" onstatuschange="{!c.handleStatusChange}" />
+
+                    </div>
+
+                </div>
+
+            </section>
+
+            <div class="slds-backdrop slds-backdrop_open"></div>
+
+        </div>
+
+    </aura:if>
+
+</aura:component>

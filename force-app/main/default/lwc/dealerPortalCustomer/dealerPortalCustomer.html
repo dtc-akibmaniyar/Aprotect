@@ -1,0 +1,514 @@
+<template>
+    <div class="customer-tab">
+        <!-- Top Navigation Buttons -->
+        <div class="top-navigation-buttons">
+            
+                <button
+                    type="button"
+                    class="nav-button back-button"
+                    onclick={handleBack}
+                    aria-label="Back">
+                    <span class="button-label">Back</span>
+                </button>
+            
+            
+            <template if:true={isLocked}>
+                <button
+                    type="button"
+                    class="nav-button next-button"
+                    onclick={handleNext}
+                    aria-label="Next">
+                    <span class="button-label">Next</span>
+                </button>
+            </template>
+        </div>
+
+        <!-- Top Header – matches screenshot -->
+        <div class="page-header">
+            <div class="page-header-inner">
+                <div class="header-icon-wrapper">
+                    <div class="header-avatar">
+                        <svg width="66" height="62" viewBox="0 0 66 62" fill="none" xmlns="http://www.w3.org/2000/svg">
+						<path d="M64.4294 50.0143C64.4294 50.0143 43.9647 41.8759 41.1384 37.4861C40.772 36.8942 40.458 35.4638 40.8244 35.1679C43.6507 32.899 45.5872 29.4463 45.9013 25.5004C47.4715 24.9578 48.0995 23.922 48.0995 22.4423C48.0995 21.2092 47.8378 19.8775 46.6864 19.2363V11.0485C46.6864 4.9817 41.4001 0 34.9623 0H31.0369C24.5991 0 19.3128 4.9817 19.3128 11.0485V19.2363C18.1614 19.8775 17.952 20.9626 17.952 22.1957C17.952 23.6754 18.4754 24.9578 20.0456 25.5497C20.412 29.4463 22.2962 32.899 25.0702 35.1185C25.5412 35.5131 25.4366 37.0422 25.0702 37.5847C22.2962 41.7279 1.51745 50.0636 1.51745 50.0636C0.680017 50.0636 -0.0527344 50.7048 -0.0527344 51.5434V60.5696C-0.0527344 61.3588 0.627678 62.0493 1.51745 62.0493H64.3771C65.2145 62.0493 65.9473 61.4081 65.9473 60.5696V51.5434C65.9473 50.7542 65.2669 50.0636 64.3771 50.0636L64.4294 50.0143Z" fill="#5184B7"/>
+						</svg>
+                    </div>
+                </div>
+                <div class="header-text">
+                    <div class="header-title">CUSTOMER INFORMATION</div>
+                    <div class="header-subtitle">
+                        Enter the customer’s full name, phone, email, and address. Ensure consent for warranty communications. All information is confidential.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <template if:true={showError}>
+            <div class="error-message">
+                <lightning-icon icon-name="utility:error" size="x-small" variant="error"></lightning-icon>
+                <span>{errorMessage}</span>
+            </div>
+        </template>
+
+        <div class="cards-wrapper">
+            <!-- SECTION 1 – PRIMARY OWNER / LESSEE -->
+            <div class="section-card">
+                <div class="section-header-row">
+                    <div class="section-heading-area">
+                        <div class="section-heading">PRIMARY OWNER/LESSEE</div>
+                    </div>
+                </div>
+
+                <div class="section-body">
+                    <!-- Row: First / Last -->
+                    <div class="row row-three">
+                        <div class="field-block small">
+                            <label class="field-label">TITLE</label>
+                            <input class="slds-input"
+                                type="text"
+                                aria-label="Title"
+                                disabled={fieldDisabled}
+                            />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">FIRST NAME</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={firstName}
+                                name="firstName"
+                                onchange={handleFirstNameChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">LAST NAME</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={lastName}
+                                name="lastName"
+                                onchange={handleLastNameChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                    </div>
+
+                    <!-- Row: Address / City / Province / Postal / Country -->
+                    <div class="row row-five">
+                        <div class="field-block address-field">
+                            <label class="field-label">ADDRESS</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={streetAddress}
+                                name="streetAddress"
+                                onchange={handleStreetAddressChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">CITY</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={city}
+                                name="city"
+                                onchange={handleCityChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">PROVINCE</label>
+                            <lightning-combobox
+                                name="province"
+                                value={province}
+                                options={provinces}
+                                onchange={handleProvinceChange}
+                                placeholder="-- Select --"
+                                variant="label-hidden"
+                                disabled={fieldDisabled}>
+                            </lightning-combobox>
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">POSTAL CODE</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={postalCode}
+                                name="postalCode"
+                                onchange={handlePostalCodeChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">COUNTRY</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={country}
+                                name="country"
+                                onchange={handleCountryChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                    </div>
+
+                    <!-- Row: Phone / Alt / Email -->
+                    <div class="row row-three">
+                        <div class="field-block">
+                            <label class="field-label">PHONE #</label>
+                            <input 
+                                class="slds-input" 
+                                type="tel" 
+                                value={phone}
+                                name="phone"
+                                onchange={handlePhoneChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">ALT. PHONE #</label>
+                            <input disabled={fieldDisabled} class="slds-input" type="tel" />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">E-MAIL ADDRESS*</label>
+                            <input 
+                                class="slds-input" 
+                                type="email" 
+                                value={email}
+                                name="email"
+                                onchange={handleEmailChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                    </div>
+
+                    <!-- Row: Driver’s License + Consent -->
+                    <div class="row row-license">
+                        <div class="field-block">
+                            <label class="field-label">DRIVERS LICENSE # (OPTIONAL)</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={licenseNumber}
+                                disabled={fieldDisabled}
+                                name="licenseNumber"
+                                onchange={handleLicenseNumberChange} />
+                        </div>
+                        <div class="consent-block">
+                            <div class="consent-inner">
+                                <input type="checkbox" disabled={fieldDisabled} class="consent-checkbox" />
+                                <span class="consent-text">
+                                    By checking this box, the Customer acknowledges that the phone number and
+                                    email address provided are collected solely for warranty registration and related
+                                    communications. This information will remain confidential and will not be
+                                    disclosed to unauthorized parties without consent.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add secondary owner row -->
+            <div class="add-secondary-row">
+                <div class="add-icon"><svg width="27" height="28" viewBox="0 0 27 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M13.4918 0C6.03665 0 0 6.1894 0 13.8034C0 21.4173 6.03665 27.6067 13.4918 27.6067C20.9469 27.6067 26.9835 21.4173 26.9835 13.8034C26.9835 6.1894 20.9469 0 13.4918 0ZM20.4685 15.67H15.306V20.9425H11.6775V15.67H6.51497V11.9531H11.6775V6.68063H15.306V11.9531H20.4685V15.67Z" fill="#5184B7"/>
+</svg>
+</div>
+                <div class="add-text">ADD SECONDARY OWNER/ REGISTER TO COMPANY/BUSINESS</div>
+            </div>
+
+            <!-- SECTION 2 – SECONDARY OWNER / CO-LESSEE -->
+            <div class="section-card">
+                <div class="section-header-row">
+                    <div class="section-heading-area">
+                        <div class="section-heading">SECONDARY OWNER/CO-LESSEE (OPTIONAL)</div>
+                    </div>
+                </div>
+
+                <div class="section-body">
+                    <!-- We use plain text fields for co-lessee here -->
+                        <div class="field-block small">
+                            <label class="field-label">TITLE</label>
+                            <input class="slds-input" type="text" disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">FIRST NAME</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={coBuyerFirstName}
+                                name="coBuyerFirstName"
+                                onchange={handleCoBuyerFirstNameChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">LAST NAME</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={coBuyerLastName}
+                                name="coBuyerLastName"
+                                onchange={handleCoBuyerLastNameChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                    </div>
+
+                    <div class="row row-five">
+                        <div class="field-block address-field">
+                            <label class="field-label">ADDRESS</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={coBuyerStreetAddress}
+                                name="coBuyerStreetAddress"
+                                onchange={handleCoBuyerStreetAddressChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">CITY</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={coBuyerCity}
+                                name="coBuyerCity"
+                                onchange={handleCoBuyerCityChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">PROVINCE</label>
+                            <lightning-combobox
+                                name="coBuyerProvince"
+                                value={coBuyerProvince}
+                                options={coBuyerProvinces}
+                                onchange={handleCoBuyerProvinceChange}
+                                placeholder="-- Select --"
+                                variant="label-hidden"
+                                disabled={fieldDisabled}>
+                            </lightning-combobox>
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">POSTAL CODE</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={coBuyerPostalCode}
+                                name="coBuyerPostalCode"
+                                onchange={handleCoBuyerPostalCodeChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">COUNTRY</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={coBuyerCountry}
+                                name="coBuyerCountry"
+                                onchange={handleCoBuyerCountryChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                    </div>
+
+                    <div class="row row-three">
+                        <div class="field-block">
+                            <label class="field-label">PHONE #</label>
+                            <input 
+                                class="slds-input" 
+                                type="tel" 
+                                value={coBuyerPhone}
+                                onchange={handleCoBuyerPhoneChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">ALT. PHONE #</label>
+                            <input class="slds-input" type="tel" disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">E-MAIL ADDRESS*</label>
+                            <input 
+                                class="slds-input" 
+                                type="email" 
+                                value={coBuyerEmail}
+                                onchange={handleCoBuyerEmailChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                    </div>
+
+                    <div class="row row-license">
+                        <div class="field-block">
+                            <label class="field-label">DRIVERS LICENSE # (OPTIONAL)</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={licenseNumber}
+                                disabled={fieldDisabled}
+                                name="licenseNumber"
+                                onchange={handleLicenseNumberChange} />
+                        </div>
+                        <div class="consent-block">
+                            <div class="consent-inner">
+                                <input disabled={fieldDisabled} type="checkbox" class="consent-checkbox" />
+                                <span class="consent-text">
+                                    By checking this box, the Customer acknowledges that the phone number and
+                                    email address provided are collected solely for warranty registration and related
+                                    communications. This information will remain confidential and will not be
+                                    disclosed to unauthorized parties without consent.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 3 – REGISTER TO A COMPANY/BUSINESS (visual only, like screenshot) -->
+            <div class="section-card company-card">
+                <div class="company-header">REGISTER TO A COMPANY/BUSINESS</div>
+                <div class="section-body">
+                    <div class="row row-two">
+                        <div class="field-block">
+                            <label class="field-label">BUSINESS NO./LICENSE #</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={businessNumber}
+                                onchange={handleBusinessNumberChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">COMPANY/BUSINESS NAME</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={companyBusiness}
+                                onchange={handleCompanyBusinessChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                    </div>
+                    <div class="row row-five">
+                        <div class="field-block address-field">
+                            <label class="field-label">ADDRESS</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={companyBusinessAddress}
+                                onchange={handleCompanyBusinessAddressChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">CITY</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={companyBusinessCity}
+                                onchange={handleCompanyBusinessCityChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">PROVINCE</label>
+                            <lightning-combobox
+                                name="companyProvince"
+                                value={companyProvince}
+                                options={provinces}
+                                onchange={handleCompanyProvinceChange}
+                                placeholder="-- Select --"
+                                variant="label-hidden"
+                                disabled={fieldDisabled}>
+                            </lightning-combobox>
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">POSTAL CODE</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={companyBusinessPostalCode}
+                                onchange={handleCompanyBusinessPostalCodeChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">COUNTRY</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={companyBusinessCountry}
+                                onchange={handleCompanyBusinessCountryChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                    </div>
+                    <div class="row row-four">
+                        <div class="field-block">
+                            <label class="field-label">PHONE #</label>
+                            <input 
+                                class="slds-input" 
+                                type="tel" 
+                                value={companyBusinessPhone}
+                                onchange={handleCompanyBusinessPhoneChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">ALT. PHONE #</label>
+                            <input 
+                                class="slds-input" 
+                                type="tel" 
+                                value={companyBusinessAltPhone}
+                                onchange={handleCompanyBusinessAltPhoneChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">COMPANY E-MAIL ADDRESS*</label>
+                            <input 
+                                class="slds-input" 
+                                type="email" 
+                                value={companyEmail}
+                                onchange={handleCompanyEmailChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">COMPANY CONTACT NAME</label>
+                            <input 
+                                class="slds-input" 
+                                type="text" 
+                                value={companyContactName}
+                                onchange={handleCompanyContactNameChange}
+                                disabled={fieldDisabled} />
+                        </div>
+                    </div>
+                    <div class="row row-two">
+                        <div class="field-block">
+                            <label class="field-label">PHONE #</label>
+                            <input class="slds-input" type="tel" disabled={fieldDisabled} />
+                        </div>
+                        <div class="field-block">
+                            <label class="field-label">E-MAIL ADDRESS*</label>
+                            <input class="slds-input" type="email" disabled={fieldDisabled} />
+                        </div>
+                    </div>
+                    <div class="row company-consent-row">
+                        <div class="company-consent-inner">
+                            <input type="checkbox" class="consent-checkbox" disabled={fieldDisabled} />
+                            <span class="consent-text">
+                                By checking this box, the Customer acknowledges that the phone number and email address
+                                provided are collected solely for warranty registration and related communications. This
+                                information will remain confidential and will not be disclosed to unauthorized parties
+                                without consent.
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons (you can keep them; they are not in screenshot but necessary) -->
+        <div class="action-buttons">
+            <!-- <button
+                type="button"
+                class="back-button"
+                onclick={handleBack}
+                aria-label="Back">
+                <span class="back-label">Back</span>
+            </button> -->
+            <template if:false={fieldDisabled}>
+                <button
+                    type="button"
+                    class="continue-button"
+                    onclick={handleContinue}
+                    aria-label="Save & Continue">
+                    <span class="continue-label">Save & Continue</span>
+                </button>
+            </template>
+            
+        </div>
+</template>

@@ -1,0 +1,240 @@
+.container {
+    font-family: Arial, sans-serif;
+    background: #f7f7f7;
+    padding: 10px;
+}
+
+.option-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.option-title {
+    font-weight: bold;
+    font-size: 1.3em;
+    margin-bottom: 16px;
+    text-align: center;
+    color: #fff;
+    background: #222;
+    padding: 8px 0;
+    border-radius: 4px;
+    width: 100%;
+    display: block;
+    position: relative;
+}
+
+.export-checkbox-in-bar {
+    float: right;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 16px;
+    color: #fff;
+    font-weight: normal;
+    font-size: 1em;
+}
+
+.export-checkbox-in-bar label {
+    color: #fff;
+    margin-left: 4px;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.export-checkbox-in-bar input[type="checkbox"] {
+    accent-color: #fff;
+    width: 16px;
+    height: 16px;
+    margin: 0 2px 0 0;
+}
+
+.row {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+}
+
+.section {
+    background: #fff;
+    border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    padding: 12px 10px;
+    min-width: 220px;
+    flex: 1 1 0;
+    margin-bottom: 8px;
+}
+
+.section-title {
+    font-weight: bold;
+    font-size: 1.1em;
+    margin-bottom: 6px;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 3px;
+}
+
+.parts .section-title { background: #1a4d7a; }
+.labour .section-title { background: #2c5c88; }
+.warranty .section-title { background: #5a3d8a; }
+.retail .section-title { background: #e6c200; color: #222; }
+.profit .section-title { background: #e6c200; color: #222; }
+
+.subsection {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.subsection-title {
+    font-weight: bold;
+    color: #222;
+    margin-bottom: 2px;
+}
+
+.field-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+    font-size: 0.97em;
+}
+
+.field-row span:first-child {
+    flex: 1;
+    margin-right: 8px;
+}
+
+.field-row span:last-child {
+    font-weight: bold;
+}
+
+/* Input Styling */
+.field-row lightning-input {
+    width: 120px;
+}
+
+.field-row .slds-input {
+    height: 32px;
+    min-height: 32px;
+    padding: 0 8px;
+}
+
+.currency-input {
+    width: 100px !important;
+}
+
+.number-input {
+    width: 80px !important;
+}
+
+.text-input {
+    width: 140px !important;
+}
+
+.slds-form-element__control {
+    width: auto !important;
+}
+
+/* Highlights and Special Sections */
+.highlight {
+    background: #fff8b3;
+    border-radius: 2px;
+    padding: 1px 4px;
+}
+
+.loss {
+    color: #d32f2f;
+    font-weight: bold;
+}
+
+.shop-supplies-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #eee;
+}
+
+.shop-supplies-section .field-row {
+    margin-bottom: 4px;
+}
+
+.total-section {
+    margin-top: 16px;
+    font-weight: bold;
+    font-size: 1.1em;
+    background: #fff8b3;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+/* Edit Mode Styling */
+.action-buttons {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px;
+    margin-bottom: 16px;
+}
+
+.read-only-value {
+    font-weight: bold;
+    padding: 4px 8px;
+}
+
+.field-row.edit-mode {
+    margin-bottom: 8px;
+}
+
+.field-row:not(.edit-mode) {
+    opacity: 0.9;
+}
+
+/* Save Button Container */
+.save-button-container {
+    margin-top: 1rem;
+    text-align: right;
+    padding: 1rem;
+}
+
+/* Lightning Input Custom Styling */
+lightning-input {
+    --sds-c-input-radius-border: 4px;
+    --sds-c-input-color-border: #dddbda;
+}
+
+/* Responsive Design */
+@media screen and (max-width: 1024px) {
+    .row {
+        flex-direction: column;
+    }
+    
+    .section {
+        min-width: auto;
+    }
+
+    .field-row lightning-input {
+        width: 100px;
+    }
+}
+
+/* Better alignment for checkbox in header */
+.export-checkbox-in-bar {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Input field sizes for better alignment */
+.field-row lightning-input.slds-form-element__control {
+    min-width: 80px;
+    max-width: 140px;
+}
+
+/* Ensure consistent spacing in all sections */
+.section > .field-row:not(:last-child) {
+    margin-bottom: 4px;
+}
+.highlight.yellow { background: #fff8b3; }
+.highlight.red { background: #ffd6d6; }
+.highlight.blue { background: #e3f0ff; }
+.highlight.purple { background: #e6e0fa; }
+.loss { color: #d32f2f; font-weight: bold; }

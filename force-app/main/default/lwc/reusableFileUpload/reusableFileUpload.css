@@ -1,0 +1,348 @@
+/* Reusable File Upload Styles */
+.file-manager-container {
+    width: 100%;
+}
+
+.file-section {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+    text-transform: uppercase;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddd;
+}
+
+.subsection-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+/* Loading Section */
+.loading-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 4px;
+    margin-bottom: 16px;
+}
+
+.loading-text {
+    margin-left: 8px;
+    font-size: 14px;
+    color: #0369a1;
+}
+
+/* PDF Loading Section */
+.pdf-loading-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+
+.pdf-loading-section .loading-text {
+    color: #92400e;
+}
+
+/* Existing Files Section */
+.existing-files-section {
+    margin-bottom: 16px;
+}
+
+/* OPTIMIZED: File Item Layout for Icon-Only Buttons */
+.file-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    grid-template-areas: "icon name size actions";
+    gap: 8px;
+    align-items: center;
+    padding: 12px 14px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+    min-height: 48px; /* Standard height */
+}
+
+.file-item:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+.existing-file {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+/* File Icon - Stays in place */
+.file-icon {
+    grid-area: icon;
+    flex-shrink: 0;
+}
+
+/* File Name - Truncates properly */
+.file-name {
+    grid-area: name;
+    color: #374151;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 0; /* Important: Allows text truncation */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 8px;
+}
+
+/* File Size - Stays compact */
+.file-size {
+    grid-area: size;
+    font-size: 12px;
+    color: #6b7280;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* OPTIMIZED: Icon-Only Button Actions */
+.file-actions {
+    grid-area: actions;
+    display: flex;
+    gap: 4px; /* Tight spacing for icons */
+    align-items: center;
+    flex-shrink: 0;
+    min-width: 100px; /* Much smaller - just for 3 icons */
+    position: relative;
+}
+
+/* Icon Button Styling */
+.view-button-icon {
+    --sds-c-button-brand-color-background: #059669;
+    --sds-c-button-brand-color-background-hover: #047857;
+    --sds-c-button-brand-color-background-active: #065f46;
+}
+
+.download-button-icon {
+    --sds-c-button-neutral-color-background: #6b7280;
+    --sds-c-button-neutral-color-background-hover: #4b5563;
+    --sds-c-button-neutral-color-background-active: #374151;
+}
+
+.remove-button-icon {
+    --sds-c-button-error-color-background: #ef4444;
+    --sds-c-button-error-color-background-hover: #dc2626;
+    --sds-c-button-error-color-background-active: #b91c1c;
+}
+
+/* Remove Spinner */
+.remove-spinner {
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+}
+
+/* Tablet Responsive (768px - 1023px) */
+@media (max-width: 1023px) and (min-width: 768px) {
+    .file-actions {
+        gap: 3px;
+        min-width: 85px;
+    }
+}
+
+/* Mobile Responsive (under 768px) */
+@media (max-width: 767px) {
+    .file-item {
+        grid-template-columns: auto 1fr auto;
+        grid-template-areas: 
+            "icon name actions"
+            "size size actions";
+        gap: 6px 8px;
+    }
+    
+    .file-size {
+        grid-area: size;
+        justify-self: start;
+    }
+    
+    .file-actions {
+        grid-row: span 2;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 32px; /* Just icon width */
+        align-self: stretch;
+        justify-content: center;
+    }
+}
+
+/* Very small screens (under 480px) */
+@media (max-width: 479px) {
+    .file-item {
+        grid-template-columns: auto 1fr;
+        grid-template-areas: 
+            "icon name"
+            "size actions";
+        gap: 4px 6px;
+    }
+    
+    .file-actions {
+        grid-row: 1;
+        flex-direction: row;
+        gap: 4px;
+        min-width: 100px;
+        justify-self: end;
+    }
+}
+
+/* Upload Section */
+.upload-section {
+    margin-bottom: 16px;
+}
+
+.upload-message {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    background: #fefce8;
+    border: 1px solid #fde047;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    color: #a16207;
+}
+
+.upload-message lightning-icon {
+    margin-right: 8px;
+}
+
+.upload-message span {
+    font-size: 14px;
+}
+
+/* Upload Progress */
+.upload-progress {
+    display: flex;
+    align-items: center;
+    margin-top: 12px;
+    padding: 12px;
+    background: #eff6ff;
+    border: 1px solid #93c5fd;
+    border-radius: 4px;
+}
+
+.progress-text {
+    margin-left: 8px;
+    font-size: 14px;
+    color: #1e40af;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 30px 20px;
+    background: #f9fafb;
+    border: 2px dashed #d1d5db;
+    border-radius: 8px;
+    color: #6b7280;
+}
+
+.empty-icon {
+    margin-bottom: 12px;
+    opacity: 0.6;
+}
+
+.empty-message {
+    font-size: 16px;
+    margin: 0;
+}
+
+/* Override lightning-file-upload styles */
+.upload-section lightning-file-upload {
+    --slds-c-file-selector-color-border: #3b82f6;
+    --slds-c-file-selector-color-border-hover: #2563eb;
+}
+
+/* Accessibility improvements */
+.file-item:focus-within {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+.file-actions lightning-button-icon:focus {
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #3b82f6;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .file-item {
+        border-width: 2px;
+    }
+    
+    .file-name {
+        font-weight: 600;
+    }
+}
+
+/* Loading states */
+.file-actions:has(.remove-spinner) {
+    pointer-events: none;
+}
+
+.file-actions:has(.remove-spinner) lightning-button-icon {
+    opacity: 0.6;
+}
+
+/* Icon Button animations */
+.file-actions lightning-button-icon {
+    transition: all 0.15s ease;
+}
+
+.file-actions lightning-button-icon:hover {
+    transform: translateY(-1px);
+}
+
+/* Enhanced tooltips for icon-only buttons */
+.file-actions lightning-button-icon:hover::after {
+    z-index: 1000;
+}
+
+/* Icon button hover effects */
+.view-button-icon:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(5, 150, 105, 0.3);
+}
+
+.download-button-icon:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(107, 114, 128, 0.3);
+}
+
+.remove-button-icon:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+}
+
+/* Ensure buttons maintain consistent size */
+.file-actions lightning-button-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}

@@ -1,0 +1,1156 @@
+/* Typography System - CSS Custom Properties */
+:host {
+    --font-family-primary: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    
+    /* Font Sizes */
+    --font-size-title: 1.75rem; /* 28px */
+    --font-size-instruction: 0.9rem; /* 14.4px */
+    --font-size-section-label: 0.875rem; /* 14px */
+    --font-size-field-label: 0.75rem; /* 12px */
+    --font-size-input: 0.9rem; /* 14.4px */
+    --font-size-status: 0.85rem; /* 13.6px */
+    --font-size-button: 0.875rem; /* 14px */
+    --font-size-help: 0.8rem; /* 12.8px */
+    
+    /* Font Weights */
+    --font-weight-title: 700;
+    --font-weight-section: 700;
+    --font-weight-field-label: 600;
+    --font-weight-status: 500;
+    --font-weight-button: 600;
+    --font-weight-regular: 400;
+    
+    /* Colors */
+    --color-title: #1a1a1a;
+    --color-instruction: #4a4a4a;
+    --color-section-label: #2c2c2c;
+    --color-field-label: #666666;
+    --color-input: #1a1a1a;
+    --color-success: #28a745;
+    --color-warning: #ffc107;
+    --color-help: #6c757d;
+    
+    /* Line Heights */
+    --line-height-instruction: 1.5;
+    --line-height-normal: 1.4;
+    
+    /* Override SLDS border-radius for sharp corners */
+    --slds-c-input-radius-border: 0;
+    --slds-c-button-radius-border: 0;
+    
+    /* Override SLDS border color for light grey borders */
+    --slds-c-input-color-border: #d0d0d0;
+    --slds-c-input-color-border-focus: #d0d0d0;
+    --slds-c-input-color-border-hover: #d0d0d0;
+    --slds-c-combobox-color-border: #d0d0d0;
+    --slds-c-combobox-color-border-focus: #d0d0d0;
+    --slds-c-combobox-color-border-hover: #d0d0d0;
+    --slds-c-textarea-color-border: #d0d0d0;
+    --slds-c-textarea-color-border-focus: #d0d0d0;
+    --slds-c-textarea-color-border-hover: #d0d0d0;
+    --slds-c-button-color-border: #d0d0d0;
+}
+
+.vehicle-tab {
+    font-family: var(--font-family-primary);
+    padding: 0;
+    max-width: 1400px;
+    margin: 0 auto;
+    
+    /* Apply SLDS styling hooks to all Lightning components within */
+    --slds-c-input-radius-border: 0;
+    --slds-c-button-radius-border: 0;
+    --slds-c-input-color-border: #d0d0d0;
+    --slds-c-input-color-border-focus: #d0d0d0;
+    --slds-c-input-color-border-hover: #d0d0d0;
+    --slds-c-combobox-color-border: #d0d0d0;
+    --slds-c-combobox-color-border-focus: #d0d0d0;
+    --slds-c-combobox-color-border-hover: #d0d0d0;
+    --slds-c-textarea-color-border: #d0d0d0;
+    --slds-c-textarea-color-border-focus: #d0d0d0;
+    --slds-c-textarea-color-border-hover: #d0d0d0;
+    --slds-c-button-color-border: #d0d0d0;
+}
+
+.vehicle-tab .form-container {
+    padding: 0 2rem 2rem 2rem;
+}
+
+/* Top Navigation Buttons - Back and Next */
+.top-navigation-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    gap: 1rem;
+}
+
+.nav-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 1.5rem;
+    border-radius: 0;
+    background: #ffffff;
+    border: 1px solid #d0d0d0;
+    color: #4a4a4a;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.nav-button:hover,
+.nav-button:focus {
+    background: #f8f9fa;
+    border-color: #b0b0b0;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+.nav-button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.nav-button:focus-visible {
+    outline: 2px solid #1e88ff;
+    outline-offset: 2px;
+}
+
+.next-button {
+    order: 2; /* Next button on the right */
+    margin-left: auto;
+}
+
+.button-label {
+    line-height: 1;
+}
+
+/* Header Section - No color (white/default) */
+.form-header {
+    background: #ffffff; /* White background - no yellow */
+    color: #1f1f1f;
+    padding: 1.25rem 1.5rem;
+    margin: 0 0 1.5rem 0;
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+}
+
+.header-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+.header-icon lightning-icon { display: none; }
+
+.header-svg {
+    width: 48px;
+    height: 48px;
+    fill: #5184b8; /* Car icon color */
+}
+
+.header-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.main-title {
+    font-size: 1rem;
+    font-weight: var(--font-weight-title);
+    color: #5184b8;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.instruction-text {
+    font-size: 0.7rem;
+    font-weight: var(--font-weight-regular);
+    color: var(--color-instruction);
+    line-height: var(--line-height-instruction);
+    margin: 0;
+}
+
+/* Form Container */
+.form-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Form Section */
+.form-section {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.section-title {
+    font-size: var(--font-size-section-label);
+    font-weight: var(--font-weight-section);
+    color: var(--color-section-label);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 1rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+/* VIN Section - Light Blue Background */
+.vin-decoder-section {
+    margin-bottom: 0.25rem;
+    background: #d8e8f8 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 1rem 1.5rem !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Vehicle Details Section - No Border */
+.vehicle-details-section {
+    border: none !important;
+    box-shadow: none !important;
+    border-bottom: 4px solid #175579 !important;
+    padding-bottom: 1.5rem;
+}
+
+.vin-decoder-section .section-title {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    font-size: 0.875rem;
+}
+
+.vin-row {
+    display: grid;
+    grid-template-columns: 50% auto;
+    column-gap: 1rem;
+    row-gap: 1rem;
+    margin-bottom: 0.75rem;
+    margin-top: 0;
+    align-items: center;
+}
+
+.vin-buttons-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+}
+
+.vin-row > * {
+    margin: 0;
+    padding: 0;
+}
+
+.vin-button-field:first-of-type {
+    margin-right: 0;
+}
+
+.vin-button-field:last-of-type {
+    margin-left: 0;
+}
+
+.vin-field {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    margin-right: 1rem;
+}
+
+.vin-field.form-field {
+    flex-direction: row;
+    gap: 0;
+}
+
+.vin-field lightning-input {
+    width: 100%;
+    min-width: 0;
+    display: block;
+}
+
+.vin-field lightning-input .slds-form-element,
+.vin-field lightning-input .slds-form-element__control {
+    width: 100%;
+}
+
+.vin-field .slds-input,
+.vin-field lightning-input .slds-input {
+    border-radius: 6px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 2.5rem !important;
+    padding: 0.75rem 1rem !important;
+}
+
+.vin-button-field {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    white-space: nowrap;
+    width: auto;
+    margin: 0;
+    padding: 0;
+}
+
+.vin-button-field.form-field {
+    flex-direction: row;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.vin-button-field .custom-button {
+    margin: 0;
+}
+
+.vin-button-field + .vin-button-field {
+    margin-left: 0;
+    padding-left: 0;
+}
+
+/* VIN Status Messages */
+.vin-status-container {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.vin-status-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    font-size: var(--font-size-status);
+    font-weight: var(--font-weight-status);
+    flex: 1;
+    min-width: 0;
+}
+
+.vin-success {
+    background-color: #d4edda;
+    color: var(--color-success);
+    border: 1px solid #c3e6cb;
+}
+
+.vin-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.loading-indicator {
+    margin-top: 0.75rem;
+    display: flex;
+    justify-content: center;
+}
+
+/* Form Rows */
+.form-row {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.vehicle-basic-row {
+    grid-template-columns: repeat(5, 1fr);
+}
+
+.vehicle-details-row {
+    grid-template-columns: repeat(7, 1fr);
+}
+
+.purchase-odometer-row {
+    grid-template-columns: 2fr 1.5fr 1.5fr 2fr;
+    align-items: start;
+}
+
+.dealership-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.dealership-left-column,
+.dealership-right-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Form Fields */
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.field-label {
+    font-size: var(--font-size-field-label);
+    font-weight: var(--font-weight-field-label);
+    color: var(--color-field-label);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.required {
+    color: #d32f2f;
+}
+
+.info-icon {
+    color: var(--color-help);
+    cursor: help;
+}
+
+.input-field {
+    font-size: var(--font-size-input);
+    font-weight: var(--font-weight-regular);
+    color: var(--color-input);
+}
+
+/* Remove rounded corners from Lightning Input Fields */
+lightning-input .slds-input,
+lightning-input input,
+lightning-combobox .slds-select,
+lightning-combobox .slds-combobox__input,
+lightning-combobox select,
+lightning-combobox input,
+lightning-textarea .slds-textarea,
+lightning-textarea textarea {
+    border-radius: 0 !important;
+    border-color: #d0d0d0 !important;
+}
+
+/* Remove rounded corners from Lightning Buttons */
+lightning-button .slds-button,
+lightning-button button,
+lightning-button-icon .slds-button_icon,
+lightning-button-icon button {
+    border-radius: 0 !important;
+}
+
+/* Global SLDS class overrides for all input fields and buttons */
+.slds-input,
+.slds-select,
+.slds-textarea,
+.slds-combobox__input,
+.slds-combobox__input input,
+.slds-form-element__control .slds-input,
+.slds-form-element__control .slds-select,
+.slds-form-element__control .slds-textarea,
+.slds-button,
+.slds-button_neutral,
+.slds-button_brand,
+.slds-button_icon,
+.slds-button_icon-container,
+.slds-button_icon-inverse {
+    border-radius: 0 !important;
+}
+
+/* Set light grey borders for all input fields */
+.slds-input,
+.slds-select,
+.slds-textarea,
+.slds-combobox__input,
+.slds-combobox__input input,
+.slds-form-element__control .slds-input,
+.slds-form-element__control .slds-select,
+.slds-form-element__control .slds-textarea {
+    border-color: #d0d0d0 !important;
+}
+
+/* Target combobox dropdown and input wrapper */
+.slds-combobox,
+.slds-combobox__form-element,
+.slds-combobox__input-value,
+.slds-combobox__input {
+    border-radius: 0 !important;
+    border-color: #d0d0d0 !important;
+}
+
+/* Target all input types */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="email"],
+input[type="tel"],
+input[type="url"],
+select,
+textarea {
+    border-radius: 0 !important;
+    border-color: #d0d0d0 !important;
+}
+
+/* Odometer Units */
+.odometer-units {
+    margin-top: 0.5rem;
+}
+
+.odometer-radio-group {
+    font-size: var(--font-size-field-label);
+}
+
+/* Commercial/Usage Type */
+.usage-type-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.usage-type-radio-group {
+    margin-bottom: 0.75rem;
+}
+
+.usage-radio-group {
+    font-size: var(--font-size-input);
+}
+
+.checkbox-container {
+    margin-top: 0.5rem;
+}
+
+.branded-checkbox {
+    font-size: var(--font-size-field-label);
+}
+
+/* Manufacturer Warranty Section */
+.manufacturer-warranty-section {
+    background: #ffffff;
+    border: none !important;
+    box-shadow: none !important;
+    border-bottom: 4px solid #175579 !important;
+    padding-bottom: 1.5rem;
+    padding-top: 0.5rem;
+}
+
+.manufacturer-warranty-section .section-title {
+    color: #5184b8;
+    border-bottom: none;
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.manufacturer-warranty-title .section-title-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.section-icon-svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.warranty-content {
+    margin-top: 1rem;
+}
+
+.warranty-fields-row {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 1.5fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.deferral-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    margin-top: 1rem;
+    padding-top: 0;
+    border-top: none;
+}
+
+.deferral-container {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.deferral-checkbox {
+    margin-top: 0.25rem;
+    flex-shrink: 0;
+}
+
+.deferral-content {
+    flex: 1;
+}
+
+.deferral-label {
+    font-weight: 700;
+    font-size: var(--font-size-input);
+    color: var(--color-input);
+    margin-bottom: 0.25rem;
+}
+
+.deferral-text {
+    font-size: var(--font-size-input);
+    color: var(--color-input);
+    line-height: var(--line-height-normal);
+    background-color: #fffacd;
+    padding: 0.75rem 1rem;
+    border-left: 4px solid #ffc107;
+}
+
+.warranty-timeline {
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    padding: 1rem;
+}
+
+.timeline-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+}
+
+.timeline-year {
+    font-size: var(--font-size-input);
+    font-weight: var(--font-weight-field-label);
+    color: var(--color-input);
+}
+
+.timeline-label {
+    font-size: var(--font-size-field-label);
+    font-weight: var(--font-weight-section);
+    color: var(--color-section-label);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.timeline-duration {
+    font-size: var(--font-size-field-label);
+    font-weight: var(--font-weight-regular);
+    color: var(--color-field-label);
+}
+
+.timeline-start {
+    font-size: var(--font-size-field-label);
+    font-weight: var(--font-weight-field-label);
+    color: var(--color-input);
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #dee2e6;
+}
+
+.timeline-range {
+    font-size: var(--font-size-help);
+    font-weight: var(--font-weight-regular);
+    color: var(--color-field-label);
+}
+
+/* Dealer Comments Section */
+.dealer-comments-section {
+    background: #ffffff;
+    border: none !important;
+    box-shadow: none !important;
+    border-bottom: 4px solid #175579 !important;
+    padding: 0.4rem 1.5rem 0.75rem;
+}
+
+.dealer-comments-section .section-title {
+    color: #5184b8;
+    border-bottom: none;
+    margin-bottom: 0.2rem;
+}
+
+.comments-instruction {
+    font-size: 11px;
+    font-weight: var(--font-weight-regular);
+    color: #1f1f1f;
+    margin: 0;
+    line-height: var(--line-height-normal);
+    font-style: italic;
+}
+
+.comments-instruction strong {
+    font-style: italic;
+    font-weight: 700;
+}
+
+.comments-row {
+    margin: 0;
+}
+
+.comments-field {
+    width: 100%;
+}
+
+.dealer-comments-section .field-label {
+    display: none;
+}
+
+.comments-textarea {
+    min-height: 90px;
+    font-size: var(--font-size-input);
+    font-weight: var(--font-weight-regular);
+    color: var(--color-input);
+    font-family: var(--font-family-primary);
+    margin: 0 !important;
+}
+
+.comments-textarea textarea,
+.comments-textarea .slds-textarea {
+    border-radius: 0 !important;
+    margin-top: 0 !important;
+}
+
+.comments-field lightning-textarea .slds-form-element {
+    margin: 0 !important;
+}
+
+.comments-checkbox-row {
+    margin-bottom: 0;
+    margin-top: 0.1rem;
+}
+
+.comments-checkbox-row .slds-form-element {
+    margin: 0 !important;
+}
+
+.comments-checkbox {
+    font-size: var(--font-size-field-label);
+}
+
+/* Dealership Information Section */
+.dealership-info-section {
+    background: #ffffff;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0.4rem 1.5rem 0.75rem;
+}
+
+.dealership-info-section .section-title {
+    color: #5184b8;
+    border-bottom: none;
+    margin-bottom: 0.2rem;
+}
+
+.dealership-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 0;
+}
+
+.dealership-left-column,
+.dealership-right-column {
+    gap: 0.35rem;
+}
+
+.dealership-info-section .form-field {
+    gap: 0.25rem;
+}
+
+.dealership-info-section .input-field {
+    margin: 0 !important;
+}
+
+.dealership-info-section lightning-textarea .slds-form-element,
+.dealership-info-section lightning-input .slds-form-element,
+.dealership-info-section lightning-combobox .slds-form-element {
+    margin: 0 !important;
+}
+
+.combined-address-textarea textarea,
+.combined-address-textarea .slds-textarea {
+    min-height: 60px;
+    border-radius: 0 !important;
+}
+
+/* Custom Buttons */
+.custom-button {
+    width: auto;
+    min-width: fit-content;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-button);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    white-space: nowrap;
+    margin: 0;
+}
+
+.custom-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+.custom-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.custom-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.custom-button:disabled:hover {
+    transform: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Search VIN # button - blue with rounded corners */
+.search-button {
+    background-color: #4d81b5;
+    color: #ffffff;
+    border-radius: 8px;
+}
+
+.search-button:hover {
+    background-color: #3d6a95;
+}
+
+.search-button .button-icon {
+    --slds-c-icon-color-foreground-default: #ffffff;
+}
+
+/* View Vehicle Details button - blue with sharp edges */
+.view-details-button {
+    background-color: #1288fe;
+    color: #ffffff;
+    border-radius: 0;
+}
+
+.view-details-button:hover:not(:disabled) {
+    background-color: #0e6fd4;
+}
+
+.button-text {
+    line-height: 1.2;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: none;
+}
+
+.continue-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 1.9rem;
+    border-radius: 0;
+    background: #1e88ff;
+    border: 1px solid #1a78e0;
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.continue-button:hover,
+.continue-button:focus {
+    background: #1b7de6;
+    border-color: #166ac6;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+    transform: translateY(-1px);
+}
+
+.continue-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.continue-button:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+}
+
+.continue-label {
+    line-height: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .vehicle-details-row {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    
+    .purchase-odometer-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .deferral-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .vehicle-tab {
+        padding: 1rem;
+    }
+    
+    .vehicle-basic-row,
+    .vehicle-details-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .vin-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .warranty-fields-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .purchase-odometer-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .dealership-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .main-title {
+        font-size: 1.5rem;
+    }
+}
+
+/* Additional Vehicle Information Modal Styles */
+.additional-info-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 0.5rem 0;
+}
+
+.info-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid #e0e0e0;
+}
+
+.info-section-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1976d2;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 0.75rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #1976d2;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem 1.5rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 0.75rem;
+    background: #ffffff;
+    border-radius: 4px;
+    border: 1px solid #e8e8e8;
+    transition: box-shadow 0.2s ease;
+}
+
+.info-item:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-color: #1976d2;
+}
+
+.info-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 0.25rem;
+}
+
+.info-value {
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: #1f1f1f;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.no-additional-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: #666;
+    font-size: 0.875rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px dashed #ccc;
+}
+
+
+/* Modal content padding adjustment for compact design */
+.slds-modal__content {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.slds-modal__content.slds-p-around_medium {
+    padding: 1rem 1.5rem;
+}
+
+/* Vehicle Type row — narrow, left-aligned */
+.vehicle-type-row {
+    margin-bottom: 0.75rem;
+}
+
+.vehicle-type-field {
+    max-width: 200px;
+}
+
+/* Powersports Specifications section */
+.powersports-specs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.powersports-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #e0474c;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.powersports-hours-row {
+    grid-template-columns: 200px;
+    margin-bottom: 0.75rem;
+}
+
+.powersports-specs-row {
+    grid-template-columns: repeat(6, 1fr);
+    margin-bottom: 12px;
+}
+
+/* Input with prefix/suffix badge wrapper */
+.input-with-unit {
+    display: flex;
+    align-items: stretch;
+    box-sizing: border-box;
+    height: 32px;
+    border: 1px solid rgba(166, 166, 166, 0.61);
+    overflow: hidden;
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)), #FFFFFF;
+}
+
+.input-with-unit lightning-input {
+    flex: 1;
+    --slds-c-input-sizing-height: 46px;
+    --sds-c-input-sizing-height: 46px;
+    --slds-c-input-color-border: transparent;
+    --sds-c-input-color-border: transparent;
+    --lwc-inputColorBorder: transparent;
+    --lwc-colorBorder: transparent;
+    --slds-c-input-radius-border: 0;
+    --lwc-borderRadiusMedium: 0;
+}
+
+.unit-badge {
+    background: #5184b8;
+    color: #ffffff;
+    width: 47px;
+    min-width: 47px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    box-sizing: border-box;
+    border-left: 1px solid rgba(166, 166, 166, 0.61);
+}
+
+.currency-prefix {
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)), #F3F3F3;
+    color: #000000;
+    width: 47px;
+    min-width: 47px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 17px;
+    white-space: nowrap;
+    box-sizing: border-box;
+    border-right: 1px solid rgba(166, 166, 166, 0.61);
+}
+
+/* Responsive: Single column on mobile */
+@media (max-width: 768px) {
+    .info-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .info-section {
+        padding: 0.75rem;
+    }
+    
+    .additional-info-container {
+        gap: 1rem;
+    }
+}

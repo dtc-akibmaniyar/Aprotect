@@ -1,0 +1,805 @@
+<template>
+    <div class="gap-container" data-render-key={renderKey}>
+        <!-- Top Navigation Buttons -->
+        <div class="top-navigation-buttons">
+            <button
+                type="button"
+                class="nav-button back-button"
+                onclick={handleBack}
+                aria-label="Back">
+                <span class="button-label">Back</span>
+            </button>
+        <template if:false={isQuoteStatus}>
+<button
+                type="button"
+                class="nav-button skip-button"
+                onclick={handleSkip}
+                aria-label={skipButtonLabel}>
+                <span class="button-label">{skipButtonLabel}</span>
+            </button>
+        </template>
+            
+        </div>
+
+        <div class="loan-hero">
+            <div class="loan-hero__media">
+                <img src={loanHeroImage} alt="Loan Protection" class="loan-hero__media-image" />
+            </div>
+            <div class="loan-hero__content">
+                <div class="loan-hero__header-row">
+                    <h1>LOAN PROTECTION</h1>
+                    <div class="loan-hero__header-actions">
+                        <template if:true={isQuoteStatus}>
+                            <button class="convert-to-app-btn" onclick={handleConvertToApplication} title="Convert this quote to a pending application">Convert to Application</button>
+                        </template>
+                    </div>
+                </div>
+                <p>
+                    Provides financial protection if your customer must return the vehicle due to total loss events.
+                    Enter the loan details below to surface the most accurate Total Loss Protection packages available for this application.
+                </p>
+            </div>
+        </div>
+
+        <!-- GAP Input Fields (Hidden when existing package is present) -->
+        <template if:true={shouldShowInputFields}>
+            <div class="gap-input-section">
+                <!-- Back button - only show for existing applications -->
+                <template if:true={isExistingApplication}>
+                    <lightning-button
+                        label="Back to Package Selection"
+                        variant="neutral"
+                        icon-name="utility:back"
+                        onclick={handleBackToPackageSelection}
+                        class="back-to-package-btn">
+                    </lightning-button>
+                </template>
+
+                <div class="gap-input-form">
+                    <div class="loan-input-grid">
+                        <label class="loan-field full-width">
+                            <span>Lien Holder / Financial Institution</span>
+                            <input
+                                type="text"
+                                value={lenderLienholder}
+                                disabled={fieldDisabled}
+                                oninput={handleLenderLienholderChange}
+                                required>
+                        </label>
+
+                        <label class="loan-field">
+                            <span>Financed Loan Term (Months)</span>
+                            <select disabled={fieldDisabled} onchange={handleFinanceLoanTermChange} required>
+                                <option value="">Select Term</option>
+                                <template for:each={financeLoanTermSelectOptions} for:item="option">
+                                    <option key={option.value} value={option.value} selected={option.selected}>{option.label}</option>
+                                </template>
+                            </select>
+                        </label>
+
+                        <label class="loan-field">
+                            <span>Total Amount Financed</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={loanAmount}
+                                disabled={fieldDisabled}
+                                oninput={handleLoanAmountChange}
+                                required>
+                        </label>
+
+                        <label class="loan-field">
+                            <span>Interest Rate (APR %)</span>
+                            <input
+                                type="number"
+                                min="0"
+                                max="50"
+                                step="0.01"
+                                value={interestRate}
+                                disabled={fieldDisabled}
+                                oninput={handleInterestRateChange}
+                                required>
+                        </label>
+
+                        <label class="loan-field">
+                            <span>Payment Frequency</span>
+                            <select disabled={fieldDisabled} onchange={handlePaymentFrequencyChange}>
+                                <option value="">Select Frequency</option>
+                                <template for:each={paymentFrequencySelectOptions} for:item="option">
+                                    <option key={option.value} value={option.value} selected={option.selected}>{option.label}</option>
+                                </template>
+                            </select>
+                        </label>
+
+                        <label class="loan-field">
+                            <span>Cash Down Payment</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={cashDown}
+                                disabled={fieldDisabled}
+                                oninput={handleCashDownChange}>
+                        </label>
+
+                        <label class="loan-field">
+                            <span>Trade In Equity Amount</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={vehicleTradeInEquity}
+                                disabled={fieldDisabled}
+                                oninput={handleVehicleTradeInEquityChange}>
+                        </label>
+                    </div>
+
+                    <div class="gap-input-actions">
+                        <button
+                            type="button"
+                            class="find-packages-btn"
+                            onclick={handleFindPackages}
+                            disabled={searchButtonDisabled}
+                            aria-label="Search Available Loan Protection Plans">
+                            <span class="find-packages-label">Search Available Loan Protection Plans</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+        <!-- Main Content (Show when existing package or after input) -->
+        <template if:true={showPackageSelection}>
+            <div class="slds-grid slds-wrap details-grid">
+            <!-- Left Column - Programs -->
+            <div class="slds-col slds-size_8-of-12 warranty-left-column">
+                <!-- No Package Disclaimer -->
+                <template if:true={showNoPackageDisclaimer}>
+                    <button type="button" class="disclaimer-back-btn" onclick={handleChangeFilters} title="Back to Form">
+                        <lightning-icon icon-name="utility:back" size="small"></lightning-icon>
+                    </button>
+                    <div class="no-packages-message">
+                        <lightning-icon icon-name="utility:warning" size="medium" variant="warning"></lightning-icon>
+                        <h3>This Dealer has no Loan Protection Plans available</h3>
+                        <p>There are no Loan Protection plans configured for this dealer. You may continue to the next section.</p>
+                    </div>
+                </template>
+                <!-- Vehicle/Criteria Not Eligible Disclaimer -->
+                <template if:true={showVehicleNotEligibleDisclaimer}>
+                    <div class="no-packages-message">
+                        <lightning-icon icon-name="utility:warning" size="medium" variant="warning"></lightning-icon>
+                        <h3>No Loan Protection Plans match your entered criteria. <button type="button" class="disclaimer-inline-btn" onclick={handleChangeFilters}>Change Filter</button></h3>
+                        <p>None of the available plans match the entered loan details. You may adjust your filters and search again, or continue to the next section.</p>
+                    </div>
+                </template>
+                <!-- Program Selection -->
+                <template if:true={showPackagesList}>
+                <div class="programs-container">
+                    <!-- Program Accordion -->
+                    <lightning-accordion allow-multiple-sections-open>
+                        <template for:each={dealerPackagesDisplay} for:item="program">
+                            <lightning-accordion-section 
+                                key={program.id} 
+                                name={program.id} 
+                                label={program.name}
+                                class={program.cssClass}
+                                data-program={program.name}
+                                data-package-id={program.id}>
+                                <div class="program-wrapper">
+                                    <div class="program-content">
+                                        <!-- Option Help Modal -->
+                                        <template if:true={showHelpModal}>
+                                            <div class="help-modal-overlay" onclick={closeHelpModal}>
+                                                <div class="help-modal" onclick={stopPropagation}>
+                                                    <div class="help-modal-header">
+                                                        <h3 class="help-modal-title">
+                                                            <lightning-icon icon-name="utility:info" size="small"></lightning-icon>
+                                                            {helpModalTitle}
+                                                        </h3>
+                                                        <button class="help-modal-close" onclick={closeHelpModal}>
+                                                            <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                                                        </button>
+                                                    </div>
+                                                    <div class="help-modal-content">
+                                                        <p class="help-modal-text">{helpModalText}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        
+                                        <!-- Terms Section - Show all terms for this package -->
+                                        <template if:true={program.terms.length}>
+                                            <div class="warranty-terms-section">
+                                                <div class="terms-scroll-container">
+                                                    <div class="term-group term-group-two-column">
+                                                        <template for:each={program.terms} for:item="term">
+                                                            <button 
+                                                                key={term.id}
+                                                                type="button"
+                                                                class={term.rowClass}
+                                                                data-term={term.id}
+                                                                data-package={program.id}
+                                                                data-disabled={term.isDisabled}
+                                                                onclick={handleGapTermSelection}>
+                                                                <div class="term-row-left">
+                                                                    <div class="term-row-title">{term.termDisplayName}</div>
+                                                                </div>
+                                                                <div class="term-row-right">
+                                                                    <span class="term-row-price">{term.price}</span>
+                                                                </div>
+                                                            </button>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        
+                                        <!-- No Terms Available Message -->
+                                        <template if:false={program.terms.length}>
+                                            <div class="no-terms-message">
+                                                <lightning-icon icon-name="utility:warning" size="small" variant="warning"></lightning-icon>
+                                                <span>No Total Loss Protection terms available for this package. Please contact your administrator.</span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </lightning-accordion-section>
+                        </template>
+                    </lightning-accordion>
+                </div>
+                </template>
+            </div>
+
+            <!-- Right Column - Vehicle Details, Price and Options -->
+            <div class="slds-col slds-size_4-of-12 warranty-right-column">
+                <!-- Vehicle Details Panel (Top Right) -->
+                <template if:true={vehicleData.year}>
+                    <div class="vehicle-details-panel">
+                        <div class="vehicle-details-content">
+                            <!-- Left: Car Icon -->
+                            <div class="vehicle-icon-container">
+                                <svg class="vehicle-svg" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true">
+                                    <g transform="translate(0,512) scale(0.1,-0.1)" fill="#5184b8" stroke="none">
+                                        <path d="M1326 4224 c-69 -22 -133 -68 -166 -121 -16 -25 -117 -266 -226 -537 -195 -488 -196 -491 -241 -526 -88 -69 -176 -201 -217 -323 -72 -216 -57 -576 36 -867 56 -174 106 -243 216 -297 l57 -28 1765 0 1765 0 63 29 c91 42 151 112 191 220 119 329 142 697 61 946 -36 110 -86 188 -180 282 l-87 87 -199 497 c-186 464 -202 501 -246 549 -29 32 -68 62 -100 76 l-53 24 -1195 2 c-1047 2 -1201 0 -1244 -13z m2278 -296 c29 -26 266 -615 266 -662 0 -17 -11 -39 -29 -57 l-29 -29 -1255 0 -1255 0 -31 26 c-24 20 -31 34 -31 62 0 47 234 636 263 663 20 18 51 19 1048 19 l1028 0 25 -22z m-2288 -1390 c65 -34 134 -111 157 -174 23 -66 22 -135 -2 -165 -19 -24 -22 -24 -243 -27 -276 -4 -314 0 -375 41 -58 39 -91 99 -99 183 -8 77 1 129 27 155 19 19 31 20 252 17 230 -3 232 -3 283 -30z m3093 6 c17 -22 21 -41 21 -108 -1 -121 -38 -193 -125 -239 -37 -21 -57 -22 -292 -25 -276 -4 -306 1 -319 54 -23 91 47 236 143 295 71 44 98 48 330 49 l222 0 20 -26z m-1054 -19 c14 -13 25 -28 25 -34 0 -30 -144 -398 -162 -413 -19 -17 -66 -18 -668 -18 -622 0 -648 1 -664 19 -19 21 -156 381 -156 411 0 10 12 28 26 39 26 21 33 21 801 21 l774 0 24 -25z"/>
+                                        <path d="M360 3437 c-104 -29 -164 -94 -164 -176 1 -57 22 -98 77 -151 42 -41 185 -120 216 -120 9 0 51 35 94 77 76 74 81 82 128 200 27 68 49 125 49 128 0 2 -30 14 -67 26 -84 27 -265 35 -333 16z"/>
+                                        <path d="M4485 3435 c-63 -13 -135 -40 -135 -49 0 -3 21 -58 46 -122 45 -111 50 -119 130 -198 l84 -83 49 18 c113 39 211 112 248 183 23 42 21 114 -2 154 -56 94 -239 137 -420 97z"/>
+                                        <path d="M660 1258 c0 -123 5 -239 10 -259 12 -42 51 -82 102 -103 31 -13 85 -16 300 -16 245 0 264 1 305 21 29 14 52 35 68 63 24 42 25 47 25 249 l0 207 -307 0 c-318 0 -402 8 -472 45 l-31 16 0 -223z"/>
+                                        <path d="M4417 1463 c-67 -35 -155 -43 -470 -43 l-308 0 3 -217 c3 -212 4 -219 27 -252 47 -65 74 -71 371 -71 292 0 322 6 368 65 38 48 43 89 40 317 l-3 216 -28 -15z"/>
+                                            </g>
+                                        </svg>
+                                    </div>
+                            
+                            <!-- Right: Vehicle Information -->
+                            <div class="vehicle-info-container">
+                                <div class="vehicle-model-name">{vehicleDisplayName}</div>
+                                <template if:true={vehicleData.vin}>
+                                    <div class="vehicle-detail-text">{vehicleData.vin}</div>
+                                                    </template>
+                                <template if:true={vehicleData.odometer}>
+                                    <div class="vehicle-detail-text">Odometer: {formattedOdometer}</div>
+                                                    </template>
+                                <template if:true={vehicleData.purchasePrice}>
+                                    <div class="vehicle-detail-text">Purchase Price: {formattedPurchasePrice}</div>
+                                                    </template>
+                            </div>
+                                            </div>
+                                        </div>
+                            </template>
+                            
+                <!-- Filters Section (under vehicle information) -->
+                <template if:true={showPackageSelection}>
+                    <div class="filters-panel">
+                        <div class="filters-content">
+                            <!-- Left: Filter Icon -->
+                            <div class="filters-icon-container">
+                                <lightning-icon icon-name="utility:filter" size="small" class="filters-icon"></lightning-icon>
+                                                </div>
+                            
+                            <!-- Right: Filter Information -->
+                            <div class="filters-info-container">
+                                <div class="filters-title">Terms Found</div>
+                                <div class="filters-description">
+                                    Found <strong>{totalTermCount}</strong> terms matching your
+                                    <template if:true={displayFinanceLoanTermText}>
+                                        <strong>{displayFinanceLoanTermText}</strong> finance loan term
+                                                        </template>
+                                    <template if:true={displayInterestRate}>
+                                        , <strong>{displayInterestRate}%</strong> interest rate
+                                                        </template>
+                                    <template if:true={displayLoanAmount}>
+                                        , and <strong>${displayLoanAmount}</strong> loan amount
+                                    </template>.
+                                                </div>
+                                <div class="filters-action">
+                                    <lightning-button
+                                        variant="neutral"
+                                        label="Change Filters"
+                                        icon-name="utility:edit"                                        disabled={fieldDisabled}                                        onclick={handleChangeFilters}
+                                        class="change-filters-btn">
+                                    </lightning-button>
+                                        </div>
+                                </div>
+                        </div>
+                    </div>
+                </template>
+                
+                <!-- Selected Plan Section -->
+                <template if:true={selectedDealerPackage}>
+                    <div class="selected-plan-section">
+                        <h4 class="section-heading">SELECTED PLAN:</h4>
+                        <div class="selected-plan-box">
+                            <span class="selected-plan-text">{selectedDealerPackage.PackageName}</span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    
+                <!-- Coverage Term Selected Section -->
+                <template if:true={selectedWarrantyTerm}>
+                    <div class="coverage-term-section">
+                        <h4 class="section-heading">COVERAGE TERM SELECTED:</h4>
+                        <div class="coverage-term-box">
+                            <span class="coverage-term-text">
+                                {selectedTermName}
+                            </span>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <!-- Down Payment Protection Section -->
+                <template if:true={selectedWarrantyTerm}>
+                    <div class="down-payment-protection-section">
+                        <h4 class="section-heading">DOWN PAYMENT PROTECTION</h4>
+                        <div class="filters-panel">
+                            <div class="filters-content">
+                                <!-- Left: Money Icon -->
+                                <div class="filters-icon-container">
+                                    <lightning-icon icon-name="utility:money" size="small" class="filters-icon"></lightning-icon>
+                                </div>
+                                
+                                <!-- Right: Down Payment Protection Content -->
+                                <div class="filters-info-container">
+                                    <div class="down-payment-inputs-inline">
+                                        <div class="input-row">
+                                            <div class="input-field">
+                                                <label class="input-label">Cash Down ($)</label>
+                                                <lightning-input
+                                                    type="number"
+                                                    value={cashDown}
+                                                    onchange={handleCashDownChange}
+                                                    disabled={fieldDisabled}
+                                                    placeholder="0.00"
+                                                    step="0.01"
+                                                    min="0">
+                                                </lightning-input>
+                                            </div>
+                                            <div class="input-field">
+                                                <label class="input-label">Vehicle Trade In Equity ($)</label>
+                                                <lightning-input
+                                                    type="number"
+                                                    value={vehicleTradeInEquity}
+                                                    onchange={handleVehicleTradeInEquityChange}
+                                                    disabled={fieldDisabled}
+                                                    placeholder="0.00"
+                                                    step="0.01"
+                                                    min="0">
+                                                </lightning-input>
+                                            </div>
+                                        </div>
+                                        <div class="find-options-section">
+                                            <lightning-button
+                                                variant="brand"
+                                                label="Find Options"
+                                                onclick={handleFindDownPaymentOptions}
+                                                disabled={findOptionsButtonDisabled}
+                                                class="find-options-btn">
+                                            </lightning-button>
+                                        </div>
+                                    
+                                    <!-- Qualifying Options Display -->
+                                    <template if:true={filteredDownPaymentOptions.length}>
+                                        <div class="options-subsection" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e9ecef;">
+                                            <div class="subsection-header">
+                                                <lightning-icon icon-name="utility:filter" size="x-small" variant="brand"></lightning-icon>
+                                                <span class="subsection-title">Qualifying Options ({filteredDownPaymentOptions.length})</span>
+                                            </div>
+                                            <div class="available-options-grid">
+                                                <template for:each={filteredDownPaymentOptions} for:item="option">
+                                                    <div key={option.id} class="available-option-card">
+                                                        <lightning-input
+                                                            type="checkbox"
+                                                            label={option.optionName}
+                                                            data-option-id={option.id}
+                                                            checked={option.isSelected}
+                                                            disabled={fieldDisabled}
+                                                            onchange={handleAdditionalOptionToggle}
+                                                            class="option-checkbox-input">
+                                                        </lightning-input>
+                                                        <div class="option-details">
+                                                            <span class="option-price-tag">+{option.price}</span>
+                                                            <div class="option-range">
+                                                                Range: ${option.minimumValue} - ${option.maximumValue}
+                                                            </div>
+                                                            <template if:true={option.inclusion}>
+                                                                <lightning-button-icon
+                                                                    icon-name="utility:info"
+                                                                    variant="bare"
+                                                                    size="x-small"
+                                                                    alternative-text="More info"
+                                                                    title="View details"
+                                                                    data-option-id={option.id}
+                                                                    data-help-type="inclusion"
+                                                                    data-help-text={option.inclusion}
+                                                                    onclick={toggleOptionHelp}
+                                                                    class="option-info-icon">
+                                                                </lightning-button-icon>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    
+                                    <!-- No qualifying options message -->
+                                    <template if:false={filteredDownPaymentOptions.length}>
+                                        <template if:true={cashDown}>
+                                            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e9ecef;">
+                                            <div class="no-options-message">
+                                                <lightning-icon icon-name="utility:info" size="small"></lightning-icon>
+                                                    <span>No options match your down payment criteria. Try adjusting your values and click "Find Options" again.</span>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </template>
+                                    </div>
+                                </div>
+                            </div>
+                                </div>
+                            </div>
+                        </template>
+                
+                <!-- Commercial/Business Premium Use Section -->
+                <template if:true={selectedWarrantyTerm}>
+                    <div class="additional-options-section-new">
+                        <h4 class="additional-options-heading">COMMERCIAL/BUSINESS PREMIUM USE</h4>
+                        <div class="additional-options-list-new">
+                            <template if:true={commercialOptions.length}>
+                                <template for:each={commercialOptions} for:item="option">
+                                    <div key={option.id} class="additional-option-item-card">
+                                        <label class="additional-option-label">
+                                            <input 
+                                                type="checkbox" 
+                                                class="additional-option-checkbox"
+                                                data-option-id={option.id}
+                                                checked={option.isSelected}
+                                                disabled={fieldDisabled}
+                                                onchange={handleAdditionalOptionToggle}
+                                            />
+                                            <div class="additional-option-plus-icon">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" class="additional-option-plus-svg">
+                                                    <path fill="#12baf3" d="M352 128C352 110.3 337.7 96 320 96C302.3 96 288 110.3 288 128L288 288L128 288C110.3 288 96 302.3 96 320C96 337.7 110.3 352 128 352L288 352L288 512C288 529.7 302.3 544 320 544C337.7 544 352 529.7 352 512L352 352L512 352C529.7 352 544 337.7 544 320C544 302.3 529.7 288 512 288L352 288L352 128z"/>
+                                                </svg>
+                                            </div>
+                                            <span class="additional-option-item-text">{option.optionName}</span>
+                                            <div class="additional-option-right">
+                                                <span class="additional-option-price">
+                                                    <template if:true={option.price}>
+                                                        {option.price}
+                                                    </template>
+                                                    <template if:false={option.price}>
+                                                        $ RETAIL
+                                                    </template>
+                                                </span>
+                                                <div class="additional-option-d-icon">D</div>
+                                                <template if:true={option.inclusion}>
+                                                    <button 
+                                                        class="includes-info-icon-btn" 
+                                                        data-option-id={option.id}
+                                                        data-help-type="inclusion"
+                                                        data-help-text={option.inclusion}
+                                                        onclick={toggleOptionHelp}
+                                                        title="More info">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 40 40" class="info-icon-svg">
+                                                            <path fill="#98ccfd" d="M20,38.5C9.799,38.5,1.5,30.201,1.5,20S9.799,1.5,20,1.5S38.5,9.799,38.5,20S30.201,38.5,20,38.5z"></path>
+                                                            <path fill="#4788c7" d="M20,2c9.925,0,18,8.075,18,18s-8.075,18-18,18S2,29.925,2,20S10.075,2,20,2 M20,1 C9.507,1,1,9.507,1,20s8.507,19,19,19s19-8.507,19-19S30.493,1,20,1L20,1z"></path>
+                                                            <path fill="#fff" d="M20 10A2 2 0 1 0 20 14A2 2 0 1 0 20 10Z"></path>
+                                                            <g>
+                                                                <path fill="#fff" d="M22 29L22 17 17 17 17 18 18 18 18 29 17 29 17 30 23 30 23 29z"></path>
+                                                            </g>
+                                                        </svg>
+                                                    </button>
+                                                </template>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </template>
+                            </template>
+                            <template if:false={commercialOptions.length}>
+                                <div class="no-additional-options-message">
+                                    No Commercial/Business Premium Use options available for this term.
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    </template>
+                    
+                <!-- Price Section -->
+                <template if:true={selectedWarrantyTerm}>
+                    <div class="price-summary-section">
+                            <h4 class="section-heading">PRICE:</h4>
+                            <div class="price-summary-box">
+                                <span class="price-summary-value">{formattedPrice}</span>
+                                <button class="price-breakdown-inline" title="View Price Breakdown" onclick={showPriceBreakdownModal}>
+                                    <lightning-icon icon-name="utility:info" size="xx-small"></lightning-icon>
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                
+                </div>
+            </div>
+        </template>
+        
+        <!-- Navigation Buttons - Save As Quote and Continue at bottom -->
+        <template if:false={isQuoteStatus}>
+            <!-- Both buttons showing: Save Quote Left, Continue Right -->
+            <div class="navigation-buttons">
+                <template if:true={sowSaveAsQuoteButton}>
+                    <button
+                        type="button"
+                        class="nav-button save-quote-button"
+                        onclick={handleSaveAsQuote}
+                        aria-label="Save As Quote">
+                        <span class="button-label">Save As Quote</span>
+                    </button>
+                </template>
+                
+                <div class="continue-button-wrapper">
+                    <template if:true={loading}>
+                        <lightning-spinner alternative-text="Loading..." size="small"></lightning-spinner>
+                    </template>
+                    <button
+                        type="button"
+                        class="continue-button"
+                        onclick={handleContinue}
+                        disabled={isContinueDisabled}
+                        aria-label={continueButtonLabel}>
+                        <span class="continue-label">{continueButtonLabel}</span>
+                    </button>
+                </div>
+            </div>
+        </template>
+        
+        <!-- Only Save As Quote showing (on the right) -->
+        <template if:true={isQuoteStatus}>
+            <div class="navigation-buttons">
+                <!-- <template if:true={sowSaveAsQuoteButton}> -->
+                    <button
+                        type="button"
+                        class="nav-button save-quote-button"
+                        onclick={handleSaveAsQuote}
+                        style="margin-left: auto;"
+                        aria-label="Save As Quote">
+                        <span class="button-label">Save As Quote</span>
+                    </button>
+                <!-- </template> -->
+            </div>
+        </template>
+        
+        
+        <!-- Error Message -->
+        <template if:true={showError}>
+            <div class="error-message">
+                <lightning-icon icon-name="utility:error" size="x-small" variant="error"></lightning-icon>
+                <span>{errorMessage}</span>
+            </div>
+        </template>
+        
+        <!-- Decline Total Loss Protection Modal -->
+        <template if:true={showDeclineModal}>
+            <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header">
+                        <h2 class="slds-text-heading_medium">Decline Total Loss Protection</h2>
+                        <button class="slds-button slds-button_icon slds-modal__close" onclick={cancelDeclineGap}>
+                            <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                        </button>
+                    </header>
+                    <div class="slds-modal__content slds-p-around_medium">
+                        <p>Are you sure you want to decline Total Loss Protection coverage? This action cannot be undone.</p>
+                    </div>
+                    <footer class="slds-modal__footer">
+                        <lightning-button label="Cancel" variant="neutral" onclick={cancelDeclineGap}></lightning-button>
+                        <lightning-button label="Confirm Decline" variant="destructive" onclick={confirmDeclineGap}></lightning-button>
+                    </footer>
+                </div>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+        
+        <!-- Total Loss Protection Selection Modal -->
+        <template if:true={showGapModal}>
+            <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header">
+                        <h2 class="slds-text-heading_medium">Total Loss Protection Coverage Details</h2>
+                        <button class="slds-button slds-button_icon slds-modal__close" onclick={closeGapModal}>
+                            <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                        </button>
+                    </header>
+                    <div class="slds-modal__content slds-p-around_medium">
+                        <div class="gap-details">
+                            <h3>Selected Total Loss Protection Package</h3>
+                            <p><strong>Package:</strong> {selectedDealerPackageName}</p>
+                            <p><strong>Term:</strong> {selectedWarrantyTermName}</p>
+                            <p><strong>Price:</strong> ${price}</p>
+                        </div>
+                    </div>
+                    <footer class="slds-modal__footer">
+                        <lightning-button label="Close" variant="neutral" onclick={closeGapModal}></lightning-button>
+                    </footer>
+                </div>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+        
+        <!-- Comparison Modal -->
+        <template if:true={showComparisonModal}>
+            <div class="comparison-modal-overlay" onclick={closeComparison}>
+                <div class="comparison-modal" onclick={stopPropagation}>
+                    <div class="comparison-modal-header">
+                        <h2 class="comparison-title">
+                            <lightning-icon icon-name="utility:compare" size="small" class="comparison-icon"></lightning-icon>
+                            Compare Total Loss Protection Terms
+                        </h2>
+                        <button class="comparison-close-btn" onclick={closeComparison}>
+                            <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                        </button>
+                    </div>
+                    
+                    <div class="comparison-content">
+                        <div class="comparison-table-container">
+                            <table class="comparison-table">
+                                <thead>
+                                    <tr>
+                                        <th class="feature-column">Coverage</th>
+                                        <template for:each={comparisonTerms} for:item="term">
+                                            <th key={term.id} class="term-column">
+                                                <div class="term-header-compare">
+                                                    <h4 class="term-name-compare">{term.name}</h4>
+                                                    <div class="term-package-compare">{term.packageName}</div>
+                                                    <div class="term-coverage-compare">{term.inputFieldInfo}</div>
+                                                </div>
+                                            </th>
+                                        </template>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="feature-label">Additional Options</td>
+                                        <template for:each={comparisonTerms} for:item="term">
+                                            <td key={term.id} class="feature-value">
+                                                <div class="options-checklist">
+                                                    <template for:each={term.includedOptions} for:item="option">
+                                                        <div key={option.id} class="option-check-item">
+                                                            <lightning-icon icon-name="utility:add" size="x-small" variant="success" class="option-check-icon"></lightning-icon>
+                                                            <span class="option-name">{option.name}</span>
+                                                        </div>
+                                                    </template>
+                                                    <template if:false={term.includedOptions.length}>
+                                                        <div class="no-options">No additional options</div>
+                                                    </template>
+                                                </div>
+                                            </td>
+                                        </template>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td class="feature-label">Action</td>
+                                        <template for:each={comparisonTermsWithButtons} for:item="term">
+                                            <td key={term.id} class="action-cell">
+                                                <lightning-button 
+                                                    label={term.buttonLabel}
+                                                    variant={term.buttonVariant}
+                                                    size="small"
+                                                    onclick={selectFromComparison}
+                                                    data-term={term.id}
+                                                    disabled={term.buttonDisabled}
+                                                    class="select-term-btn">
+                                                </lightning-button>
+                                            </td>
+                                        </template>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+        
+        <!-- Price Breakdown Modal -->
+        <template if:true={showPriceModal}>
+            <div class="price-breakdown-modal-overlay" onclick={hidePriceBreakdownModal}>
+                <div class="price-breakdown-modal" onclick={stopPropagation}>
+                    <div class="modal-header">
+                        <h3 class="modal-title">Price Breakdown</h3>
+                        <button class="modal-close-btn" onclick={hidePriceBreakdownModal}>
+                            <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                        </button>
+                    </div>
+                    <div class="modal-content">
+                        <div class="pricing-source-info">
+                            <template if:true={currentPriceBreakdown.source}>
+                                <div class="source-label">Pricing Source: {currentPriceBreakdown.source}</div>
+                            </template>
+                        </div>
+                        <div class="breakdown-section">
+                            <div class="breakdown-item">
+                                <span class="breakdown-label"><strong><u>Retail Price (Before Tax):</u></strong></span>
+                                <span class="breakdown-value">{currentPriceBreakdown.retailPrice}</span>
+                            </div>
+                            <template if:true={additionalOptionsPricing.existingOptionsPrice}>
+                                <div class="breakdown-item">
+                                    <span class="breakdown-label"><strong><u>Existing Additional Options:</u></strong></span>
+                                </div>
+                                <div class="breakdown-divider"></div>
+                                <!-- Existing categories nested under main existing total -->
+                                <template if:true={additionalOptionsPricing.existingCommercialPrice}>
+                                    <div class="breakdown-item" style="padding-left: 16px;">
+                                        <span class="breakdown-label">Commercial/Business Premium Use ({additionalOptionsPricing.existingCommercialCount}):</span>
+                                        <span class="breakdown-value">{additionalOptionsPricing.formattedExistingCommercialPrice}</span>
+                                    </div>
+                                </template>
+                                <template if:true={additionalOptionsPricing.existingDownPaymentPrice}>
+                                    <div class="breakdown-item" style="padding-left: 16px;">
+                                        <span class="breakdown-label">Down Payment Protection ({additionalOptionsPricing.existingDownPaymentCount}):</span>
+                                        <span class="breakdown-value">{additionalOptionsPricing.formattedExistingDownPaymentPrice}</span>
+                                    </div>
+                                </template>
+                            </template>
+                            <template if:true={additionalOptionsPricing.newOptionsPrice}>
+                                <div class="breakdown-item">
+                                    <span class="breakdown-label">New Additional Options:</span>
+                                    <span class="breakdown-value">+{additionalOptionsPricing.formattedNewOptionsPrice}</span>
+                                </div>
+                                <div class="breakdown-divider"></div>
+                                <!-- New categories nested under main new total -->
+                                <template if:true={additionalOptionsPricing.newCommercialPrice}>
+                                    <div class="breakdown-item" style="padding-left: 16px;">
+                                        <span class="breakdown-label">Commercial/Business Premium Use ({additionalOptionsPricing.newCommercialCount}):</span>
+                                        <span class="breakdown-value">+{additionalOptionsPricing.formattedNewCommercialPrice}</span>
+                                    </div>
+                                </template>
+                                <template if:true={additionalOptionsPricing.newDownPaymentPrice}>
+                                    <div class="breakdown-item" style="padding-left: 16px;">
+                                        <span class="breakdown-label">Down Payment Protection ({additionalOptionsPricing.newDownPaymentCount}):</span>
+                                        <span class="breakdown-value">+{additionalOptionsPricing.formattedNewDownPaymentPrice}</span>
+                                    </div>
+                                </template>
+                            </template>
+                            <template if:true={currentPriceBreakdown.taxAmount}>
+                                <div class="breakdown-item">
+                                    <span class="breakdown-label"><strong><u>Tax ({currentPriceBreakdown.taxRate}):</u></strong></span>
+                                    <span class="breakdown-value">+{currentPriceBreakdown.taxAmount}</span>
+                                </div>
+                            </template>
+                            <div class="breakdown-item total">
+                                <span class="breakdown-label">Total Price:</span>
+                                <span class="breakdown-value">{currentPriceBreakdown.totalPrice}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <lightning-button 
+                            label="Close" 
+                            variant="brand" 
+                            onclick={hidePriceBreakdownModal}
+                            class="close-btn">
+                        </lightning-button>
+                    </div>
+                </div>
+            </div>
+        </template>
+        
+    </div>
+</template>

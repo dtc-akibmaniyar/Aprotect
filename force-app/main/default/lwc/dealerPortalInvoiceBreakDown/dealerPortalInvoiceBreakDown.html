@@ -1,0 +1,244 @@
+<template>
+    <template if:true={isLoading}>
+        <div class="slds-p-around_medium">
+            <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+        </div>
+    </template>
+
+    <template if:false={isLoading}>
+        <template if:true={invoiceData}>
+            <div class="remittance-modal-content">
+
+                <!-- Title and Actions Header -->
+                <div class="header-section">
+                    <div>
+                        <h1 class="remittance-form-title">
+                            REMITTANCE ID#: {invoiceData.remittanceFormName}
+                        </h1>
+                        <template if:true={invoiceData.isAllocationRemittance}>
+                            <p class="services-label">Services: {invoiceData.selectedServiceLabels}</p>
+                        </template>
+                    </div>
+                    <lightning-button
+                        variant="brand"
+                        label="Download PDF"
+                        icon-name="utility:download"
+                        onclick={handleDownloadPDF}>
+                    </lightning-button>
+                </div>
+
+                <!-- Remittance Form Details -->
+                <div class="remittance-details-grid">
+                    <div>
+                        <div class="field-container">
+                            <strong class="field-label">Dealer Name</strong>
+                            <div>{invoiceData.dealerName}</div>
+                        </div>
+                        <div class="field-container">
+                            <strong class="field-label">Status</strong>
+                            <div><span class={invoiceData.statusBadgeClass}>{invoiceData.status}</span></div>
+                        </div>
+                        <template if:true={invoiceData.isCancelled}>
+                            <div class="field-container">
+                                <strong class="field-label">Cancelation Reason</strong>
+                                <div>{invoiceData.cancellationReason}</div>
+                            </div>
+                        </template>
+                    </div>
+                    <div>
+                        <div class="field-container">
+                            <strong class="field-label">Bill To</strong>
+                            <div data-id="billToContent" class="rich-text-field"></div>
+                        </div>
+                        <div class="field-container">
+                            <strong class="field-label">Receiver Name</strong>
+                            <div>{invoiceData.receiverName}</div>
+                        </div>
+                        <div class="field-container">
+                            <strong class="field-label">Payer Name</strong>
+                            <div>{invoiceData.payerName}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Credit Information -->
+                <div class="credit-info-section">
+                    <h3 class="credit-info-heading">Credit Information</h3>
+                    <div class="remittance-details-grid">
+                        <div>
+                            <div class="field-container">
+                                <strong class="field-label">Credit Issued By</strong>
+                                <div>{invoiceData.creditIssuedBy}</div>
+                            </div>
+                            <template if:true={invoiceData.hasAvailableCredit}>
+                                <div class="field-container">
+                                    <strong class="field-label">Available Credit</strong>
+                                    <div class="available-credit-value">{invoiceData.formattedAvailableCredit}</div>
+                                    <p class="available-credit-note">Contact the office to request credit to be applied on this remittance.</p>
+                                </div>
+                            </template>
+                        </div>
+                        <div>
+                            <div class="field-container">
+                                <strong class="field-label">Credit Note</strong>
+                                <lightning-formatted-rich-text value={invoiceData.creditNote}></lightning-formatted-rich-text>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Invoice Table ───────────────────────────────────────── -->
+                <div class="table-wrapper">
+                    <table class="inv-table">
+                        <thead>
+                            <tr>
+                                <th class="col-index">#</th>
+                                <th class="col-inv">INV #</th>
+                                <th class="col-customer">CUSTOMER</th>
+                                <th class="col-vehicle">VEHICLE</th>
+                                <th class="col-service">WARRANTY</th>
+                                <th class="col-service">TIRE AND RIM</th>
+                                <th class="col-service">LOAN PROTECTION</th>
+                                <th class="col-subtotal">SUB-TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template for:each={invoiceData.tableRows} for:item="row">
+                                <tr key={row.id} class="inv-row">
+                                    <td class="col-index">{row.rowIndex}</td>
+                                    <td class="col-inv">
+                                        <a class="inv-link"
+                                           data-id={row.id}
+                                           onclick={handleInvoiceClick}
+                                           href="#">{row.invoiceName}</a>
+                                        <template if:true={row.invoiceStatus}>
+                                            <span class={row.invoiceStatusClass}>{row.invoiceStatus}</span>
+                                        </template>
+                                    </td>
+                                    <td class="col-customer">{row.customerName}</td>
+                                    <td class="col-vehicle">{row.vehicleInfo}</td>
+
+                                    <!-- WARRANTY -->
+                                    <td class="col-service">
+                                        <template if:true={row.warranty}>
+                                            <span class="svc-amount">{row.warranty.formattedAmount}</span>
+                                            <template if:true={row.warranty.hasStatus}>
+                                                <span class={row.warranty.statusClass}>{row.warranty.status}</span>
+                                            </template>
+                                        </template>
+                                        <template if:false={row.warranty}>
+                                            <span class="svc-dash">-</span>
+                                        </template>
+                                    </td>
+
+                                    <!-- TIRE AND RIM -->
+                                    <td class="col-service">
+                                        <template if:true={row.tireRim}>
+                                            <span class="svc-amount">{row.tireRim.formattedAmount}</span>
+                                            <template if:true={row.tireRim.hasStatus}>
+                                                <span class={row.tireRim.statusClass}>{row.tireRim.status}</span>
+                                            </template>
+                                        </template>
+                                        <template if:false={row.tireRim}>
+                                            <span class="svc-dash">-</span>
+                                        </template>
+                                    </td>
+
+                                    <!-- LOAN PROTECTION -->
+                                    <td class="col-service">
+                                        <template if:true={row.loanProtection}>
+                                            <span class="svc-amount">{row.loanProtection.formattedAmount}</span>
+                                            <template if:true={row.loanProtection.hasStatus}>
+                                                <span class={row.loanProtection.statusClass}>{row.loanProtection.status}</span>
+                                            </template>
+                                        </template>
+                                        <template if:false={row.loanProtection}>
+                                            <span class="svc-dash">-</span>
+                                        </template>
+                                    </td>
+
+                                    <td class="col-subtotal">{row.formattedSubTotal}</td>
+                                </tr>
+                            </template>
+                        </tbody>
+                        <tfoot>
+                            <!-- Row 1: QTY + column totals -->
+                            <tr class="footer-row">
+                                <td colspan="4" class="footer-qty">
+                                    <strong>QTY: {invoiceData.invoiceCount}</strong>
+                                </td>
+                                <td class="col-service footer-total">{invoiceData.warrantyColTotal}</td>
+                                <td class="col-service footer-total">{invoiceData.tireRimColTotal}</td>
+                                <td class="col-service footer-total">{invoiceData.loanProtectionColTotal}</td>
+                                <td class="col-subtotal"></td>
+                            </tr>
+                            <!-- Row 2: service counts aligned under their columns -->
+                            <tr class="footer-count-row">
+                                <td colspan="4"></td>
+                                <td class="col-service footer-count">
+                                    <template if:true={invoiceData.hasWarrantyCol}>
+                                        <strong>WARRANTY:</strong> {invoiceData.warrantyCount}
+                                    </template>
+                                </td>
+                                <td class="col-service footer-count">
+                                    <template if:true={invoiceData.hasTireRimCol}>
+                                        <strong>TIRE AND RIM:</strong> {invoiceData.tireRimCount}
+                                    </template>
+                                </td>
+                                <td class="col-service footer-count">
+                                    <template if:true={invoiceData.hasLoanProtectionCol}>
+                                        <strong>LOAN PROTECTION:</strong> {invoiceData.loanProtectionCount}
+                                    </template>
+                                </td>
+                                <td class="col-subtotal"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Summary Section -->
+                <div class="remittance-summary">
+                    <div class="summary-section">
+                        <div class="summary-row total-row">
+                            <span class="summary-label">Remittance Form Total:</span>
+                            <span class="summary-value">{invoiceData.grandTotal}</span>
+                        </div>
+                        <template if:true={invoiceData.discountAmount}>
+                            <div class="summary-row">
+                                <span class="summary-label">Discount Amount:</span>
+                                <span class="summary-value">{invoiceData.formattedDiscountAmount}</span>
+                            </div>
+                        </template>
+                        <template if:true={invoiceData.remittanceFormTotalAfterDiscount}>
+                            <div class="summary-row">
+                                <span class="summary-label">Remittance Form Total (After Discount):</span>
+                                <span class="summary-value">{invoiceData.formattedRemittanceFormTotalAfterDiscount}</span>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="summary-section summary-amounts">
+                        <template if:true={invoiceData.balance}>
+                            <div class="summary-row balance-row">
+                                <span class="summary-label">Balance:</span>
+                                <span class="summary-value">{invoiceData.formattedBalance}</span>
+                            </div>
+                        </template>
+                        <template if:true={invoiceData.paidAmount}>
+                            <div class="summary-row paid-row">
+                                <span class="summary-label">Paid Amount:</span>
+                                <span class="summary-value">{invoiceData.formattedPaidAmount}</span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+            </div>
+        </template>
+
+        <template if:false={invoiceData}>
+            <div class="slds-p-around_medium">
+                <p>No invoice data available.</p>
+            </div>
+        </template>
+    </template>
+</template>

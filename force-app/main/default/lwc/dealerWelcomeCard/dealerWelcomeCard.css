@@ -1,0 +1,38 @@
+.welcome-container {
+    display: flex;
+    align-items: center;
+    /* padding: 20px 30px; */
+    background-color: #fff;
+    /* min-height: 200px; */
+}
+
+.loading-spinner {
+    position: fixed;
+}
+
+.logo-section {
+    margin-right: 20px;
+}
+
+.dealer-logo {
+    width: 200px;
+    height: auto;
+    object-fit: contain;
+}
+
+.welcome-text {
+    font-family: 'Arial', sans-serif;
+    font-weight: 600;
+    font-size: 24px;
+    color: #4B7AAA;
+}
+
+.welcome {
+    color: #4B7AAA;
+}
+
+.dealer-name {
+    color: #4B7AAA;
+    font-weight: 700;
+	font-size: 36px;
+}

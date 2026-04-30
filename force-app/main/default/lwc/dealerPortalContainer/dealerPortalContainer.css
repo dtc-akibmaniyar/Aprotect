@@ -1,0 +1,217 @@
+.dealer-portal-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Salesforce Sans', Arial, sans-serif;
+}
+
+/* Tab Navigation */
+.tab-strip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.tab-header {
+    background: linear-gradient(90deg, #235e80 0%, #367ba3 20%, #235e80 60%, #235e80 100%);
+    color: #ffffff;
+    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    padding: 14px 28px;
+    border-radius: 32px 0 32px 0;
+    box-shadow: 0 6px 14px rgba(35, 94, 128, 0.35);
+    min-width: 190px;
+    text-align: center;
+}
+
+.tab-header__title {
+    display: block;
+}
+
+.tab-navigation {
+    display: flex;
+    justify-content: stretch;
+    gap: 4px;
+    margin-bottom: 0;
+    flex-wrap: nowrap;
+    flex: 1;
+}
+
+.tab-button {
+    background: #e6e6e6;
+    border: 1px solid #bcbcbc;
+    border-radius: 0;
+    padding: 7px 26px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #5a5a5a;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 100%;
+}
+
+.tab-button:hover,
+.tab-button:focus {
+    background: #dcdcdc;
+    border-color: #a8a8a8;
+    color: #3f3f3f;
+}
+
+.tab-button:focus-visible {
+    outline: 2px solid #1e88ff;
+    outline-offset: 2px;
+}
+
+.tab-button.active {
+    background: #3d6fa6;
+    border-color: #2f5685;
+    color: #ffffff;
+    box-shadow: 0 3px 6px rgba(48, 91, 146, 0.35);
+}
+
+.tab-button.completed {
+    background: #34a853;
+    border-color: #2b8a45;
+    color: #ffffff;
+    box-shadow: 0 3px 6px rgba(52, 168, 83, 0.35);
+}
+
+.tab-button.completed:hover,
+.tab-button.completed:focus {
+    background: #2f974b;
+    border-color: #267d3d;
+    color: #ffffff;
+}
+
+.tab-button.active.completed {
+    background: #3d6fa6;
+    border-color: #2f5685;
+    color: #ffffff;
+    box-shadow: 0 3px 6px rgba(48, 91, 146, 0.35);
+}
+
+.tab-button.locked,
+.tab-button:disabled {
+    background: #f4f4f4;
+    border-color: #cccccc;
+    color: #a0a0a0;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.tab-button.locked:hover,
+.tab-button.locked:focus,
+.tab-button:disabled:hover,
+.tab-button:disabled:focus {
+    background: #f4f4f4;
+    border-color: #cccccc;
+    color: #a0a0a0;
+    box-shadow: none;
+}
+
+.tab-button.hidden {
+    display: none;
+}
+
+
+/* Tab Content */
+.tab-content {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    overflow: visible;
+    min-height: 400px;
+    position: relative;
+}
+
+/* Tab Content Sections */
+.tab-content-section {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease-in-out;
+    transform: translateX(20px);
+}
+
+.tab-content-section.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+    position: relative;
+}
+
+.tab-content-section.hidden {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(20px);
+    pointer-events: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .tab-strip {
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .tab-header {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .dealer-portal-container {
+        padding: 16px;
+    }
+    
+    .tab-navigation {
+        gap: 6px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+    
+    .tab-button {
+        padding: 10px 16px;
+        font-size: 0.8rem;
+        min-width: 100px;
+    }
+}
+
+/* Locked Container Styles */
+.locked-message-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+    border: 2px solid #ffc107;
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    color: #856404;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.2);
+}
+
+.locked-message-text {
+    line-height: 1.4;
+    font-size: 14px;
+}

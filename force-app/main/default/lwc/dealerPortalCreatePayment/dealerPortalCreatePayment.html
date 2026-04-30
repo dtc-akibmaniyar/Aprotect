@@ -1,0 +1,497 @@
+<template>
+            <div class="slds-col"> 
+                <lightning-button
+                    label="Cancel Remittance Form"
+                    variant="destructive"
+                    icon-name="utility:error"
+                    onclick={handleCancelRemittanceForm}
+                    disabled={isCancelButtonDisabled}
+                ></lightning-button>
+             </div>
+
+    <!-- Payment Method Selector -->
+    <div class="slds-m-top_medium">
+        <c-payment-method-selector disabled={isPaymentDisabled} onpaymentmethodselected={handlePaymentMethodSelected}></c-payment-method-selector>
+    </div>
+
+
+     <div class="slds-m-top_medium">
+            <c-transaction-history-display 
+                record-id={recordId}
+                lwc:ref="transactionHistoryDisplay">
+            </c-transaction-history-display>
+        </div>
+
+    <!-- Cancellation Confirmation Modal -->
+    <template if:true={showCancellationModal}>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+        <div class="slds-modal slds-fade-in-open slds-modal_small" role="dialog" aria-labelledby="cancellation-modal-heading">
+            <div class="slds-modal__container">
+                <div class="slds-modal__header">
+                    <h2 id="cancellation-modal-heading" class="slds-modal__title slds-hyphenate">
+                        Confirm Cancellation
+                    </h2>
+                    <button 
+                        class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                        title="Close dialog"
+                        onclick={handleCloseCancellationModal}>
+                        <lightning-icon 
+                            icon-name="utility:close"
+                            alternative-text="close"
+                            variant="inverse">
+                        </lightning-icon>
+                    </button>
+                </div>
+                <div class="slds-modal__content slds-text-align_center slds-var-p-around_medium">
+                    <p>Are you sure you want to cancel this remittance form?</p>
+                    <div class="slds-m-top_medium">
+                        <textarea 
+                            class="cancellation-reason-input" 
+                            placeholder="Please provide a reason for cancellation (optional)"
+                            value={cancellationReason}
+                            onchange={handleCancellationReasonChange}>
+                        </textarea>
+                    </div>
+                </div>
+                <div class="slds-modal__footer">
+                    <button 
+                        class="slds-button slds-button_neutral"
+                        onclick={handleCloseCancellationModal}>
+                        Cancel
+                    </button>
+                    <button 
+                        class="slds-button slds-button_brand"
+                        onclick={handleConfirmCancellation}
+                        disabled={isCancelling}>
+                        <template if:false={isCancelling}>
+                            Confirm Cancellation
+                        </template>
+                        <template if:true={isCancelling}>
+                            <lightning-spinner alternative-text="Processing" size="small" variant="inverse"></lightning-spinner>
+                            Processing...
+                        </template>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Invoice Selection Modal -->
+    <template if:true={showInvoiceSelectionModal}>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+        <div class="remittance-modal" role="dialog" aria-labelledby="invoice-selection-modal-heading">
+            <div class="remittance-modal-container">
+                <!-- Header Section -->
+                <div class="remittance-modal-header">
+                    <h2 class="invoice-selection-header-title" id="invoice-selection-modal-heading">Selected Invoices To Pay</h2>
+                    <button 
+                        class="remittance-close-btn"
+                        title="Close dialog"
+                        onclick={handleCloseInvoiceSelectionModal}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M18 6L6 18M6 6l12 12" stroke="#666" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Content Section -->
+                <div class="remittance-modal-content">
+                    <template if:true={isLoadingInvoices}>
+                        <div class="slds-p-around_medium">
+                            <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+                        </div>
+                    </template>
+
+                    <template if:false={isLoadingInvoices}>
+                        <template if:true={invoiceData}>
+                            <!-- Title with Remittance Form Name -->
+                            <h1 class="remittance-form-title">REMITTANCE ID#: {remittanceFormName}</h1>
+
+                            <!-- Column Headers -->
+                            <div class="remittance-columns-header">
+                                <div class="remittance-col-header checkbox-col-header">
+                                    <input 
+                                        type="checkbox" 
+                                        class="select-all-checkbox"
+                                        checked={isAllSelected}
+                                        onchange={handleSelectAll}
+                                        disabled>
+                                </div>
+                                <div class="remittance-col-header application-col-header">APPLICATION</div>
+                                <div class="remittance-col-header invoice-col-header">INVOICE DETAILS</div>
+                            </div>
+
+                            <!-- Invoice Rows -->
+                            <div class="remittance-rows-container invoice-selection-rows">
+                                <template for:each={allInvoicesWithSelection} for:item="application">
+                                    <div key={application.id} class="remittance-data-row">
+                                            <!-- Checkbox Column -->
+                                            <div class="remittance-checkbox-col">
+                                                <input 
+                                                    type="checkbox" 
+                                                    class="invoice-checkbox"
+                                                    data-invoice-id={application.id}
+                                                    checked={application.isSelected}
+                                                    onchange={handleInvoiceCheckboxChange}
+                                                    disabled>
+                                            </div>
+                                            <!-- Application Column -->
+                                            <div class="remittance-app-col">
+                                                <div class="app-info">
+                                                    <div class="app-info-item app-id-row">
+                                                        <div class="app-id-content">
+                                                            <strong>Application ID #</strong>
+                                                            <div>{application.applicationNumber}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="app-info-item">
+                                                        <strong>Customer Name</strong>
+                                                        <div>{application.customerName}</div>
+                                                    </div>
+                                                    <div class="app-info-item">
+                                                        <strong>Vehicle Year/Make/Model/Trim</strong>
+                                                        <div>{application.vehicleInfo}</div>
+                                                    </div>
+                                                    <div class="app-info-item">
+                                                        <strong>VIN #</strong>
+                                                        <div>{application.vin}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Invoice Details Column -->
+                                            <div class="remittance-invoice-col">
+                                                <div class="invoice-details">
+                                                    <template for:each={application.lineItems} for:item="item">
+                                                        <div key={item.id} class="invoice-item">
+                                                            <span class="invoice-label">{item.name}:</span>
+                                                            <span class="invoice-value">{item.formattedAmount}</span>
+                                                        </div>
+                                                    </template>
+                                                    <div class="invoice-divider"></div>
+                                                    <div class="invoice-item">
+                                                        <span class="invoice-label">Sub Total:</span>
+                                                        <span class="invoice-value">{application.formattedSubTotal}</span>
+                                                    </div>
+                                                    <template if:true={application.applicationTaxAmount}>
+                                                        <div class="invoice-item">
+                                                            <span class="invoice-label">Tax ({application.applicationTaxPercentage}%):</span>
+                                                            <span class="invoice-value">{application.formattedApplicationTaxAmount}</span>
+                                                        </div>
+                                                    </template>
+                                                    <div class="invoice-total">
+                                                        <span class="invoice-label"><strong>Total:</strong></span>
+                                                        <span class="invoice-value"><strong>{application.formattedTotalDue}</strong></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                </template>
+                            </div>
+
+                            <!-- Summary Section -->
+                            <div class="remittance-summary">
+                                <div class="summary-row total-row">
+                                    <span>Invoices Total Amount: {selectedInvoicesTotalFormatted}</span>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="invoice-selection-footer">
+                                <button 
+                                    class="cancel-btn"
+                                    onclick={handleCloseInvoiceSelectionModal}>
+                                    Cancel
+                                </button>
+                                <button 
+                                    class="continue-btn"
+                                    onclick={handleNextPaymentMethod}>
+                                    Next
+                                </button>
+                            </div>
+                        </template>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Payment Modal -->
+    <template if:true={showPaymentModal}>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+        <div class="slds-modal slds-fade-in-open slds-modal_small" role="dialog" aria-labelledby="payment-modal-heading">
+            <div class="slds-modal__container">
+                <div class="slds-modal__header">
+                    <h2 id="payment-modal-heading" class="slds-modal__title slds-hyphenate">
+                        Payment Information
+                    </h2>
+                    <button 
+                        class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                        title="Close dialog"
+                        onclick={handleClosePaymentModal}>
+                        <lightning-icon 
+                            icon-name="utility:close"
+                            alternative-text="close"
+                            variant="inverse">
+                        </lightning-icon>
+                    </button>
+                </div>
+                <div class="slds-modal__content slds-var-p-around_medium">
+                    <div class="slds-m-bottom_large" style="display: flex; gap: 1rem; align-items: center;">
+                        <label class="slds-form-element__label" style="margin: 0;">Balance Amount:</label>
+                        <p class="slds-text-body_regular" style="margin: 0; font-size: 1.25rem; font-weight: bold; color: #0070d2;">
+                            ${remittanceFormAmount}
+                        </p>
+                    </div>
+                    <div class="slds-m-bottom_large" style="display: flex; gap: 1rem; align-items: center;">
+                        <label class="slds-form-element__label" style="margin: 0;">Payable Amount:</label>
+                        <p class="slds-text-body_regular" style="margin: 0; font-size: 1.25rem; font-weight: bold; color: #0070d2;">
+                            {selectedInvoicesTotalFormatted}
+                        </p>
+                    </div>
+                    <div class="slds-m-bottom_medium">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <div class="card-icon-header">
+                                <svg width="47" height="32" viewBox="0 0 47 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_1014_2042)">
+<path d="M1.98955 11.5722L0.279432 11.5692L0.287871 12.4192L0.279396 28.6901C0.283494 30.1101 1.42495 31.2588 2.84498 31.2547L43.9471 31.2667C45.3572 31.2627 46.5059 30.1212 46.5018 28.7012L46.5103 12.4303L46.5018 11.5803L44.8017 11.5772L1.98945 11.5622L1.98955 11.5722ZM5.41622 19.2786L15.6967 19.2765L15.6937 20.9867L5.4132 20.9887L5.41622 19.2786ZM22.5351 26.129L5.41422 26.129L5.41715 24.4088L22.538 24.4089L22.5351 26.129ZM41.3696 24.4819C41.3787 25.3919 40.6261 26.1394 39.686 26.1387L36.2158 26.1332C35.2758 26.1425 34.5283 25.3899 34.5293 24.4798L34.5282 24.3698C34.5291 23.4498 35.2818 22.7123 36.2118 22.713L39.6821 22.7186C40.622 22.7093 41.3695 23.4619 41.3687 24.3819L41.3697 24.4919L41.3696 24.4819Z" fill="#5184B8"/>
+<path d="M43.9605 0.445003L2.85839 0.433036C1.42836 0.437232 0.289732 1.58859 0.283829 3.00872L0.279245 5.56889L0.287782 6.42885L1.9879 6.43197L44.8002 6.44696L46.5103 6.44999L46.5017 5.59003L46.5063 3.02986C46.5022 1.60983 45.3607 0.451103 43.9506 0.455101L43.9605 0.445003Z" fill="#5184B8"/>
+</g>
+<defs>
+<clipPath id="clip0_1014_2042">
+<rect width="46.49" height="31.24" fill="white" transform="translate(0 0.461521) rotate(-0.568802)"/>
+</clipPath>
+</defs>
+</svg>
+
+                            </div>
+                            <h3 class="slds-text-heading_small" style="margin: 0;">Enter Credit Card Information</h3>
+                        </div>
+                        <c-card-input oncardcomplete={handleCardComplete}></c-card-input>
+                    </div>
+                </div>
+                <div class="slds-modal__footer">
+                    <button 
+                        class="slds-button slds-button_neutral"
+                        onclick={handleBackFromPaymentModal}>
+                        Back
+                    </button>
+                    <button 
+                        class="slds-button slds-button_brand"
+                        onclick={handleProcessPayment}
+                        disabled={isGenerating}>
+                        <template if:false={isGenerating}>
+                            Process Payment
+                        </template>
+                        <template if:true={isGenerating}>
+                            <lightning-spinner alternative-text="Processing" size="small" variant="inverse"></lightning-spinner>
+                            Processing...
+                        </template>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Cheque Modal -->
+    <template if:true={showChequeModal}>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+        <div class="slds-modal slds-fade-in-open slds-modal_small" role="dialog" aria-labelledby="cheque-modal-heading">
+            <div class="slds-modal__container">
+                <div class="slds-modal__header cheque-modal-header">
+                    <div style="display: flex; align-items: center; gap: 1rem; flex: 1;">
+                        <div class="cheque-icon">
+                            <img src={staticResources.chequePayment} alt="Cheque Payment" style="width: 32px; height: 32px;"/>
+                        </div>
+                        <h2 id="cheque-modal-heading" class="slds-modal__title slds-hyphenate" style="margin: 0;">
+                            Enter Cheque Details
+                        </h2>
+                    </div>
+                    <button 
+                        class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                        title="Close dialog"
+                        onclick={handleCloseChequeModal}>
+                        <lightning-icon 
+                            icon-name="utility:close"
+                            alternative-text="close"
+                            variant="inverse">
+                        </lightning-icon>
+                    </button>
+                </div>
+                <div class="slds-modal__content cheque-modal-content">
+                    <div class="slds-m-bottom_large" style="display: flex; gap: 1rem; align-items: center;">
+                        <label class="slds-form-element__label" style="margin: 0;">Balance Amount:</label>
+                        <p class="slds-text-body_regular" style="margin: 0; font-size: 1.25rem; font-weight: bold; color: #0070d2;">
+                            ${remittanceFormAmount}
+                        </p>
+                    </div>
+                    <div class="slds-m-bottom_large" style="display: flex; gap: 1rem; align-items: center;">
+                        <label class="slds-form-element__label" style="margin: 0;">Cheque Amount:</label>
+                        <p class="slds-text-body_regular" style="margin: 0; font-size: 1.25rem; font-weight: bold; color: #0070d2;">
+                            ${remittanceFormAmount}
+                        </p>
+                    </div>
+                    <div class="cheque-form-section">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <lightning-combobox
+                                    label="Delivery Method"
+                                    value={chequeDeliveryMethod}
+                                    onchange={handleChequeDeliveryMethodChange}
+                                    options={deliveryMethodOptions}
+                                    placeholder="-- Select --"
+                                    required>
+                                </lightning-combobox>
+                            </div>
+                            <div class="form-group">
+                                <lightning-input
+                                    type="date"
+                                    label="Cheque Date"
+                                    value={chequeDate}
+                                    onchange={handleChequeDateChange}
+                                    placeholder="DD-MM-YYYY"
+                                    required>
+                                </lightning-input>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <lightning-input
+                                    type="text"
+                                    label="Cheque #"
+                                    value={chequeNumber}
+                                    onchange={handleChequeNumberChange}
+                                    placeholder="Enter cheque number"
+                                    required>
+                                </lightning-input>
+                            </div>
+                            <!-- Cheque Amount moved to display above -->
+                        </div>
+                        <div class="form-row notes-section">
+                            <lightning-textarea
+                                class="custom-textarea" 
+                                label="Notes"
+                                placeholder="enter text"
+                                value={chequeNotes}
+                                onchange={handleChequeNotesChange}>
+                            </lightning-textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="slds-modal__footer">
+                    <button 
+                        class="slds-button slds-button_neutral"
+                        onclick={handleBackFromChequeModal}>
+                        Back
+                    </button>
+                    <button 
+                        class="slds-button slds-button_brand"
+                        onclick={handleSubmitCheque}>
+                        Submit Cheque
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- E-Transfer Modal -->
+    <template if:true={showETransferModal}>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+        <div class="slds-modal slds-fade-in-open slds-modal_small" role="dialog" aria-labelledby="etransfer-modal-heading">
+            <div class="slds-modal__container">
+                <div class="slds-modal__header etransfer-modal-header">
+                    <div style="display: flex; align-items: center; gap: 1rem; flex: 1;">
+                        <div class="etransfer-icon">
+                            <img src={staticResources.eTransfer} alt="E-Transfer Payment" style="width: 32px; height: 32px;"/>
+                        </div>
+                        <h2 id="etransfer-modal-heading" class="slds-modal__title slds-hyphenate" style="margin: 0;">
+                            Enter E-Transfer Details
+                        </h2>
+                    </div>
+                    <button 
+                        class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                        title="Close dialog"
+                        onclick={handleCloseETransferModal}>
+                        <lightning-icon 
+                            icon-name="utility:close"
+                            alternative-text="close"
+                            variant="inverse">
+                        </lightning-icon>
+                    </button>
+                </div>
+                <div class="slds-modal__content etransfer-modal-content">
+                    <div class="slds-m-bottom_large" style="display: flex; gap: 1rem; align-items: center;">
+                        <label class="slds-form-element__label" style="margin: 0;">Balance Amount:</label>
+                        <p class="slds-text-body_regular" style="margin: 0; font-size: 1.25rem; font-weight: bold; color: #0070d2;">
+                            ${remittanceFormAmount}
+                        </p>
+                    </div>
+                    <div class="slds-m-bottom_large" style="display: flex; gap: 1rem; align-items: center;">
+                        <label class="slds-form-element__label" style="margin: 0;">Transaction Amount:</label>
+                        <p class="slds-text-body_regular" style="margin: 0; font-size: 1.25rem; font-weight: bold; color: #0070d2;">
+                            ${remittanceFormAmount}
+                        </p>
+                    </div>
+                    <div class="etransfer-form-section">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <lightning-input
+                                    type="text"
+                                    label="Transaction Reference #"
+                                    value={eTransferReferenceNumber}
+                                    onchange={handleETransferReferenceNumberChange}
+                                    placeholder="Enter reference number"
+                                    required>
+                                </lightning-input>
+                            </div>
+                            <div class="form-group">
+                                <lightning-input
+                                    type="date"
+                                    label="Transaction Date"
+                                    value={eTransferDate}
+                                    onchange={handleETransferDateChange}
+                                    placeholder="DD-MM-YYYY"
+                                    required>
+                                </lightning-input>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <!-- Transaction Amount moved to display above -->
+                            <div class="form-group">
+                                <lightning-input
+                                    type="email"
+                                    label="Sender Email"
+                                    value={eTransferSenderEmail}
+                                    onchange={handleETransferSenderEmailChange}
+                                    placeholder="Enter sender email"
+                                    required>
+                                </lightning-input>
+                            </div>
+                        </div>
+                        <div class="form-row notes-section">
+                            <lightning-textarea
+                                label="Notes"
+                                class="custom-textarea" 
+                                placeholder="enter text"
+                                value={eTransferNotes}
+                                onchange={handleETransferNotesChange}>
+                            </lightning-textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="slds-modal__footer">
+                    <button 
+                        class="slds-button slds-button_neutral"
+                        onclick={handleBackFromETransferModal}>
+                        Back
+                    </button>
+                    <button 
+                        class="slds-button slds-button_brand"
+                        onclick={handleSubmitETransfer}>
+                        Submit E-Transfer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+</template>

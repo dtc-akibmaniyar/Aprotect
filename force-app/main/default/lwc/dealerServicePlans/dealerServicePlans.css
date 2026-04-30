@@ -1,0 +1,123 @@
+.service-plans-container {
+    background-color: #ffffff;
+    padding: 0;
+    font-family: 'Arial', sans-serif;
+}
+
+/* HEADER BAR */
+.header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: linear-gradient(90deg, #5184B7 0%, #4F81B3 19%, #4B7AAA 34%, #436E99 48%, #395D81 60%, #2C4763 73%, #1B2C3E 84%, #080D12 96%, #000000 100%);
+    height: 40px;
+    margin: 0;
+    padding: 0;
+}
+
+/* .header-bar h2 {
+    margin: 0;
+    padding: 0;
+} */
+
+.header-bar h2 {
+    color: #FFFFFF;
+    font-size: 20px;
+    /* font-weight: 700; */
+    text-align: center;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+/* GRID LAYOUT */
+.plans-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.plan-card {
+    /* background-color: #fff; */
+    text-align: center;
+    /* border: 1px solid #ddd; */
+    /* overflow: hidden; */
+    display: flex;
+    flex-direction: column;
+}
+
+.plan-image {
+	height: 432px;
+    /* object-fit: cover; */
+    display: block;
+}
+
+.plan-text {
+    padding: 10px 12px;
+}
+
+.plan-text h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e3d68;
+    margin: 6px 0;
+}
+
+.plan-text p {
+    font-size: 13px;
+    color: #333;
+    margin: 0;
+}
+
+.protection-list {
+    list-style: none;
+    margin: 10px 0 0;
+    padding: 0;
+    color: #1e3d68;
+    font-size: 13px;
+    text-align: left;
+    padding-left: 40px;
+}
+
+/* COLOR HIGHLIGHTS */
+.ev { color: #7ac943; font-weight: 800; }
+.pro { color: #d63a3a; font-weight: 800; }
+.tire { color: #d63a3a; font-weight: 800; }
+
+/* BUTTONS */
+.btn-row {
+    display: flex;
+    gap: 0;
+    margin: 0;
+    padding-top: 10px;
+    flex: 1;
+}
+
+.btn-row:first-of-type {
+    /* border-bottom: 1px solid #ddd; */
+	gap: 17px;
+}
+
+.plan-btn {
+    background-color: #F0F0F0;
+    border: 0px solid #ccc;
+    border-right: none;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.15);
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 0;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background 0.2s ease;
+    flex: 1;
+    text-transform: uppercase;
+}
+
+/* .plan-btn:last-child {
+    border-right: 1px solid #ccc;
+} */
+
+.plan-btn:hover {
+    background-color: #d0d0d0;
+}

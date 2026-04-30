@@ -1,0 +1,220 @@
+* {
+    box-sizing: border-box;
+}
+
+.cancellation-container {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 32px 24px;
+}
+
+/* Main Two-Column Layout */
+.main-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+/* Left Column */
+.left-column {
+    position: sticky;
+    top: 24px;
+}
+
+/* Right Column */
+.right-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Vehicle Info Card */
+.vehicle-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    background: #EAF4FF;
+    border: 1px solid #d9dde3;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.vehicle-icon {
+    flex-shrink: 0;
+}
+
+.vehicle-details {
+    width: 100%;
+    text-align: left;
+}
+
+.vehicle-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #000;
+    margin-bottom: 4px;
+}
+
+.vehicle-info {
+    font-size: 12px;
+    color: #2D3748;
+    margin-bottom: 2px;
+    line-height: 1.4;
+}
+
+/* Policy Sections */
+/* .policy-section {
+    background: white;
+    border: 1px solid #d9dde3;
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+} */
+
+
+.policy-section{
+    /* border: 1px solid #d9dde3; */
+    padding: 24px;
+    margin-bottom: 0;
+    background: #FDFDFD;
+	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+}
+
+.policy-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #000;
+    margin: 0 0 16px 0;
+}
+
+.policy-text {
+    font-size: 12px;
+    line-height: 1.6;
+    color: #2D3748;
+    margin: 0 0 20px 0;
+    text-align: justify;
+}
+
+/* Checkbox Container */
+.checkbox-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+.policy-checkbox,
+.privacy-checkbox {
+    margin-top: 2px;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.checkbox-label {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #2D3748;
+    cursor: pointer;
+    user-select: none;
+}
+
+.checkbox-label:hover {
+    color: #000;
+}
+
+/* Spinner Container */
+.spinner-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    width: 100%;
+}
+
+/* Error Message */
+.error-message {
+    padding: 20px;
+    background: #fee;
+    border: 1px solid #fcc;
+    border-radius: 4px;
+    color: #c00;
+    text-align: center;
+}
+.button-group {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+    justify-content: center;
+}
+.loading-indicator {
+    margin-top: 0.75rem;
+    display: flex;
+    justify-content: center;
+}
+
+
+.action-buttons-container {
+    padding: 7px 0px;
+    background-color: #ffffff;
+    text-align: left;
+    display: flex;
+    gap: 20px;
+    justify-content: flex-start;
+    border-top: 4px solid #235E80;
+}
+.save-button {
+    background: #F89E43;
+    border: none;
+    border-radius: 9px;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 12px 40px;
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.2s ease;
+}
+
+.save-button:hover:not(:disabled) {
+    background: #e68a2e;
+}
+
+.save-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.cancel-button {
+    background: #5D89B1;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 12px 60px;
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.2s ease;
+    margin-left: 400px;
+}
+
+.cancel-button:hover:not(:disabled) {
+    background: #4a6f8f;
+}
+
+.cancel-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

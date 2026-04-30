@@ -1,0 +1,566 @@
+<template>
+    <div class="more-products-container" data-render-key={renderKey}>
+        <!-- Top Navigation Buttons -->
+        <div class="top-navigation-buttons">
+            <button
+                type="button"
+                class="nav-button back-button"
+                onclick={handleBack}
+                aria-label="Back">
+                <span class="button-label">Back</span>
+            </button>
+            <button
+                type="button"
+                class="nav-button skip-button"
+                onclick={handleSkip}
+                aria-label={skipButtonLabel}>
+                <span class="button-label">{skipButtonLabel}</span>
+            </button>
+        </div>
+
+        <template if:true={isPlanSelectionView}>
+            <div class="tire-hero">
+                <div class="tire-hero__media">
+                    <img src={heroImage} alt="Tire & Rim Illustration" class="tire-hero__media-image" />
+                </div>
+                <div class="tire-hero__content">
+                    <div class="tire-hero__header-row">
+                        <h1>TIRE & RIM WARRANTY</h1>
+                        <div class="tire-hero__header-actions">
+                            <template if:true={isQuoteStatus}>
+                                <button class="convert-to-app-btn" onclick={handleConvertToApplication} title="Convert this quote to a pending application">Convert to Application</button>
+                            </template>
+                        </div>
+                    </div>
+                    <p>
+                        Covers tire and rim repair or replacement from damage caused by potholes, nails, debris, and other road hazards to stay protected from costly repairs.
+                        Enter the tire and rim information for this vehicle, including tire brand, tread depth, rim size, and any visible damage or notes.
+                        Accurate details are required to confirm eligibility for Tire & Rim Protection coverage.
+                    </p>
+                </div>
+            </div>
+
+            <section class="package-list-panel">
+                <template if:true={showPlanCards}>
+                    <div class="package-list">
+                        <template for:each={planCards} for:item="card">
+                            <article key={card.id} class={card.cardClass}>
+                                <div class="plan-card-header">
+                                    <div class="plan-card-name">{card.name}</div>
+                                </div>
+                                <template if:true={card.planTypeDescription}>
+                                    <p class="plan-card-description">{card.planTypeDescription}</p>
+                                </template>
+                                
+                                <!-- INCLUDES Section in Plan Card -->
+                                <template if:true={card.options}>
+                                    <div class="includes-section">
+                                        <h4 class="includes-heading">INCLUDES:</h4>
+                                        <div class="includes-list">
+                                            <template for:each={card.options} for:item="option">
+                                                <div key={option.id} class="includes-item-card">
+                                                    <div class="includes-check-icon">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="24" height="24" viewBox="0 0 256 256" xml:space="preserve" class="green-tick-svg">
+                                                            <g style="stroke: none; stroke-width: 0; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: none; fill-rule: nonzero; opacity: 1;" transform="translate(1.4065934065934016 1.4065934065934016) scale(2.81 2.81)">
+                                                                <path d="M 89.328 2.625 L 89.328 2.625 c -1.701 -2.859 -5.728 -3.151 -7.824 -0.568 L 46.532 45.173 c -0.856 1.055 -2.483 0.997 -3.262 -0.115 l -8.382 -11.97 c -2.852 -4.073 -8.789 -4.335 -11.989 -0.531 l 0 0 c -2.207 2.624 -2.374 6.403 -0.408 9.211 l 17.157 24.502 c 2.088 2.982 6.507 2.977 8.588 -0.011 l 4.925 -7.07 L 89.135 7.813 C 90.214 6.272 90.289 4.242 89.328 2.625 z" style="stroke: none; stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: rgb(111,178,6); fill-rule: nonzero; opacity: 1;" transform=" matrix(1 0 0 1 0 0) " stroke-linecap="round"/>
+                                                                <path d="M 45 90 C 20.187 90 0 69.813 0 45 C 0 20.187 20.187 0 45 0 c 6.072 0 11.967 1.19 17.518 3.538 c 2.034 0.861 2.986 3.208 2.125 5.242 c -0.859 2.035 -3.207 2.987 -5.242 2.126 C 54.842 8.978 49.996 8 45 8 C 24.598 8 8 24.598 8 45 c 0 20.402 16.598 37 37 37 c 20.402 0 37 -16.598 37 -37 c 0 -3.248 -0.42 -6.469 -1.249 -9.573 c -0.57 -2.134 0.698 -4.327 2.832 -4.897 c 2.133 -0.571 4.326 0.698 4.896 2.833 C 89.488 37.14 90 41.055 90 45 C 90 69.813 69.813 90 45 90 z" style="stroke: none; stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: rgb(111,178,6); fill-rule: nonzero; opacity: 1;" transform=" matrix(1 0 0 1 0 0) " stroke-linecap="round"/>
+                                                            </g>
+                                                        </svg>
+                                                    </div>
+                                                    <span class="includes-item-text">{option.optionName}</span>
+                                                    <template if:true={option.inclusion}>
+                                                        <button 
+                                                            class="includes-info-icon-btn" 
+                                                            data-option-id={option.id}
+                                                            data-help-type="inclusion"
+                                                            data-help-text={option.inclusion}
+                                                            onclick={toggleOptionHelp}
+                                                            title="More info">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 40 40" class="info-icon-svg">
+                                                                <path fill="#98ccfd" d="M20,38.5C9.799,38.5,1.5,30.201,1.5,20S9.799,1.5,20,1.5S38.5,9.799,38.5,20S30.201,38.5,20,38.5z"></path>
+                                                                <path fill="#4788c7" d="M20,2c9.925,0,18,8.075,18,18s-8.075,18-18,18S2,29.925,2,20S10.075,2,20,2 M20,1 C9.507,1,1,9.507,1,20s8.507,19,19,19s19-8.507,19-19S30.493,1,20,1L20,1z"></path>
+                                                                <path fill="#fff" d="M20 10A2 2 0 1 0 20 14A2 2 0 1 0 20 10Z"></path>
+                                                                <g>
+                                                                    <path fill="#fff" d="M22 29L22 17 17 17 17 18 18 18 18 29 17 29 17 30 23 30 23 29z"></path>
+                                                                </g>
+                                                            </svg>
+                                                        </button>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                                
+                                <button
+                                    class={card.buttonClass}
+                                    data-plan-type-key={card.id}
+                                    data-plan-type-label={card.name}
+                                    data-plan-type-description={card.planTypeDescription}
+                                    onclick={handlePlanCardClick}
+                                    disabled={card.buttonDisabled}>
+                                    {card.buttonLabel}
+                                </button>
+                            </article>
+                        </template>
+                    </div>
+                </template>
+                <template if:false={dealerHasSpecificPackages}>
+                    <div class="no-packages-message">
+                        <lightning-icon icon-name="utility:warning" size="medium" variant="warning"></lightning-icon>
+                        <h3>This Dealer has no Tire and Rim Service Plans available</h3>
+                        <p>There are no Tire and Rim plans configured for this dealer. You may continue to the next section.</p>
+                    </div>
+                </template>
+                <template if:true={showVehicleNotEligibleDisclaimer}>
+                    <div class="no-packages-message">
+                        <lightning-icon icon-name="utility:warning" size="medium" variant="warning"></lightning-icon>
+                        <h3>This vehicle does not qualify for any Tire and Rim Service Plans</h3>
+                        <p>None of the available plans are eligible for this vehicle. You may continue to the next section.</p>
+                    </div>
+                </template>
+            </section>
+        </template>
+
+        <template if:true={isDetailView}>
+            <div class="tire-hero">
+                <div class="tire-hero__media">
+                    <img src={heroImage} alt="Tire & Rim Illustration" class="tire-hero__media-image" />
+                </div>
+                <div class="tire-hero__content">
+                    <div class="tire-hero__header">
+                        <div class="tire-hero__header-row">
+                            <h1>TIRE &amp; RIM WARRANTY</h1>
+                            <div class="tire-hero__header-actions">
+                                <template if:true={isQuoteStatus}>
+                                    <button class="convert-to-app-btn" onclick={handleConvertToApplication} title="Convert this quote to a pending application">Convert to Application</button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                    <p>
+                        Covers tire and rim repair or replacement from damage caused by potholes, nails, debris, and other road hazards to stay protected from costly repairs.
+                        Enter the tire and rim information for this vehicle, including tire brand, tread depth, rim size, and any visible damage or notes.
+                        Accurate details are required to confirm eligibility for Tire &amp; Rim Protection coverage.
+                    </p>
+                    <div class="detail-view-header">
+                        <button class="back-to-plans-btn" onclick={handleViewAllPlans}>
+                            <lightning-icon icon-name="utility:back" size="x-small"></lightning-icon>
+                            <span>View All Plans</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tire-detail-grid">
+                <div class="tire-detail-column tire-detail-left left">
+                    <template if:true={hasSelectedPackage}>
+                        <div class="tire-term-card">
+                            <div class="tire-term-card-header">
+                                <div class="tire-term-card-title">Select Term of Coverage:</div>
+                            </div>
+                            <div class="tire-term-grid">
+                                <template for:each={selectedPackageTermOptions} for:item="term">
+                                    <button 
+                                        key={term.id}
+                                        class={term.buttonClass}
+                                        data-term={term.id}
+                                        data-package={term.packageId}
+                                        disabled={fieldDisabled}
+                                        onclick={handleWarrantyTermSelection}>
+                                        <div class="tire-term-duration">{term.durationLabel}</div>
+                                        <div class="tire-term-price">{term.price}</div>
+                                        <div class="tire-term-class">{term.classLabel}</div>
+                                    </button>
+                                </template>
+                            </div>
+                            <template if:true={termSelectionMessage}>
+                                <div class="tire-term-helper">{termSelectionMessage}</div>
+                            </template>
+                        </div>
+                    </template>
+                    <template if:false={hasSelectedPackage}>
+                        <div class="no-selected-package-card">
+                            <lightning-icon icon-name="utility:warning" size="small" variant="warning"></lightning-icon>
+                            <p>Select a Tire &amp; Rim package to view coverage terms.</p>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="tire-detail-column tire-detail-right right">
+                    <template if:true={hasVehicleInfo}>
+                        <div class="vehicle-details-panel">
+                            <div class="vehicle-details-content">
+                                <div class="vehicle-icon-container">
+                                    <svg class="vehicle-svg" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true">
+                                        <g transform="translate(0,512) scale(0.1,-0.1)" fill="#5184b8" stroke="none">
+                                            <path d="M1326 4224 c-69 -22 -133 -68 -166 -121 -16 -25 -117 -266 -226 -537 -195 -488 -196 -491 -241 -526 -88 -69 -176 -201 -217 -323 -72 -216 -57 -576 36 -867 56 -174 106 -243 216 -297 l57 -28 1765 0 1765 0 63 29 c91 42 151 112 191 220 119 329 142 697 61 946 -36 110 -86 188 -180 282 l-87 87 -199 497 c-186 464 -202 501 -246 549 -29 32 -68 62 -100 76 l-53 24 -1195 2 c-1047 2 -1201 0 -1244 -13z m2278 -296 c29 -26 266 -615 266 -662 0 -17 -11 -39 -29 -57 l-29 -29 -1255 0 -1255 0 -31 26 c-24 20 -31 34 -31 62 0 47 234 636 263 663 20 18 51 19 1048 19 l1028 0 25 -22z m-2288 -1390 c65 -34 134 -111 157 -174 23 -66 22 -135 -2 -165 -19 -24 -22 -24 -243 -27 -276 -4 -314 0 -375 41 -58 39 -91 99 -99 183 -8 77 1 129 27 155 19 19 31 20 252 17 230 -3 232 -3 283 -30z m3093 6 c17 -22 21 -41 21 -108 -1 -121 -38 -193 -125 -239 -37 -21 -57 -22 -292 -25 -276 -4 -306 1 -319 54 -23 91 47 236 143 295 71 44 98 48 330 49 l222 0 20 -26z m-1054 -19 c14 -13 25 -28 25 -34 0 -30 -144 -398 -162 -413 -19 -17 -66 -18 -668 -18 -622 0 -648 1 -664 19 -19 21 -156 381 -156 411 0 10 12 28 26 39 26 21 33 21 801 21 l774 0 24 -25z"/>
+                                            <path d="M360 3437 c-104 -29 -164 -94 -164 -176 1 -57 22 -98 77 -151 42 -41 185 -120 216 -120 9 0 51 35 94 77 76 74 81 82 128 200 27 68 49 125 49 128 0 2 -30 14 -67 26 -84 27 -265 35 -333 16z"/>
+                                            <path d="M4485 3435 c-63 -13 -135 -40 -135 -49 0 -3 21 -58 46 -122 45 -111 50 -119 130 -198 l84 -83 49 18 c113 39 211 112 248 183 23 42 21 114 -2 154 -56 94 -239 137 -420 97z"/>
+                                            <path d="M660 1258 c0 -123 5 -239 10 -259 12 -42 51 -82 102 -103 31 -13 85 -16 300 -16 245 0 264 1 305 21 29 14 52 35 68 63 24 42 25 47 25 249 l0 207 -307 0 c-318 0 -402 8 -472 45 l-31 16 0 -223z"/>
+                                            <path d="M4417 1463 c-67 -35 -155 -43 -470 -43 l-308 0 3 -217 c3 -212 4 -219 27 -252 47 -65 74 -71 371 -71 292 0 322 6 368 65 38 48 43 89 40 317 l-3 216 -28 -15z"/>
+                                        </g>
+                                    </svg>
+                                </div>
+                                <div class="vehicle-info-container">
+                                    <div class="vehicle-model-name">{vehicleSummaryTitle}</div>
+                                    <template if:true={vehicleVinDisplay}>
+                                        <div class="vehicle-detail-text">{vehicleVinDisplay}</div>
+                                    </template>
+                                    <template if:true={vehicleOdometerDisplay}>
+                                        <div class="vehicle-detail-text">Odometer: {vehicleOdometerDisplay}</div>
+                                    </template>
+                                    <template if:true={vehiclePurchasePriceDisplay}>
+                                        <div class="vehicle-detail-text">Purchase Price: {vehiclePurchasePriceDisplay}</div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="vehicle-class-panel">
+                            <div class="vehicle-class-strip">
+                                <div class="vehicle-class-arrow"></div>
+                                <span class="vehicle-class-text">{vehicleClassDisplay}</span>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div class="right-column-stack">
+                        <div class="selected-plan-section">
+                            <h4 class="section-heading">SELECTED PLAN:</h4>
+                            <div class="selected-plan-box">
+                                <span class="selected-plan-text">{selectedPlanDisplay}</span>
+                            </div>
+                        </div>
+
+                        <div class="coverage-term-section">
+                            <h4 class="section-heading">COVERAGE TERM SELECTED:</h4>
+                            <div class="coverage-term-box">
+                                <span class="coverage-term-text">{selectedCoverageTermText}</span>
+                                <template if:false={hasSelectedTerm}>
+                                    <lightning-icon icon-name="utility:warning" size="xx-small" variant="error"></lightning-icon>
+                                </template>
+                            </div>
+                        </div>
+
+                        <div class="price-summary-section">
+                            <h4 class="section-heading">PRICE:</h4>
+                            <div class="price-summary-box">
+                                <span class="price-summary-value">{formattedPrice}</span>
+                                <button class="price-breakdown-inline" title="View Price Breakdown" onclick={showPriceBreakdownModal}>
+                                    <lightning-icon icon-name="utility:info" size="xx-small"></lightning-icon>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- INCLUDES Section -->
+                        <template if:true={selectedDealerPackage}>
+                            <div class="includes-section">
+                                <h4 class="includes-heading">INCLUDES:</h4>
+                                <div class="includes-list">
+                                    <template for:each={selectedPackageOptions} for:item="option">
+                                        <div key={option.id} class="includes-item-card">
+                                            <div class="includes-check-icon">
+                                                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="24" height="24" viewBox="0 0 256 256" xml:space="preserve" class="green-tick-svg">
+                                                    <g style="stroke: none; stroke-width: 0; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: none; fill-rule: nonzero; opacity: 1;" transform="translate(1.4065934065934016 1.4065934065934016) scale(2.81 2.81)">
+                                                        <path d="M 89.328 2.625 L 89.328 2.625 c -1.701 -2.859 -5.728 -3.151 -7.824 -0.568 L 46.532 45.173 c -0.856 1.055 -2.483 0.997 -3.262 -0.115 l -8.382 -11.97 c -2.852 -4.073 -8.789 -4.335 -11.989 -0.531 l 0 0 c -2.207 2.624 -2.374 6.403 -0.408 9.211 l 17.157 24.502 c 2.088 2.982 6.507 2.977 8.588 -0.011 l 4.925 -7.07 L 89.135 7.813 C 90.214 6.272 90.289 4.242 89.328 2.625 z" style="stroke: none; stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: rgb(111,178,6); fill-rule: nonzero; opacity: 1;" transform=" matrix(1 0 0 1 0 0) " stroke-linecap="round"/>
+                                                        <path d="M 45 90 C 20.187 90 0 69.813 0 45 C 0 20.187 20.187 0 45 0 c 6.072 0 11.967 1.19 17.518 3.538 c 2.034 0.861 2.986 3.208 2.125 5.242 c -0.859 2.035 -3.207 2.987 -5.242 2.126 C 54.842 8.978 49.996 8 45 8 C 24.598 8 8 24.598 8 45 c 0 20.402 16.598 37 37 37 c 20.402 0 37 -16.598 37 -37 c 0 -3.248 -0.42 -6.469 -1.249 -9.573 c -0.57 -2.134 0.698 -4.327 2.832 -4.897 c 2.133 -0.571 4.326 0.698 4.896 2.833 C 89.488 37.14 90 41.055 90 45 C 90 69.813 69.813 90 45 90 z" style="stroke: none; stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: rgb(111,178,6); fill-rule: nonzero; opacity: 1;" transform=" matrix(1 0 0 1 0 0) " stroke-linecap="round"/>
+                                                    </g>
+                                                </svg>
+                                            </div>
+                                            <span class="includes-item-text">{option.optionName}</span>
+                                            <template if:true={option.inclusion}>
+                                                <button 
+                                                    class="includes-info-icon-btn" 
+                                                    data-option-id={option.id}
+                                                    data-help-type="inclusion"
+                                                    data-help-text={option.inclusion}
+                                                    onclick={toggleOptionHelp}
+                                                    title="More info">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 40 40" class="info-icon-svg">
+                                                        <path fill="#98ccfd" d="M20,38.5C9.799,38.5,1.5,30.201,1.5,20S9.799,1.5,20,1.5S38.5,9.799,38.5,20S30.201,38.5,20,38.5z"></path>
+                                                        <path fill="#4788c7" d="M20,2c9.925,0,18,8.075,18,18s-8.075,18-18,18S2,29.925,2,20S10.075,2,20,2 M20,1 C9.507,1,1,9.507,1,20s8.507,19,19,19s19-8.507,19-19S30.493,1,20,1L20,1z"></path>
+                                                        <path fill="#fff" d="M20 10A2 2 0 1 0 20 14A2 2 0 1 0 20 10Z"></path>
+                                                        <g>
+                                                            <path fill="#fff" d="M22 29L22 17 17 17 17 18 18 18 18 29 17 29 17 30 23 30 23 29z"></path>
+                                                        </g>
+                                                    </svg>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tire-details-form-card">
+                <div class="tire-details-header">
+                    <h3>Tire &amp; Rim Details</h3>
+                    <p>
+                        Enter current tire and rim details exactly as they appear on the vehicle. Include tire size, rim size and type, and note any visible damage or aftermarket modifications before submitting the application.
+                    </p>
+                </div>
+                <div class="tire-details-grid">
+                    <div class="tire-details-form-fields">
+                        <label class="tire-detail-field">
+                            <span>Tire Brand <abbr title="required" class="required-star">*</abbr></span>
+                            <select required disabled={fieldDisabled} onchange={handleTireBrandChange}>
+                                <option value="">Select Tire Brand</option>
+                                <template for:each={tireBrandSelectOptions} for:item="option">
+                                    <option key={option.value} value={option.value} selected={option.selected}>{option.label}</option>
+                                </template>
+                            </select>
+                        </label>
+                        <label class="tire-detail-field">
+                            <span>Tire Type <abbr title="required" class="required-star">*</abbr></span>
+                            <input type="text" required value={tireType} disabled={fieldDisabled} onchange={handleTireTypeChange}/>
+                        </label>
+                        <label class="tire-detail-field">
+                            <span>Tread Depth <abbr title="required" class="required-star">*</abbr></span>
+                            <input type="text" required value={treadDepth} disabled={fieldDisabled} onchange={handleTreadDepthChange}/>
+                        </label>
+                        <label class="tire-detail-field">
+                            <span>Tread Depth Unit <abbr title="required" class="required-star">*</abbr></span>
+                            <select required disabled={fieldDisabled} onchange={handleTreadDepthUnitChange}>
+                                <option value="">Select Unit</option>
+                                <template for:each={treadDepthUnitSelectOptions} for:item="option">
+                                    <option key={option.value} value={option.value} selected={option.selected}>{option.label}</option>
+                                </template>
+                            </select>
+                        </label>
+                        <label class="tire-detail-field">
+                            <span>Rim Size <abbr title="required" class="required-star">*</abbr></span>
+                            <input type="text" required value={rimSize} disabled={fieldDisabled} onchange={handleRimSizeChange}/>
+                        </label>
+                        <label class="tire-detail-field">
+                            <span>Rim Size Unit <abbr title="required" class="required-star">*</abbr></span>
+                            <select required disabled={fieldDisabled} onchange={handleRimSizeUnitChange}>
+                                <option value="">Select Unit</option>
+                                <template for:each={rimSizeUnitSelectOptions} for:item="option">
+                                    <option key={option.value} value={option.value} selected={option.selected}>{option.label}</option>
+                                </template>
+                            </select>
+                        </label>
+                        <label class="tire-detail-field">
+                            <span>Rim Brand <abbr title="required" class="required-star">*</abbr></span>
+                            <select required disabled={fieldDisabled} onchange={handleRimBrandChange}>
+                                <option value="">Select Rim Brand</option>
+                                <template for:each={rimBrandSelectOptions} for:item="option">
+                                    <option key={option.value} value={option.value} selected={option.selected}>{option.label}</option>
+                                </template>
+                            </select>
+                        </label>
+                        <label class="tire-detail-field">
+                            <span>Rim Type <abbr title="required" class="required-star">*</abbr></span>
+                            <select required disabled={fieldDisabled} onchange={handleRimTypeChange}>
+                                <option value="">Select Rim Type</option>
+                                <template for:each={rimTypeSelectOptions} for:item="option">
+                                    <option key={option.value} value={option.value} selected={option.selected}>{option.label}</option>
+                                </template>
+                            </select>
+                        </label>
+                        <label class="tire-detail-field full-width">
+                            <span>Dealer Comments</span>
+                            <textarea rows="3" disabled={fieldDisabled} onchange={handleDealerCommentsChange}>{dealerComments}</textarea>
+                        </label>
+                    </div>
+                    <div class="tire-upload-section">
+                        <div class="tire-upload-header">
+                            <h4 class="upload-title">Upload Tire & Rim Images</h4>
+                            <p class="upload-description">Select files to upload. Files will be saved when you click Continue.</p>
+                        </div>
+                        
+                        <!-- Custom file input - works without record-id -->
+                        <div class="custom-file-upload">
+                            <label class="file-input-label" for="tireRimFileInput">
+                                <lightning-icon icon-name="utility:upload" size="small"></lightning-icon>
+                                <span>Choose Files</span>
+                            </label>
+                            <input 
+                                type="file" 
+                                id="tireRimFileInput"
+                                class="file-input-hidden"
+                                accept={acceptedFileTypes}
+                                disabled={fieldDisabled}
+                                multiple
+                                onchange={handleFileSelection}>
+                        </div>
+                        
+                        <!-- Show pending files -->
+                        <template if:true={pendingFiles}>
+                            <template if:true={pendingFiles.length}>
+                                <div class="pending-files-list">
+                                    <h5>Selected Files ({pendingFiles.length}):</h5>
+                                    <template for:each={pendingFiles} for:item="file" for:index="index">
+                                        <div key={file.name} class="pending-file-item">
+                                            <lightning-icon icon-name="utility:file" size="x-small"></lightning-icon>
+                                            <span class="file-name">{file.name}</span>
+                                            <lightning-button-icon 
+                                                icon-name="utility:close" 
+                                                alternative-text="Remove"
+                                                onclick={removePendingFile}
+                                                data-index={index}
+                                                variant="bare">
+                                            </lightning-button-icon>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </template>
+                        
+                        <!-- Show upload progress -->
+                        <template if:true={uploadInProgress}>
+                            <div class="upload-progress">
+                                <lightning-spinner alternative-text="Uploading files..." size="small"></lightning-spinner>
+                                <span class="progress-text">Uploading files...</span>
+                            </div>
+                        </template>
+                        
+                        <!-- Info message -->
+                        <div class="upload-info">
+                            <p class="upload-hint">Files will be uploaded when you click Continue. Accepted formats: PDF, JPG, PNG, GIF</p>
+                        </div>
+                    </div>
+                </div>
+                
+               
+            </div>
+        
+        <!-- Error Message -->
+        <template if:true={showError}>
+            <div class="error-message">
+                <lightning-icon icon-name="utility:error" size="x-small" variant="error"></lightning-icon>
+                <span>{errorMessage}</span>
+            </div>
+        </template>
+        
+        <!-- Decline Warranty Modal -->
+        <template if:true={showDeclineModal}>
+            <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header">
+                        <h2 class="slds-text-heading_medium">Decline More Products</h2>
+                        <button class="slds-button slds-button_icon slds-modal__close" onclick={cancelDeclineMoreProducts}>
+                            <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                        </button>
+                    </header>
+                    <div class="slds-modal__content slds-p-around_medium">
+                        <p>Are you sure you want to decline more products coverage? This action cannot be undone.</p>
+                    </div>
+                    <footer class="slds-modal__footer">
+                        <lightning-button label="Cancel" variant="neutral" onclick={cancelDeclineMoreProducts}></lightning-button>
+                        <lightning-button label="Confirm Decline" variant="destructive" onclick={confirmDeclineMoreProducts}></lightning-button>
+                    </footer>
+                </div>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+        
+        <!-- More Products Selection Modal -->
+        <template if:true={showMoreProductsModal}>
+            <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header">
+                        <h2 class="slds-text-heading_medium">More Products Coverage Details</h2>
+                        <button class="slds-button slds-button_icon slds-modal__close" onclick={closeMoreProductsModal}>
+                            <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                        </button>
+                    </header>
+                    <div class="slds-modal__content slds-p-around_medium">
+                        <div class="more-products-details">
+                            <h3>Selected More Products Package</h3>
+                            <p><strong>Package:</strong> {selectedDealerPackageName}</p>
+                            <p><strong>Term:</strong> {selectedWarrantyTermName}</p>
+                            <p><strong>Price:</strong> {formattedPrice}</p>
+                        </div>
+                    </div>
+                    <footer class="slds-modal__footer">
+                        <lightning-button label="Close" variant="neutral" onclick={closeMoreProductsModal}></lightning-button>
+                    </footer>
+                </div>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+        
+        
+        <!-- Price Breakdown Modal -->
+        <template if:true={showPriceModal}>
+            <div class="price-breakdown-modal-overlay" onclick={hidePriceBreakdownModal}>
+                <div class="price-breakdown-modal" onclick={stopPropagation}>
+                    <div class="modal-header">
+                        <h3 class="modal-title">Price Breakdown</h3>
+                        <button class="modal-close-btn" onclick={hidePriceBreakdownModal}>
+                            <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                        </button>
+                    </div>
+                    <div class="modal-content">
+                        <div class="pricing-source-info">
+                            <template if:true={currentPriceBreakdown.source}>
+                                <div class="source-label">Pricing Source: {currentPriceBreakdown.source}</div>
+                            </template>
+                        </div>
+                        <div class="breakdown-section">
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Retail Price (Before Tax):</span>
+                                <span class="breakdown-value">{currentPriceBreakdown.retailPrice}</span>
+                            </div>
+                            <template if:true={currentPriceBreakdown.taxAmount}>
+                                <div class="breakdown-item">
+                                    <span class="breakdown-label">Tax ({currentPriceBreakdown.taxRate}):</span>
+                                    <span class="breakdown-value">+{currentPriceBreakdown.taxAmount}</span>
+                                </div>
+                            </template>
+                            <div class="breakdown-item total">
+                                <span class="breakdown-label">Total Price:</span>
+                                <span class="breakdown-value">{currentPriceBreakdown.totalPrice}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <lightning-button 
+                            label="Close" 
+                            variant="brand" 
+                            onclick={hidePriceBreakdownModal}
+                            class="close-btn">
+                        </lightning-button>
+                    </div>
+                </div>
+            </div>
+        </template>
+        
+        </template>
+
+         <!-- Navigation Buttons - Save As Quote and Continue at bottom -->
+        <div class="navigation-buttons">
+            <template if:true={showContinueButton}>
+                <button
+                    type="button"
+                    class="nav-button save-quote-button"
+                    onclick={handleSaveAsQuote}
+                    aria-label="Save As Quote">
+                    <span class="button-label">Save As Quote</span>
+                </button>
+            </template>
+            
+            
+            <div class="continue-button-wrapper">
+                <template if:true={loading}>
+                    <lightning-spinner alternative-text="Loading..." size="small"></lightning-spinner>
+                </template>
+                <template if:true={showContinueButton}>
+                    <button
+                        type="button"
+                        class="continue-button"
+                        onclick={handleContinue}
+                        disabled={isContinueDisabled}
+                        aria-label="Save & Continue">
+                        <span class="continue-label">Save & Continue</span>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
+</template>

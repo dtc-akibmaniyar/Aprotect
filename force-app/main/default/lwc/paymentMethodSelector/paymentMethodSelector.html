@@ -1,0 +1,135 @@
+<template>
+    <template if:false={disabled}>
+        <div class="payment-selector-container">
+            <h2 class="slds-text-heading_small slds-m-bottom_medium" style="font-weight: 600;">Select Method of Payment:</h2>
+            
+            <!-- Credit Card Payment Option -->
+            <div class="payment-option-card" onclick={handleSelectCreditCard}>
+                <div class="payment-option-content">
+                    <div class="payment-icon">
+                        <svg width="53" height="41" viewBox="0 0 53 41" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_enabled)">
+<path d="M4.36461 20.9878L2.6949 21.3574L2.88829 22.1851L6.42451 38.067C6.73785 39.4521 8.10213 40.3246 9.48717 40.0112L49.6048 31.0691C50.9801 30.7581 51.8526 29.3938 51.5392 28.0087L48.003 12.1268L47.8096 11.2991L46.1497 11.6664L4.36233 20.978L4.36461 20.9878ZM9.38775 27.7626L19.4209 25.5211L19.7905 27.1908L9.75734 29.4323L9.38775 27.7626ZM27.5878 30.7193L10.8781 34.4489L10.5062 32.7694L27.2159 29.0398L27.5878 30.7193ZM45.6112 25.0088C45.8183 25.8949 45.2466 26.7884 44.3289 26.9926L40.9409 27.7431C40.0255 27.957 39.132 27.3853 38.9347 26.4969L38.9097 26.3898C38.7101 25.4916 39.2841 24.6078 40.1919 24.406L43.58 23.6554C44.4954 23.4416 45.3889 24.0133 45.5885 24.9114L45.6135 25.0185L45.6112 25.0088Z" fill="#5184B8"/>
+<path d="M42.9033 0.984615L2.78565 9.92671C1.39088 10.2423 0.530411 11.6141 0.834014 13.0014L1.38725 15.5011L1.58292 16.3385L3.24288 15.9712L45.0302 6.65953L46.6999 6.28994L46.5043 5.4525L45.951 2.95281C45.6377 1.56778 44.2711 0.685562 42.8958 0.996627L42.9033 0.984615Z" fill="#5184B8"/>
+</g>
+<defs>
+<clipPath id="clip0_enabled">
+<rect width="46.49" height="31.24" fill="white" transform="translate(0 10.5774) rotate(-13.1511)"/>
+</clipPath>
+</defs>
+</svg>
+
+                    </div>
+                    <div class="payment-details">
+                        <h3 class="slds-text-heading_small slds-m-bottom_x-small">
+                            <u>Credit Card Payment Online</u>
+                            <div class="card-logos">
+                                <img src={staticResources.cardsIcons} alt="Visa and Mastercard" class="card-icon"/>
+                            </div>
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cheque Payment Option -->
+            <div class="payment-option-card" onclick={handleSelectCheque}>
+                <div class="payment-option-content">
+                    <div class="payment-icon">
+                        <img src={staticResources.chequePayment} alt="chequePayment"/>
+                    </div>
+                    <div class="payment-details">
+                        <h3 class="slds-text-heading_small slds-m-bottom_x-small">
+                            <u>Cheque</u>
+                        </h3>
+                        <p class="slds-text-body_small slds-m-bottom_none">
+                            Mail a cheque to A-Protect Warranty 8800 Dufferin St. Suite 302B Concord, ON L4K 0C5 and reference the Remittance Form ID #
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- E-transfer Payment Option -->
+            <div class="payment-option-card" onclick={handleSelectETransfer}>
+                <div class="payment-option-content">
+                    <div class="payment-icon">
+                         <img src={staticResources.eTransfer} alt="eTransfer"/>
+                    </div>
+                    <div class="payment-details">
+                        <h3 class="slds-text-heading_small slds-m-bottom_x-small">
+                            <u>View Interact E-transfer</u>
+                        </h3>
+                        <p class="slds-text-body_small slds-m-bottom_none">
+                            Send an e-transfer to <strong>payments@a-protectwarranty.com</strong> and reference the Remittance Form ID #
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+    <template if:true={disabled}>
+        <div class="payment-selector-container disabled">
+            <h2 class="slds-text-heading_small slds-m-bottom_medium" style="font-weight: 600;">Select Method of Payment:</h2>
+            
+            <!-- Credit Card Payment Option -->
+            <div class="payment-option-card disabled" onclick={handleSelectCreditCard}>
+                <div class="payment-option-content">
+                    <div class="payment-icon">
+                        <svg width="53" height="41" viewBox="0 0 53 41" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_disabled)">
+<path d="M4.36461 20.9878L2.6949 21.3574L2.88829 22.1851L6.42451 38.067C6.73785 39.4521 8.10213 40.3246 9.48717 40.0112L49.6048 31.0691C50.9801 30.7581 51.8526 29.3938 51.5392 28.0087L48.003 12.1268L47.8096 11.2991L46.1497 11.6664L4.36233 20.978L4.36461 20.9878ZM9.38775 27.7626L19.4209 25.5211L19.7905 27.1908L9.75734 29.4323L9.38775 27.7626ZM27.5878 30.7193L10.8781 34.4489L10.5062 32.7694L27.2159 29.0398L27.5878 30.7193ZM45.6112 25.0088C45.8183 25.8949 45.2466 26.7884 44.3289 26.9926L40.9409 27.7431C40.0255 27.957 39.132 27.3853 38.9347 26.4969L38.9097 26.3898C38.7101 25.4916 39.2841 24.6078 40.1919 24.406L43.58 23.6554C44.4954 23.4416 45.3889 24.0133 45.5885 24.9114L45.6135 25.0185L45.6112 25.0088Z" fill="#5184B8"/>
+<path d="M42.9033 0.984615L2.78565 9.92671C1.39088 10.2423 0.530411 11.6141 0.834014 13.0014L1.38725 15.5011L1.58292 16.3385L3.24288 15.9712L45.0302 6.65953L46.6999 6.28994L46.5043 5.4525L45.951 2.95281C45.6377 1.56778 44.2711 0.685562 42.8958 0.996627L42.9033 0.984615Z" fill="#5184B8"/>
+</g>
+<defs>
+<clipPath id="clip0_disabled">
+<rect width="46.49" height="31.24" fill="white" transform="translate(0 10.5774) rotate(-13.1511)"/>
+</clipPath>
+</defs>
+</svg>
+
+                    </div>
+                    <div class="payment-details">
+                        <h3 class="slds-text-heading_small slds-m-bottom_x-small">
+                            <u>Credit Card Payment Online</u>
+                            <div class="card-logos">
+                                <img src={staticResources.cardsIcons} alt="Visa and Mastercard" class="card-icon"/>
+                            </div>
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cheque Payment Option -->
+            <div class="payment-option-card disabled" onclick={handleSelectCheque}>
+                <div class="payment-option-content">
+                    <div class="payment-icon">
+                        <img src={staticResources.chequePayment} alt="chequePayment"/>
+                    </div>
+                    <div class="payment-details">
+                        <h3 class="slds-text-heading_small slds-m-bottom_x-small">
+                            <u>Cheque</u>
+                        </h3>
+                        <p class="slds-text-body_small slds-m-bottom_none">
+                            Mail a cheque to A-Protect Warranty 8800 Dufferin St. Suite 302B Concord, ON L4K 0C5 and reference the Remittance Form ID #
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- E-transfer Payment Option -->
+            <div class="payment-option-card disabled" onclick={handleSelectETransfer}>
+                <div class="payment-option-content">
+                    <div class="payment-icon">
+                         <img src={staticResources.eTransfer} alt="eTransfer"/>
+                    </div>
+                    <div class="payment-details">
+                        <h3 class="slds-text-heading_small slds-m-bottom_x-small">
+                            <u>View Interact E-transfer</u>
+                        </h3>
+                        <p class="slds-text-body_small slds-m-bottom_none">
+                            Send an e-transfer to <strong>payments@a-protectwarranty.com</strong> and reference the Remittance Form ID #
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>

@@ -1,0 +1,268 @@
+<template>
+    <!-- Loading -->
+    <template if:true={isLoading}>
+        <div class="loading-container">
+            <lightning-spinner alternative-text="Loading invoice..." size="medium"></lightning-spinner>
+        </div>
+    </template>
+
+    <!-- Error -->
+    <template if:true={error}>
+        <div class="error-container" role="alert">
+            <div class="error-icon-row">
+                <lightning-icon icon-name="utility:error" variant="error" size="small"></lightning-icon>
+                <span class="error-title">Unable to load invoice</span>
+            </div>
+            <p class="error-message">{error}</p>
+        </div>
+    </template>
+
+    <!-- Invoice Content -->
+    <template if:true={invoiceData}>
+        <div class="invoice-wrapper">
+
+            <!-- INVOICE HEADER -->
+            <div class="invoice-header">
+                <div>
+                    <div class="invoice-title">INVOICE</div>
+                    <div class="invoice-id">Invoice ID # {invoiceData.invoiceName}</div>
+                </div>
+                <div class="invoice-header-actions">
+                    <template if:true={canCancelInvoice}>
+                        <lightning-button
+                            variant="destructive"
+                            label="Request Cancellation"
+                            icon-name="utility:ban"
+                            disabled={isLoading}
+                            onclick={handleCancelInvoice}>
+                        </lightning-button>
+                    </template>
+                    <template if:true={canPay}>
+                        <lightning-button
+                            variant="success"
+                            label="Pay Now"
+                            icon-name="utility:currency"
+                            disabled={isLoading}
+                            onclick={handlePayNow}>
+                        </lightning-button>
+                    </template>
+                    <lightning-button
+                        variant="brand"
+                        label="Download Invoice"
+                        icon-name="utility:download"
+                        disabled={isLoading}
+                        onclick={handleDownloadPDF}>
+                    </lightning-button>
+                </div>
+            </div>
+
+            <!-- DATE & STATUS ROW -->
+            <div class="date-status-row">
+                <div class="date-section">
+                    <div class="field-label">Date:</div>
+                    <div class="field-value">{invoiceData.invoiceDate}</div>
+                </div>
+                <div class="status-section">
+                    <div class="status-label">Status:</div>
+                    <div class={invoiceData.statusClass}>{invoiceData.invoiceStatus}</div>
+                </div>
+            </div>
+
+            <!-- BILL TO -->
+            <div class="bill-to-section">
+                <div class="field-label">Bill to:</div>
+                <template if:true={invoiceData.dealerName}>
+                    <div class="dealer-name">{invoiceData.dealerName}</div>
+                </template>
+                <template if:true={invoiceData.billTo}>
+                    <lightning-formatted-rich-text value={invoiceData.billTo} class="bill-to-content"></lightning-formatted-rich-text>
+                </template>
+            </div>
+
+            <!-- 3-COLUMN INFO TABLE -->
+            <table class="info-table">
+                <thead>
+                    <tr>
+                        <th class="info-table-header col-app-id">Application Id</th>
+                        <th class="info-table-header col-customer">CUSTOMER INFORMATION</th>
+                        <th class="info-table-header col-vehicle">VEHICLE INFORMATION</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="info-table-cell cell-app-id">
+                            <a class="app-id-link" onclick={handleApplicationClick}>{invoiceData.applicationId}</a>
+                        </td>
+                        <td class="info-table-cell">
+                            <div class="customer-name">{invoiceData.customerFullName}</div>
+                            <template if:true={invoiceData.customerAddress}>
+                                <div class="customer-address">{invoiceData.customerAddress}</div>
+                            </template>
+                        </td>
+                        <td class="info-table-cell">
+                            <div class="vehicle-info">{invoiceData.vehicleInfo}</div>
+                            <template if:true={invoiceData.vin}>
+                                <div class="vehicle-detail">VIN # {invoiceData.vin}</div>
+                            </template>
+                            <template if:true={invoiceData.formattedOdometer}>
+                                <div class="vehicle-detail">Odometer: {invoiceData.formattedOdometer}</div>
+                            </template>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- SERVICES SECTION -->
+            <template if:true={invoiceData.hasPackages}>
+                <div class="services-header">SERVICES</div>
+
+                <template for:each={invoiceData.packages} for:item="pkg">
+                    <div key={pkg.packageId} class="service-item">
+                        <!-- Record Type Name -->
+                        <template if:true={pkg.recordTypeName}>
+                            <div class="service-record-type">{pkg.recordTypeName}</div>
+                        </template>
+
+                        <!-- Package Name + Line Items (status + amount) -->
+                        <div class="service-name-row">
+                            <div class="service-name">{pkg.packageName}</div>
+                            <div class="service-line-items">
+                                <template for:each={pkg.lineItems} for:item="li">
+                                    <div key={li.lineItemId} class="line-item-row">
+                                        <span class={li.statusClass}>{li.status}</span>
+                                        <span class="line-item-amount">{li.formattedAmount}</span>
+                                        <template if:true={li.canCancel}>
+                                            <!-- <button class="li-cancel-btn"
+                                                data-lineitemid={li.lineItemId}
+                                                data-packagename={li.packageName}
+                                                data-status={li.status}
+                                                onclick={handleCancelLineItem}
+                                                title="Request Cancellation">&#x2715;</button> -->
+
+                                                <button class="icon-btn danger"
+                                                    data-lineitemid={li.lineItemId}
+                                                    data-packagename={li.packageName}
+                                                    data-status={li.status}
+                                                    title="Request Cancellation"
+                                                    onclick={handleCancelLineItem}
+                                                    aria-label="Request Cancellation">
+                                                    <svg width="25" height="25" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                        <g clip-path="url(#clip0_34_2206)">
+                                                            <path d="M8.00736 0C3.57682 0 0 3.35327 0 7.5069C0 11.6605 3.57682 15.0138 8.00736 15.0138C12.4379 15.0138 16.0147 11.6605 16.0147 7.5069C16.0147 3.35327 12.4232 0 8.00736 0ZM10.3919 10.943L8.00736 8.70745L5.65225 10.9154L4.34223 9.68721L6.69733 7.4793L4.31279 5.24379L5.59338 4.04324L7.97792 6.27875L10.333 4.07084L11.6431 5.29899L9.28795 7.5069L11.6725 9.74241L10.3919 10.943Z" fill="#E61E25" />
+                                                        </g>
+                                                        <defs>
+                                                            <clipPath id="clip0_34_2206">
+                                                                <rect width="16" height="15" fill="white" />
+                                                            </clipPath>
+                                                        </defs>
+                                                    </svg>
+                                                </button>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Package Details -->
+                        <div class="service-details">
+                            <template if:true={pkg.packageTerm}>
+                                <div>Selected Term: {pkg.packageTerm}</div>
+                            </template>
+                            <template if:true={pkg.startDate}>
+                                <div>Start Date:{pkg.startDate}</div>
+                            </template>
+                            <template if:true={pkg.expiryDate}>
+                                <div>Expiry Date:{pkg.expiryDate}</div>
+                            </template>
+                            <template if:true={pkg.formattedStartOdometer}>
+                                <div>Start Odometer:{pkg.formattedStartOdometer}</div>
+                            </template>
+                            <template if:true={pkg.formattedExpiryOdometer}>
+                                <div>Expiry Odometer:{pkg.formattedExpiryOdometer}</div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </template>
+
+            <!-- FOOTER: QTY + TOTAL -->
+            <div class="invoice-footer">
+                <div class="footer-qty">
+                    <strong>Qty:</strong> {invoiceData.packageCount}
+                </div>
+                <table class="total-table">
+                    <tbody>
+                        <tr>
+                            <td class="total-label">Total Amount:</td>
+                            <td class="total-value">{invoiceData.formattedTotal}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+
+        <!-- PAY NOW CONFIRMATION MODAL -->
+        <template if:true={showPayModal}>
+            <div class="pay-modal-overlay" onclick={handleClosePayModal}>
+                <div class="pay-modal-box" onclick={handleModalBoxClick}>
+                    <button class="pay-modal-close" onclick={handleClosePayModal} aria-label="Close">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M18 6L6 18M6 6L18 18" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <h2 class="pay-modal-title">Pay Invoice</h2>
+                    <p class="pay-modal-message">
+                        Are you sure you want to pay for Invoice # <strong>{invoiceData.invoiceName}</strong>?
+                        A remittance form will be created for this invoice.
+                    </p>
+                    <div class="pay-modal-footer">
+                        <button class="pay-modal-btn" disabled={isPayLoading} onclick={handleConfirmPay}>
+                            <template if:true={isPayLoading}>Processing...</template>
+                            <template if:false={isPayLoading}>Continue to Pay</template>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- CANCEL CONFIRMATION MODAL -->
+        <template if:true={showCancelModal}>
+            <div class="pay-modal-overlay" onclick={handleCloseCancelModal}>
+                <div class="pay-modal-box cancel-modal-box" onclick={handleModalBoxClick}>
+                    <button class="pay-modal-close" onclick={handleCloseCancelModal} aria-label="Close">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M18 6L6 18M6 6L18 18" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <h2 class="pay-modal-title">{cancelContext.displayTitle}</h2>
+                    <p class="pay-modal-message">
+                        <strong>{cancelContext.displayName}</strong><br/>
+                        Current Status: <span class={cancelContext.statusClass}>{cancelContext.currentStatus}</span>
+                    </p>
+                    <div class="cancel-reason-section">
+                        <label class="cancel-reason-label">Reason <span class="cancel-required">*</span></label>
+                        <textarea
+                            class="cancel-reason-input"
+                            onchange={handleCancelReasonChange}
+                            placeholder="Please provide a reason for cancellation..."></textarea>
+                    </div>
+                    <div class="pay-modal-footer">
+                        <button class="pay-modal-btn cancel-submit-btn" disabled={cancelSubmitDisabled} onclick={handleConfirmCancellation}>
+                            <template if:true={isCancelLoading}>Processing...</template>
+                            <template if:false={isCancelLoading}>Submit Cancellation Request</template>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+    </template>
+
+    <!-- No Data -->
+    <template if:false={hasContent}>
+        <div class="no-data-container">
+            <p>No invoice data available.</p>
+        </div>
+    </template>
+</template>

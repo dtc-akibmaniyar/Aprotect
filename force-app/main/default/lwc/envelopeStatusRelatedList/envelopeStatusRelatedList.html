@@ -1,0 +1,46 @@
+<template>
+
+
+
+     <lightning-card  variant="Narrow"  title="Document Status" icon-name="standard:document">
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Loading" size="small" variant="brand"></lightning-spinner>
+        </template>
+        <div slot="actions">
+            <lightning-icon 
+                        icon-name="action:refresh"
+                        size="small"
+                        alternative-text="Refresh" onclick={handleRefresh}>
+                    </lightning-icon>
+        </div>
+        
+        <div class="slds-var-p-around_small">
+            <template if:false={isLoading}>
+                <template if:true={hasRecords}>
+                    <lightning-datatable 
+                        key-field="Id"
+                        data={envelopeStatusList}
+                        columns={columns}
+                        hide-checkbox-column="true"
+                        row-number-offset=0
+                        class="slds-m-top_medium">
+                    </lightning-datatable>
+                </template>
+
+                <template if:false={hasRecords}>
+                    <div class="slds-box slds-theme_shade slds-p-around_medium slds-text-align_center">
+                        <p class="slds-text-body_small">No envelope status records found.</p>
+                    </div>
+                </template>
+
+                <template if:true={errorMessage}>
+                    <div class="slds-box slds-theme_alert-texture slds-m-top_medium slds-border_left_4">
+                        <p class="slds-text-body_small slds-text-color_error">
+                            <strong>Error:</strong> {errorMessage}
+                        </p>
+                    </div>
+                </template>
+            </template>
+        </div>
+    </lightning-card>
+</template>

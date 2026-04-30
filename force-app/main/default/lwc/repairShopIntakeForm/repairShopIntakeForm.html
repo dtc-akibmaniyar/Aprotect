@@ -1,0 +1,530 @@
+<template>
+    <div class="slds-box slds-theme_default slds-p-around_medium">
+        <!-- Loading spinner -->
+        <template if:true={loading}>
+            <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+        </template>
+
+        <!-- Error message -->
+        <template if:true={error}>
+            <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                <span class="slds-assistive-text">error</span>
+                <h2>{error}</h2>
+            </div>
+        </template>
+
+        <!-- Header Section -->
+        <div class="slds-grid slds-gutters slds-p-bottom_medium slds-border_bottom">
+            <div class="slds-col slds-size_2-of-3">
+                <div class="shop-info">
+                    <lightning-icon icon-name="standard:service_appointment" size="medium" class="slds-m-right_small"></lightning-icon>
+                    <h1 class="slds-text-heading_large slds-p-bottom_small">{formData.shopInfo.name}</h1>
+                    <p class="slds-text-body_regular">{formData.shopInfo.address}</p>
+                    <p class="slds-text-body_regular">Tel: {formData.shopInfo.phone}</p>
+                    <p class="slds-text-body_regular">Email: {formData.shopInfo.email}</p>
+                    <p class="slds-text-body_regular">HST #: {formData.shopInfo.hstNumber}</p>
+                    <p class="slds-text-body_regular">Tax Percentage: {formData.shopInfo.taxPercentage}%</p>
+                </div>
+            </div>
+            <div class="slds-col slds-size_1-of-3">
+                <div class="slds-text-align_right">
+                    <h1 class="slds-text-heading_large slds-text-color_success">REPAIR ESTIMATE</h1>
+                </div>
+            </div>
+        </div>
+
+        <!-- Customer and Vehicle Information -->
+        <div class="slds-grid slds-gutters slds-p-vertical_medium">
+            <!-- Customer Information -->
+            <div class="slds-col">
+                <div class="slds-box slds-theme_shade">
+                    <h2 class="slds-text-heading_medium">
+                        <lightning-icon icon-name="standard:customer" size="small" class="slds-m-right_small"></lightning-icon>
+                        Customer Information
+                    </h2>
+                    <div class="slds-p-left_medium">
+                        <p><strong>Name:</strong> {formData.customerInfo.name}</p>
+                        <p><strong>Address:</strong> {formData.customerInfo.address}</p>
+                        <p><strong>Phone:</strong> {formData.customerInfo.phone}</p>
+                        <p><strong>Email:</strong> {formData.customerInfo.email}</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Vehicle Information -->
+            <div class="slds-col">
+                <div class="slds-box slds-theme_shade">
+                    <h2 class="slds-text-heading_medium">
+                        <lightning-icon icon-name="standard:maintenance_asset" size="small" class="slds-m-right_small"></lightning-icon>
+                        Vehicle Information
+                    </h2>
+                    <div class="slds-p-left_medium">
+                        <p><strong>Vehicle:</strong> {formData.vehicleInfo.vehicle}</p>
+                        <p><strong>VIN:</strong> {formData.vehicleInfo.vin}</p>
+                        <p><strong>Odometer IN:</strong> {formData.vehicleInfo.odometerIn}</p>
+                        <p><strong>Odometer OUT:</strong> {formData.vehicleInfo.odometerIn}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Services Section -->
+        <div class="slds-section slds-is-open">
+            <h3 class="slds-section__title slds-theme_shade">
+                <span class="slds-truncate slds-p-horizontal_small">
+                    <lightning-icon icon-name="standard:service_crew_member" size="small" class="slds-m-right_small"></lightning-icon>
+                    Services/Tasks
+                </span>
+            </h3>
+            <div class="slds-section__content">
+                <lightning-button 
+                    label="Add Service" 
+                    icon-name="utility:add"
+                    variant="brand" 
+                    onclick={handleAddService}
+                    class="slds-m-bottom_small">
+                </lightning-button>
+
+                <template if:true={services}>
+                    <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                        <thead>
+                            <tr class="slds-line-height_reset">
+                                <th>Category</th>
+                                <th>Item/Description</th>
+                                <th>Time</th>
+                                <th>Cost</th>
+                                <th>Price</th>
+                                <th>Discount</th>
+                                <th>Charge</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template for:each={services} for:item="service" for:index="index">
+                                <tr key={service.id}>
+                                    <td>
+                                        <lightning-input type="text" 
+                                                       variant="label-hidden"
+                                                       value={service.category} 
+                                                       data-index={index} 
+                                                       data-field="category"
+                                                       onchange={handleServiceChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-input type="text" 
+                                                       variant="label-hidden"
+                                                       value={service.description} 
+                                                       data-index={index} 
+                                                       data-field="description"
+                                                       onchange={handleServiceChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-input type="text" 
+                                        variant="label-hidden"
+                                        value={service.serviceTime} 
+                                        data-index={index} 
+                                        data-field="serviceTime"
+                                        onchange={handleServiceChange}>
+                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-input type="number" 
+                                                       variant="label-hidden"
+                                                       formatter="currency"
+                                                       step="0.01"
+                                                       value={service.cost} 
+                                                       data-index={index} 
+                                                       data-field="cost"
+                                                       onchange={handleServiceChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-input type="number" 
+                                                       variant="label-hidden"
+                                                       formatter="currency"
+                                                       step="0.01"
+                                                       value={service.price} 
+                                                       data-index={index} 
+                                                       data-field="price"
+                                                       onchange={handleServiceChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-input type="number" 
+                                                       variant="label-hidden"
+                                                       formatter="currency"
+                                                       step="0.01"
+                                                       value={service.discount} 
+                                                       data-index={index} 
+                                                       data-field="discount"
+                                                       onchange={handleServiceChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-input type="number" 
+                                                       variant="label-hidden"
+                                                       formatter="currency"
+                                                       step="0.01"
+                                                       value={service.charge} 
+                                                       data-index={index} 
+                                                       data-field="charge"
+                                                       onchange={handleServiceChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-button-icon icon-name="utility:delete"
+                                                             variant="destructive"
+                                                             alternative-text="Remove"
+                                                             data-index={index}
+                                                             onclick={handleRemoveService}>
+                                        </lightning-button-icon>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </template>
+            </div>
+        </div>
+
+        <!-- Parts Section -->
+        <div class="slds-section slds-is-open slds-m-top_medium">
+            <h3 class="slds-section__title slds-theme_shade">
+                <span class="slds-truncate slds-p-horizontal_small">
+                    <lightning-icon icon-name="standard:product" size="small" class="slds-m-right_small"></lightning-icon>
+                    Parts
+                </span>
+            </h3>
+            <div class="slds-section__content">
+                <lightning-button 
+                    label="Add Part" 
+                    icon-name="utility:add"
+                    variant="brand" 
+                    onclick={handleAddPart}
+                    class="slds-m-bottom_small">
+                </lightning-button>
+
+                <template if:true={parts}>
+                    <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                        <thead>
+                            <tr class="slds-line-height_reset">
+                                <th>Part Code</th>
+                                <th>Description</th>
+                                <th>Qty</th>
+                                <th>Cost</th>
+                                <th>Price</th>
+                                <th>Discount</th>
+                                <th>Charge</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template for:each={parts} for:item="part" for:index="index">
+                                <tr key={part.id}>
+                                    <td>
+                                        <lightning-input type="text" 
+                                                       variant="label-hidden"
+                                                       value={part.partCode} 
+                                                       data-index={index} 
+                                                       data-field="partCode"
+                                                       onchange={handlePartChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-input type="text" 
+                                                       variant="label-hidden"
+                                                       value={part.description} 
+                                                       data-index={index} 
+                                                       data-field="description"
+                                                       onchange={handlePartChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-input type="number" 
+                                                       variant="label-hidden"
+                                                       value={part.quantity} 
+                                                       data-index={index} 
+                                                       data-field="quantity"
+                                                       onchange={handlePartChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-input type="number" 
+                                                       variant="label-hidden"
+                                                       formatter="currency"
+                                                       step="0.01"
+                                                       value={part.partCost} 
+                                                       data-index={index} 
+                                                       data-field="partCost"
+                                                       onchange={handlePartChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-input type="number" 
+                                                       variant="label-hidden"
+                                                       formatter="currency"
+                                                       step="0.01"
+                                                       value={part.price} 
+                                                       data-index={index} 
+                                                       data-field="price"
+                                                       onchange={handlePartChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-input type="number" 
+                                                       variant="label-hidden"
+                                                       formatter="currency"
+                                                       step="0.01"
+                                                       value={part.discount} 
+                                                       data-index={index} 
+                                                       data-field="discount"
+                                                       onchange={handlePartChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-input type="number" 
+                                                       variant="label-hidden"
+                                                       formatter="currency"
+                                                       step="0.01"
+                                                       value={part.productCharge} 
+                                                       data-index={index} 
+                                                       data-field="productCharge"
+                                                       onchange={handlePartChange}>
+                                        </lightning-input>
+                                    </td>
+                                    <td>
+                                        <lightning-button-icon icon-name="utility:delete"
+                                                             variant="destructive"
+                                                             alternative-text="Remove"
+                                                             data-index={index}
+                                                             onclick={handleRemovePart}>
+                                        </lightning-button-icon>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </template>
+            </div>
+        </div>
+
+        <!-- Supplies Section -->
+       <!-- Supplies Section -->
+<div class="slds-section slds-is-open slds-m-top_medium">
+    <h3 class="slds-section__title slds-theme_shade">
+        <span class="slds-truncate slds-p-horizontal_small">
+            <lightning-icon icon-name="standard:maintenance_asset" size="small" class="slds-m-right_small"></lightning-icon>
+            G.O.G & Supplies
+        </span>
+    </h3>
+    <div class="slds-section__content">
+        <lightning-button 
+            label="Add Supply" 
+            icon-name="utility:add"
+            variant="brand" 
+            onclick={handleAddSupply}
+            class="slds-m-bottom_small">
+        </lightning-button>
+
+        <template if:true={supplies}>
+            <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                <thead>
+                    <tr class="slds-line-height_reset">
+                        <th>Item Name</th>
+                        <th>Description</th>
+                        <th>Time</th>
+                        <th>Qty</th>
+                        <th>Cost</th>
+                        <th>Price</th>
+                        <th>Discount</th>
+                        <th>Charge</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template for:each={supplies} for:item="supply" for:index="index">
+                        <tr key={supply.id}>
+                            <td>
+                                <lightning-input type="text" 
+                                               variant="label-hidden"
+                                               value={supply.itemName} 
+                                               data-index={index} 
+                                               data-field="itemName"
+                                               onchange={handleSupplyChange}>
+                                </lightning-input>
+                            </td>
+                            <td>
+                                <lightning-input type="text" 
+                                               variant="label-hidden"
+                                               value={supply.description} 
+                                               data-index={index} 
+                                               data-field="description"
+                                               onchange={handleSupplyChange}>
+                                </lightning-input>
+                            </td>
+                            <td>
+                                <lightning-input type="text" 
+                                               variant="label-hidden"
+                                               value={supply.supplyTime} 
+                                               data-index={index} 
+                                               data-field="supplyTime"
+                                               onchange={handleSupplyChange}>
+                                </lightning-input>
+                            </td>
+                            <td>
+                                <lightning-input type="number" 
+                                               variant="label-hidden"
+                                               value={supply.qty} 
+                                               data-index={index} 
+                                               data-field="qty"
+                                               onchange={handleSupplyChange}>
+                                </lightning-input>
+                            </td>
+                            <td>
+                                <lightning-input type="number" 
+                                               variant="label-hidden"
+                                               formatter="currency"
+                                               step="0.01"
+                                               value={supply.cost} 
+                                               data-index={index} 
+                                               data-field="cost"
+                                               onchange={handleSupplyChange}>
+                                </lightning-input>
+                            </td>
+                            <td>
+                                <lightning-input type="number" 
+                                               variant="label-hidden"
+                                               formatter="currency"
+                                               step="0.01"
+                                               value={supply.price} 
+                                               data-index={index} 
+                                               data-field="price"
+                                               onchange={handleSupplyChange}>
+                                </lightning-input>
+                            </td>
+                            <td>
+                                <lightning-input type="number" 
+                                               variant="label-hidden"
+                                               formatter="currency"
+                                               step="0.01"
+                                               value={supply.discount} 
+                                               data-index={index} 
+                                               data-field="discount"
+                                               onchange={handleSupplyChange}>
+                                </lightning-input>
+                            </td>
+                            <td>
+                                <lightning-input type="number" 
+                                               variant="label-hidden"
+                                               formatter="currency"
+                                               step="0.01"
+                                               value={supply.charge} 
+                                               data-index={index} 
+                                               data-field="charge"
+                                               onchange={handleSupplyChange}>
+                                </lightning-input>
+                            </td>
+                            <td>
+                                <lightning-button-icon icon-name="utility:delete"
+                                                     variant="destructive"
+                                                     alternative-text="Remove"
+                                                     data-index={index}
+                                                     onclick={handleRemoveSupply}>
+                                </lightning-button-icon>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </template>
+    </div>
+</div>
+
+<!-- Totals Section -->
+<div class="slds-grid slds-grid_align-end slds-m-top_medium">
+<div class="slds-size_1-of-3">
+<div class="slds-box slds-theme_shade">
+    <div class="slds-grid slds-grid_align-spread">
+        <div class="slds-col">
+            <p class="slds-p-bottom_x-small">Labor Total:</p>
+            <p class="slds-p-bottom_x-small">Parts Total:</p>
+            <p class="slds-p-bottom_x-small">Supplies Total:</p>
+            <p class="slds-p-bottom_x-small">Subtotal:</p>
+            <p class="slds-p-bottom_x-small">Tax ({formData.shopInfo.taxPercentage}%):</p>
+            <p class="slds-text-heading_medium">Total:</p>
+        </div>
+        <div class="slds-col slds-text-align_right">
+            <p class="slds-p-bottom_x-small">
+                <lightning-formatted-number value={formData.totals.laborTotal}
+                                          format-style="currency"
+                                          currency-code="CAD">
+                </lightning-formatted-number>
+            </p>
+            <p class="slds-p-bottom_x-small">
+                <lightning-formatted-number value={formData.totals.partsTotal}
+                                          format-style="currency"
+                                          currency-code="CAD">
+                </lightning-formatted-number>
+            </p>
+            <p class="slds-p-bottom_x-small">
+                <lightning-formatted-number value={formData.totals.suppliesTotal}
+                                          format-style="currency"
+                                          currency-code="CAD">
+                </lightning-formatted-number>
+            </p>
+            <p class="slds-p-bottom_x-small">
+                <lightning-formatted-number value={formData.totals.subtotal}
+                                          format-style="currency"
+                                          currency-code="CAD">
+                </lightning-formatted-number>
+            </p>
+            <p class="slds-p-bottom_x-small">
+                <lightning-formatted-number value={formData.totals.tax}
+                                          format-style="currency"
+                                          currency-code="CAD">
+                </lightning-formatted-number>
+            </p>
+            <p class="slds-text-heading_medium">
+                <lightning-formatted-number value={formData.totals.total}
+                                          format-style="currency"
+                                          currency-code="CAD">
+                </lightning-formatted-number>
+            </p>
+        </div>
+    </div>
+</div>
+</div>
+</div>
+<!-- New Comments Section -->
+<div class="slds-section slds-is-open slds-m-top_medium">
+    <h3 class="slds-section__title slds-theme_shade">
+        <span class="slds-truncate slds-p-horizontal_small">
+            <lightning-icon icon-name="utility:comments" size="small" class="slds-m-right_small"></lightning-icon>
+            Repair Comments
+        </span>
+    </h3>
+    <div class="slds-section__content">
+        <div class="slds-box slds-theme_default">
+            <lightning-textarea
+                name="repairComments"
+                label="Comments"
+                variant="label-hidden"
+                placeholder="Enter repair comments here..."
+                value={repairComments}
+                onchange={handleCommentsChange}>
+            </lightning-textarea>
+        </div>
+    </div>
+</div>
+<div class="slds-grid slds-grid_align-center slds-m-top_medium">
+    <lightning-button 
+        label="Submit Estimate" 
+        variant="brand" 
+        icon-name="utility:save"
+        onclick={handleSubmit}
+        class="slds-m-right_x-small">
+    </lightning-button>
+</div>
+</div>
+</template>

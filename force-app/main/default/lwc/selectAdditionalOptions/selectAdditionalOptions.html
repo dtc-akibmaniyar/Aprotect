@@ -1,0 +1,271 @@
+<template>
+    <!-- Loading Spinner -->
+    <template if:true={isLoading}>
+        <div class="slds-is-relative">
+            <lightning-spinner alternative-text="Loading package details..." size="medium"></lightning-spinner>
+        </div>
+    </template>
+
+    <!-- Error Message -->
+    <template if:true={errorMessage}>
+        <div class="slds-notify slds-notify_alert slds-theme_alert-texture slds-theme_error slds-m-top_medium">
+            <span class="slds-assistive-text">Error</span>
+            <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+            <h2>{errorMessage}</h2>
+        </div>
+    </template>
+
+    <!-- Package Details -->
+    <template if:true={packageDataWithDiscounts}>
+        <div class="slds-card">
+            <div class="slds-card__header">
+                <h2 class="slds-text-heading_small">{packageDataWithDiscounts.packageName}</h2>
+            </div>
+            <div class="slds-card__body slds-card__body_inner">
+                <template if:true={packageDataWithDiscounts.packageDescription}>
+                    <p class="slds-text-body_regular slds-m-bottom_medium">{packageDataWithDiscounts.packageDescription}</p>
+                </template>
+
+                <!-- Page Header -->
+                <div class="slds-page-header slds-page-header_record-home slds-m-bottom_large">
+                    <div class="slds-page-header__row">
+                        <div class="slds-page-header__col-title">
+                            <div class="slds-media">
+                                <div class="slds-media__figure">
+                                    <lightning-icon icon-name="utility:add" size="medium" class="slds-icon slds-icon-standard-opportunity"></lightning-icon>
+                                </div>
+                                <div class="slds-media__body">
+                                    <div class="slds-page-header__name">
+                                        <div class="slds-page-header__name-title">
+                                            <h1>
+                                                <span class="slds-page-header__title slds-truncate" title="Select Additional Options">Select Additional Options</span>
+                                            </h1>
+                                        </div>
+                                    </div>
+                                    <p class="slds-page-header__name-meta">Choose additional options for your package</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bulk Discount Section -->
+                <div class="slds-card slds-m-bottom_large">
+                    <div class="slds-card__header">
+                        <h3 class="slds-text-heading_small">
+                            <lightning-icon icon-name="utility:discount" size="small" class="slds-m-right_x-small"></lightning-icon>
+                            Bulk Discount
+                        </h3>
+                    </div>
+                    <div class="slds-card__body slds-card__body_inner">
+                        <div class="slds-grid slds-wrap slds-gutters">
+                            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
+                                <lightning-combobox
+                                    name="bulk-discount-type"
+                                    label="Discount Type"
+                                    value={bulkDiscountType}
+                                    placeholder="Select type"
+                                    options={discountTypeOptions}
+                                    onchange={handleBulkDiscountTypeChange}
+                                    variant="label-stacked">
+                                </lightning-combobox>
+                            </div>
+                            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
+                                <lightning-input
+                                    type="number"
+                                    name="bulk-discount-value"
+                                    label="Discount Value"
+                                    value={bulkDiscountValue}
+                                    placeholder="0"
+                                    step="1"
+                                    onchange={handleBulkDiscountValueChange}
+                                    variant="label-stacked">
+                                </lightning-input>
+                            </div>
+                            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
+                                <div class="slds-form-element">
+                                    <label class="slds-form-element__label">Apply To</label>
+                                    <div class="slds-form-element__control">
+                                        <div class="slds-text-body_regular slds-m-bottom_x-small">
+                                            <span class="slds-badge slds-badge_lightest">
+                                                {selectedOptionsCount} of {totalOptionsCount} Selected Options
+                                            </span>
+                                        </div>
+                                        <div class="slds-form-element">
+                                            <div class="slds-checkbox">
+                                                <input type="checkbox" 
+                                                       name="select-all-options" 
+                                                       onchange={handleSelectAllChange}
+                                                       class="slds-checkbox__input"
+                                                       checked={isAllSelected}
+                                                       id="select-all-checkbox" />
+                                                <label class="slds-checkbox__label" for="select-all-checkbox">
+                                                    <span class="slds-checkbox_faux"></span>
+                                                    <span class="slds-form-element__label">Select All Options</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slds-m-top_medium">
+                            <lightning-button
+                                label="Apply Bulk Discount"
+                                variant="brand"
+                                onclick={applyBulkDiscount}
+                                disabled={isBulkDiscountDisabled}>
+                            </lightning-button>
+                            <lightning-button
+                                label="Clear Bulk Discount"
+                                variant="neutral"
+                                onclick={clearBulkDiscount}
+                                class="slds-m-left_small">
+                            </lightning-button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Section -->
+                <div class="slds-card slds-m-bottom_large">
+                    <div class="slds-card__header">
+                        <h3 class="slds-text-heading_small">
+                            <lightning-icon icon-name="utility:save" size="small" class="slds-m-right_x-small"></lightning-icon>
+                            Save Selections
+                        </h3>
+                    </div>
+                    <div class="slds-card__body slds-card__body_inner">
+                        <div class="slds-grid slds-wrap slds-gutters">
+                            <div class="slds-col slds-size_1-of-1 slds-medium-size_2-of-3">
+                                <div class="slds-text-body_regular">
+                                    <p class="slds-m-bottom_small">
+                                        <strong>Selected Options:</strong> {selectedOptionsCount} of {totalOptionsCount} options
+                                    </p>
+                                    <p class="slds-text-body_small slds-text-color_weak">
+                                        Save your selected options with discount information to Salesforce.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
+                                <div class="slds-form-element">
+                                    <lightning-button
+                                        label="Save Selections"
+                                        variant="success"
+                                        onclick={saveSelections}
+                                        disabled={isSaveButtonDisabled}
+                                        class="slds-m-top_medium">
+                                        <lightning-icon icon-name="utility:save" size="x-small" slot="icon"></lightning-icon>
+                                    </lightning-button>
+                                    <template if:true={isSaving}>
+                                        <lightning-spinner alternative-text="Saving..." size="small" class="slds-m-left_small"></lightning-spinner>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simple Options Table -->
+                <template if:true={packageDataWithDiscounts.packageTerms}>
+                    <div class="slds-card">
+                        <div class="slds-card__header">
+                            <h3 class="slds-text-heading_small">Available Options</h3>
+                        </div>
+                        <div class="slds-card__body slds-card__body_inner">
+                            <template for:each={packageDataWithDiscounts.packageTerms} for:item="term">
+                                <div key={term.id} class="slds-m-bottom_large">
+                                    <h4 class="slds-text-heading_small slds-m-bottom_small">{term.name} - {term.tierName}</h4>
+                                    
+                                    <template if:true={term.packageOptions}>
+                                        <template if:true={term.packageOptions.length}>
+                                            <table class="slds-table slds-table_cell-buffer">
+                                                <thead>
+                                                    <tr class="slds-line-height_reset">
+                                                        <th class="slds-text-title_caps" scope="col">Select</th>
+                                                        <th class="slds-text-title_caps" scope="col">Option Name</th>
+                                                        <th class="slds-text-title_caps" scope="col">Base Price</th>
+                                                        <th class="slds-text-title_caps" scope="col">Discount Type</th>
+                                                        <th class="slds-text-title_caps" scope="col">Discount Value</th>
+                                                        <th class="slds-text-title_caps" scope="col">Final Price</th>
+                                                        <th class="slds-text-title_caps" scope="col">Description</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <template for:each={term.packageOptions} for:item="option">
+                                                        <tr key={option.id}>
+                                                            <td data-label="Select">
+                                                                <lightning-input type="checkbox" 
+                                                                                name="option-{option.id}"
+                                                                                data-term-id={term.id}
+                                                                                data-option-id={option.id}
+                                                                                checked={option.isSelected}
+                                                                                onchange={handleOptionChange}>
+                                                                </lightning-input>
+                                                            </td>
+                                                            <td data-label="Option Name">
+                                                                <div class="slds-truncate" title={option.name}>{option.name}</div>
+                                                            </td>
+                                                            <td data-label="Base Price">
+                                                                <div class="slds-truncate">{option.priceDisplay}</div>
+                                                            </td>
+                                                            <td data-label="Discount Type">
+                                                                <lightning-combobox
+                                                                    name="discount-type-{option.id}"
+                                                                    value={option.discountType}
+                                                                    placeholder="Select type"
+                                                                    options={discountTypeOptions}
+                                                                    onchange={handleDiscountTypeChange}
+                                                                    data-option-id={option.id}
+                                                                    variant="label-hidden">
+                                                                </lightning-combobox>
+                                                            </td>
+                                                            <td data-label="Discount Value">
+                                                                <lightning-input
+                                                                    type="number"
+                                                                    name="discount-value-{option.id}"
+                                                                    value={option.discountValue}
+                                                                    placeholder="0"
+                                                                    step="1"
+                                                                    onchange={handleDiscountValueChange}
+                                                                    data-option-id={option.id}
+                                                                    variant="label-hidden">
+                                                                </lightning-input>
+                                                            </td>
+                                                            <td data-label="Final Price">
+                                                                <div class="slds-truncate slds-text-heading_small">
+                                                                    <span class="final-price">{option.finalPriceDisplay}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td data-label="Description">
+                                                                <template if:true={option.inclusionText}>
+                                                                    <div class="slds-text-body_small slds-m-bottom_x-small">
+                                                                        <strong class="slds-text-color_success">✓ Includes:</strong> {option.inclusionText}
+                                                                    </div>
+                                                                </template>
+                                                                <template if:true={option.exclusionText}>
+                                                                    <div class="slds-text-body_small">
+                                                                        <strong class="slds-text-color_error">✗ Excludes:</strong> {option.exclusionText}
+                                                                    </div>
+                                                                </template>
+                                                            </td>
+                                                        </tr>
+                                                    </template>
+                                                </tbody>
+                                            </table>
+                                        </template>
+                                        <template if:false={term.packageOptions.length}>
+                                            <p class="slds-text-color_weak">No options available for this term.</p>
+                                        </template>
+                                    </template>
+                                    <template if:false={term.packageOptions}>
+                                        <p class="slds-text-color_weak">No options available for this term.</p>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
+</template>

@@ -1,0 +1,145 @@
+<template>
+    <div class="file-manager-container">
+        <template if:true={showSection}>
+            <div class="file-section">
+                <h3 class="section-title" if:true={title}>{title}</h3>
+                
+                 <!--Loading Spinner--> 
+                <template if:true={isLoading}>
+                    <div class="loading-section">
+                        <lightning-spinner alternative-text="Loading files..." size="small"></lightning-spinner>
+                        <span class="loading-text">Loading files...</span>
+                    </div>
+                </template>
+                
+                <!--PDF View Loading-->
+                <template if:true={pdfViewLoading}>
+                    <div class="pdf-loading-section">
+                        <lightning-spinner alternative-text="Opening PDF..." size="small"></lightning-spinner>
+                        <span class="loading-text">Opening PDF...</span>
+                    </div>
+                </template>
+                
+                 <!--Existing Files Display--> 
+                <template if:true={hasExistingFiles}>
+                    <div class="existing-files-section">
+                        <h4 class="subsection-title">Existing Files:</h4>
+                        <template for:each={existingFiles} for:item="file">
+                            <div key={file.Id} class="file-item existing-file">
+                                <!-- File Icon -->
+                                <lightning-icon 
+                                    icon-name={file.iconName} 
+                                    size="small" 
+                                    class="file-icon">
+                                </lightning-icon>
+                                
+                                <!-- File Name with tooltip for long names -->
+                                <span class="file-name" title={file.Name}>{file.Name}</span>
+                                
+                                <!-- File Size -->
+                                <span class="file-size">({file.formattedSize})</span>
+                                
+                                <!-- Action Buttons - ICON ONLY -->
+                                <div class="file-actions">
+                                    <!-- View Button (for PDFs) - Icon Only -->
+                                    <template if:true={file.FileType}>
+                                        <lightning-button-icon
+                                            icon-name="action:preview"
+                                            variant="brand"
+                                            alternative-text="View PDF"
+                                            title="Open PDF in new tab"
+                                            size="small"
+                                            label="View PDF"
+                                            onclick={handleFileView}
+                                            data-document-id={file.ContentDocumentId}
+                                            data-file-name={file.Name}
+                                            data-download-url={file.DownloadUrl}
+                                            class="view-button-icon">VIEW
+                                        </lightning-button-icon>
+                                    </template>
+                                    
+                                    <!-- Download Button - Icon Only -->
+                                    <!-- <lightning-button-icon
+                                        icon-name="action:download"
+                                        variant="neutral"
+                                        alternative-text="Download"
+                                        title="Download file"
+                                        size="small"
+                                        onclick={handleFileDownload}
+                                        data-download-url={file.DownloadUrl}
+                                        data-file-name={file.Name}
+                                        class="download-button-icon">
+                                    </lightning-button-icon> -->
+                                    
+                                    <!-- Remove Button - Icon Only -->
+                                    <!--<template if:true={isRemoveEnabled}>
+                                        <lightning-button-icon
+                                            icon-name="action:delete"
+                                            variant="error"
+                                            alternative-text="Remove"
+                                            title="Remove file from package"
+                                            size="small"
+                                            onclick={handleFileRemove}
+                                            data-document-id={file.ContentDocumentId}
+                                            data-file-name={file.Name}
+                                            class="remove-button-icon"
+                                            disabled={removingFileId}>
+                                        </lightning-button-icon>-->
+                                        <!-- Remove Loading State -->
+                                        <!--<template if:true={removingFileId}>
+                                            <lightning-spinner 
+                                                alternative-text="Removing..." 
+                                                size="xx-small"
+                                                class="remove-spinner">
+                                            </lightning-spinner>
+                                        </template>
+                                    </template>-->
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+                <template if:false={hasExistingFiles}>
+                    No Brochure Found!
+                </template>
+                <!--File Upload Section-->
+                <!-- <template if:true={showUpload}>
+                    <div class="upload-section">
+                        <template if:false={hasExistingFiles}>
+                            <div class="upload-message">
+                                <lightning-icon icon-name="utility:upload" size="small"></lightning-icon>
+                                <span>No files found. Upload documents below.</span>
+                            </div>
+                        </template>
+                        
+                        <lightning-file-upload
+                            label={uploadLabel}
+                            name="fileUploadManager"
+                            accept={acceptedFileTypes}
+                            record-id={recordId}
+                            multiple={allowMultipleFiles}
+                            onuploadfinished={handleFileUpload}
+                            disabled={uploadInProgress}>
+                        </lightning-file-upload>
+                        -->
+                        <!--Upload Progress-->
+                        <!--<template if:true={uploadInProgress}>
+                            <div class="upload-progress">
+                                <lightning-spinner alternative-text="Uploading files..." size="small"></lightning-spinner>
+                                <span class="progress-text">Uploading files...</span>
+                            </div>
+                        </template>
+                    </div>
+                </template> 
+            -->
+                 <!--Empty State--> 
+                <template if:true={showEmptyState}>
+                    <div class="empty-state">
+                        <lightning-icon icon-name="utility:file" size="medium" class="empty-icon"></lightning-icon>
+                        <p class="empty-message">No files available</p>
+                    </div>
+                </template>
+            </div>
+        </template>
+    </div>
+</template>

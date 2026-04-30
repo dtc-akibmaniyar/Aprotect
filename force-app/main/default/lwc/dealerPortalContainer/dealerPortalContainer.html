@@ -1,0 +1,136 @@
+<template>
+    <div class="dealer-portal-container">
+        
+        <!-- Locked Message -->
+        <template if:true={isApplicationLocked}>
+            <div class="locked-message-banner">
+                <lightning-icon icon-name="utility:lock" size="small" variant="warning"></lightning-icon>
+                <span class="locked-message-text">{lockedMessage}</span>
+            </div>
+        </template>
+
+        <div class="tab-strip">
+            <div class="tab-header">
+                <span class="tab-header__title">{headerTitle}</span>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="tab-navigation">
+                <button 
+                    class={vehicleTabClass}
+                    data-tab="vehicle" 
+                    disabled={vehicleTabDisabled}
+                >
+                    Vehicle
+                </button>
+                <button 
+                    class={warrantyTabClass}
+                    data-tab="warranty" 
+                    disabled={warrantyTabDisabled}
+                >
+                    Warranty
+                </button>
+                <button 
+                    class={moreProductsTabClass}
+                    data-tab="moreProducts" 
+                    disabled={moreProductsTabDisabled}
+                >
+                    Tire & Rim
+                </button>
+                <button 
+                    class={gapTabClass}
+                    data-tab="gap" 
+                    disabled={gapTabDisabled}
+                >
+                    Loan Protection
+                </button>
+                <button 
+                    class={customerTabClass}
+                    data-tab="customer" 
+                    disabled={customerTabDisabled}
+                >
+                    Customer
+                </button>
+                <button 
+                    class={summaryTabClass}
+                    data-tab="summary" 
+                    disabled={summaryTabDisabled}
+                >
+                    Summary
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <div class={vehicleTabContentClass}>
+                <c-dealer-portal-vehicle 
+                    application-id={applicationId}
+                    is-locked={isApplicationLocked}
+                    onvehiclecomplete={handleVehicleComplete}
+                    onnavigate={handleVehicleNavigate}
+                    onback={handleVehicleBack}
+                ></c-dealer-portal-vehicle>
+            </div>
+
+            <div class={warrantyTabContentClass}>
+                <c-dealer-portal-warranty 
+                    application-id={applicationId}
+                    application-status={applicationStatus}
+                    is-locked={isApplicationLocked}
+                    onwarrantycomplete={handleWarrantyComplete}
+                    onnavigate={handleWarrantyNavigate}
+                    onback={handleWarrantyBack}
+                    onapplicationstatuschanged={handleApplicationStatusChanged}
+                    onsaveasquote={handleWarrantySaveAsQuote}
+                ></c-dealer-portal-warranty>
+            </div>
+
+            <div class={moreProductsTabContentClass}>
+                <c-dealer-portal-more-products 
+                    application-id={applicationId}
+                    is-locked={isApplicationLocked}
+                    application-status={applicationStatus}
+                    onmoreproductscomplete={handleMoreProductsComplete}
+                    onnavigate={handleMoreProductsNavigate}
+                    onback={handleMoreProductsBack}
+                    onapplicationstatuschanged={handleApplicationStatusChanged}
+                    onsaveasquote={handleMoreProductsSaveAsQuote}
+                ></c-dealer-portal-more-products>
+            </div>
+
+            <div class={gapTabContentClass}>
+                <c-dealer-portal-gap 
+                    application-id={applicationId}
+                    application-status={applicationStatus}
+                    is-locked={isApplicationLocked}
+                    ongapcomplete={handleGapComplete}
+                    onnavigate={handleGapNavigate}
+                    onback={handleGapBack}
+                    onapplicationstatuschanged={handleApplicationStatusChanged}
+                    onsaveasquote={handleGapSaveAsQuote}
+                ></c-dealer-portal-gap>
+            </div>
+
+            <div class={customerTabContentClass}>
+                <c-dealer-portal-customer 
+                    application-id={applicationId}
+                    is-locked={isApplicationLocked}
+                    oncustomercomplete={handleCustomerComplete}
+                    onnavigate={handleCustomerNavigate}
+                    onback={handleCustomerBack}
+                ></c-dealer-portal-customer>
+            </div>
+
+            <div class={summaryTabContentClass}>
+                <c-dealer-portal-summary 
+                    application-id={applicationId}
+                    is-locked={isApplicationLocked}
+                    onback={handleSummaryBack}
+                    onapplicationstatuschanged={handleApplicationStatusChanged}
+                    onnavigate={handleSummaryNavigate}
+                ></c-dealer-portal-summary>
+            </div>
+        </div>
+    </div>
+</template>

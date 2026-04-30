@@ -1,0 +1,172 @@
+<template>
+    <div class="transaction-history-container">
+        <div class="transaction-history-header">Payments</div>
+        
+        <template if:true={hasTransactions}>
+            <template for:each={transactions} for:item="transaction">
+                <div key={transaction.id} class="transaction-item">
+                    <!-- Cheque Payment -->
+                    <template if:true={transaction.isCheque}>
+                        <div class="transaction-content cheque-payment">
+                            <template if:true={transaction.statusHistory.length}>
+                                <div class="status-timeline">
+                                    <div class="timeline-header">
+                                        <div class="timeline-title">STATUS HISTORY</div>
+                                        <button
+                                            class="view-button"
+                                            onclick={handleViewTransaction}
+                                            data-id={transaction.id}
+                                            title="View transaction details">
+                                            View
+                                        </button>
+                                    </div>
+                                    <template for:each={transaction.statusHistory} for:item="entry">
+                                        <div key={entry.label} class="timeline-entry">
+                                            <span class={entry.iconClass}></span>
+                                            <div class="timeline-info">
+                                                <span class="timeline-label">{entry.label}</span>
+                                                <span class="timeline-date">{entry.formattedDate}</span>
+                                                <template if:true={entry.isFirst}>
+                                                    <div class="entry-payment-details">
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Payment Method:</span>
+                                                            <span class="value">Cheque</span>
+                                                        </div>
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Cheque REF #:</span>
+                                                            <span class="value">{transaction.chequeNumber}</span>
+                                                        </div>
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Cheque Amount:</span>
+                                                            <span class="value">{transaction.formattedAmount}</span>
+                                                        </div>
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Status:</span>
+                                                            <span class={transaction.statusBadgeClass}>{transaction.status}</span>
+                                                        </div>
+                                                        <template if:true={transaction.notes}>
+                                                            <div class="transaction-detail">
+                                                                <span class="label">Notes:</span>
+                                                                <span class="value">{transaction.notes}</span>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Credit Card Payment -->
+                    <template if:true={transaction.isCard}>
+                        <div class="transaction-content card-payment">
+                            <template if:true={transaction.statusHistory.length}>
+                                <div class="status-timeline">
+                                    <div class="timeline-header">
+                                        <div class="timeline-title">STATUS HISTORY</div>
+                                        <button
+                                            class="view-button"
+                                            onclick={handleViewTransaction}
+                                            data-id={transaction.id}
+                                            title="View transaction details">
+                                            View
+                                        </button>
+                                    </div>
+                                    <template for:each={transaction.statusHistory} for:item="entry">
+                                        <div key={entry.label} class="timeline-entry">
+                                            <span class={entry.iconClass}></span>
+                                            <div class="timeline-info">
+                                                <span class="timeline-label">{entry.label}</span>
+                                                <span class="timeline-date">{entry.formattedDate}</span>
+                                                <template if:true={entry.isFirst}>
+                                                    <div class="entry-payment-details">
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Payment Method:</span>
+                                                            <span class="value">Card</span>
+                                                        </div>
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Transaction REF #:</span>
+                                                            <span class="value">{transaction.transactionReference}</span>
+                                                        </div>
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Transaction Amount:</span>
+                                                            <span class="value">{transaction.formattedAmount}</span>
+                                                        </div>
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Status:</span>
+                                                            <span class={transaction.statusBadgeClass}>{transaction.status}</span>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- E-Transfer Payment -->
+                    <template if:true={transaction.isETransfer}>
+                        <div class="transaction-content etransfer-payment">
+                            <template if:true={transaction.statusHistory.length}>
+                                <div class="status-timeline">
+                                    <div class="timeline-header">
+                                        <div class="timeline-title">STATUS HISTORY</div>
+                                        <button
+                                            class="view-button"
+                                            onclick={handleViewTransaction}
+                                            data-id={transaction.id}
+                                            title="View transaction details">
+                                            View
+                                        </button>
+                                    </div>
+                                    <template for:each={transaction.statusHistory} for:item="entry">
+                                        <div key={entry.label} class="timeline-entry">
+                                            <span class={entry.iconClass}></span>
+                                            <div class="timeline-info">
+                                                <span class="timeline-label">{entry.label}</span>
+                                                <span class="timeline-date">{entry.formattedDate}</span>
+                                                <template if:true={entry.isFirst}>
+                                                    <div class="entry-payment-details">
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Payment Method:</span>
+                                                            <span class="value">E-Transfer</span>
+                                                        </div>
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Transaction REF #:</span>
+                                                            <span class="value">{transaction.transactionReference}</span>
+                                                        </div>
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Transaction Amount:</span>
+                                                            <span class="value">{transaction.formattedAmount}</span>
+                                                        </div>
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Status:</span>
+                                                            <span class={transaction.statusBadgeClass}>{transaction.status}</span>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </template>
+
+        <template if:false={hasTransactions}>
+            <div class="no-transactions">
+                <div class="no-transactions-icon">📋</div>
+                <div class="no-transactions-title">No Payments</div>
+                <div class="no-transactions-message">There are no recorded payments yet. Your payment transactions will appear here once processed.</div>
+            </div>
+        </template>
+    </div>
+</template>

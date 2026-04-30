@@ -1,0 +1,131 @@
+<template>
+    <div class="container">
+        <div class="option-header">
+            <div class="option-title">
+                OPTION A
+                <span class="export-checkbox-in-bar">
+                    <input type="checkbox" id="exportA" name="exportA" />
+                    <label for="exportA">Export to Workorder</label>
+                </span>
+            </div>
+        </div>
+        <div class="row">
+            <!-- PARTS COLUMN -->
+            <div class="section parts">
+                <div class="section-title">Parts</div>
+                <!-- Part 1: Engine Rebuild -->
+                <div class="subsection">
+                    <div class="field-row"><span>Supplier:</span><span>(Dropdown)</span></div>
+                    <div class="field-row"><span>Part ID #:</span><span>ENG-001</span></div>
+                    <div class="field-row"><span>Part Name:</span><span>Engine Rebuild</span></div>
+                    <div class="field-row"><span>Part REF #:</span><span>ER-001</span></div>
+                    <div class="field-row"><span>Part Description:</span><span>Engine full rebuild</span></div>
+                    <div class="field-row"><span>Unit Cost:</span><span>$3,000.00</span></div>
+                    <div class="field-row"><span>Quantity:</span><span>1</span></div>
+                    <div class="field-row highlight yellow"><span>Wholesale Parts/Sub-Total Cost:</span><span>$3,000.00</span></div>
+                    <div class="field-row"><span>Retail Markup ($/%):</span><span>1000 / 20%</span></div>
+                    <div class="field-row"><span>Set $:</span><span>1000</span></div>
+                    <div class="field-row"><span>Set %:</span><span>20%</span></div>
+                    <div class="field-row highlight red"><span>Retail Markup:</span><span>$4,000.00</span></div>
+                    <div class="field-row highlight blue"><span>Wholesale/Parts Rate:</span><span>$3,000.00</span></div>
+                </div>
+                <!-- Part 2: Alternator -->
+                <div class="subsection">
+                    <div class="field-row"><span>Supplier:</span><span>(Dropdown)</span></div>
+                    <div class="field-row"><span>Part ID #:</span><span>ALT-001</span></div>
+                    <div class="field-row"><span>Part Name:</span><span>Alternator</span></div>
+                    <div class="field-row"><span>Part REF #:</span><span>ALT-REF</span></div>
+                    <div class="field-row"><span>Part Description:</span><span>High output alternator</span></div>
+                    <div class="field-row"><span>Unit Cost:</span><span>$500.00</span></div>
+                    <div class="field-row"><span>Quantity:</span><span>1</span></div>
+                    <div class="field-row highlight yellow"><span>Wholesale Parts/Sub-Total Cost:</span><span>$500.00</span></div>
+                    <div class="field-row"><span>Retail Markup ($/%):</span><span>30.00%</span></div>
+                    <div class="field-row"><span>Set $:</span><span>0</span></div>
+                    <div class="field-row"><span>Set %:</span><span>30.00%</span></div>
+                    <div class="field-row highlight red"><span>Retail Markup:</span><span>$650.00</span></div>
+                    <div class="field-row highlight blue"><span>Wholesale/Parts Rate:</span><span>$500.00</span></div>
+                </div>
+                <!-- Part 3: Brakepad/Rotors -->
+                <div class="subsection">
+                    <div class="field-row"><span>Supplier:</span><span>(Dropdown)</span></div>
+                    <div class="field-row"><span>Part ID #:</span><span>BRK-002</span></div>
+                    <div class="field-row"><span>Part Name:</span><span>Brakepad/Rotors</span></div>
+                    <div class="field-row"><span>Part REF #:</span><span>BRK-REF</span></div>
+                    <div class="field-row"><span>Part Description:</span><span>Front brake pads and rotors</span></div>
+                    <div class="field-row"><span>Unit Cost:</span><span>$200.00</span></div>
+                    <div class="field-row"><span>Quantity:</span><span>2</span></div>
+                    <div class="field-row highlight yellow"><span>Wholesale Parts/Sub-Total Cost:</span><span>$400.00</span></div>
+                    <div class="field-row"><span>Retail Markup ($/%):</span><span>0.20%</span></div>
+                    <div class="field-row"><span>Set $:</span><span>0</span></div>
+                    <div class="field-row"><span>Set %:</span><span>0.20%</span></div>
+                    <div class="field-row highlight red"><span>Retail Markup:</span><span>$520.00</span></div>
+                    <div class="field-row highlight blue"><span>Wholesale/Parts Rate:</span><span>$400.00</span></div>
+                </div>
+            </div>
+
+            <!-- LABOUR COLUMN -->
+            <div class="section labour">
+                <div class="section-title">Labour</div>
+                <div class="field-row"><span>Repair Shop:</span><span>ABC Repairs</span></div>
+                <div class="field-row"><span>Estimate REF #:</span><span>Link to Estimate</span></div>
+                <div class="field-row"><span>Part Type:</span><span>Engine Rebuild</span></div>
+                <div class="field-row"><span>Repair Description:</span><span>Engine full rebuild</span></div>
+                <div class="field-row"><span>Hourly Labour Rate:</span><span>$80.00</span></div>
+                <div class="field-row"><span>Labour Time (hrs):</span><span>6.5</span></div>
+                <div class="field-row highlight yellow"><span>Wholesale Parts/Sub-Total Cost:</span><span>$520.00</span></div>
+                <div class="field-row"><span>Retail Markup ($/%):</span><span>300 / 20%</span></div>
+                <div class="field-row"><span>Set $:</span><span>300</span></div>
+                <div class="field-row"><span>Set %:</span><span>20%</span></div>
+                <div class="field-row highlight red"><span>Retail Markup:</span><span>$820.00</span></div>
+                <div class="field-row highlight blue"><span>Wholesale/Labour Rate:</span><span>$520.00</span></div>
+                <!-- Miscellaneous (from second image) -->
+                <div class="subsection">
+                    <div class="field-row"><span>Miscellaneous (Shop Supplies):</span><span>$100.00</span></div>
+                    <div class="field-row"><span>(Oil Change):</span><span>$200.00</span></div>
+                    <div class="field-row highlight blue"><span>Total Misc. Costs:</span><span>$300.00</span></div>
+                </div>
+            </div>
+
+            <!-- WARRANTY COVERAGE COLUMN -->
+            <div class="section warranty">
+                <div class="section-title" style="background: #a020f0;">Warranty Coverage</div>
+                <div class="field-row"><span>Plan Name:</span><span>Diamond Plus Warranty</span></div>
+                <div class="field-row"><span>Per Claim Limit:</span><span>$3,000.00</span></div>
+                <div class="field-row"><span>Deductible:</span><span>$100.00</span></div>
+                <div class="field-row highlight yellow"><span>Total Plan Coverage:</span><span>$2,900.00</span></div>
+                <div class="field-row"><span>Credits/Reimbursements</span><span></span></div>
+                <div class="field-row"><span>Towing:</span><span>$60.00</span></div>
+                <div class="field-row"><span>Trip Interruption:</span><span>$150.00</span></div>
+                <div class="field-row"><span><i>(Add new reimbursement type category)</i></span><span></span></div>
+                <div class="field-row highlight yellow"><span>Total Credits/Reimbursements:</span><span>$210.00</span></div>
+                <div class="field-row highlight purple"><span>Total Claim Payout:</span><span>$3,110.00</span></div>
+            </div>
+
+            <!-- RETAIL SUMMARY COLUMN -->
+            <div class="section retail">
+                <div class="section-title" style="background: #d32f2f; color: #fff;">Retail Summary</div>
+                <div class="field-row"><span>Retail Parts</span><span>$5,170.00</span></div>
+                <div class="field-row"><span>Rebuild Engine</span><span>$4,000.00</span></div>
+                <div class="field-row"><span>Alternator</span><span>$650.00</span></div>
+                <div class="field-row"><span>Brakes</span><span>$520.00</span></div>
+                <div class="field-row highlight red"><span>Retail Labour</span><span>$920.00</span></div>
+                <div class="field-row"><span>Labour</span><span>$820.00</span></div>
+                <div class="field-row"><span>Shop Supplies</span><span>$100.00</span></div>
+                <div class="field-row highlight"><span>Repair Total:</span><span>$6,090.00</span></div>
+                <div class="field-row"><span>A-Protect Warranty Coverage:</span><span>$3,110.00</span></div>
+                <div class="field-row highlight yellow"><span>CUSTOMER PAYS</span><span>$2,980.00</span></div>
+                <div class="field-row"><span>Deposit</span><span></span></div>
+            </div>
+
+            <!-- PROFIT & LOSS REPORT SECTION -->
+            <div class="section profit">
+                <div class="section-title">PROFIT & LOSS REPORT</div>
+                <div class="field-row"><span>Wholesale (Sub-Total):</span><span>$3,520.00</span></div>
+                <div class="field-row"><span>Tax (HST:13%):</span><span>13%</span></div>
+                <div class="field-row highlight"><span>Total:</span><span>$3,977.60</span></div>
+                <div class="field-row"><span>Customer pay:</span><span>$2,592.12</span></div>
+                <div class="field-row highlight loss"><span>Profit/Loss Amount:</span><span>-$1,385.48</span></div>
+            </div>
+        </div>
+    </div>
+</template>
