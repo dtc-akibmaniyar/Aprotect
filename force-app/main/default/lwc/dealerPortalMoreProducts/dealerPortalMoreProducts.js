@@ -1,10 +1,7 @@
 import { LightningElement, track, api, wire } from 'lwc';
 import { NavigationMixin } from 'lightning/navigation';
-import { getObjectInfo, getPicklistValues } from 'lightning/uiObjectInfoApi';
-import APPLICATION_PACKAGE_OBJECT from '@salesforce/schema/Application_Package__c';
-import TIRE_BRAND_FIELD  from '@salesforce/schema/Application_Package__c.Tire_Brand__c';
-import RIM_BRAND_FIELD   from '@salesforce/schema/Application_Package__c.Rim_Brand__c';
-import RIM_TYPE_FIELD    from '@salesforce/schema/Application_Package__c.Rim_Type__c';
+// import { getObjectInfo, getPicklistValues } from 'lightning/uiObjectInfoApi';
+// Schema imports removed — fields do not exist on Application_Package__c
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getDealerPackages from '@salesforce/apex/DealerPortalController.getDealerPackages';
 import getExistingApplicationPackageByRecordType from '@salesforce/apex/DealerPortalController.getExistingApplicationPackageByRecordType';
@@ -22,6 +19,9 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     @track loading = false
     @track renderKey = 0 // Used to force re-renders;
     @track price = 0.00;
+    @track isPriceEditMode = false;
+    @track priceOverrideInput = '';
+    @track isPriceOverridden = false;
     @track selectedProgram = '';
     @track selectedTerm = '4';
     @track selectedClaim = '5000';
@@ -75,18 +75,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     @track rimType       = '';
     @track dealerComments = '';
 
-    // Picklist wire adapters
-    @wire(getObjectInfo, { objectApiName: APPLICATION_PACKAGE_OBJECT })
-    objectInfo;
-
-    @wire(getPicklistValues, { recordTypeId: '$objectInfo.data.defaultRecordTypeId', fieldApiName: TIRE_BRAND_FIELD })
-    tireBrandPicklist;
-
-    @wire(getPicklistValues, { recordTypeId: '$objectInfo.data.defaultRecordTypeId', fieldApiName: RIM_BRAND_FIELD })
-    rimBrandPicklist;
-
-    @wire(getPicklistValues, { recordTypeId: '$objectInfo.data.defaultRecordTypeId', fieldApiName: RIM_TYPE_FIELD })
-    rimTypePicklist;
+    // Picklist wire adapters removed — fields do not exist on Application_Package__c
 
     @track currentView = 'planSelection';
     @track planCards = [];
@@ -583,6 +572,12 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                     
                     // Update price and other dependent fields
                     this.updatePrice();
+                    
+                    // Check if there's a dealer price override
+                    if (result.data.dealerPriceOverride != null && result.data.dealerPriceOverride !== undefined) {
+                        this.price = result.data.dealerPriceOverride;
+                        this.isPriceOverridden = true;
+                    }
                     
                     // Force re-render to update visual highlighting
                     setTimeout(() => {
@@ -1234,6 +1229,124 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         this.planCards = cards;
     }
 
+    // Accordion-based plan type groups with package terms (matches warranty tab layout)
+    get planTypeGroupsWithPackageTerms() {
+        if (!Array.isArray(this.allDealerPackages) || this.allDealerPackages.length === 0) {
+            return [];
+        }
+
+        const groupsMap = new Map();
+        const headerColors = ['#333333', '#6d6e70', '#d4af37', '#c0c0c0', '#cd7f32', '#2c3e50', '#1a5276', '#7d3c98'];
+        let colorIndex = 0;
+
+        this.allDealerPackages.forEach(pkg => {
+            const key = pkg.planTypeId || this.otherPlanTypeKey;
+            if (!groupsMap.has(key)) {
+                const color = headerColors[colorIndex % headerColors.length];
+                colorIndex++;
+                groupsMap.set(key, {
+                    key,
+                    label: pkg.planTypeName || 'Other Packages',
+                    description: this.normalizeDescription(pkg.planTypeDescription || ''),
+                    headerClass: 'plan-type-section-header',
+                    headerColor: color,
+                    packages: []
+                });
+            }
+            groupsMap.get(key).packages.push(pkg);
+        });
+
+        return Array.from(groupsMap.values()).map(group => {
+            const packagesWithTerms = group.packages.map(pkg => {
+                const isSelectable = this.isPackageSelectable(pkg.PackageClass);
+                const terms = (pkg.warrantyTerms || []).map(term => {
+                    const isTermSelected = this.selectedWarrantyTerm && this.selectedWarrantyTerm.Id === term.Id;
+                    const displayPrice = term.totalPrice || term.netCost || 0;
+                    return {
+                        id: term.Id,
+                        name: term.packageTermName || term.Name || 'Unknown Term',
+                        price: this.formatPrice(displayPrice),
+                        packageId: pkg.Id,
+                        rowClass: isTermSelected ? 'term-row selected' : (isSelectable ? 'term-row' : 'term-row disabled'),
+                        isSelected: isTermSelected
+                    };
+                });
+
+                const options = (pkg.options || []).map(option => ({
+                    id: option.Id || option.id,
+                    optionName: option.optionName || option.Name || option.label,
+                    inclusion: option.inclusion,
+                    exclusion: option.exclusion
+                }));
+
+                return {
+                    id: pkg.Id,
+                    name: pkg.PackageName + (isSelectable ? '' : ' (Not Eligible)'),
+                    terms,
+                    options,
+                    hasTerms: terms.length > 0,
+                    hasOptions: options.length > 0,
+                    isSelectable
+                };
+            });
+
+            return {
+                key: group.key,
+                label: group.label,
+                description: group.description,
+                hasDescription: !!group.description,
+                headerClass: group.headerClass,
+                packagesWithTerms
+            };
+        });
+    }
+
+    // Handle term selection from the accordion view (stays on plan selection, no navigation)
+    async handleAccordionTermSelection(event) {
+        const termId = event.currentTarget.dataset.term;
+        const packageId = event.currentTarget.dataset.package;
+
+        if (!termId || !packageId) return;
+
+        // Find the package
+        const pkg = this.allDealerPackages.find(p => p.Id === packageId);
+        if (!pkg) return;
+
+        // Check eligibility
+        if (!this.isPackageSelectable(pkg.PackageClass)) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Package Not Available',
+                message: `This package is not available for ${this.vehicleModelClass} vehicles.`,
+                variant: 'warning',
+                mode: 'sticky'
+            }));
+            return;
+        }
+
+        // Find the term
+        const term = (pkg.warrantyTerms || []).find(t => t.Id === termId);
+        if (!term) return;
+
+        // Auto-select the package if different
+        if (!this.selectedDealerPackage || this.selectedDealerPackage.Id !== pkg.Id) {
+            this.selectedDealerPackage = pkg;
+            this.selectedProgram = pkg.PackageName;
+            this.setSelectedPlanTypeFromPackage(pkg);
+            this.dealerPackages = this.allDealerPackages.filter(p => (p.planTypeId || this.otherPlanTypeKey) === this.selectedPlanTypeKey);
+        }
+
+        // Select term
+        this.selectedWarrantyTerm = term;
+        console.log('✅ Accordion term selected:', term.packageTermName || term.Name, 'from package:', pkg.PackageName);
+
+        this.updatePrice();
+        this.saveDataToSession();
+
+        // Stay on plan selection view — do NOT navigate to detail view
+        // Force re-render to update highlighting
+        this.renderKey++;
+    }
+
     getPlanIncludes(pkg) {
         if (!pkg) {
             return ['Coverage details available after selection.'];
@@ -1786,6 +1899,10 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     }
     
     updatePrice() {
+        // Reset custom price override when recalculating
+        this.isPriceOverridden = false;
+        this.isPriceEditMode = false;
+        this.priceOverrideInput = '';
         console.log('💰 === UPDATE PRICE START ===');
         console.log('💰 isExistingApplication:', this.isExistingApplication);
         console.log('💰 existingApplicationPackage:', this.existingApplicationPackage);
@@ -2011,7 +2128,8 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                 dealerPackageId: this.selectedDealerPackage.Id,
                 packageName: this.selectedDealerPackage.PackageName,
                 selectedTermId: this.selectedWarrantyTerm.Id,
-                recordType: 'Tire_Rim_Protection_Plan'
+                recordType: 'Tire_Rim_Protection_Plan',
+                dealerPriceOverride: this.isPriceOverridden ? this.price : null
             };
             
             console.log('📦 [TIRE createOrUpdate] Saving with active management:', packageData);
@@ -2526,6 +2644,65 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     
     get formattedPrice() {
         return this.formatPrice(this.price);
+    }
+
+    // ── Custom Pricing (click-to-edit override) ──
+    handlePriceClick() {
+        if (!this.selectedWarrantyTerm) return;
+        this.isPriceEditMode = true;
+        this.priceOverrideInput = this.price ? this.price.toFixed(2) : '';
+        setTimeout(() => {
+            const input = this.template.querySelector('.price-override-input');
+            if (input) { input.focus(); input.select(); }
+        }, 0);
+    }
+
+    handlePriceOverrideChange(event) {
+        this.priceOverrideInput = event.target.value;
+    }
+
+    handlePriceOverrideBlur() {
+        this._applyPriceOverride();
+    }
+
+    handlePriceOverrideKeyDown(event) {
+        if (event.key === 'Enter') {
+            this._applyPriceOverride();
+        } else if (event.key === 'Escape') {
+            this.isPriceEditMode = false;
+            this.priceOverrideInput = '';
+        }
+    }
+
+    _applyPriceOverride() {
+        const val = parseFloat(this.priceOverrideInput);
+        if (!isNaN(val) && val >= 0) {
+            this.price = parseFloat(val.toFixed(2));
+            this.isPriceOverridden = true;
+        } else {
+            this.isPriceOverridden = false;
+            this.updatePrice();
+        }
+        this.isPriceEditMode = false;
+    }
+
+    handleResetPriceOverride() {
+        this.isPriceOverridden = false;
+        this.isPriceEditMode = false;
+        this.priceOverrideInput = '';
+
+        const isSameTerm = this.isExistingApplication &&
+                           this.existingApplicationPackage &&
+                           this.selectedWarrantyTerm &&
+                           this.selectedWarrantyTerm.Id === this.existingApplicationPackage.selectedTermId;
+
+        if (isSameTerm) {
+            const basePrice = this.existingApplicationPackage.contractPremiumPriceWithoutTax || 0;
+            const taxAmount = this.existingApplicationPackage.taxAmount || 0;
+            this.price = parseFloat((basePrice + taxAmount).toFixed(2));
+        } else {
+            this.updatePrice();
+        }
     }
     
     

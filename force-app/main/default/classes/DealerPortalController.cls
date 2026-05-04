@@ -5898,7 +5898,6 @@ public static VehicleResponse decodeVin(String vin) {
 
             VehicleDataDTO vehicleData = new VehicleDataDTO();
             VinDecoderService.DecodedVehicleData sourceData = decodeResponse.vehicleData;
-            
 
             vehicleData.vin = vin;
             vehicleData.year = sourceData.year;
@@ -6114,6 +6113,7 @@ public static VehicleResponse decodeVin(String vin) {
                 if (psResult.success) {
                     VehicleDataDTO vehicleData = new VehicleDataDTO();
                     VinDecoderService.DecodedVehicleData sd = psResult.vehicleData;
+                    System.debug('power sport data test: ' + JSON.serializePretty(sd));
                     PowersportsVinDecoderService.PowersportsVehicleData pd = psResult.powersportsData;
 
                     vehicleData.vin                           = vin;

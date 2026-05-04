@@ -4202,6 +4202,95 @@ lightning-accordion-section.program-section-selected lightning-button:hover {
     width: 100%;
 }
 
+/* Custom Pricing Override */
+.price-clickable {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    border-bottom: 1px dashed transparent;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.price-clickable:hover {
+    color: #2e5f9a;
+    border-bottom-color: #2e5f9a;
+}
+
+.price-edit-icon {
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+    color: #5184B7;
+}
+
+.price-clickable:hover .price-edit-icon {
+    opacity: 1;
+}
+
+.price-override-wrap {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.price-override-input {
+    font-size: 1.7rem;
+    font-weight: 600;
+    color: #1b3b65;
+    width: 100%;
+    border: 2px solid #5184B7;
+    border-radius: 4px;
+    padding: 2px 8px;
+    outline: none;
+    background: #f0f5fb;
+}
+
+.price-override-input:focus {
+    border-color: #2e5f9a;
+    box-shadow: 0 0 0 3px rgba(81, 132, 183, 0.2);
+}
+
+.price-override-input::-webkit-inner-spin-button,
+.price-override-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
+.price-override-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.price-override-badge {
+    font-size: 10px;
+    font-weight: 700;
+    background: #e8f0fb;
+    color: #5184B7;
+    border: 1px solid #5184B7;
+    border-radius: 10px;
+    padding: 2px 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.price-reset-btn {
+    font-size: 11px;
+    font-weight: 600;
+    color: #888;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    transition: color 0.15s;
+}
+
+.price-reset-btn:hover {
+    color: #333;
+}
+
 .price-summary-box .price-breakdown-inline {
     margin-left: 0.5rem;
 }
@@ -4394,4 +4483,269 @@ lightning-accordion-section.program-section-selected lightning-button:hover {
 
 .progress-text {
     font-weight: 500;
+}
+
+/* ===== Accordion Layout Styles (matching Warranty tab) ===== */
+
+.details-grid {
+    padding: 0 16px;
+}
+
+.tire-left-column {
+    padding-right: 16px;
+}
+
+.tire-right-column {
+    padding-left: 8px;
+}
+
+.plan-type-group {
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    border-radius: 0;
+}
+
+.plan-type-section-header {
+    padding: 16px 24px;
+    background-color: #333333;
+    color: #ffffff;
+    font-size: 1.05rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.plan-type-group-description {
+    background: #ffffff;
+    border-left: 1px solid #e0e0e0;
+    border-right: 1px solid #e0e0e0;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 16px 24px;
+    font-size: 0.9rem;
+    color: #333;
+}
+
+.package-accordion-section {
+    margin-bottom: 4px;
+}
+
+.accordion-includes {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.accordion-includes .includes-heading {
+    text-align: left;
+}
+
+.warranty-terms-section {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #e0e5ee;
+}
+
+.terms-accordion .slds-accordion__summary {
+    background-color: #f5f5f5;
+    color: #2b2b2b;
+    font-weight: 600;
+}
+
+.term-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.term-group-two-column {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.term-row {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 0;
+    padding: 12px 14px;
+    background-color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    appearance: none;
+    outline: none;
+}
+
+.term-row:hover {
+    border-color: #4a4a4a;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.term-row.selected {
+    border-color: #1e8449;
+    box-shadow: 0 2px 10px rgba(30, 132, 73, 0.2);
+    background-color: #f1fbf5;
+}
+
+.term-row.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.term-row:focus-visible {
+    outline: none;
+}
+
+.term-row-left {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.term-row-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2d2d2d;
+}
+
+.term-row-right {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.term-row-price {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1f1f1f;
+}
+
+.no-terms-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    color: #856404;
+    font-size: 14px;
+}
+
+.no-terms-message lightning-icon {
+    margin-right: 10px;
+}
+
+/* Right column styles for accordion layout */
+.right-column-stack {
+    margin-top: 8px;
+}
+
+.section-heading {
+    font-size: 10px;
+    font-weight: 700;
+    color: #000;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 12px 0 4px 0;
+}
+
+.selected-plan-box,
+.coverage-term-box,
+.price-summary-box {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.selected-plan-text,
+.coverage-term-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+}
+
+.price-summary-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a3571;
+}
+
+/* Help modal */
+.help-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.help-modal {
+    background: #fff;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+}
+
+.help-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.help-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.help-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+}
+
+.help-modal-content {
+    padding: 20px;
+}
+
+.help-modal-text {
+    font-size: 14px;
+    color: #333;
+    line-height: 1.6;
+    margin: 0;
+}
+
+@media (max-width: 1024px) {
+    .tire-left-column,
+    .tire-right-column {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex-basis: 100% !important;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .term-group-two-column {
+        grid-template-columns: 1fr;
+    }
 }

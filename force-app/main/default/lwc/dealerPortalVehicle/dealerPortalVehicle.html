@@ -279,94 +279,150 @@
                         </lightning-input>
                     </div>
                 </div>
-                <!-- Second Row: Engine, Transmission, Fuel, Drive, Body Style, Colour, GVWR -->
+                <!-- Vehicle Details: conditional fields based on vehicle type -->
                 <h3 class="section-title">VEHICLE DETAILS:</h3>
-                <div class="form-row vehicle-details-row">
-                    <div class="form-field">
-                        <label class="field-label">ENGINE</label>
-                        <lightning-input
-                            type="text"
-                            name="engine"
-                            value={vehicleData.engine}
-                            onchange={handleInputChange}
-                            disabled={fieldDisabled}
-                            class="input-field"
-                            variant="label-hidden">
-                        </lightning-input>
+                <template if:false={isPowersports}>
+                    <!-- Standard (Used Car) fields -->
+                    <div class="form-row vehicle-details-row">
+                        <div class="form-field">
+                            <label class="field-label">ENGINE</label>
+                            <lightning-input
+                                type="text"
+                                name="engine"
+                                value={vehicleData.engine}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                        <div class="form-field">
+                            <label class="field-label">TRANSMISSION</label>
+                            <lightning-input
+                                type="text"
+                                name="transmission"
+                                value={vehicleData.transmission}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                        <div class="form-field">
+                            <label class="field-label">FUEL</label>
+                            <lightning-combobox
+                                name="fuelType"
+                                value={vehicleData.fuelType}
+                                options={fuelTypeOptions}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-combobox>
+                        </div>
+                        <div class="form-field">
+                            <label class="field-label">DRIVE</label>
+                            <lightning-combobox
+                                name="driveType"
+                                value={vehicleData.driveType}
+                                options={driveTypeOptions}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-combobox>
+                        </div>
+                        <div class="form-field">
+                            <label class="field-label">BODY STYLE</label>
+                            <lightning-combobox
+                                name="bodyStyle"
+                                value={vehicleData.bodyStyle}
+                                options={bodyStyleOptions}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-combobox>
+                        </div>
+                        <div class="form-field">
+                            <label class="field-label">COLOUR</label>
+                            <lightning-input
+                                type="text"
+                                name="color"
+                                value={vehicleData.color}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                        <div class="form-field">
+                            <label class="field-label">GVWR</label>
+                            <lightning-input
+                                type="number"
+                                name="gvwr"
+                                value={vehicleData.gvwr}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
                     </div>
-                    <div class="form-field">
-                        <label class="field-label">TRANSMISSION</label>
-                        <lightning-input
-                            type="text"
-                            name="transmission"
-                            value={vehicleData.transmission}
-                            onchange={handleInputChange}
-                            disabled={fieldDisabled}
-                            class="input-field"
-                            variant="label-hidden">
-                        </lightning-input>
+                </template>
+                <template if:true={isPowersports}>
+                    <!-- Powersports fields -->
+                    <div class="form-row vehicle-details-row">
+                        <div class="form-field">
+                            <label class="field-label">ENGINE TYPE</label>
+                            <lightning-input
+                                type="text"
+                                name="engine"
+                                value={vehicleData.engine}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                        <div class="form-field">
+                            <label class="field-label">ENGINE CC</label>
+                            <lightning-input
+                                type="number"
+                                name="engineCC"
+                                value={vehicleData.engineCC}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                        <div class="form-field">
+                            <label class="field-label">COOLING TYPE</label>
+                            <lightning-input
+                                type="text"
+                                name="coolingType"
+                                value={vehicleData.coolingType}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                        <div class="form-field">
+                            <label class="field-label">FUEL TYPE</label>
+                            <lightning-combobox
+                                name="fuelType"
+                                value={vehicleData.fuelType}
+                                options={fuelTypeOptions}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-combobox>
+                        </div>
                     </div>
-                    <div class="form-field">
-                        <label class="field-label">FUEL</label>
-                        <lightning-combobox
-                            name="fuelType"
-                            value={vehicleData.fuelType}
-                            options={fuelTypeOptions}
-                            onchange={handleInputChange}
-                            disabled={fieldDisabled}
-                            class="input-field"
-                            variant="label-hidden">
-                        </lightning-combobox>
-                    </div>
-                    <div class="form-field">
-                        <label class="field-label">DRIVE</label>
-                        <lightning-combobox
-                            name="driveType"
-                            value={vehicleData.driveType}
-                            options={driveTypeOptions}
-                            onchange={handleInputChange}
-                            disabled={fieldDisabled}
-                            class="input-field"
-                            variant="label-hidden">
-                        </lightning-combobox>
-                    </div>
-                    <div class="form-field">
-                        <label class="field-label">BODY STYLE</label>
-                        <lightning-combobox
-                            name="bodyStyle"
-                            value={vehicleData.bodyStyle}
-                            options={bodyStyleOptions}
-                            onchange={handleInputChange}
-                            disabled={fieldDisabled}
-                            class="input-field"
-                            variant="label-hidden">
-                        </lightning-combobox>
-                    </div>
-                    <div class="form-field">
-                        <label class="field-label">COLOUR</label>
-                        <lightning-input
-                            type="text"
-                            name="color"
-                            value={vehicleData.color}
-                            onchange={handleInputChange}
-                            disabled={fieldDisabled}
-                            class="input-field"
-                            variant="label-hidden">
-                        </lightning-input>
-                    </div>
-                    <div class="form-field">
-                        <label class="field-label">GVWR</label>
-                        <lightning-input
-                            type="number"
-                            name="gvwr"
-                            value={vehicleData.gvwr}
-                            onchange={handleInputChange}
-                            disabled={fieldDisabled}
-                            class="input-field"
-                            variant="label-hidden">
-                        </lightning-input>
-                    </div>
-                                </div>
+                </template>
 
                 <!-- Third Row: Odometer, Purchase Price, Delivery Date, Usage Type -->
                 <div class="form-row purchase-odometer-row">
@@ -456,9 +512,8 @@
                      </div>
                 </div>
 
-                <!-- Powersports Specifications — only visible when vehicle is Powersports -->
+                <!-- Powersports HOURS/USAGE — only visible when vehicle is Powersports -->
                 <template if:true={isPowersports}>
-                    <!-- HOURS/USAGE — standalone row -->
                     <div class="form-row powersports-hours-row">
                         <div class="form-field">
                             <label class="field-label">HOURS/USAGE</label>
@@ -474,79 +529,6 @@
                                 </lightning-input>
                                 <span class="unit-badge">HRS</span>
                             </div>
-                        </div>
-                    </div>
-                    <!-- Vehicle Specs grid -->
-                    <div class="powersports-specs-header">
-                        <span class="section-title" style="margin:0; border:none; padding:0">VEHICLE SPECIFICATIONS</span>
-                        <span class="powersports-badge">POWERSPORTS</span>
-                    </div>
-                    <div class="form-row powersports-specs-row">
-                        <div class="form-field">
-                            <label class="field-label">ENGINE TYPE</label>
-                            <lightning-input
-                                type="text"
-                                name="engine"
-                                value={vehicleData.engine}
-                                onchange={handleInputChange}
-                                disabled={fieldDisabled}
-                                class="input-field"
-                                variant="label-hidden">
-                            </lightning-input>
-                        </div>
-                        <div class="form-field">
-                            <label class="field-label">ENGINE CC</label>
-                            <lightning-input
-                                type="number"
-                                name="engineCC"
-                                value={vehicleData.engineCC}
-                                onchange={handleInputChange}
-                                disabled={fieldDisabled}
-                                class="input-field"
-                                variant="label-hidden">
-                            </lightning-input>
-                        </div>
-                        <div class="form-field">
-                            <label class="field-label">COOLING TYPE</label>
-                            <lightning-input
-                                type="text"
-                                name="coolingType"
-                                value={vehicleData.coolingType}
-                                onchange={handleInputChange}
-                                disabled={fieldDisabled}
-                                class="input-field"
-                                variant="label-hidden">
-                            </lightning-input>
-                        </div>
-                        <div class="form-field">
-                            <label class="field-label">FUEL TYPE</label>
-                            <lightning-combobox
-                                name="fuelType"
-                                value={vehicleData.fuelType}
-                                options={fuelTypeOptions}
-                                onchange={handleInputChange}
-                                disabled={fieldDisabled}
-                                class="input-field"
-                                variant="label-hidden">
-                            </lightning-combobox>
-                        </div>
-                        <div class="form-field placeholder-field">
-                            <label class="field-label">—</label>
-                            <lightning-input
-                                type="text"
-                                variant="label-hidden"
-                                disabled
-                                class="input-field">
-                            </lightning-input>
-                        </div>
-                        <div class="form-field placeholder-field">
-                            <label class="field-label">—</label>
-                            <lightning-input
-                                type="text"
-                                variant="label-hidden"
-                                disabled
-                                class="input-field">
-                            </lightning-input>
                         </div>
                     </div>
                 </template>
