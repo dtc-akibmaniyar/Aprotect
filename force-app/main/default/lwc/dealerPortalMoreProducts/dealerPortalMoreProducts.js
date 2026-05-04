@@ -1542,24 +1542,9 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             return false;
         }
 
-        // Tire & Rim mandatory field validation (Dealer Comments is optional)
-        const tireRequired = [
-            { value: this.tireBrand,      label: 'Tire Brand' },
-            { value: this.tireType,       label: 'Tire Type' },
-            { value: this.treadDepth,     label: 'Tread Depth' },
-            { value: this.treadDepthUnit, label: 'Tread Depth Unit' },
-            { value: this.rimSize,        label: 'Rim Size' },
-            { value: this.rimSizeUnit,    label: 'Rim Size Unit' },
-            { value: this.rimBrand,       label: 'Rim Brand' },
-            { value: this.rimType,        label: 'Rim Type' }
-        ];
-        for (const field of tireRequired) {
-            if (!field.value || !String(field.value).trim()) {
-                this.errorMessage = field.label + ' is required in the Tire & Rim Details section.';
-                this.showError = true;
-                return false;
-            }
-        }
+        // Tire & Rim detail fields are OPTIONAL - validation disabled.
+        // Was blocking Save & Continue when users hadn't filled tire detail inputs
+        // (inputs only visible in planDetails view, not planSelection accordion view).
 
         // Clear any previous errors
         this.showError = false;
