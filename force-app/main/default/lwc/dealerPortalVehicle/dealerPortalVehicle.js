@@ -42,6 +42,10 @@ export default class DealerPortalVehicle extends LightningElement {
     get fieldDisabled() {
         return this.isLocked;
     }
+
+    get isNotPowersports() {
+        return !this.isPowersports;
+    }
     
     // Getters for warranty fields that combine lock status with warranty logic
     get manufacturerWarrantyTypeDisabled() {

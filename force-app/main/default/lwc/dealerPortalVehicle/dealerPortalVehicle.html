@@ -456,7 +456,7 @@
                 <!-- Third Row: Odometer, Purchase Price, Delivery Date, Usage Type -->
                 <div class="form-row purchase-odometer-row">
                     <div class="form-field">
-                        <label class="field-label">ODOMETER <span class="required">*</span>
+                        <label class="field-label">ODOMETER <template if:false={isPowersports}><span class="required">*</span></template>
                             <lightning-icon icon-name="utility:info" size="xx-small" class="info-icon"></lightning-icon>
                         </label>
                         <lightning-input
@@ -465,7 +465,7 @@
                             value={vehicleData.odometerReading}
                             onchange={handleInputChange}
                             disabled={fieldDisabled}
-                            required
+                            required={isNotPowersports}
                             class="input-field"
                             variant="label-hidden">
                         </lightning-input>
