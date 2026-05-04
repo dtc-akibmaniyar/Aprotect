@@ -199,8 +199,8 @@
             <!-- Vehicle Details Section - All fields combined -->
             <div class="form-section vehicle-details-section">
                 <!-- Vehicle Type — system-set, read-only -->
-                <div class="form-row vehicle-type-row">
-                    <div class="form-field vehicle-type-field">
+                <div class="form-row vehicle-type-row" style="display: flex; gap: 1rem; align-items: flex-end;">
+                    <div class="form-field vehicle-type-field" style="flex: 1;">
                         <label class="field-label">VEHICLE TYPE</label>
                         <lightning-combobox
                             name="vehicleCategory"
@@ -210,6 +210,18 @@
                             variant="label-hidden"
                             class="input-field">
                         </lightning-combobox>
+                    </div>
+                    <div class="form-field vehicle-type-field" style="flex: 1;">
+                        <label class="field-label">VEHICLE SUB TYPE</label>
+                        <lightning-input
+                            type="text"
+                            name="vehicleSubType"
+                            value={vehicleSubType}
+                            onchange={handleVehicleSubTypeChange}
+                            variant="label-hidden"
+                            class="input-field"
+                            disabled={fieldDisabled}>
+                        </lightning-input>
                     </div>
                 </div>
                 <!-- First Row: Stock ID, Year, Make, Model, Trim -->

@@ -25,6 +25,7 @@ export default class DealerPortalVehicle extends LightningElement {
 
     // Powersports state
     @track vehicleCategory = '';
+    @track vehicleSubType = '';
     @track isPowersports = false;
     @track powersportsModalData = null;
 
@@ -124,6 +125,7 @@ export default class DealerPortalVehicle extends LightningElement {
         usageType: 'Personal Use',
         // Powersports fields
         vehicleCategory: '',
+        vehicleSubType: '',
         engineCC: '',
         coolingType: '',
         hoursUsage: ''
@@ -221,6 +223,7 @@ export default class DealerPortalVehicle extends LightningElement {
             deliveryDate: '',
             usageType: 'Personal Use',
             vehicleCategory: '',
+            vehicleSubType: '',
             engineCC: '',
             coolingType: '',
             hoursUsage: ''
@@ -244,6 +247,7 @@ export default class DealerPortalVehicle extends LightningElement {
 
         // Reset Powersports state
         this.vehicleCategory = '';
+        this.vehicleSubType = '';
         this.isPowersports = false;
         this.powersportsModalData = null;
         
@@ -370,6 +374,7 @@ export default class DealerPortalVehicle extends LightningElement {
             const businessCommercialUse = vehicleData.businessCommercialUse || false;
             const loadedCategory = vehicleData.vehicleCategory || '';
             this.vehicleCategory = loadedCategory;
+            this.vehicleSubType = vehicleData.vehicleSubType || '';
             this.isPowersports = (loadedCategory === 'Powersports');
             this.vehicleData = {
                 stockNumber: vehicleData.stockNumber || '',
@@ -404,6 +409,7 @@ export default class DealerPortalVehicle extends LightningElement {
                 deliveryDate: vehicleData.deliveryDate || '',
                 // Powersports fields
                 vehicleCategory: loadedCategory,
+                vehicleSubType: this.vehicleSubType,
                 engineCC: vehicleData.engineCC || '',
                 coolingType: vehicleData.coolingType || '',
                 hoursUsage: vehicleData.hoursUsage || ''
@@ -1065,6 +1071,10 @@ getCurrentData() {
     }
     
     // Handle input changes with field-level tracking and auto-save
+    handleVehicleSubTypeChange(event) {
+        this.vehicleSubType = event.target.value;
+    }
+
     handleInputChange(event) {
         const field = event.target.name;
         let value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
@@ -1362,6 +1372,13 @@ getCurrentData() {
                 this.vehicleCategory = decodedData.vehicleCategory || '';
                 this.isPowersports = (this.vehicleCategory === 'Powersports');
 
+                // Set vehicle sub type from API response
+                if (this.isPowersports) {
+                    this.vehicleSubType = decodedData.powersportsModelClass || '';
+                } else {
+                    this.vehicleSubType = decodedData.bodyClass || '';
+                }
+
                 // Store Powersports modal data if present
                 if (this.isPowersports) {
                     this.powersportsModalData = {
@@ -1413,6 +1430,7 @@ getCurrentData() {
                     usageType: this.vehicleData.usageType || 'Personal Use',
                     // Powersports storable fields
                     vehicleCategory: this.vehicleCategory,
+                    vehicleSubType: this.vehicleSubType,
                     engineCC: this.isPowersports ? (decodedData.engineCC || '') : '',
                     coolingType: this.vehicleData.coolingType || '',
                     hoursUsage: this.vehicleData.hoursUsage || ''
@@ -2095,6 +2113,7 @@ async handleContinue() {
                 dealerSalesId: this.applicationData.dealerSalesId || '',
                 // Powersports storable fields
                 vehicleCategory: this.vehicleData.vehicleCategory || '',
+                vehicleSubType: this.vehicleData.vehicleSubType || '',
                 engineCC: this.vehicleData.engineCC ? parseFloat(this.vehicleData.engineCC) : null,
                 coolingType: this.vehicleData.coolingType || '',
                 hoursUsage: this.vehicleData.hoursUsage ? parseFloat(this.vehicleData.hoursUsage) : null
