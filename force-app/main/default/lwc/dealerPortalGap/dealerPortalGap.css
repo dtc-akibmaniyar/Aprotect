@@ -165,9 +165,9 @@
     letter-spacing: 0.08em;
     padding: 0.5rem 1.9rem;
     border-radius: 0;
-    background: #ffffff;
-    border: 1px solid #d0d0d0;
-    color: #4a4a4a;
+    background: #8B0000;
+    border: 1px solid #8B0000;
+    color: #ffffff;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     cursor: pointer;
     transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
@@ -176,8 +176,8 @@
 
 .skip-button:hover,
 .skip-button:focus {
-    background: #f8f9fa;
-    border-color: #b0b0b0;
+    background: #6B0000;
+    border-color: #6B0000;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     transform: translateY(-1px);
 }

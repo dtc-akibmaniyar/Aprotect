@@ -83,7 +83,7 @@ export default class DealerPortalGap extends LightningElement {
     
     // Getter for skip button label - "Next" when locked, "Skip" when not locked
     get skipButtonLabel() {
-        return this.isLocked ? 'Next' : 'Skip';
+        return this.isLocked ? 'Next' : 'Decline Loan Protection';
     }
     
     // Getter for search button disabled state (combines loading state with lock)

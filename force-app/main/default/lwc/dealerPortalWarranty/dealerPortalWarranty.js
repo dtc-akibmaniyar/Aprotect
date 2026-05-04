@@ -85,7 +85,7 @@ export default class DealerPortalWarranty extends LightningElement {
     
     // Getter for skip button label - "Next" when locked, "Skip" when not locked
     get skipButtonLabel() {
-        return this.isLocked ? 'Next' : 'Skip';
+        return this.isLocked ? 'Next' : 'Decline Warranty';
     }
     
     // Getter and setter for applicationId to handle changes
