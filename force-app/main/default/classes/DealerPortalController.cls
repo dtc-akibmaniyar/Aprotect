@@ -252,6 +252,7 @@ public class VehicleDataDTO {
     @AuraEnabled public String vehicleCategory;   // 'Used Car' or 'Powersports' — set by cascade logic
     @AuraEnabled public Decimal engineCC;          // engine_displacement from Powersports API (stored on Vehicle__c)
     @AuraEnabled public Decimal hoursUsage;        // manual entry, stored on Vehicle__c
+    @AuraEnabled public String vehicleClass;       // Powersports class_name, stored on Vehicle__c / Application__c
 
     // Powersports modal-only display fields (not stored in database)
     @AuraEnabled public String powersportsClassName;
@@ -835,6 +836,7 @@ public static VehicleResponse loadVehicleData(String applicationId) {
                 vehicleData.deliveryDate = vehicle.Delivery_Date__c != null ? String.valueOf(vehicle.Delivery_Date__c) : null;
                 vehicleData.usageType = vehicle.Usage_Type__c;
                 vehicleData.vehicleSubType = vehicle.Vehicle_Sub_Type__c;
+                vehicleData.vehicleClass = vehicle.Vehicle_Class__c;
                 
 
                 if (app.Dealer_Comments_Notes__c != null) {
@@ -3108,6 +3110,7 @@ vehicle.Delivery_Date__c = null;
         }
         vehicle.Usage_Type__c = (String) vehicleDataMap.get('usageType');
         vehicle.Vehicle_Sub_Type__c = (String) vehicleDataMap.get('vehicleSubType');
+        vehicle.Vehicle_Class__c = (String) vehicleDataMap.get('vehicleClass');
 
 
         String vehicleName = '';
@@ -3203,6 +3206,7 @@ throw new CalloutException('Failed to create Application: ' + e.getMessage());
             appToUpdate.Show_Comments_On_Print__c = (Boolean) vehicleDataMap.get('showCommentsOnPrint');
             appToUpdate.Dealer_Sales_ID_License__c = (String) vehicleDataMap.get('dealerSalesId');
             appToUpdate.Vehicle_Sub_Type__c = (String) vehicleDataMap.get('vehicleSubType');
+            appToUpdate.Vehicle_Class__c = (String) vehicleDataMap.get('vehicleClass');
             
 
             Object salesRepIdObj = vehicleDataMap.get('salesRepId');
@@ -4164,7 +4168,7 @@ private static List<Application__c> queryApplications(String applicationId, Bool
             'Vehicle__r.Odometer__c, Vehicle__r.Odometer_Unit__c, Vehicle__r.Business_Commercial_Use__c, Vehicle__r.Type_of_Commercial_Use__c, ' +
             'Vehicle__r.Engine__c, Vehicle__r.Transmission__c, Vehicle__r.Fuel_Type__c, Vehicle__r.Drive_Type__c, Vehicle__r.Body_Style__c, ' +
             'Vehicle__r.Color__c, Vehicle__r.GVWR__c, Vehicle__r.Manufacturer_Warranty_Type__c, Vehicle__r.Warranty_Term__c, ' +
-            'Vehicle__r.Deferral_Option__c, Vehicle__r.Delivery_Date__c, Vehicle__r.Usage_Type__c, Vehicle__r.Vehicle_Sub_Type__c, ' +
+            'Vehicle__r.Deferral_Option__c, Vehicle__r.Delivery_Date__c, Vehicle__r.Usage_Type__c, Vehicle__r.Vehicle_Sub_Type__c, Vehicle__r.Vehicle_Class__c, ' +
             'Dealer_Name__c, Dealer_Name__r.Id, Dealer_Name__r.Name, Dealer_Name__r.BillingStreet, Dealer_Name__r.BillingCity, ' +
             'Dealer_Name__r.BillingState, Dealer_Name__r.BillingPostalCode, Dealer_Comments_Notes__c, Show_Comments_On_Print__c, ' +
             'Sales_Rep__c, Sales_Rep__r.Id, Sales_Rep__r.Name, Dealer_Sales_ID_License__c' :

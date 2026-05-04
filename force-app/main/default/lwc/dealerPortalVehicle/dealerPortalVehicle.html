@@ -277,19 +277,36 @@
                             variant="label-hidden">
                         </lightning-input>
                     </div>
-                    <div class="form-field">
-                        <label class="field-label">TRIM <span class="required">*</span></label>
-                        <lightning-input
-                            type="text"
-                            name="trim"
-                            value={vehicleData.trim}
-                            onchange={handleInputChange}
-                            disabled={fieldDisabled}
-                            required
-                            class="input-field"
-                            variant="label-hidden">
-                        </lightning-input>
-                    </div>
+                    <template if:false={isPowersports}>
+                        <div class="form-field">
+                            <label class="field-label">TRIM <span class="required">*</span></label>
+                            <lightning-input
+                                type="text"
+                                name="trim"
+                                value={vehicleData.trim}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                required
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                    </template>
+                    <template if:true={isPowersports}>
+                        <div class="form-field">
+                            <label class="field-label">CLASS <span class="required">*</span></label>
+                            <lightning-input
+                                type="text"
+                                name="vehicleClass"
+                                value={vehicleData.vehicleClass}
+                                onchange={handleInputChange}
+                                disabled={fieldDisabled}
+                                required
+                                class="input-field"
+                                variant="label-hidden">
+                            </lightning-input>
+                        </div>
+                    </template>
                 </div>
                 <!-- Vehicle Details: conditional fields based on vehicle type -->
                 <h3 class="section-title">VEHICLE DETAILS:</h3>

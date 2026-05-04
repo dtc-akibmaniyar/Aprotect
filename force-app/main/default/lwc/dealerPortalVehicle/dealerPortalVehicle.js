@@ -128,7 +128,8 @@ export default class DealerPortalVehicle extends LightningElement {
         vehicleSubType: '',
         engineCC: '',
         coolingType: '',
-        hoursUsage: ''
+        hoursUsage: '',
+        vehicleClass: ''
     };
     
     // Application data for dealer comments and dealership info
@@ -226,7 +227,8 @@ export default class DealerPortalVehicle extends LightningElement {
             vehicleSubType: '',
             engineCC: '',
             coolingType: '',
-            hoursUsage: ''
+            hoursUsage: '',
+            vehicleClass: ''
         };
 
         // Reset application data
@@ -412,7 +414,8 @@ export default class DealerPortalVehicle extends LightningElement {
                 vehicleSubType: this.vehicleSubType,
                 engineCC: vehicleData.engineCC || '',
                 coolingType: vehicleData.coolingType || '',
-                hoursUsage: vehicleData.hoursUsage || ''
+                hoursUsage: vehicleData.hoursUsage || '',
+                vehicleClass: vehicleData.vehicleClass || ''
             };
 
             // Populate Application fields
@@ -1433,7 +1436,8 @@ getCurrentData() {
                     vehicleSubType: this.vehicleSubType,
                     engineCC: this.isPowersports ? (decodedData.engineCC || '') : '',
                     coolingType: this.vehicleData.coolingType || '',
-                    hoursUsage: this.vehicleData.hoursUsage || ''
+                    hoursUsage: this.vehicleData.hoursUsage || '',
+                    vehicleClass: this.isPowersports ? (decodedData.powersportsClassName || '') : ''
                 };
                 
                 console.log('✅ VIN decoded successfully:', {
@@ -2116,7 +2120,8 @@ async handleContinue() {
                 vehicleSubType: this.vehicleData.vehicleSubType || '',
                 engineCC: this.vehicleData.engineCC ? parseFloat(this.vehicleData.engineCC) : null,
                 coolingType: this.vehicleData.coolingType || '',
-                hoursUsage: this.vehicleData.hoursUsage ? parseFloat(this.vehicleData.hoursUsage) : null
+                hoursUsage: this.vehicleData.hoursUsage ? parseFloat(this.vehicleData.hoursUsage) : null,
+                vehicleClass: this.vehicleData.vehicleClass || ''
             };
             
             console.log('🔍 dataToSend object created:', dataToSend);
