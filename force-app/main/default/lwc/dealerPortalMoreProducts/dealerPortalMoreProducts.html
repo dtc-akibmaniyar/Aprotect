@@ -76,13 +76,13 @@
                                                         <template if:true={group.hasDescription}>
                                                             <div class="plan-type-group-description">{group.description}</div>
                                                         </template>
-                                                        <lightning-accordion allow-multiple-sections-open class="terms-accordion">
+                                                        <lightning-accordion allow-multiple-sections-open active-section-name={activeAccordionSections} class="terms-accordion">
                                                             <template for:each={group.packagesWithTerms} for:item="pkg">
                                                                 <lightning-accordion-section
                                                                     key={pkg.id}
                                                                     name={pkg.id}
                                                                     label={pkg.name}
-                                                                    class="package-accordion-section">
+                                                                    class={pkg.sectionClass}>
 
                                                                     <!-- INCLUDES inside accordion -->
                                                                     <template if:true={pkg.hasOptions}>
@@ -359,12 +359,7 @@
                         Enter the tire and rim information for this vehicle, including tire brand, tread depth, rim size, and any visible damage or notes.
                         Accurate details are required to confirm eligibility for Tire &amp; Rim Protection coverage.
                     </p>
-                    <div class="detail-view-header">
-                        <button class="back-to-plans-btn" onclick={handleViewAllPlans}>
-                            <lightning-icon icon-name="utility:back" size="x-small"></lightning-icon>
-                            <span>View All Plans</span>
-                        </button>
-                    </div>
+<!-- View All Plans button removed -->
                 </div>
             </div>
 
@@ -676,6 +671,7 @@
                 
                
             </div>
+        </template>
         
         <!-- Error Message -->
         <template if:true={showError}>
@@ -777,8 +773,6 @@
                     </div>
                 </div>
             </div>
-        </template>
-        
         </template>
 
          <!-- Navigation Buttons - Save As Quote and Continue at bottom -->

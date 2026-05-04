@@ -46,6 +46,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     @track showMoreProductsModal = false;
     @track selectedDealerPackageName = '';
     @track selectedWarrantyTermName = '';
+    @track activeAccordionSections = [];
     @track packageHasFiles = false;
     @track packageFileCount = 0;
     @track originalWarrantyData = {};
@@ -197,6 +198,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             // Restore selected dealer package if available
             if (savedData.selectedDealerPackage) {
                 this.selectedDealerPackage = savedData.selectedDealerPackage;
+                this.activeAccordionSections = [savedData.selectedDealerPackage.Id];
                 console.log('✅ Restored selected dealer package from session:', this.selectedDealerPackage);
             }
             
@@ -496,7 +498,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
 
                 // Determine which view to show based on whether an existing record is being edited
                 const hasExistingSelection = this.isExistingApplication && this.selectedDealerPackage;
-                this.currentView = hasExistingSelection ? 'planDetails' : 'planSelection';
+                this.currentView = 'planSelection';
                 
                 // Update price after checking for existing package
                 this.updatePrice();
@@ -556,6 +558,8 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                     this.selectedProgram = matchingDealerPackage.PackageName;
                     this.setSelectedPlanTypeFromPackage(matchingDealerPackage);
                     this.dealerPackages = this.allDealerPackages.filter(pkg => (pkg.planTypeId || this.otherPlanTypeKey) === this.selectedPlanTypeKey);
+                    // Only expand the selected package's accordion section
+                    this.activeAccordionSections = [matchingDealerPackage.Id];
                     console.log('✅ Auto-selected package:', matchingDealerPackage.PackageName);
                     
                     // Find and select the matching term
@@ -1028,6 +1032,9 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             this.trackWarrantyChange('package', oldPackageId, newPackageId);
             console.log('⚠️ Please select a warranty term for this package');
             
+            // Only expand the selected package's accordion section
+            this.activeAccordionSections = [selectedPackage.Id];
+            
             // Force UI refresh to show selection highlighting
             this.template.querySelectorAll('.program-section').forEach(section => {
                 section.classList.remove('selected');
@@ -1039,8 +1046,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             // Save data
             this.saveDataToSession();
 
-            // Transition to detail view and refresh plan cards to reflect selection
-            this.currentView = 'planDetails';
+            // Refresh plan cards to reflect selection (stay on list view)
             this.buildPlanCards();
             this.updateSelectionHighlighting();
         }
@@ -1279,14 +1285,17 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                     exclusion: option.exclusion
                 }));
 
+                const isPackageSelected = this.selectedDealerPackage && this.selectedDealerPackage.Id === pkg.Id;
                 return {
                     id: pkg.Id,
-                    name: pkg.PackageName + (isSelectable ? '' : ' (Not Eligible)'),
+                    name: pkg.PackageName + (isSelectable ? '' : ' (Not Eligible)') + (isPackageSelected ? ' ✓' : ''),
                     terms,
                     options,
                     hasTerms: terms.length > 0,
                     hasOptions: options.length > 0,
-                    isSelectable
+                    isSelectable,
+                    isSelected: isPackageSelected,
+                    sectionClass: isPackageSelected ? 'package-accordion-section selected' : 'package-accordion-section'
                 };
             });
 
@@ -1327,8 +1336,14 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         const term = (pkg.warrantyTerms || []).find(t => t.Id === termId);
         if (!term) return;
 
-        // Auto-select the package if different
+        // Auto-select the package if different — enforces single package selection
         if (!this.selectedDealerPackage || this.selectedDealerPackage.Id !== pkg.Id) {
+            // Clear additional options when switching packages
+            this.selectedAdditionalOptions = [];
+            this.existingAdditionalOptions = [];
+            this.selectedNewOptions = [];
+            this.optionsToRemove = [];
+            
             this.selectedDealerPackage = pkg;
             this.selectedProgram = pkg.PackageName;
             this.setSelectedPlanTypeFromPackage(pkg);
@@ -1338,6 +1353,9 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         // Select term
         this.selectedWarrantyTerm = term;
         console.log('✅ Accordion term selected:', term.packageTermName || term.Name, 'from package:', pkg.PackageName);
+
+        // Collapse all accordion sections except the selected package
+        this.activeAccordionSections = [pkg.Id];
 
         this.updatePrice();
         this.saveDataToSession();
@@ -1405,7 +1423,6 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         }
 
         this.dealerPackages = filteredPackages;
-        this.currentView = 'planDetails';
 
         const defaultPackage = filteredPackages.find(pkg => this.isPackageSelectable(pkg.PackageClass)) || filteredPackages[0];
 
@@ -2055,6 +2072,15 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             
             // Total price includes base warranty (with tax)
             totalPrice = retailPrice + taxAmount;
+        } else if (this.isExistingApplication && this.existingApplicationPackage) {
+            // Existing application but no term explicitly selected yet — use stored values
+            netCost = this.existingApplicationPackage.dealerPackagePrice || 0;
+            markup = this.existingApplicationPackage.dealerMarkup || 0;
+            retailPrice = this.existingApplicationPackage.dealerPackageRetailPrice || 0;
+            totalPrice = this.existingApplicationPackage.contractPremiumPrice || 0;
+            console.log('🔍 Existing app price breakdown (no term selected, using stored):', {
+                netCost, markup, retailPrice, totalPrice
+            });
         } else {
             netCost = markup = retailPrice = totalPrice = 0;
         }
@@ -2069,6 +2095,10 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         } else if (this.selectedWarrantyTerm && this.selectedWarrantyTerm.taxAmount !== undefined) {
             displayTaxAmount = this.selectedWarrantyTerm.taxAmount || 0;
             displayTaxRate = this.selectedWarrantyTerm.taxRate || 0;
+        } else if (this.isExistingApplication && this.existingApplicationPackage) {
+            // Existing application, no term selected — use stored tax values
+            displayTaxAmount = this.existingApplicationPackage.taxAmount || 0;
+            displayTaxRate = this.existingApplicationPackage.taxPercentage || 0;
         } else if (this.selectedDealerPackage && this.selectedDealerPackage.taxRate) {
             displayTaxRate = this.selectedDealerPackage.taxRate || 0;
             if (displayTaxRate > 0) {
