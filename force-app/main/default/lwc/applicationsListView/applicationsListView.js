@@ -150,7 +150,12 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 				statusBadge: statusBadge,
 				applicationStatus: row.applicationStatus || '',
 				invoiceId: row.invoiceId || null,
-				disabledCancel: statusBadge && statusBadge.toLowerCase() !== 'due' ? true : false,
+				disabledCancel: (statusBadge && statusBadge.toLowerCase() !== 'due') || 
+					['cancelled', 'deleted'].includes((row.applicationStatus || '').toLowerCase()) ||
+					(row.cancellationStatus && ['pending sales review', 'pending accounting review', 'approved', 'cancelled'].includes(row.cancellationStatus.toLowerCase())),
+				cancellationBadge: (row.cancellationStatus && ['Pending Sales Review', 'Pending Accounting Review'].includes(row.cancellationStatus)) ? 'Pending-Cancellation' : '',
+				cancellationBadgeLabel: (row.cancellationStatus && ['Pending Sales Review', 'Pending Accounting Review'].includes(row.cancellationStatus)) ? 'Cancellation Requested' : '',
+				showCancellationBadge: !!(row.cancellationStatus && ['Pending Sales Review', 'Pending Accounting Review'].includes(row.cancellationStatus)),
 			remittanceDisabled: row.applicationStatus === 'Active'
 			};
 		});
@@ -531,6 +536,10 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 		return this.statusFilter === 'Cancelled';
 	}
 
+	get isPendingCancellationSelected() {
+		return this.statusFilter === 'Pending Cancellation';
+	}
+
 	get isAllSelected() {
 		return this.statusFilter === 'All';
 	}
@@ -579,59 +588,14 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 	}
 
 	handleCloseCancellationModal() {
+		// Close the cancellation modal and reload the list to reflect any changes
 		this.showCancellationModal = false;
 		this.cancellationApplicationId = null;
 		this.cancellationVehicleName = '';
 		this.cancellationVIN = '';
 		this.cancellationApplicationStatus = '';
-	}
-
-	async handleContinueToCancellationForm() {
-		// Check application status to determine action
-		if (this.cancellationApplicationStatus && this.cancellationApplicationStatus.toLowerCase() !== 'submitted') {
-			// For Draft status, mark application status as Deleted
-			this.isLoading = true;
-			try {
-				const fields = {
-					Id: this.cancellationApplicationId,
-					Application_Status__c: 'Deleted'
-				};
-				const recordInput = { fields };
-				await updateRecord(recordInput);
-				this.dispatchEvent(new ShowToastEvent({
-					title: 'Success',
-					message: 'Application canceled successfully!',
-					variant: 'success'
-				}));
-				this.handleCloseCancellationModal();
-				// Reload the applications list
-				await this.loadInitial();
-			} catch (err) {
-				const msg = (err && err.body && err.body.message) || err.message || JSON.stringify(err);
-				this.dispatchEvent(new ShowToastEvent({
-					title: 'Error canceling application',
-					message: msg,
-					variant: 'error'
-				}));
-				console.error('Error canceling application', err);
-			} finally {
-				this.isLoading = false;
-			}
-		} else {
-			// For Submitted status, navigate to cancellation form page
-			if (this.cancellationApplicationId) {
-				this[NavigationMixin.Navigate]({
-					type: 'comm__namedPage',
-					attributes: {
-						name: 'canellationform__c'
-					},
-					state: {
-						appId: this.cancellationApplicationId
-					}
-				});
-				this.handleCloseCancellationModal();
-			}
-		}
+		// Reload list to pick up status changes from cancellation flow
+		this.loadInitial();
 	}
 
 	handleCloseNewApplicationModal() {

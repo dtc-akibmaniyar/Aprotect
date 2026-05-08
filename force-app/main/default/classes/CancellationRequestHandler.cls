@@ -1,6 +1,5 @@
 public class CancellationRequestHandler {
 
-    // Queue IDs - cached to avoid repeated queries
     private static Id salesQueueId;
     private static Id accountingQueueId;
 
@@ -24,26 +23,95 @@ public class CancellationRequestHandler {
     }
 
     private static void handleAfterInsert(List<App_Cancellation_Request__c> newList) {
-        List<App_Cancellation_Request__c> toAssign = new List<App_Cancellation_Request__c>();
+        List<App_Cancellation_Request__c> toUpdate = new List<App_Cancellation_Request__c>();
         Map<Id, String> appStatusMap = new Map<Id, String>();
 
+        Integer slaDays = 5;
+        Cancellation_Settings__mdt settings = Cancellation_Settings__mdt.getInstance('Default');
+        if (settings != null && settings.SLA_Business_Days__c != null) {
+            slaDays = (Integer) settings.SLA_Business_Days__c;
+        }
+
+        List<Id> recordsToSubmit = new List<Id>();
+
         for (App_Cancellation_Request__c req : newList) {
+            App_Cancellation_Request__c upd = new App_Cancellation_Request__c(Id = req.Id);
+            Boolean needsUpdate = false;
+
+            upd.SLA_Due_Date__c = addBusinessDays(Date.today(), slaDays);
+            needsUpdate = true;
+
             if (req.Status__c == 'Pending Sales Review') {
                 if (salesQueueId != null) {
-                    toAssign.add(new App_Cancellation_Request__c(Id = req.Id, OwnerId = salesQueueId));
+                    upd.OwnerId = salesQueueId;
                 }
                 if (req.Application__c != null) {
                     appStatusMap.put(req.Application__c, 'Pending Sales Review');
                 }
+                recordsToSubmit.add(req.Id);
+            }
+
+            if (needsUpdate) {
+                toUpdate.add(upd);
             }
         }
 
-        if (!toAssign.isEmpty()) {
-            update toAssign;
+        if (!toUpdate.isEmpty()) {
+            update toUpdate;
         }
         if (!appStatusMap.isEmpty()) {
             syncApplicationStatus(appStatusMap, true);
         }
+        if (!recordsToSubmit.isEmpty()) {
+            submitForApproval(recordsToSubmit);
+        }
+    }
+
+    private static void submitForApproval(List<Id> recordIds) {
+        // Get an admin user to act as submitter (portal users can't submit approvals)
+        Id adminUserId;
+        List<User> admins = [SELECT Id FROM User WHERE Profile.Name = 'System Administrator' AND IsActive = true LIMIT 1];
+        if (!admins.isEmpty()) {
+            adminUserId = admins[0].Id;
+        }
+
+        List<Approval.ProcessSubmitRequest> requests = new List<Approval.ProcessSubmitRequest>();
+        for (Id recId : recordIds) {
+            Approval.ProcessSubmitRequest req = new Approval.ProcessSubmitRequest();
+            req.setObjectId(recId);
+            req.setProcessDefinitionNameOrId('Cancellation_Approval_Process');
+            req.setSkipEntryCriteria(true);
+            if (adminUserId != null) {
+                req.setSubmitterId(adminUserId);
+            }
+            requests.add(req);
+        }
+        if (!requests.isEmpty()) {
+            try {
+                List<Approval.ProcessResult> results = Approval.process(requests);
+                for (Approval.ProcessResult result : results) {
+                    if (!result.isSuccess()) {
+                        System.debug(LoggingLevel.ERROR, 'Approval submission failed: ' + result.getErrors());
+                    }
+                }
+            } catch (Exception e) {
+                System.debug(LoggingLevel.ERROR, 'Approval submission error: ' + e.getMessage());
+            }
+        }
+    }
+
+    public static Date addBusinessDays(Date startDate, Integer businessDays) {
+        Date result = startDate;
+        Integer added = 0;
+        while (added < businessDays) {
+            result = result.addDays(1);
+            Datetime dt = Datetime.newInstance(result, Time.newInstance(0, 0, 0, 0));
+            String dayName = dt.format('EEEE');
+            if (dayName != 'Saturday' && dayName != 'Sunday') {
+                added++;
+            }
+        }
+        return result;
     }
 
     private static void handleAfterUpdate(List<App_Cancellation_Request__c> newList, Map<Id, App_Cancellation_Request__c> oldMap) {
@@ -59,7 +127,6 @@ public class CancellationRequestHandler {
 
             if (newStatus == oldStatus) continue;
 
-            // Pending Sales Review -> Pending Accounting Review
             if (oldStatus == 'Pending Sales Review' && newStatus == 'Pending Accounting Review') {
                 if (accountingQueueId != null) {
                     toReassign.add(new App_Cancellation_Request__c(Id = req.Id, OwnerId = accountingQueueId));
@@ -68,26 +135,22 @@ public class CancellationRequestHandler {
                     appStatusMap.put(req.Application__c, 'Pending Accounting Review');
                 }
             }
-            // Pending Sales Review -> Approved (non-paid, direct approval)
             else if (oldStatus == 'Pending Sales Review' && newStatus == 'Approved') {
                 if (req.Application__c != null) {
                     appStatusMap.put(req.Application__c, 'Cancelled');
                 }
             }
-            // Pending Accounting Review -> Approved (with refund)
             else if (oldStatus == 'Pending Accounting Review' && newStatus == 'Approved') {
                 approvedWithRefund.add(req);
                 if (req.Application__c != null) {
                     appStatusMap.put(req.Application__c, 'Cancelled');
                 }
             }
-            // Any -> Rejected
             else if (newStatus == 'Rejected') {
                 if (req.Application__c != null) {
                     appStatusMap.put(req.Application__c, 'Rejected');
                 }
             }
-            // Any -> Withdrawn
             else if (newStatus == 'Withdrawn') {
                 if (req.Application__c != null) {
                     appsToClear.add(req.Application__c);
@@ -145,12 +208,10 @@ public class CancellationRequestHandler {
             if (req.Application__c != null) applicationIds.add(req.Application__c);
         }
 
-        // Query applications to get Dealer
         Map<Id, Application__c> appMap = new Map<Id, Application__c>(
             [SELECT Id, Dealer_Name__c FROM Application__c WHERE Id IN :applicationIds]
         );
 
-        // Sum refund amounts from cancellation services
         Map<Id, Decimal> requestRefundMap = new Map<Id, Decimal>();
         for (AggregateResult ar : [
             SELECT App_Cancellation_Request__c reqId, SUM(Refund_Amount__c) totalRefund

@@ -1,0 +1,42 @@
+.service-list {
+    border: 1px solid #d8dde6;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.service-row {
+    transition: background-color 0.15s ease;
+}
+
+.service-row:hover {
+    background-color: #f3f3f3;
+}
+
+.service-row-selected {
+    background-color: #eef4ff;
+}
+
+.price-text {
+    font-weight: 600;
+    color: #0070d2;
+}
+
+.total-section {
+    background-color: #f4f6f9;
+    border-radius: 4px;
+    border: 1px solid #d8dde6;
+}
+
+.total-amount {
+    color: #0070d2;
+    font-weight: 700;
+}
+
+.summary-section h3 {
+    color: #3e3e3c;
+}
+
+.select-all-checkbox {
+    padding-left: 4px;
+}

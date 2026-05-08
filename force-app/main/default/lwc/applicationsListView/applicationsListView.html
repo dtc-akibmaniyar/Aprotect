@@ -37,6 +37,7 @@
                             <option value="All" selected={isAllSelected}>All</option>
                             <option value="Pending" selected={isPendingSelected}>Pending</option>
                             <option value="Submitted" selected={isSubmittedSelected}>Submitted</option>
+                            <option value="Pending Cancellation" selected={isPendingCancellationSelected}>Pending Cancellation</option>
                             <option value="Cancelled" selected={isCancelledSelected}>Cancelled</option>
                         </select>
                     </div>
@@ -260,6 +261,11 @@
                             <span class={app.statusBadge}>
                                 {app.statusBadge}
                             </span>
+                            <template if:true={app.showCancellationBadge}>
+                                <div class="cancellation-badge-row">
+                                    <span class="Pending-Cancellation">{app.cancellationBadgeLabel}</span>
+                                </div>
+                            </template>
                         </div>
                         </template>
 
@@ -329,31 +335,15 @@
             </div>
         </div>
 
-        <!-- Cancellation Request Modal -->
+        <!-- Cancellation Request Modal — uses cancellationModal LWC flow -->
         <template if:true={showCancellationModal}>
-            <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="modal-heading-01" class="slds-modal slds-fade-in-open">
-                <div class="slds-modal__container cancellation-modal">
-                    <button class="modal-close-btn" onclick={handleCloseCancellationModal} aria-label="Close">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M18 6L6 18M6 6L18 18" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </button>
-                    <div class="slds-p-left_medium slds-p-right_medium slds-p-top_medium">
-                        <h2 id="modal-heading-01" class="modal-title">Request Cancellation</h2>
-                    </div>
-                    <div class="slds-p-left_medium slds-p-right_medium">
-                        <p class="cancellation-message">
-                            Would you like to cancel the application for <span class="vehicle-name">{cancellationVehicleName}</span><br/>
-                            VIN#<span class="vin-number"> {cancellationVIN}</span>?
-                        </p>
-                    </div>
-                    <div class="slds-p-left_medium slds-p-right_medium slds-p-top_medium">
-                        <template if:false={isSubmittedStatus}>
-                            <button class="modal-btn-continue slds-p-around_x-small" onclick={handleContinueToCancellationForm}>Continue to Cancellation</button>
-                        </template>
-                        <template if:true={isSubmittedStatus}>
-                            <button class="modal-btn-continue slds-p-around_x-small" onclick={handleContinueToCancellationForm}>Continue to Cancellation Form</button>
-                        </template>
+            <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="cancel-modal-heading" class="slds-modal slds-fade-in-open slds-modal_large">
+                <div class="slds-modal__container">
+                    <div class="slds-modal__content slds-p-around_none" style="overflow: visible;">
+                        <c-cancellation-modal
+                            record-id={cancellationApplicationId}
+                            onclose={handleCloseCancellationModal}>
+                        </c-cancellation-modal>
                     </div>
                 </div>
             </section>

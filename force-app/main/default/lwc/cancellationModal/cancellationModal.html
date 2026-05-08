@@ -1,0 +1,186 @@
+<template>
+    <!-- Loading Spinner -->
+    <template if:true={isLoading}>
+        <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+    </template>
+
+    <template if:false={isLoading}>
+        <!-- STEP 1: Service Selection -->
+        <template if:true={isStep1}>
+            <div class="slds-modal__header">
+                <h2 class="slds-modal__title slds-hyphenate">Cancel Application Services</h2>
+                <p class="slds-m-top_x-small slds-text-body_small">
+                    Application: <strong>{applicationName}</strong> &bull; 
+                    Status: <lightning-badge label={applicationStatus}></lightning-badge>
+                </p>
+            </div>
+            <div class="slds-modal__content slds-p-around_medium" style="min-height: 200px;">
+                <template if:true={hasServices}>
+                    <div class="slds-m-bottom_small">
+                        <lightning-input 
+                            type="checkbox" 
+                            label="Select All Services" 
+                            checked={allSelected}
+                            onchange={handleSelectAll}
+                            class="select-all-checkbox">
+                        </lightning-input>
+                    </div>
+                    <div class="service-list">
+                        <template for:each={serviceOptions} for:item="svc">
+                            <div key={svc.id} class={svc.rowClass}>
+                                <div class="slds-grid slds-grid_vertical-center slds-p-around_small">
+                                    <div class="slds-col slds-size_1-of-12">
+                                        <lightning-input 
+                                            type="checkbox" 
+                                            checked={svc.selected}
+                                            data-id={svc.id}
+                                            onchange={handleServiceToggle}
+                                            variant="label-hidden"
+                                            label={svc.name}>
+                                        </lightning-input>
+                                    </div>
+                                    <div class="slds-col slds-size_7-of-12">
+                                        <p class="slds-text-body_regular"><strong>{svc.displayName}</strong></p>
+                                        <p class="slds-text-body_small slds-text-color_weak">{svc.coverageTerm}</p>
+                                    </div>
+                                    <div class="slds-col slds-size_4-of-12 slds-text-align_right">
+                                        <p class="slds-text-body_regular price-text">
+                                            <lightning-formatted-number value={svc.price} format-style="currency" currency-code="CAD"></lightning-formatted-number>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="slds-m-top_medium slds-p-around_small total-section">
+                        <div class="slds-grid">
+                            <div class="slds-col slds-size_8-of-12">
+                                <p class="slds-text-heading_small">Estimated Refund Total ({selectedCount} selected)</p>
+                            </div>
+                            <div class="slds-col slds-size_4-of-12 slds-text-align_right">
+                                <p class="slds-text-heading_small total-amount">
+                                    <lightning-formatted-number value={totalRefundAmount} format-style="currency" currency-code="CAD"></lightning-formatted-number>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <template if:false={hasServices}>
+                    <div class="slds-illustration slds-illustration_small slds-p-around_large slds-text-align_center">
+                        <p class="slds-text-body_regular">No services found for this application.</p>
+                    </div>
+                </template>
+            </div>
+            <div class="slds-modal__footer">
+                <lightning-button label="Cancel" onclick={handleClose} class="slds-m-right_small"></lightning-button>
+                <lightning-button variant="brand" label="Next: Provide Reason" onclick={handleNext} disabled={isNextDisabled}></lightning-button>
+            </div>
+        </template>
+
+        <!-- STEP 2: Reason & Confirmation -->
+        <template if:true={isStep2}>
+            <div class="slds-modal__header">
+                <h2 class="slds-modal__title slds-hyphenate">Cancellation Reason</h2>
+            </div>
+            <div class="slds-modal__content slds-p-around_medium" style="min-height: 200px;">
+                <lightning-combobox 
+                    label="Reason for Cancellation" 
+                    value={selectedReason}
+                    options={reasonOptions}
+                    onchange={handleReasonChange}
+                    required
+                    class="slds-m-bottom_medium">
+                </lightning-combobox>
+                <lightning-textarea 
+                    label="Additional Details" 
+                    value={additionalDetails}
+                    onchange={handleDetailsChange}
+                    max-length="5000"
+                    class="slds-m-bottom_medium">
+                </lightning-textarea>
+                <div class="summary-section slds-box slds-theme_shade slds-p-around_medium">
+                    <h3 class="slds-text-heading_small slds-m-bottom_small">Summary</h3>
+                    <div class="slds-grid slds-m-bottom_x-small">
+                        <div class="slds-col slds-size_6-of-12">Services to cancel:</div>
+                        <div class="slds-col slds-size_6-of-12 slds-text-align_right"><strong>{selectedCount}</strong></div>
+                    </div>
+                    <div class="slds-grid slds-m-bottom_x-small">
+                        <div class="slds-col slds-size_6-of-12">Estimated refund:</div>
+                        <div class="slds-col slds-size_6-of-12 slds-text-align_right">
+                            <strong><lightning-formatted-number value={totalRefundAmount} format-style="currency" currency-code="CAD"></lightning-formatted-number></strong>
+                        </div>
+                    </div>
+                    <div class="slds-grid">
+                        <div class="slds-col slds-size_6-of-12">Expected outcome:</div>
+                        <div class="slds-col slds-size_6-of-12 slds-text-align_right">
+                            <lightning-badge label={expectedOutcome}></lightning-badge>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="slds-modal__footer">
+                <lightning-button label="Back" onclick={handleBack} class="slds-m-right_small"></lightning-button>
+                <lightning-button label="Cancel" onclick={handleClose} class="slds-m-right_small"></lightning-button>
+                <lightning-button variant="brand" label="Submit Cancellation" onclick={handleSubmit} disabled={isSubmitDisabled}></lightning-button>
+            </div>
+        </template>
+
+        <!-- STEP 3: Result -->
+        <template if:true={isStep3}>
+            <div class="slds-modal__header">
+                <h2 class="slds-modal__title slds-hyphenate">
+                    <template if:true={submitSuccess}>Cancellation Request Submitted</template>
+                    <template if:false={submitSuccess}>Submission Error</template>
+                </h2>
+            </div>
+            <div class="slds-modal__content slds-p-around_medium slds-text-align_center" style="min-height: 200px;">
+                <template if:true={submitSuccess}>
+                    <div class="slds-m-bottom_medium">
+                        <lightning-icon icon-name="action:approval" size="large" class="slds-m-bottom_small"></lightning-icon>
+                    </div>
+                    <p class="slds-text-heading_small slds-m-bottom_small">
+                        Cancellation request has been submitted successfully.
+                    </p>
+                    <p class="slds-text-body_regular slds-m-bottom_medium">
+                        Status: <lightning-badge label={expectedOutcome}></lightning-badge>
+                    </p>
+                    <p class="slds-text-body_small slds-text-color_weak">
+                        The page will refresh to show updated information.
+                    </p>
+                </template>
+                <template if:false={submitSuccess}>
+                    <div class="slds-m-bottom_medium">
+                        <lightning-icon icon-name="action:close" size="large" class="slds-m-bottom_small"></lightning-icon>
+                    </div>
+                    <p class="slds-text-heading_small slds-m-bottom_small slds-text-color_error">
+                        An error occurred while submitting the cancellation request.
+                    </p>
+                    <p class="slds-text-body_regular slds-m-bottom_medium">{errorMessage}</p>
+                </template>
+            </div>
+            <div class="slds-modal__footer">
+                <template if:true={submitSuccess}>
+                    <lightning-button variant="brand" label="Close" onclick={handleCloseAndRefresh}></lightning-button>
+                </template>
+                <template if:false={submitSuccess}>
+                    <lightning-button label="Back" onclick={handleBackToReason} class="slds-m-right_small"></lightning-button>
+                    <lightning-button variant="brand" label="Try Again" onclick={handleSubmit}></lightning-button>
+                </template>
+            </div>
+        </template>
+
+        <!-- Error loading data -->
+        <template if:true={hasError}>
+            <div class="slds-modal__header">
+                <h2 class="slds-modal__title">Error</h2>
+            </div>
+            <div class="slds-modal__content slds-p-around_medium slds-text-align_center">
+                <lightning-icon icon-name="utility:error" size="large" variant="error" class="slds-m-bottom_small"></lightning-icon>
+                <p class="slds-text-color_error">{errorMessage}</p>
+            </div>
+            <div class="slds-modal__footer">
+                <lightning-button variant="brand" label="Close" onclick={handleClose}></lightning-button>
+            </div>
+        </template>
+    </template>
+</template>

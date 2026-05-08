@@ -1,0 +1,13 @@
+.total-refund-box {
+    background-color: #f3f3f3;
+    border: 2px solid #0176d3;
+    border-radius: 4px;
+}
+.notes-text {
+    white-space: pre-wrap;
+}
+.action-bar {
+    background-color: #fafaf9;
+    border-top: 1px solid #dddbda;
+    border-radius: 0 0 4px 4px;
+}

@@ -948,3 +948,21 @@
 	opacity: 0.6;
 	box-shadow: none;
 }
+
+/* Cancellation status badge */
+.cancellation-badge-row {
+	margin-top: 4px;
+}
+.Pending-Cancellation {
+	display: inline-block;
+	padding: 4px 8px;
+	border-radius: 4px;
+	font-size: 10px;
+	font-weight: 600;
+	color: #fff;
+	background: #e67e22;
+	white-space: nowrap;
+	line-height: 1.2;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+}

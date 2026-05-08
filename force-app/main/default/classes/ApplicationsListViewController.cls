@@ -30,6 +30,7 @@ public with sharing class ApplicationsListViewController {
         @AuraEnabled public Decimal purchasePrice;
         @AuraEnabled public String paymentStatus;
         @AuraEnabled public String applicationStatus;
+        @AuraEnabled public String cancellationStatus;
         @AuraEnabled public String invoiceId;
         public ApplicationRow() {}
     }
@@ -120,6 +121,8 @@ public with sharing class ApplicationsListViewController {
             conditions.add('Application_Status__c != \'Quote\'');
         } else if (statusFilter == 'Submitted') {
             conditions.add('Application_Status__c IN (\'Submitted\', \'Active\')');
+        } else if (statusFilter == 'Pending Cancellation') {
+            conditions.add('Cancellation_Status__c IN (\'Pending Sales Review\', \'Pending Accounting Review\')');
         } else if (statusFilter == 'Cancelled') {
             conditions.add('Application_Status__c = \'Cancelled\'');
         } else {
@@ -164,7 +167,7 @@ public with sharing class ApplicationsListViewController {
         if (fromDt != null) whereClause += ' AND CreatedDate >= :fromDt';
         if (toDt   != null) whereClause += ' AND CreatedDate < :toDt';
 
-        String fields = 'Id, Name, CreatedDate, Vehicle__c, Vehicle__r.Name, Vehicle_VIN__c, Odometer__c, Application_Status__c, Payment_Status__c, Odometer_Unit__c, Vehicle_Purchase_Price__c, Customer_Name__c, Customer_Name__r.Name, Customer_Name__r.BillingStreet, Customer_Name__r.BillingCity, Customer_Name__r.BillingState, Customer_Name__r.BillingPostalCode';
+        String fields = 'Id, Name, CreatedDate, Vehicle__c, Vehicle__r.Name, Vehicle_VIN__c, Odometer__c, Application_Status__c, Cancellation_Status__c, Payment_Status__c, Odometer_Unit__c, Vehicle_Purchase_Price__c, Customer_Name__c, Customer_Name__r.Name, Customer_Name__r.BillingStreet, Customer_Name__r.BillingCity, Customer_Name__r.BillingState, Customer_Name__r.BillingPostalCode';
         String query = 'SELECT ' + fields + ' FROM Application__c WHERE ' + whereClause + ' ORDER BY CreatedDate DESC LIMIT ' + pageSize + ' OFFSET ' + offset;
         System.debug('Fetching applications: ' + query);
         List<Application__c> apps = Database.query(query);
@@ -308,6 +311,7 @@ public with sharing class ApplicationsListViewController {
             row.purchasePrice = a.Vehicle_Purchase_Price__c;
             row.paymentStatus = a.Payment_Status__c;
             row.applicationStatus = a.Application_Status__c;
+            row.cancellationStatus = a.Cancellation_Status__c;
             row.invoiceId = appIdToLatestInvoiceId != null && appIdToLatestInvoiceId.containsKey(a.Id) ? appIdToLatestInvoiceId.get(a.Id) : null;
             row.services = new List<ServiceInfo>();
             if (appIdToServiceInfo != null && appIdToServiceInfo.containsKey(a.Id)) {

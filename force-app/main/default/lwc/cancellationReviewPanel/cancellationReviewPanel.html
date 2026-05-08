@@ -1,0 +1,131 @@
+<template>
+    <template if:true={isLoading}>
+        <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+    </template>
+
+    <template if:true={hasData}>
+        <div class="slds-page-header slds-m-bottom_medium">
+            <div class="slds-page-header__row">
+                <div class="slds-page-header__col-title">
+                    <h1 class="slds-page-header__title">Cancellation Review</h1>
+                </div>
+                <div class="slds-page-header__col-actions">
+                    <span class={statusBadgeClass}>{requestData.Status__c}</span>
+                </div>
+            </div>
+        </div>
+
+        <lightning-card title="Request Summary" icon-name="standard:document">
+            <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+                <div class="slds-grid slds-wrap slds-gutters">
+                    <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                        <p class="slds-text-title slds-m-bottom_xx-small">Application</p>
+                        <p class="slds-text-body_regular">{applicationName}</p>
+                    </div>
+                    <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                        <p class="slds-text-title slds-m-bottom_xx-small">Submitted By</p>
+                        <p class="slds-text-body_regular">{submittedBy}</p>
+                    </div>
+                    <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                        <p class="slds-text-title slds-m-bottom_xx-small">Date Submitted</p>
+                        <p class="slds-text-body_regular">{formattedDate}</p>
+                    </div>
+                    <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                        <p class="slds-text-title slds-m-bottom_xx-small">Current Owner</p>
+                        <p class="slds-text-body_regular">{requestData.Owner.Name}</p>
+                    </div>
+                    <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                        <p class="slds-text-title slds-m-bottom_xx-small">Reason</p>
+                        <p class="slds-text-body_regular">{requestData.Reason__c}</p>
+                    </div>
+                    <template if:true={requestData.Sales_Notes__c}>
+                        <div class="slds-col slds-size_1-of-1 slds-p-bottom_small">
+                            <p class="slds-text-title slds-m-bottom_xx-small">Sales Notes</p>
+                            <p class="slds-text-body_regular notes-text">{requestData.Sales_Notes__c}</p>
+                        </div>
+                    </template>
+                    <template if:true={requestData.Denial_Reason__c}>
+                        <div class="slds-col slds-size_1-of-1 slds-p-bottom_small">
+                            <p class="slds-text-title slds-m-bottom_xx-small">Denial Reason</p>
+                            <p class="slds-text-body_regular notes-text">{requestData.Denial_Reason__c}</p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </lightning-card>
+
+        <lightning-card title="Cancellation Services" icon-name="standard:service_contract" class="slds-m-top_medium">
+            <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+                <template if:true={hasServices}>
+                    <lightning-datatable
+                        key-field="Id"
+                        data={services}
+                        columns={columns}
+                        hide-checkbox-column>
+                    </lightning-datatable>
+                </template>
+                <template if:false={hasServices}>
+                    <p class="slds-text-body_regular slds-text-color_weak">No services found.</p>
+                </template>
+                <div class="slds-m-top_medium slds-p-around_small total-refund-box">
+                    <span class="slds-text-heading_small"><strong>Total Refund Amount: {formattedTotalRefund}</strong></span>
+                </div>
+            </div>
+        </lightning-card>
+
+        <template if:true={showSalesReviewActions}>
+            <div class="slds-m-top_medium slds-p-around_medium action-bar">
+                <lightning-button variant="brand" label="Send to Accounting Review" 
+                    onclick={handleSendToAccounting} class="slds-m-right_small"></lightning-button>
+                <lightning-button variant="success" label="Approve (Final)" 
+                    onclick={handleApproveFinal} class="slds-m-right_small"></lightning-button>
+                <lightning-button variant="destructive" label="Reject" 
+                    onclick={handleOpenRejectModal}></lightning-button>
+            </div>
+        </template>
+        <template if:true={showAccountingReviewActions}>
+            <div class="slds-m-top_medium slds-p-around_medium action-bar">
+                <lightning-button variant="success" label="Approve and Issue Refund" 
+                    onclick={handleApproveFinal} class="slds-m-right_small"></lightning-button>
+                <lightning-button variant="destructive" label="Reject" 
+                    onclick={handleOpenRejectModal}></lightning-button>
+            </div>
+        </template>
+        <template if:true={isTerminalStatus}>
+            <div class="slds-m-top_medium slds-p-around_medium">
+                <div class={terminalMessageClass}>
+                    {terminalMessage}
+                </div>
+            </div>
+        </template>
+    </template>
+
+    <template if:true={showRejectModal}>
+        <section role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <h2 class="slds-modal__title">Reject Cancellation Request</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <lightning-textarea label="Rejection Reason" value={rejectionReason} 
+                        onchange={handleReasonChange} required></lightning-textarea>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Cancel" onclick={handleCloseRejectModal} 
+                        class="slds-m-right_small"></lightning-button>
+                    <lightning-button variant="destructive" label="Confirm Rejection" 
+                        onclick={handleConfirmReject} disabled={isRejectDisabled}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+
+    <template if:true={error}>
+        <div class="slds-p-around_medium">
+            <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                <span>{error}</span>
+            </div>
+        </div>
+    </template>
+</template>
