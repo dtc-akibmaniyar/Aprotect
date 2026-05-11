@@ -2,7 +2,6 @@ public without sharing class CancellationModalController {
     
     @AuraEnabled(cacheable=true)
     public static Map<String, Object> getApplicationDetails(Id applicationId) {
-        // Query Application
         Application__c app = [
             SELECT Id, Name, Application_Status__c, Cancellation_Status__c, Dealer_Name__c
             FROM Application__c 
@@ -10,7 +9,6 @@ public without sharing class CancellationModalController {
             LIMIT 1
         ];
         
-        // Query related Application Packages (services)
         List<Application_Package__c> packages = [
             SELECT Id, Name, Coverage_Plan__c, Coverage_Term__c, 
                    Total_Package_Price__c, Dealer_Package_Retail_Price__c,
@@ -20,7 +18,6 @@ public without sharing class CancellationModalController {
             ORDER BY Name ASC
         ];
         
-        // Build services list
         List<Map<String, Object>> services = new List<Map<String, Object>>();
         for (Application_Package__c pkg : packages) {
             Map<String, Object> svc = new Map<String, Object>();
@@ -35,7 +32,6 @@ public without sharing class CancellationModalController {
             services.add(svc);
         }
         
-        // Build application map
         Map<String, Object> appMap = new Map<String, Object>();
         appMap.put('id', app.Id);
         appMap.put('name', app.Name);
@@ -51,7 +47,6 @@ public without sharing class CancellationModalController {
     
     @AuraEnabled
     public static Id submitCancellationRequest(Id applicationId, List<Id> serviceIds, String reason, String details) {
-        // Get application to determine status-based routing
         Application__c app = [
             SELECT Id, Application_Status__c, Dealer_Name__c
             FROM Application__c
@@ -59,7 +54,6 @@ public without sharing class CancellationModalController {
             LIMIT 1
         ];
         
-        // Determine request status based on Application status
         String requestStatus;
         String appStatus = app.Application_Status__c;
         if (appStatus == 'Draft' || appStatus == 'Quote') {
@@ -68,7 +62,9 @@ public without sharing class CancellationModalController {
             requestStatus = 'Pending Sales Review';
         }
         
-        // Calculate total refund from selected packages
+        // Determine if application is in a pending/unpaid status
+        Boolean isUnpaid = appStatus == 'Draft' || appStatus == 'Quote' || (appStatus != null && appStatus.containsIgnoreCase('Pending'));
+        
         List<Application_Package__c> selectedPackages = [
             SELECT Id, Total_Package_Price__c
             FROM Application_Package__c
@@ -76,13 +72,14 @@ public without sharing class CancellationModalController {
         ];
         
         Decimal totalRefund = 0;
-        for (Application_Package__c pkg : selectedPackages) {
-            if (pkg.Total_Package_Price__c != null) {
-                totalRefund += pkg.Total_Package_Price__c;
+        if (!isUnpaid) {
+            for (Application_Package__c pkg : selectedPackages) {
+                if (pkg.Total_Package_Price__c != null) {
+                    totalRefund += pkg.Total_Package_Price__c;
+                }
             }
         }
         
-        // Create cancellation request
         App_Cancellation_Request__c request = new App_Cancellation_Request__c();
         request.Application__c = applicationId;
         request.Status__c = requestStatus;
@@ -91,17 +88,16 @@ public without sharing class CancellationModalController {
         request.Date_Requested__c = Datetime.now();
         request.Requested_By__c = UserInfo.getUserId();
         request.Requested_By_Name__c = UserInfo.getName();
-        request.Refund_Eligible__c = totalRefund > 0;
+        request.Refund_Eligible__c = !isUnpaid && totalRefund > 0;
         request.Payment_Status_At_Request__c = appStatus;
         insert request;
         
-        // Create Cancellation_Service__c for each selected package
         List<Cancellation_Service__c> cancServices = new List<Cancellation_Service__c>();
         for (Application_Package__c pkg : selectedPackages) {
             Cancellation_Service__c cs = new Cancellation_Service__c();
             cs.App_Cancellation_Request__c = request.Id;
             cs.Application_Package__c = pkg.Id;
-            cs.Refund_Amount__c = pkg.Total_Package_Price__c != null ? pkg.Total_Package_Price__c : 0;
+            cs.Refund_Amount__c = isUnpaid ? 0 : (pkg.Total_Package_Price__c != null ? pkg.Total_Package_Price__c : 0);
             cancServices.add(cs);
         }
         if (!cancServices.isEmpty()) {

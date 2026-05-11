@@ -43,27 +43,31 @@
                                         <p class="slds-text-body_regular"><strong>{svc.displayName}</strong></p>
                                         <p class="slds-text-body_small slds-text-color_weak">{svc.coverageTerm}</p>
                                     </div>
-                                    <div class="slds-col slds-size_4-of-12 slds-text-align_right">
-                                        <p class="slds-text-body_regular price-text">
-                                            <lightning-formatted-number value={svc.price} format-style="currency" currency-code="CAD"></lightning-formatted-number>
-                                        </p>
-                                    </div>
+                                    <template if:true={showRefundAmount}>
+                                        <div class="slds-col slds-size_4-of-12 slds-text-align_right">
+                                            <p class="slds-text-body_regular price-text">
+                                                <lightning-formatted-number value={svc.price} format-style="currency" currency-code="CAD"></lightning-formatted-number>
+                                            </p>
+                                        </div>
+                                    </template>
                                 </div>
                             </div>
                         </template>
                     </div>
-                    <div class="slds-m-top_medium slds-p-around_small total-section">
-                        <div class="slds-grid">
-                            <div class="slds-col slds-size_8-of-12">
-                                <p class="slds-text-heading_small">Estimated Refund Total ({selectedCount} selected)</p>
-                            </div>
-                            <div class="slds-col slds-size_4-of-12 slds-text-align_right">
-                                <p class="slds-text-heading_small total-amount">
-                                    <lightning-formatted-number value={totalRefundAmount} format-style="currency" currency-code="CAD"></lightning-formatted-number>
-                                </p>
+                    <template if:true={showRefundAmount}>
+                        <div class="slds-m-top_medium slds-p-around_small total-section">
+                            <div class="slds-grid">
+                                <div class="slds-col slds-size_8-of-12">
+                                    <p class="slds-text-heading_small">Estimated Refund Total ({selectedCount} selected)</p>
+                                </div>
+                                <div class="slds-col slds-size_4-of-12 slds-text-align_right">
+                                    <p class="slds-text-heading_small total-amount">
+                                        <lightning-formatted-number value={totalRefundAmount} format-style="currency" currency-code="CAD"></lightning-formatted-number>
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    </template>
                 </template>
                 <template if:false={hasServices}>
                     <div class="slds-illustration slds-illustration_small slds-p-around_large slds-text-align_center">
@@ -104,12 +108,14 @@
                         <div class="slds-col slds-size_6-of-12">Services to cancel:</div>
                         <div class="slds-col slds-size_6-of-12 slds-text-align_right"><strong>{selectedCount}</strong></div>
                     </div>
-                    <div class="slds-grid slds-m-bottom_x-small">
-                        <div class="slds-col slds-size_6-of-12">Estimated refund:</div>
-                        <div class="slds-col slds-size_6-of-12 slds-text-align_right">
-                            <strong><lightning-formatted-number value={totalRefundAmount} format-style="currency" currency-code="CAD"></lightning-formatted-number></strong>
+                    <template if:true={showRefundAmount}>
+                        <div class="slds-grid slds-m-bottom_x-small">
+                            <div class="slds-col slds-size_6-of-12">Estimated refund:</div>
+                            <div class="slds-col slds-size_6-of-12 slds-text-align_right">
+                                <strong><lightning-formatted-number value={totalRefundAmount} format-style="currency" currency-code="CAD"></lightning-formatted-number></strong>
+                            </div>
                         </div>
-                    </div>
+                    </template>
                     <div class="slds-grid">
                         <div class="slds-col slds-size_6-of-12">Expected outcome:</div>
                         <div class="slds-col slds-size_6-of-12 slds-text-align_right">

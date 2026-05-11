@@ -101,6 +101,14 @@ export default class CancellationModal extends NavigationMixin(LightningElement)
         return 'Pending Sales Review';
     }
 
+    get showRefundAmount() {
+        const s = (this.applicationStatus || '').toLowerCase();
+        if (s === 'draft' || s === 'quote' || s.includes('pending')) {
+            return false;
+        }
+        return true;
+    }
+
     // Handlers
     handleSelectAll(event) {
         if (event.target.checked) {
