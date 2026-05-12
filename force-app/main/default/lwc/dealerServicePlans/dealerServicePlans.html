@@ -3,26 +3,66 @@
         <!-- HEADER -->
         <div class="header-bar">
             <h2>SERVICE PLANS</h2>
-            <!-- <div class="notification-badge">N</div> -->
         </div>
 
+        <!-- LOADING -->
+        <template if:true={isLoading}>
+            <div class="loading-container">
+                <lightning-spinner alternative-text="Loading brochures" size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <!-- ERROR -->
+        <template if:true={hasError}>
+            <div class="error-container">
+                <p class="error-msg">{errorMessage}</p>
+            </div>
+        </template>
+
         <!-- SERVICE GRID -->
-        <div class="plans-grid">
-            <template for:each={cards} for:item="card">
-                <div key={card.id} class={card.cardClass} data-id={card.id}>
-                    <img src={card.img} alt={card.title} class="plan-image" />
-                    <div class="btn-row">
-                        <button class="plan-btn" data-action="view" onclick={handleClick}>VIEW PLANS</button>
-                        <button class="plan-btn" data-action="download" onclick={handleClick}>
-                            <img src={staticResources.downloadIcon} alt="download"/>
-                            DOWNLOAD BROCHURE
-                        </button>
-                    </div>
-                    <div class="btn-row">
-                        <button class="plan-btn" data-action="sample" onclick={handleClick}>VIEW SAMPLE VEHICLE SERVICE AGREEMENT</button>
-                    </div>
+        <template if:false={isLoading}>
+            <template if:true={hasCards}>
+                <div class="plans-grid">
+                    <template for:each={cards} for:item="card">
+                        <div key={card.id} class={card.cardClass} data-id={card.id}>
+                            <img src={card.cardImageUrl} alt={card.category} class="plan-image" />
+                            <div class="btn-row">
+                                <template if:true={card.hasCategoryPlan}>
+                                    <button class="plan-btn" onclick={handleViewPlans}>VIEW PLANS</button>
+                                </template>
+                                <template if:false={card.hasCategoryPlan}>
+                                    <button class="plan-btn plan-btn-disabled" disabled>VIEW PLANS</button>
+                                </template>
+                                <template if:true={card.hasFullBrochure}>
+                                    <button class="plan-btn" onclick={handleDownloadBrochure}>
+                                        <img src={downloadIcon} alt="download" class="btn-icon"/>
+                                        DOWNLOAD BROCHURE
+                                    </button>
+                                </template>
+                                <template if:false={card.hasFullBrochure}>
+                                    <button class="plan-btn plan-btn-disabled" disabled>
+                                        <img src={downloadIcon} alt="download" class="btn-icon"/>
+                                        DOWNLOAD BROCHURE
+                                    </button>
+                                </template>
+                            </div>
+                            <div class="btn-row">
+                                <template if:true={card.hasSampleVsa}>
+                                    <button class="plan-btn" onclick={handleViewSample}>VIEW SAMPLE VEHICLE SERVICE AGREEMENT</button>
+                                </template>
+                                <template if:false={card.hasSampleVsa}>
+                                    <button class="plan-btn plan-btn-disabled" disabled>VIEW SAMPLE VEHICLE SERVICE AGREEMENT</button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </template>
-        </div>
+            <template if:false={hasCards}>
+                <div class="empty-container">
+                    <p class="empty-msg">No service plans available at this time.</p>
+                </div>
+            </template>
+        </template>
     </div>
 </template>

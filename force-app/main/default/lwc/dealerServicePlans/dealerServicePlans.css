@@ -4,7 +4,6 @@
     font-family: 'Arial', sans-serif;
 }
 
-/* HEADER BAR */
 .header-bar {
     display: flex;
     align-items: center;
@@ -16,21 +15,14 @@
     padding: 0;
 }
 
-/* .header-bar h2 {
-    margin: 0;
-    padding: 0;
-} */
-
 .header-bar h2 {
     color: #FFFFFF;
     font-size: 20px;
-    /* font-weight: 700; */
     text-align: center;
     margin: 0;
     text-transform: uppercase;
 }
 
-/* GRID LAYOUT */
 .plans-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -39,53 +31,18 @@
 }
 
 .plan-card {
-    /* background-color: #fff; */
     text-align: center;
-    /* border: 1px solid #ddd; */
-    /* overflow: hidden; */
     display: flex;
     flex-direction: column;
 }
 
 .plan-image {
-	height: 432px;
-    /* object-fit: cover; */
+    height: 432px;
     display: block;
+    width: 100%;
+    object-fit: cover;
 }
 
-.plan-text {
-    padding: 10px 12px;
-}
-
-.plan-text h3 {
-    font-size: 16px;
-    font-weight: 700;
-    color: #1e3d68;
-    margin: 6px 0;
-}
-
-.plan-text p {
-    font-size: 13px;
-    color: #333;
-    margin: 0;
-}
-
-.protection-list {
-    list-style: none;
-    margin: 10px 0 0;
-    padding: 0;
-    color: #1e3d68;
-    font-size: 13px;
-    text-align: left;
-    padding-left: 40px;
-}
-
-/* COLOR HIGHLIGHTS */
-.ev { color: #7ac943; font-weight: 800; }
-.pro { color: #d63a3a; font-weight: 800; }
-.tire { color: #d63a3a; font-weight: 800; }
-
-/* BUTTONS */
 .btn-row {
     display: flex;
     gap: 0;
@@ -95,8 +52,7 @@
 }
 
 .btn-row:first-of-type {
-    /* border-bottom: 1px solid #ddd; */
-	gap: 17px;
+    gap: 17px;
 }
 
 .plan-btn {
@@ -112,12 +68,58 @@
     transition: background 0.2s ease;
     flex: 1;
     text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 }
-
-/* .plan-btn:last-child {
-    border-right: 1px solid #ccc;
-} */
 
 .plan-btn:hover {
     background-color: #d0d0d0;
+}
+
+.plan-btn-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.plan-btn-disabled:hover {
+    background-color: #F0F0F0;
+}
+
+.btn-icon {
+    width: 14px;
+    height: 14px;
+}
+
+.loading-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+    position: relative;
+}
+
+.empty-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}
+
+.empty-msg {
+    color: #999;
+    font-size: 16px;
+}
+
+.error-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100px;
+}
+
+.error-msg {
+    color: #e61e25;
+    font-size: 14px;
 }
