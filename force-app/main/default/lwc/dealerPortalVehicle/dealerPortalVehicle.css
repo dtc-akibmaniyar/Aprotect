@@ -1154,3 +1154,10 @@ textarea {
         gap: 1rem;
     }
 }
+/* Converted odometer read-only field */
+.converted-odometer-field {
+    margin-top: 6px;
+}
+.converted-odometer-field .converted-odometer {
+    --slds-c-input-color-background: #f3f3f3;
+}

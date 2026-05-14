@@ -1076,6 +1076,21 @@ getCurrentData() {
             { label: 'MILES', value: 'MILES' }
         ];
     }
+
+    get convertedOdometerValue() {
+        const reading = parseFloat(this.vehicleData.odometerReading);
+        if (!reading && reading !== 0) return '';
+        const unit = this.vehicleData.odometerUnit || 'KM';
+        if (unit === 'KM') {
+            return Math.round(reading / 1.60934);
+        }
+        return Math.round(reading * 1.60934);
+    }
+
+    get convertedOdometerLabel() {
+        const unit = this.vehicleData.odometerUnit || 'KM';
+        return unit === 'KM' ? 'Odometer (Miles)' : 'Odometer (KM)';
+    }
     
     // Handle input changes with field-level tracking and auto-save
     handleVehicleSubTypeChange(event) {

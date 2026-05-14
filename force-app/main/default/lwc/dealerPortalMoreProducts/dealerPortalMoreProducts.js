@@ -2106,14 +2106,26 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             }
         }
         
-        this.currentPriceBreakdown = {
-            netCost: this.formatPrice(netCost),
-            markup: this.formatPrice(markup),
-            retailPrice: this.formatPrice(retailPrice),
-            taxRate: displayTaxRate > 0 ? displayTaxRate.toFixed(2) + '%' : '0%',
-            taxAmount: this.formatPrice(displayTaxAmount),
-            totalPrice: this.formatPrice(totalPrice)
-        };
+        // When price is overridden, show custom price as total and hide breakdown details
+        if (this.isPriceOverridden) {
+            this.currentPriceBreakdown = {
+                netCost: '—',
+                markup: '—',
+                retailPrice: '—',
+                taxRate: '—',
+                taxAmount: null,
+                totalPrice: this.formatPrice(this.price)
+            };
+        } else {
+            this.currentPriceBreakdown = {
+                netCost: this.formatPrice(netCost),
+                markup: this.formatPrice(markup),
+                retailPrice: this.formatPrice(retailPrice),
+                taxRate: displayTaxRate > 0 ? displayTaxRate.toFixed(2) + '%' : '0%',
+                taxAmount: this.formatPrice(displayTaxAmount),
+                totalPrice: this.formatPrice(totalPrice)
+            };
+        }
         
         this.showPriceModal = true;
     }

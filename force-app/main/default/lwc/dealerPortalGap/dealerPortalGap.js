@@ -42,6 +42,9 @@ export default class DealerPortalGap extends LightningElement {
     @track currentPriceBreakdown = {};
     @track existingApplicationPackage = null;
     @track isExistingApplication = false;
+    @track isPriceEditMode = false;
+    @track priceOverrideInput = '';
+    @track isPriceOverridden = false;
     @track comparePackages = [];
     @track showCompareModal = false;
     @track selectedForComparison = [];
@@ -533,6 +536,13 @@ export default class DealerPortalGap extends LightningElement {
                 // Store the existing application package data
                 this.existingApplicationPackage = result.data;
                 this.isExistingApplication = true;
+
+                // Restore dealer price override if one was previously saved
+                if (result.data.dealerPriceOverride != null && result.data.dealerPriceOverride !== undefined) {
+                    this.price = result.data.dealerPriceOverride;
+                    this.isPriceOverridden = true;
+                }
+
                 // Ensure we skip the input fields and show the package selection UI
                 if (!this.showPackageSelection) {
                     console.log('✅ GAP - Setting showPackageSelection=true due to existing package');
@@ -940,6 +950,11 @@ export default class DealerPortalGap extends LightningElement {
         const oldTermId = this.originalGapData.selectedWarrantyTermId;
         const newTermId = selectedTerm.Id;
         
+        // Reset any manual price override when a new term is selected
+        this.isPriceOverridden = false;
+        this.isPriceEditMode = false;
+        this.priceOverrideInput = '';
+
         // Set the selected term - this is a tracked property so it will trigger reactive updates
         // Use Promise.resolve() to ensure the state update happens in the next microtask
         // This ensures the getter sees the updated value when it recalculates
@@ -1408,7 +1423,8 @@ export default class DealerPortalGap extends LightningElement {
                     financeLoanTerm: this.selectedFinanceTerm,
                     loanAmount: this.loanAmount,
                     interestRate: this.interestRate,
-                    paymentFrequency: this.selectedPaymentFrequency
+                    paymentFrequency: this.selectedPaymentFrequency,
+                    dealerPriceOverride: this.isPriceOverridden ? this.price : null
                 };
                 
                 packageData.recordType = 'GAP_Coverage';
@@ -1455,7 +1471,75 @@ export default class DealerPortalGap extends LightningElement {
         }));
     }
     
+    // Price override handlers
+    handlePriceClick() {
+        if (!this.selectedWarrantyTerm) return;
+        this.isPriceEditMode = true;
+        this.priceOverrideInput = this.price ? this.price.toFixed(2) : '';
+        // Focus the input on next tick
+        // eslint-disable-next-line @lwc/lwc/no-async-operation
+        setTimeout(() => {
+            const input = this.template.querySelector('.price-override-input');
+            if (input) {
+                input.focus();
+                input.select();
+            }
+        }, 0);
+    }
+
+    handlePriceOverrideChange(event) {
+        this.priceOverrideInput = event.target.value;
+    }
+
+    handlePriceOverrideBlur() {
+        this._applyPriceOverride();
+    }
+
+    handlePriceOverrideKeyDown(event) {
+        if (event.key === 'Enter') {
+            this._applyPriceOverride();
+        } else if (event.key === 'Escape') {
+            this.isPriceEditMode = false;
+            this.priceOverrideInput = '';
+        }
+    }
+
+    _applyPriceOverride() {
+        const val = parseFloat(this.priceOverrideInput);
+        if (!isNaN(val) && val >= 0) {
+            this.price = parseFloat(val.toFixed(2));
+            this.isPriceOverridden = true;
+        } else {
+            // Empty or invalid — revert to calculated price
+            this.isPriceOverridden = false;
+            this.updatePrice();
+        }
+        this.isPriceEditMode = false;
+    }
+
+    handleResetPriceOverride() {
+        this.isPriceOverridden = false;
+        this.isPriceEditMode = false;
+        this.priceOverrideInput = '';
+
+        // For an existing application on the same term, restore the original admin-calculated
+        // price using the component fields (contractPremiumPriceWithoutTax + taxAmount).
+        const isSameTerm = this.isExistingApplication &&
+                           this.existingApplicationPackage &&
+                           this.selectedWarrantyTerm &&
+                           this.selectedWarrantyTerm.Id === this.existingApplicationPackage.selectedTermId;
+
+        if (isSameTerm) {
+            const basePrice = this.existingApplicationPackage.contractPremiumPriceWithoutTax || 0;
+            const taxAmount = this.existingApplicationPackage.taxAmount || 0;
+            this.price = parseFloat((basePrice + taxAmount).toFixed(2));
+        } else {
+            this.updatePrice();
+        }
+    }
+
     updatePrice() {
+        if (this.isPriceOverridden) return;
         console.log('💰 === UPDATE PRICE START ===');
         console.log('💰 isExistingApplication:', this.isExistingApplication);
         console.log('💰 existingApplicationPackage:', this.existingApplicationPackage);
@@ -1468,8 +1552,19 @@ export default class DealerPortalGap extends LightningElement {
                           this.selectedWarrantyTerm.Id === this.existingApplicationPackage.selectedTermId;
         
         if (isSameTerm) {
-            // For existing applications with same term, use stored pricing directly from Application_Package__c
-            this.price = this.existingApplicationPackage.contractPremiumPrice || 0;
+            // For existing applications with same term, use stored pricing directly from Application_Package__c.
+            // IMPORTANT: contractPremiumPrice is a formula that returns Dealer_Price_Override__c when one exists.
+            // If the user has reset the override (isPriceOverridden = false), we must use the original
+            // admin-calculated price so that switching away and back does not silently re-apply the old override.
+            const hasStoredOverride = this.existingApplicationPackage.dealerPriceOverride != null &&
+                                      this.existingApplicationPackage.dealerPriceOverride !== undefined;
+            if (hasStoredOverride) {
+                const basePrice = this.existingApplicationPackage.contractPremiumPriceWithoutTax || 0;
+                const taxAmount = this.existingApplicationPackage.taxAmount || 0;
+                this.price = parseFloat((basePrice + taxAmount).toFixed(2));
+            } else {
+                this.price = this.existingApplicationPackage.contractPremiumPrice || 0;
+            }
             
             console.log('💰 Existing app price (using stored values from Application_Package__c):', {
                 dealerPackagePrice: this.existingApplicationPackage.dealerPackagePrice,
@@ -1777,14 +1872,26 @@ export default class DealerPortalGap extends LightningElement {
             }
         }
         
-        this.currentPriceBreakdown = {
-            netCost: this.formatPrice(netCost),
-            markup: this.formatPrice(markup),
-            retailPrice: this.formatPrice(retailPrice),
-            taxRate: displayTaxRate > 0 ? displayTaxRate.toFixed(2) + '%' : '0%',
-            taxAmount: this.formatPrice(displayTaxAmount),
-            totalPrice: this.formatPrice(totalPrice)
-        };
+        // When price is overridden, show custom price as total and hide breakdown details
+        if (this.isPriceOverridden) {
+            this.currentPriceBreakdown = {
+                netCost: '—',
+                markup: '—',
+                retailPrice: '—',
+                taxRate: '—',
+                taxAmount: null,
+                totalPrice: this.formatPrice(this.price)
+            };
+        } else {
+            this.currentPriceBreakdown = {
+                netCost: this.formatPrice(netCost),
+                markup: this.formatPrice(markup),
+                retailPrice: this.formatPrice(retailPrice),
+                taxRate: displayTaxRate > 0 ? displayTaxRate.toFixed(2) + '%' : '0%',
+                taxAmount: this.formatPrice(displayTaxAmount),
+                totalPrice: this.formatPrice(totalPrice)
+            };
+        }
         
         this.showPriceModal = true;
     }
@@ -1820,6 +1927,7 @@ export default class DealerPortalGap extends LightningElement {
                 packageName: this.selectedDealerPackage.PackageName,
                 selectedTermId: this.selectedWarrantyTerm.Id,
                 includeDeductible: false,
+                dealerPriceOverride: this.isPriceOverridden ? this.price : null,
                 // GAP input fields to persist on Application_Package__c
                 lenderLienholder: this.lenderLienholder || null,
                 financeLoanTerm: this.financeLoanTerm || null,
@@ -2007,6 +2115,7 @@ export default class DealerPortalGap extends LightningElement {
                     dealerPackageId: this.selectedDealerPackage.Id,
                     packageName: this.selectedDealerPackage.PackageName,
                     selectedTermId: this.selectedWarrantyTerm.Id,
+                    dealerPriceOverride: this.isPriceOverridden ? this.price : null,
                     // GAP input fields to persist on Application_Package__c
                     lenderLienholder: this.lenderLienholder || null,
                     financeLoanTerm: this.financeLoanTerm || null,

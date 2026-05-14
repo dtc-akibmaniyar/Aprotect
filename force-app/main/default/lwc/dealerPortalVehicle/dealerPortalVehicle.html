@@ -480,6 +480,18 @@
                                 class="odometer-radio-group">
                             </lightning-radio-group>
                         </div>
+                        <template if:true={convertedOdometerValue}>
+                            <div class="converted-odometer-field">
+                                <lightning-input
+                                    type="number"
+                                    label={convertedOdometerLabel}
+                                    value={convertedOdometerValue}
+                                    disabled
+                                    class="input-field converted-odometer"
+                                    variant="standard">
+                                </lightning-input>
+                            </div>
+                        </template>
                     </div>
                     <div class="form-field">
                         <label class="field-label">PURCHASE PRICE <span class="required">*</span>
