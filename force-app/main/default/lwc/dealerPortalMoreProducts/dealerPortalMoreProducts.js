@@ -1920,9 +1920,12 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                           this.selectedWarrantyTerm && 
                           this.selectedWarrantyTerm.Id === this.existingApplicationPackage.selectedTermId;
         
-        // Only set price if we have both a package AND a term selected
-        if (isSameTerm) {
-            // For existing applications with same term, use stored pricing directly from Application_Package__c
+        // For Draft/Pending, always recalculate from current term pricing so admin changes reflect
+        const upAppStatus = this.applicationStatus || '';
+        const shouldUseStoredPrice = isSameTerm && !['Draft', 'Pending', 'Quote'].includes(upAppStatus);
+        
+        if (shouldUseStoredPrice) {
+            // For submitted/active applications with same term, use stored pricing directly from Application_Package__c
             this.price = this.existingApplicationPackage.contractPremiumPrice || 0;
             
             console.log('💰 Existing app price (using stored values from Application_Package__c):', {
@@ -2012,10 +2015,13 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                           this.selectedWarrantyTerm && 
                           this.selectedWarrantyTerm.Id === this.existingApplicationPackage.selectedTermId;
         
+        const bdAppStatus = this.applicationStatus || '';
+        const useStoredForBreakdown = isSameTerm && !['Draft', 'Pending', 'Quote'].includes(bdAppStatus);
+        
         let netCost, markup, retailPrice, totalPrice;
         
-        if (isSameTerm) {
-            // For existing applications with same term, use stored values directly from Application_Package__c
+        if (useStoredForBreakdown) {
+            // For submitted/active applications with same term, use stored values directly from Application_Package__c
             netCost = this.existingApplicationPackage.dealerPackagePrice || 0;
             markup = this.existingApplicationPackage.dealerMarkup || 0;
             retailPrice = this.existingApplicationPackage.dealerPackageRetailPrice || 0;
@@ -2770,7 +2776,10 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                            this.selectedWarrantyTerm &&
                            this.selectedWarrantyTerm.Id === this.existingApplicationPackage.selectedTermId;
 
-        if (isSameTerm) {
+        const resetAppStatus = this.applicationStatus || '';
+        const useStoredForReset = isSameTerm && !['Draft', 'Pending', 'Quote'].includes(resetAppStatus);
+
+        if (useStoredForReset) {
             const basePrice = this.existingApplicationPackage.contractPremiumPriceWithoutTax || 0;
             const taxAmount = this.existingApplicationPackage.taxAmount || 0;
             this.price = parseFloat((basePrice + taxAmount).toFixed(2));

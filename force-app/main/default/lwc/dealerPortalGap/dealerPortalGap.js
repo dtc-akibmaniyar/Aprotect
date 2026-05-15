@@ -1552,14 +1552,17 @@ export default class DealerPortalGap extends LightningElement {
         this._overridePreTaxPrice = null;
         this._overrideTaxAmount = null;
 
-        // For an existing application on the same term, restore the original admin-calculated
-        // price using the component fields (contractPremiumPriceWithoutTax + taxAmount).
+        // For an existing application on the same term, restore pricing.
+        // For Draft/Pending, recalculate from current term. For submitted/active, use stored values.
         const isSameTerm = this.isExistingApplication &&
                            this.existingApplicationPackage &&
                            this.selectedWarrantyTerm &&
                            this.selectedWarrantyTerm.Id === this.existingApplicationPackage.selectedTermId;
 
-        if (isSameTerm) {
+        const resetAppStatus = this.applicationStatus || '';
+        const useStoredForReset = isSameTerm && !['Draft', 'Pending', 'Quote'].includes(resetAppStatus);
+
+        if (useStoredForReset) {
             const basePrice = this.existingApplicationPackage.contractPremiumPriceWithoutTax || 0;
             const taxAmount = this.existingApplicationPackage.taxAmount || 0;
             this.price = parseFloat((basePrice + taxAmount).toFixed(2));
@@ -1581,11 +1584,12 @@ export default class DealerPortalGap extends LightningElement {
                           this.selectedWarrantyTerm && 
                           this.selectedWarrantyTerm.Id === this.existingApplicationPackage.selectedTermId;
         
-        if (isSameTerm) {
-            // For existing applications with same term, use stored pricing directly from Application_Package__c.
-            // IMPORTANT: contractPremiumPrice is a formula that returns Dealer_Price_Override__c when one exists.
-            // If the user has reset the override (isPriceOverridden = false), we must use the original
-            // admin-calculated price so that switching away and back does not silently re-apply the old override.
+        // For Draft/Pending, always recalculate from current term pricing so admin changes reflect
+        const upAppStatus = this.applicationStatus || '';
+        const shouldUseStoredPrice = isSameTerm && !['Draft', 'Pending', 'Quote'].includes(upAppStatus);
+        
+        if (shouldUseStoredPrice) {
+            // For submitted/active applications with same term, use stored pricing directly from Application_Package__c.
             const hasStoredOverride = this.existingApplicationPackage.dealerPriceOverride != null &&
                                       this.existingApplicationPackage.dealerPriceOverride !== undefined;
             if (hasStoredOverride) {
@@ -1728,10 +1732,13 @@ export default class DealerPortalGap extends LightningElement {
                           this.selectedWarrantyTerm && 
                           this.selectedWarrantyTerm.Id === this.existingApplicationPackage.selectedTermId;
         
+        const bdAppStatus = this.applicationStatus || '';
+        const useStoredForBreakdown = isSameTerm && !['Draft', 'Pending', 'Quote'].includes(bdAppStatus);
+        
         let netCost, markup, retailPrice, totalPrice;
         
-        if (isSameTerm) {
-            // For existing applications with same term, use stored values directly from Application_Package__c
+        if (useStoredForBreakdown) {
+            // For submitted/active applications with same term, use stored values directly from Application_Package__c
             netCost = this.existingApplicationPackage.dealerPackagePrice || 0;
             markup = this.existingApplicationPackage.dealerMarkup || 0;
             retailPrice = this.existingApplicationPackage.dealerPackageRetailPrice || 0;
