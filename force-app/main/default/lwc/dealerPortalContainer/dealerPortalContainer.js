@@ -426,6 +426,13 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
 
 
 
+    // Handle direct tab click navigation
+    handleTabClick(event) {
+        const tabName = event.currentTarget.dataset.tab;
+        console.log('🖱️ Tab clicked:', tabName);
+        this.switchToTab(tabName);
+    }
+
     switchToTab(tabName) {
         console.log(`🔄 Attempting to switch to tab: ${tabName}`);
 

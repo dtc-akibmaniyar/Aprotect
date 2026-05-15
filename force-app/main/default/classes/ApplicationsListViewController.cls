@@ -37,15 +37,6 @@ public with sharing class ApplicationsListViewController {
 
     /**
      * Fetch list data for Applications List View with server-side pagination and search.
-     * - Base object: Application__c
-     * - Vehicle: show Vehicle__r.Name
-     * - Services: include static labels if related Application_Package__c records exist with:
-     *     RecordType.Name = 'Extended Limited Warranty'  -> 'Extended Warranty'
-     *     OR RecordType.DeveloperName = 'Total_Loss_Coverage' -> 'Loan Protection'
-     * @param pageNumber Page number (1-based)
-     * @param pageSize Number of records per page (10, 20, 50, or up to 25000 for initial load)
-     * @param searchTerm Optional search term to filter by customer name, app number, or vehicle VIN
-     * @param statusFilter Status filter: 'Draft', 'Submitted', or 'Cancelled'
      */
     @AuraEnabled
     public static ApplicationsResponse getApplicationsList(Integer pageNumber, Integer pageSize, String searchTerm, String statusFilter, String fromDate, String toDate) {
@@ -54,34 +45,24 @@ public with sharing class ApplicationsListViewController {
         resp.message = '';
 
         try {
-            // Validate inputs
             if (pageNumber == null || pageNumber < 1) pageNumber = 1;
             if (pageSize == null || pageSize < 1) pageSize = 10;
-            // Cap pageSize to 25000 (allows initial bulk fetch)
             if (pageSize > 25000) pageSize = 25000;
 
-            // Normalize search term
             searchTerm = String.isBlank(searchTerm) ? null : searchTerm.trim();
-
-            // Default to Draft if not specified
             if (String.isBlank(statusFilter)) statusFilter = 'Draft';
 
-            // Parse date range filter
             Date fromDateParsed = String.isNotBlank(fromDate) ? Date.valueOf(fromDate) : null;
             Date toDateParsed   = String.isNotBlank(toDate)   ? Date.valueOf(toDate)   : null;
 
-            // Get total count with search filter if applicable
             Integer totalCount = getApplicationsCount(searchTerm, statusFilter, fromDateParsed, toDateParsed);
 
-            // Calculate offset and pages
             Integer offset = (pageNumber - 1) * pageSize;
             Integer totalPages = (totalCount > 0) ? Integer.valueOf(Math.ceil((Decimal)totalCount / (Decimal)pageSize)) : 1;
 
-            // Validate page number
             if (pageNumber > totalPages) pageNumber = totalPages;
             offset = (pageNumber - 1) * pageSize;
 
-            // Fetch applications with LIMIT and OFFSET
             List<Application__c> apps = fetchApplications(pageSize, offset, searchTerm, statusFilter, fromDateParsed, toDateParsed);
             
             if (apps.isEmpty()) {
@@ -94,7 +75,7 @@ public with sharing class ApplicationsListViewController {
                 return resp;
             }
             
-            Map<Id, List<ServiceInfo>> appIdToServiceInfo = buildServiceLabelsByApplication(apps);
+            Map<Id, List<ServiceInfo>> appIdToServiceInfo = buildServiceLabelsByApplication(apps, statusFilter);
             Map<Id, String> appIdToLatestInvoiceId = getLatestInvoiceForApplications(apps);
             List<ApplicationRow> rows = buildRows(apps, appIdToServiceInfo, appIdToLatestInvoiceId);
             
@@ -110,7 +91,21 @@ public with sharing class ApplicationsListViewController {
         return resp;
     }
 
-    // Build a dynamic WHERE clause based on status and search term only (no dates — use bind vars in callers)
+    /**
+     * For the Cancelled filter, pre-query Application IDs that have at least one cancelled package.
+     * SOQL does not allow semi-join subselects inside OR groups, so we must pre-resolve the IDs.
+     */
+    private static Set<Id> getCancelledPackageAppIds() {
+        Set<Id> appIds = new Set<Id>();
+        for (Application_Package__c pkg : [
+            SELECT Application__c FROM Application_Package__c 
+            WHERE Application_Status__c = 'Cancelled' AND Application__c != null
+        ]) {
+            appIds.add(pkg.Application__c);
+        }
+        return appIds;
+    }
+
     private static String buildWhereClause(String searchTerm, String statusFilter) {
         List<String> conditions = new List<String>();
 
@@ -124,7 +119,8 @@ public with sharing class ApplicationsListViewController {
         } else if (statusFilter == 'Pending Cancellation') {
             conditions.add('Cancellation_Status__c IN (\'Pending Sales Review\', \'Pending Accounting Review\')');
         } else if (statusFilter == 'Cancelled') {
-            conditions.add('Application_Status__c = \'Cancelled\'');
+            // Uses bind variable :cancelledAppIds — caller must supply it in query scope
+            conditions.add('(Application_Status__c = \'Cancelled\' OR Id IN :cancelledAppIds)');
         } else {
             // Default: Pending/Draft
             conditions.add('Application_Status__c != \'Submitted\'');
@@ -144,11 +140,12 @@ public with sharing class ApplicationsListViewController {
         return String.join(conditions, ' AND ');
     }
 
-    // Get count of applications, optionally filtered by search term, status, and date range
     private static Integer getApplicationsCount(String searchTerm, String statusFilter, Date fromDate, Date toDate) {
-        // Use Datetime bind variables so Database.query resolves them from local scope
         Datetime fromDt = fromDate != null ? DateTime.newInstance(fromDate, Time.newInstance(0, 0, 0, 0)) : null;
         Datetime toDt   = toDate   != null ? DateTime.newInstance(toDate.addDays(1), Time.newInstance(0, 0, 0, 0)) : null;
+
+        // Pre-resolve cancelled package app IDs for bind variable
+        Set<Id> cancelledAppIds = (statusFilter == 'Cancelled') ? getCancelledPackageAppIds() : new Set<Id>();
 
         String whereClause = buildWhereClause(searchTerm, statusFilter);
         if (fromDt != null) whereClause += ' AND CreatedDate >= :fromDt';
@@ -157,11 +154,12 @@ public with sharing class ApplicationsListViewController {
         return Database.countQuery('SELECT COUNT() FROM Application__c WHERE ' + whereClause);
     }
 
-    // Fetch applications with vehicle and customer account details, filtered by status, search, and date range
     private static List<Application__c> fetchApplications(Integer pageSize, Integer offset, String searchTerm, String statusFilter, Date fromDate, Date toDate) {
-        // Use Datetime bind variables so Database.query resolves them from local scope
         Datetime fromDt = fromDate != null ? DateTime.newInstance(fromDate, Time.newInstance(0, 0, 0, 0)) : null;
         Datetime toDt   = toDate   != null ? DateTime.newInstance(toDate.addDays(1), Time.newInstance(0, 0, 0, 0)) : null;
+
+        // Pre-resolve cancelled package app IDs for bind variable
+        Set<Id> cancelledAppIds = (statusFilter == 'Cancelled') ? getCancelledPackageAppIds() : new Set<Id>();
 
         String whereClause = buildWhereClause(searchTerm, statusFilter);
         if (fromDt != null) whereClause += ' AND CreatedDate >= :fromDt';
@@ -175,7 +173,6 @@ public with sharing class ApplicationsListViewController {
         return apps;
     }
 
-    // Build a map of application Id -> set of chip labels from active packages
     // Wrapper class for service information with prices
     public class ServiceInfo {
         @AuraEnabled public String label;
@@ -207,7 +204,6 @@ public with sharing class ApplicationsListViewController {
         
         Map<Id, String> appIdToLatestInvoiceId = new Map<Id, String>();
         for (Invoice__c inv : invoices) {
-            // Only add if this application doesn't have an invoice mapped yet (first/latest one)
             if (!appIdToLatestInvoiceId.containsKey(inv.Application__c)) {
                 appIdToLatestInvoiceId.put(inv.Application__c, inv.Id);
             }
@@ -215,7 +211,7 @@ public with sharing class ApplicationsListViewController {
         return appIdToLatestInvoiceId;
     }
 
-    private static Map<Id, List<ServiceInfo>> buildServiceLabelsByApplication(List<Application__c> apps) {
+    private static Map<Id, List<ServiceInfo>> buildServiceLabelsByApplication(List<Application__c> apps, String statusFilter) {
         Set<Id> appIds = new Set<Id>();
         for (Application__c a : apps) {
             appIds.add(a.Id);
@@ -223,12 +219,24 @@ public with sharing class ApplicationsListViewController {
         if (appIds.isEmpty()) {
             return new Map<Id, List<ServiceInfo>>();
         }
-        List<Application_Package__c> packages = [
-            SELECT Id, Application__c, RecordType.DeveloperName, RecordType.Name, Contract_Cost_Price__c, Contract_Cost_Price_Without_Tax__c
-            FROM Application_Package__c
-            WHERE Active__c = true AND Application__c IN :appIds
-            ORDER BY RecordType.Name ASC
-        ];
+        
+        List<Application_Package__c> packages;
+        if (statusFilter == 'Cancelled') {
+            packages = [
+                SELECT Id, Application__c, RecordType.DeveloperName, RecordType.Name, Contract_Cost_Price__c, Contract_Cost_Price_Without_Tax__c
+                FROM Application_Package__c
+                WHERE Application_Status__c = 'Cancelled' AND Application__c IN :appIds
+                ORDER BY RecordType.Name ASC
+            ];
+        } else {
+            packages = [
+                SELECT Id, Application__c, RecordType.DeveloperName, RecordType.Name, Contract_Cost_Price__c, Contract_Cost_Price_Without_Tax__c
+                FROM Application_Package__c
+                WHERE Active__c = true AND Application__c IN :appIds
+                ORDER BY RecordType.Name ASC
+            ];
+        }
+        
         Map<Id, List<ServiceInfo>> appIdToServices = new Map<Id, List<ServiceInfo>>();
         for (Application_Package__c pkg : packages) {
             if (pkg.Application__c == null) continue;
@@ -264,7 +272,6 @@ public with sharing class ApplicationsListViewController {
 
     /**
      * Create a new Application record with 'Application' record type
-     * @return CreateApplicationResponse containing the created record ID or error message
      */
     @AuraEnabled
     public static CreateApplicationResponse createNewApplication() {

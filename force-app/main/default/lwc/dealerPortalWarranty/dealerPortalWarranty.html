@@ -317,7 +317,7 @@
                                         />
                                     </div>
                                 </template>
-                                <button class="price-breakdown-inline" title="View Price Breakdown" onclick={showPriceBreakdownModal}>
+                                <button class="price-breakdown-inline" title="View Dealer Pricing" onclick={showPriceBreakdownModal}>
                                     <lightning-icon icon-name="utility:info" size="xx-small"></lightning-icon>
                                 </button>
                             </div>
@@ -544,7 +544,7 @@
                     <div class="price-breakdown-modal-overlay" onclick={hidePriceBreakdownModal}>
                         <div class="price-breakdown-modal" onclick={stopPropagation}>
                             <div class="modal-header">
-                                <h3 class="modal-title">Price Breakdown</h3>
+                                <h3 class="modal-title">Dealer Pricing</h3>
                                 <button class="modal-close-btn" onclick={hidePriceBreakdownModal}>
                                     <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
                                 </button>
@@ -555,34 +555,99 @@
                                         <div class="source-label">Pricing Source: {currentPriceBreakdown.source}</div>
                                     </template>
                                 </div>
-                                <div class="breakdown-section">
-                                    <div class="breakdown-item">
-                                        <span class="breakdown-label">Retail Price (Before Tax):</span>
-                                        <span class="breakdown-value">{currentPriceBreakdown.retailPrice}</span>
+
+                                <!-- Custom Pricing Section (shown when price is overridden) -->
+                                <template if:true={isPriceOverridden}>
+                                    <div class="breakdown-section">
+                                        <div class="breakdown-section-header">Custom Pricing</div>
+                                        <div class="breakdown-item">
+                                            <span class="breakdown-label">Custom Price (Before Tax):</span>
+                                            <span class="breakdown-value">{currentPriceBreakdown.retailPrice}</span>
+                                        </div>
+                                        <template if:true={currentPriceBreakdown.taxAmount}>
+                                            <div class="breakdown-item">
+                                                <span class="breakdown-label">Tax ({currentPriceBreakdown.taxRate}):</span>
+                                                <span class="breakdown-value">+{currentPriceBreakdown.taxAmount}</span>
+                                            </div>
+                                        </template>
+                                        <div class="breakdown-item total">
+                                            <span class="breakdown-label">Total Price:</span>
+                                            <span class="breakdown-value">{currentPriceBreakdown.totalPrice}</span>
+                                        </div>
                                     </div>
-                                    <template if:true={additionalOptionsPricing.existingOptionsPrice}>
-                                        <div class="breakdown-item">
-                                            <span class="breakdown-label">Existing Additional Options:</span>
-                                            <span class="breakdown-value">{additionalOptionsPricing.formattedExistingOptionsPrice}</span>
-                                        </div>
-                                    </template>
-                                    <template if:true={additionalOptionsPricing.newOptionsPrice}>
-                                        <div class="breakdown-item">
-                                            <span class="breakdown-label">New Additional Options:</span>
-                                            <span class="breakdown-value">+{additionalOptionsPricing.formattedNewOptionsPrice}</span>
-                                        </div>
-                                    </template>
-                                    <template if:true={currentPriceBreakdown.taxAmount}>
-                                        <div class="breakdown-item">
-                                            <span class="breakdown-label">Tax ({currentPriceBreakdown.taxRate}):</span>
-                                            <span class="breakdown-value">+{currentPriceBreakdown.taxAmount}</span>
-                                        </div>
-                                    </template>
-                                    <div class="breakdown-item total">
-                                        <span class="breakdown-label">Total Price:</span>
-                                        <span class="breakdown-value">{currentPriceBreakdown.totalPrice}</span>
+
+                                    <!-- Toggle for Dealer Reference Pricing -->
+                                    <div class="reference-pricing-toggle">
+                                        <label class="toggle-label">
+                                            <input type="checkbox" checked={showDealerReferencePrice} onchange={handleToggleDealerReference} />
+                                            <span class="toggle-text">Show Dealer Pricing (Reference)</span>
+                                        </label>
                                     </div>
-                                </div>
+
+                                    <template if:true={showDealerReferencePrice}>
+                                        <div class="breakdown-section reference-section">
+                                            <div class="breakdown-section-header reference-header">Dealer Pricing <span class="reference-badge">Reference Only</span></div>
+                                            <div class="breakdown-item">
+                                                <span class="breakdown-label">Retail Price (Before Tax):</span>
+                                                <span class="breakdown-value">{dealerReferenceBreakdown.retailPrice}</span>
+                                            </div>
+                                            <template if:true={additionalOptionsPricing.existingOptionsPrice}>
+                                                <div class="breakdown-item">
+                                                    <span class="breakdown-label">Existing Additional Options:</span>
+                                                    <span class="breakdown-value">{additionalOptionsPricing.formattedExistingOptionsPrice}</span>
+                                                </div>
+                                            </template>
+                                            <template if:true={additionalOptionsPricing.newOptionsPrice}>
+                                                <div class="breakdown-item">
+                                                    <span class="breakdown-label">New Additional Options:</span>
+                                                    <span class="breakdown-value">+{additionalOptionsPricing.formattedNewOptionsPrice}</span>
+                                                </div>
+                                            </template>
+                                            <template if:true={dealerReferenceBreakdown.taxAmount}>
+                                                <div class="breakdown-item">
+                                                    <span class="breakdown-label">Tax ({dealerReferenceBreakdown.taxRate}):</span>
+                                                    <span class="breakdown-value">+{dealerReferenceBreakdown.taxAmount}</span>
+                                                </div>
+                                            </template>
+                                            <div class="breakdown-item total">
+                                                <span class="breakdown-label">Total Price:</span>
+                                                <span class="breakdown-value">{dealerReferenceBreakdown.totalPrice}</span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </template>
+
+                                <!-- Standard Dealer Pricing (shown when price is NOT overridden) -->
+                                <template if:false={isPriceOverridden}>
+                                    <div class="breakdown-section">
+                                        <div class="breakdown-item">
+                                            <span class="breakdown-label">Retail Price (Before Tax):</span>
+                                            <span class="breakdown-value">{currentPriceBreakdown.retailPrice}</span>
+                                        </div>
+                                        <template if:true={additionalOptionsPricing.existingOptionsPrice}>
+                                            <div class="breakdown-item">
+                                                <span class="breakdown-label">Existing Additional Options:</span>
+                                                <span class="breakdown-value">{additionalOptionsPricing.formattedExistingOptionsPrice}</span>
+                                            </div>
+                                        </template>
+                                        <template if:true={additionalOptionsPricing.newOptionsPrice}>
+                                            <div class="breakdown-item">
+                                                <span class="breakdown-label">New Additional Options:</span>
+                                                <span class="breakdown-value">+{additionalOptionsPricing.formattedNewOptionsPrice}</span>
+                                            </div>
+                                        </template>
+                                        <template if:true={currentPriceBreakdown.taxAmount}>
+                                            <div class="breakdown-item">
+                                                <span class="breakdown-label">Tax ({currentPriceBreakdown.taxRate}):</span>
+                                                <span class="breakdown-value">+{currentPriceBreakdown.taxAmount}</span>
+                                            </div>
+                                        </template>
+                                        <div class="breakdown-item total">
+                                            <span class="breakdown-label">Total Price:</span>
+                                            <span class="breakdown-value">{currentPriceBreakdown.totalPrice}</span>
+                                        </div>
+                                    </div>
+                                </template>
                             </div>
                             <div class="modal-footer">
                                 <lightning-button 

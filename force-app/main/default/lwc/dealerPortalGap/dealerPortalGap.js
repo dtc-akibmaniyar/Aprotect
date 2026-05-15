@@ -40,6 +40,8 @@ export default class DealerPortalGap extends LightningElement {
     @track selectedWarrantyTerm = null;
     @track showPriceModal = false;
     @track currentPriceBreakdown = {};
+    @track dealerReferenceBreakdown = {};
+    @track showDealerReferencePrice = false;
     @track existingApplicationPackage = null;
     @track isExistingApplication = false;
     @track isPriceEditMode = false;
@@ -1475,7 +1477,9 @@ export default class DealerPortalGap extends LightningElement {
     handlePriceClick() {
         if (!this.selectedWarrantyTerm) return;
         this.isPriceEditMode = true;
-        this.priceOverrideInput = this.price ? this.price.toFixed(2) : '';
+        // Show pre-tax override price if available, otherwise show current price
+        const editPrice = this._overridePreTaxPrice || this.price;
+        this.priceOverrideInput = editPrice ? editPrice.toFixed(2) : '';
         // Focus the input on next tick
         // eslint-disable-next-line @lwc/lwc/no-async-operation
         setTimeout(() => {
@@ -1507,20 +1511,46 @@ export default class DealerPortalGap extends LightningElement {
     _applyPriceOverride() {
         const val = parseFloat(this.priceOverrideInput);
         if (!isNaN(val) && val >= 0) {
-            this.price = parseFloat(val.toFixed(2));
+            // Custom price is pre-tax; calculate tax and add to total
+            const customPreTax = parseFloat(val.toFixed(2));
+            const taxRate = this._getCurrentTaxRate();
+            const taxAmount = taxRate > 0 ? customPreTax * (taxRate / 100) : 0;
+            this._overridePreTaxPrice = customPreTax;
+            this._overrideTaxAmount = parseFloat(taxAmount.toFixed(2));
+            this.price = parseFloat((customPreTax + taxAmount).toFixed(2));
             this.isPriceOverridden = true;
         } else {
             // Empty or invalid — revert to calculated price
             this.isPriceOverridden = false;
+            this._overridePreTaxPrice = null;
+            this._overrideTaxAmount = null;
             this.updatePrice();
         }
         this.isPriceEditMode = false;
+    }
+
+    /**
+     * Get the current applicable tax rate from the best available source.
+     */
+    _getCurrentTaxRate() {
+        if (this.existingApplicationPackage && this.existingApplicationPackage.taxPercentage) {
+            return this.existingApplicationPackage.taxPercentage;
+        }
+        if (this.selectedWarrantyTerm && this.selectedWarrantyTerm.taxRate) {
+            return this.selectedWarrantyTerm.taxRate;
+        }
+        if (this.selectedDealerPackage && this.selectedDealerPackage.taxRate) {
+            return this.selectedDealerPackage.taxRate;
+        }
+        return 0;
     }
 
     handleResetPriceOverride() {
         this.isPriceOverridden = false;
         this.isPriceEditMode = false;
         this.priceOverrideInput = '';
+        this._overridePreTaxPrice = null;
+        this._overrideTaxAmount = null;
 
         // For an existing application on the same term, restore the original admin-calculated
         // price using the component fields (contractPremiumPriceWithoutTax + taxAmount).
@@ -1872,15 +1902,27 @@ export default class DealerPortalGap extends LightningElement {
             }
         }
         
-        // When price is overridden, show custom price as total and hide breakdown details
+        // When price is overridden, show custom price + tax breakdown
         if (this.isPriceOverridden) {
+            const overrideTaxRate = this._getCurrentTaxRate();
+            const overridePreTax = this._overridePreTaxPrice || this.price;
+            const overrideTax = this._overrideTaxAmount || 0;
             this.currentPriceBreakdown = {
                 netCost: '—',
                 markup: '—',
-                retailPrice: '—',
-                taxRate: '—',
-                taxAmount: null,
+                retailPrice: this.formatPrice(overridePreTax),
+                taxRate: overrideTaxRate > 0 ? overrideTaxRate.toFixed(2) + '%' : '0%',
+                taxAmount: this.formatPrice(overrideTax),
                 totalPrice: this.formatPrice(this.price)
+            };
+            // Populate dealer reference pricing for toggle
+            this.dealerReferenceBreakdown = {
+                netCost: this.formatPrice(netCost),
+                markup: this.formatPrice(markup),
+                retailPrice: this.formatPrice(retailPrice),
+                taxRate: displayTaxRate > 0 ? displayTaxRate.toFixed(2) + '%' : '0%',
+                taxAmount: this.formatPrice(displayTaxAmount),
+                totalPrice: this.formatPrice(totalPrice)
             };
         } else {
             this.currentPriceBreakdown = {
@@ -1896,8 +1938,13 @@ export default class DealerPortalGap extends LightningElement {
         this.showPriceModal = true;
     }
     
+    handleToggleDealerReference(event) {
+        this.showDealerReferencePrice = event.target.checked;
+    }
+
     hidePriceBreakdownModal() {
         this.showPriceModal = false;
+        this.showDealerReferencePrice = false;
     }
     
     stopPropagation(event) {

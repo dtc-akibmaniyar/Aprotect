@@ -119,6 +119,7 @@ public class CancellationRequestHandler {
         Map<Id, String> appStatusMap = new Map<Id, String>();
         Set<Id> appsToClear = new Set<Id>();
         List<App_Cancellation_Request__c> approvedWithRefund = new List<App_Cancellation_Request__c>();
+        List<App_Cancellation_Request__c> approvedRequests = new List<App_Cancellation_Request__c>();
 
         for (App_Cancellation_Request__c req : newList) {
             App_Cancellation_Request__c oldReq = oldMap.get(req.Id);
@@ -136,14 +137,18 @@ public class CancellationRequestHandler {
                 }
             }
             else if (oldStatus == 'Pending Sales Review' && newStatus == 'Approved') {
+                approvedRequests.add(req);
+                // Update app cancellation status — cancelSelectedPackages handles Application_Status__c
                 if (req.Application__c != null) {
-                    appStatusMap.put(req.Application__c, 'Cancelled');
+                    appStatusMap.put(req.Application__c, 'Approved');
                 }
             }
             else if (oldStatus == 'Pending Accounting Review' && newStatus == 'Approved') {
                 approvedWithRefund.add(req);
+                approvedRequests.add(req);
+                // Update app cancellation status — cancelSelectedPackages handles Application_Status__c
                 if (req.Application__c != null) {
-                    appStatusMap.put(req.Application__c, 'Cancelled');
+                    appStatusMap.put(req.Application__c, 'Approved');
                 }
             }
             else if (newStatus == 'Rejected') {
@@ -169,6 +174,40 @@ public class CancellationRequestHandler {
         }
         if (!approvedWithRefund.isEmpty()) {
             createRefundCredits(approvedWithRefund);
+        }
+        if (!approvedRequests.isEmpty()) {
+            cancelPackagesForApprovedRequests(approvedRequests);
+        }
+    }
+
+    private static void cancelPackagesForApprovedRequests(List<App_Cancellation_Request__c> approvedRequests) {
+        Set<Id> requestIds = new Set<Id>();
+        for (App_Cancellation_Request__c req : approvedRequests) {
+            requestIds.add(req.Id);
+        }
+        
+        // Query Cancellation_Service__c records for the approved requests
+        List<Cancellation_Service__c> cancServices = [
+            SELECT Id, App_Cancellation_Request__c, Application_Package__c, 
+                   App_Cancellation_Request__r.Application__c
+            FROM Cancellation_Service__c
+            WHERE App_Cancellation_Request__c IN :requestIds
+        ];
+        
+        // Group package IDs by application
+        Map<Id, List<Id>> appToPackageIds = new Map<Id, List<Id>>();
+        for (Cancellation_Service__c cs : cancServices) {
+            Id appId = cs.App_Cancellation_Request__r.Application__c;
+            if (appId == null || cs.Application_Package__c == null) continue;
+            if (!appToPackageIds.containsKey(appId)) {
+                appToPackageIds.put(appId, new List<Id>());
+            }
+            appToPackageIds.get(appId).add(cs.Application_Package__c);
+        }
+        
+        // Cancel packages for each application
+        for (Id appId : appToPackageIds.keySet()) {
+            CancellationModalController.cancelSelectedPackages(appId, appToPackageIds.get(appId));
         }
     }
 

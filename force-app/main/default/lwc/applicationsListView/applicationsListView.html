@@ -280,7 +280,8 @@
                             </span>
                         </div>
 
-                        <!-- Delete Action -->
+                        <!-- Delete Action — hidden on Cancelled and Pending Cancellation filters -->
+                        <template if:false={isCancelledSelected}>
                         <div class="action-item">
                             <template if:false={app.disabledCancel}>
                                 <button class="icon-btn danger" title="Delete" onclick={clickDelete} aria-label="Delete">
@@ -312,6 +313,7 @@
                                 <!-- </button> -->
                             </template>
                         </div>
+                        </template>
                     </div>
                 </div>
             </template>

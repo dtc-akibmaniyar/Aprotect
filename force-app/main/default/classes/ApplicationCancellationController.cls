@@ -81,8 +81,8 @@ public static List<Policy__c> getPolicies() {
 }
 
     /**
-     * Save Application_Policy__c records for an application and mark the
-     * Application__c record as Canceled.
+     * Save Application_Policy__c records for an application and cancel all active packages.
+     * Uses CancellationModalController.cancelSelectedPackages to handle package-level cancellation.
      * @param applicationId Id of the Application__c record
      * @param policies List of policy wrappers from client containing Name, Policy_Text__c and Privacy_Terms_Accepted__c
      */
@@ -110,9 +110,25 @@ public static List<Policy__c> getPolicies() {
                 insert toInsert;
             }
 
-            // Mark application as Cancelled
-            Application__c appToUpdate = new Application__c(Id = applicationId, Application_Status__c = 'Cancelled');
-            update appToUpdate;
+            // Query all active packages for this application
+            List<Application_Package__c> activePackages = [
+                SELECT Id FROM Application_Package__c
+                WHERE Application__c = :applicationId AND Active__c = true
+            ];
+            
+            if (!activePackages.isEmpty()) {
+                List<Id> packageIds = new List<Id>();
+                for (Application_Package__c pkg : activePackages) {
+                    packageIds.add(pkg.Id);
+                }
+                // Cancel packages (and application if all packages are cancelled)
+                CancellationModalController.cancelSelectedPackages(applicationId, packageIds);
+            } else {
+                // No active packages — directly cancel the application
+                Application__c appToUpdate = new Application__c(Id = applicationId);
+                appToUpdate.Application_Status__c = 'Cancelled';
+                update appToUpdate;
+            }
         } catch (Exception e) {
             system.debug('Error:: '+ e.getMessage());
             throw new AuraHandledException('Error saving policies or updating application: ' + e.getMessage());

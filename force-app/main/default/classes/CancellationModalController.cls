@@ -14,7 +14,7 @@ public without sharing class CancellationModalController {
                    Total_Package_Price__c, Dealer_Package_Retail_Price__c,
                    Active__c, Package_Record_Type__c
             FROM Application_Package__c
-            WHERE Application__c = :applicationId
+            WHERE Application__c = :applicationId AND Active__c = true
             ORDER BY Name ASC
         ];
         
@@ -43,6 +43,30 @@ public without sharing class CancellationModalController {
         result.put('services', services);
         
         return result;
+    }
+    
+    public static void cancelSelectedPackages(Id applicationId, List<Id> packageIds) {
+        List<Application_Package__c> packagesToUpdate = new List<Application_Package__c>();
+        for (Id pkgId : packageIds) {
+            Application_Package__c pkg = new Application_Package__c(Id = pkgId);
+            pkg.Active__c = false;
+            pkg.Application_Status__c = 'Cancelled';
+            packagesToUpdate.add(pkg);
+        }
+        if (!packagesToUpdate.isEmpty()) {
+            update packagesToUpdate;
+        }
+        
+        Integer activeCount = [
+            SELECT COUNT() FROM Application_Package__c 
+            WHERE Application__c = :applicationId AND Active__c = true
+        ];
+        
+        if (activeCount == 0) {
+            Application__c appToUpdate = new Application__c(Id = applicationId);
+            appToUpdate.Application_Status__c = 'Cancelled';
+            update appToUpdate;
+        }
     }
     
     @AuraEnabled
@@ -102,6 +126,11 @@ public without sharing class CancellationModalController {
         }
         if (!cancServices.isEmpty()) {
             insert cancServices;
+        }
+        
+        // For Draft/Quote applications, immediately cancel selected packages
+        if (requestStatus == 'Approved') {
+            cancelSelectedPackages(applicationId, serviceIds);
         }
         
         return request.Id;
