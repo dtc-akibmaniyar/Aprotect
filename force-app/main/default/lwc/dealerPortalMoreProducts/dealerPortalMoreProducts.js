@@ -22,6 +22,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     @track isPriceEditMode = false;
     @track priceOverrideInput = '';
     @track isPriceOverridden = false;
+    @track priceValidationMessage = '';
     @track selectedProgram = '';
     @track selectedTerm = '4';
     @track selectedClaim = '5000';
@@ -583,6 +584,8 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                     if (result.data.dealerPriceOverride != null && result.data.dealerPriceOverride !== undefined) {
                         this.price = result.data.dealerPriceOverride;
                         this.isPriceOverridden = true;
+                        const txRate = result.data.taxPercentage || 0;
+                        this._retailPriceDisplay = txRate > 0 ? this.price / (1 + txRate / 100) : this.price;
                     }
                     
                     // Force re-render to update visual highlighting
@@ -1927,6 +1930,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         if (shouldUseStoredPrice) {
             // For submitted/active applications with same term, use stored pricing directly from Application_Package__c
             this.price = this.existingApplicationPackage.contractPremiumPrice || 0;
+            this._retailPriceDisplay = this.existingApplicationPackage.contractPremiumPriceWithoutTax || this.existingApplicationPackage.dealerPackageRetailPrice || 0;
             
             console.log('💰 Existing app price (using stored values from Application_Package__c):', {
                 dealerPackagePrice: this.existingApplicationPackage.dealerPackagePrice,
@@ -1968,6 +1972,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             const basePrice = priceWithMarkup + taxAmount;
             
             this.price = basePrice;
+            this._retailPriceDisplay = priceWithMarkup;
             console.log('💰 New selection price calculation:', {
                 netCost,
                 markup,
@@ -2695,6 +2700,9 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     }
     
     get formattedPrice() {
+        if (this._retailPriceDisplay != null) {
+            return this.formatPrice(this._retailPriceDisplay);
+        }
         return this.formatPrice(this.price);
     }
 
@@ -2731,6 +2739,18 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     _applyPriceOverride() {
         const val = parseFloat(this.priceOverrideInput);
         if (!isNaN(val) && val >= 0) {
+            // Validate: custom price must not be less than dealer price (net cost)
+            const dealerPrice = (this.selectedWarrantyTerm ? this.selectedWarrantyTerm.netCost : null)
+                             || (this.existingApplicationPackage ? this.existingApplicationPackage.dealerPackagePrice : null)
+                             || 0;
+            if (dealerPrice > 0 && val < dealerPrice) {
+                this.priceValidationMessage = 'Custom price ($' + val.toFixed(2) + ') cannot be less than Dealer Price ($' + dealerPrice.toFixed(2) + ').';
+                this.isPriceEditMode = false;
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                setTimeout(() => { this.priceValidationMessage = ''; }, 5000);
+                return;
+            }
+            this.priceValidationMessage = '';
             // Custom price is pre-tax; calculate tax and add to total
             const customPreTax = parseFloat(val.toFixed(2));
             const taxRate = this._getCurrentTaxRate();
@@ -2738,6 +2758,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             this._overridePreTaxPrice = customPreTax;
             this._overrideTaxAmount = parseFloat(taxAmount.toFixed(2));
             this.price = parseFloat((customPreTax + taxAmount).toFixed(2));
+            this._retailPriceDisplay = customPreTax;
             this.isPriceOverridden = true;
         } else {
             this.isPriceOverridden = false;
@@ -2768,6 +2789,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         this.isPriceOverridden = false;
         this.isPriceEditMode = false;
         this.priceOverrideInput = '';
+        this.priceValidationMessage = '';
         this._overridePreTaxPrice = null;
         this._overrideTaxAmount = null;
 

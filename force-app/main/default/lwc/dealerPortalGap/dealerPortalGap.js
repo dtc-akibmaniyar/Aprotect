@@ -47,6 +47,7 @@ export default class DealerPortalGap extends LightningElement {
     @track isPriceEditMode = false;
     @track priceOverrideInput = '';
     @track isPriceOverridden = false;
+    @track priceValidationMessage = '';
     @track comparePackages = [];
     @track showCompareModal = false;
     @track selectedForComparison = [];
@@ -543,6 +544,8 @@ export default class DealerPortalGap extends LightningElement {
                 if (result.data.dealerPriceOverride != null && result.data.dealerPriceOverride !== undefined) {
                     this.price = result.data.dealerPriceOverride;
                     this.isPriceOverridden = true;
+                    const txRate = result.data.taxPercentage || 0;
+                    this._retailPriceDisplay = txRate > 0 ? this.price / (1 + txRate / 100) : this.price;
                 }
 
                 // Ensure we skip the input fields and show the package selection UI
@@ -1499,6 +1502,18 @@ export default class DealerPortalGap extends LightningElement {
     _applyPriceOverride() {
         const val = parseFloat(this.priceOverrideInput);
         if (!isNaN(val) && val >= 0) {
+            // Validate: custom price must not be less than dealer price (net cost)
+            const dealerPrice = (this.selectedWarrantyTerm ? this.selectedWarrantyTerm.netCost : null)
+                             || (this.existingApplicationPackage ? this.existingApplicationPackage.dealerPackagePrice : null)
+                             || 0;
+            if (dealerPrice > 0 && val < dealerPrice) {
+                this.priceValidationMessage = 'Custom price ($' + val.toFixed(2) + ') cannot be less than Dealer Price ($' + dealerPrice.toFixed(2) + ').';
+                this.isPriceEditMode = false;
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                setTimeout(() => { this.priceValidationMessage = ''; }, 5000);
+                return;
+            }
+            this.priceValidationMessage = '';
             // Custom price is pre-tax; calculate tax and add to total
             const customPreTax = parseFloat(val.toFixed(2));
             const taxRate = this._getCurrentTaxRate();
@@ -1506,6 +1521,7 @@ export default class DealerPortalGap extends LightningElement {
             this._overridePreTaxPrice = customPreTax;
             this._overrideTaxAmount = parseFloat(taxAmount.toFixed(2));
             this.price = parseFloat((customPreTax + taxAmount).toFixed(2));
+            this._retailPriceDisplay = customPreTax;
             this.isPriceOverridden = true;
         } else {
             // Empty or invalid — revert to calculated price
@@ -1537,6 +1553,7 @@ export default class DealerPortalGap extends LightningElement {
         this.isPriceOverridden = false;
         this.isPriceEditMode = false;
         this.priceOverrideInput = '';
+        this.priceValidationMessage = '';
         this._overridePreTaxPrice = null;
         this._overrideTaxAmount = null;
 
@@ -1584,8 +1601,10 @@ export default class DealerPortalGap extends LightningElement {
                 const basePrice = this.existingApplicationPackage.contractPremiumPriceWithoutTax || 0;
                 const taxAmount = this.existingApplicationPackage.taxAmount || 0;
                 this.price = parseFloat((basePrice + taxAmount).toFixed(2));
+                this._retailPriceDisplay = basePrice;
             } else {
                 this.price = this.existingApplicationPackage.contractPremiumPrice || 0;
+                this._retailPriceDisplay = this.existingApplicationPackage.contractPremiumPriceWithoutTax || this.existingApplicationPackage.dealerPackageRetailPrice || 0;
             }
             
             console.log('💰 Existing app price (using stored values from Application_Package__c):', {
@@ -1629,6 +1648,7 @@ export default class DealerPortalGap extends LightningElement {
             }
             
             this.price = totalTaxableAmount + taxAmount;
+            this._retailPriceDisplay = totalTaxableAmount;
             console.log('💰 Existing app price calculation (with tax):', {
                 basePrice,
                 markup,
@@ -1670,6 +1690,7 @@ export default class DealerPortalGap extends LightningElement {
             
             // Total price = taxable amount + tax
             this.price = totalTaxableAmount + taxAmount;
+            this._retailPriceDisplay = totalTaxableAmount;
             console.log('💰 New selection price calculation:', {
                 netCost,
                 markup,
@@ -2338,6 +2359,9 @@ export default class DealerPortalGap extends LightningElement {
     }
     
     get formattedPrice() {
+        if (this._retailPriceDisplay != null) {
+            return this.formatPrice(this._retailPriceDisplay);
+        }
         return this.formatPrice(this.price);
     }
     

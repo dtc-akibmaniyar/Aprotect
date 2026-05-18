@@ -4802,3 +4802,23 @@ lightning-accordion-section.program-section-selected lightning-button:hover {
     text-transform: uppercase;
     letter-spacing: 0.03em;
 }
+/* Price validation inline message */
+.price-validation-msg {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: #fff8e1;
+    border: 1px solid #f9a825;
+    border-radius: 6px;
+    color: #e65100;
+    font-size: 12px;
+    font-weight: 500;
+    animation: fadeInValidation 0.2s ease-in;
+}
+
+@keyframes fadeInValidation {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}

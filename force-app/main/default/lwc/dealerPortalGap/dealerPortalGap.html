@@ -564,6 +564,13 @@
                                     <button class="price-reset-btn" onclick={handleResetPriceOverride} title="Reset to calculated price">Reset</button>
                                 </div>
                             </template>
+                            <!-- Inline price validation message -->
+                            <template if:true={priceValidationMessage}>
+                                <div class="price-validation-msg">
+                                    <lightning-icon icon-name="utility:warning" size="xx-small" variant="warning"></lightning-icon>
+                                    <span>{priceValidationMessage}</span>
+                                </div>
+                            </template>
                         </div>
                     </template>
                 
@@ -788,13 +795,17 @@
                             <div class="reference-pricing-toggle">
                                 <label class="toggle-label">
                                     <input type="checkbox" checked={showDealerReferencePrice} onchange={handleToggleDealerReference} />
-                                    <span class="toggle-text">Show Dealer Pricing (Reference)</span>
+                                    <span class="toggle-text">Show Dealer Price</span>
                                 </label>
                             </div>
 
                             <template if:true={showDealerReferencePrice}>
                                 <div class="breakdown-section reference-section">
-                                    <div class="breakdown-section-header reference-header">Dealer Pricing <span class="reference-badge">Reference Only</span></div>
+                                    <div class="breakdown-section-header reference-header">Dealer Pricing</div>
+                                    <div class="breakdown-item">
+                                        <span class="breakdown-label">Dealer Price:</span>
+                                        <span class="breakdown-value">{dealerReferenceBreakdown.netCost}</span>
+                                    </div>
                                     <div class="breakdown-item">
                                         <span class="breakdown-label"><strong><u>Retail Price (Before Tax):</u></strong></span>
                                         <span class="breakdown-value">{dealerReferenceBreakdown.retailPrice}</span>
@@ -905,6 +916,24 @@
                                     <span class="breakdown-value">{currentPriceBreakdown.totalPrice}</span>
                                 </div>
                             </div>
+
+                            <!-- Toggle for Dealer Reference Pricing -->
+                            <div class="reference-pricing-toggle">
+                                <label class="toggle-label">
+                                    <input type="checkbox" checked={showDealerReferencePrice} onchange={handleToggleDealerReference} />
+                                    <span class="toggle-text">Show Dealer Price</span>
+                                </label>
+                            </div>
+
+                            <template if:true={showDealerReferencePrice}>
+                                <div class="breakdown-section reference-section">
+                                    <div class="breakdown-section-header reference-header">Dealer Pricing</div>
+                                    <div class="breakdown-item">
+                                        <span class="breakdown-label">Dealer Price:</span>
+                                        <span class="breakdown-value">{currentPriceBreakdown.netCost}</span>
+                                    </div>
+                                </div>
+                            </template>
                         </template>
                     </div>
                     <div class="modal-footer">

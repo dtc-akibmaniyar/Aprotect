@@ -23,6 +23,7 @@ export default class DealerPortalWarranty extends LightningElement {
     @track isPriceEditMode = false;
     @track priceOverrideInput = '';
     @track isPriceOverridden = false;
+    @track priceValidationMessage = '';
     @track selectedProgram = '';
     @track selectedTerm = '4';
     @track selectedClaim = '5000';
@@ -344,6 +345,9 @@ export default class DealerPortalWarranty extends LightningElement {
                 if (result.data.dealerPriceOverride != null && result.data.dealerPriceOverride !== undefined) {
                     this.price = result.data.dealerPriceOverride;
                     this.isPriceOverridden = true;
+                    // For override, extract pre-tax from stored override
+                    const taxRate = result.data.taxPercentage || 0;
+                    this._retailPriceDisplay = taxRate > 0 ? this.price / (1 + taxRate / 100) : this.price;
                 }
                 
                 // Find the matching dealer package from our loaded packages
@@ -1172,8 +1176,10 @@ export default class DealerPortalWarranty extends LightningElement {
                 const basePrice = this.existingApplicationPackage.contractPremiumPriceWithoutTax || 0;
                 const taxAmount = this.existingApplicationPackage.taxAmount || 0;
                 this.price = parseFloat((basePrice + taxAmount).toFixed(2));
+                this._retailPriceDisplay = basePrice;
             } else {
                 this.price = this.existingApplicationPackage.contractPremiumPrice || 0;
+                this._retailPriceDisplay = this.existingApplicationPackage.contractPremiumPriceWithoutTax || this.existingApplicationPackage.dealerPackageRetailPrice || 0;
             }
 
             console.log('💰 Existing app price (using stored values from Application_Package__c):', {
@@ -1221,6 +1227,7 @@ export default class DealerPortalWarranty extends LightningElement {
             
             // Total price = taxable amount + tax
             this.price = totalTaxableAmount + taxAmount;
+            this._retailPriceDisplay = totalTaxableAmount;
             console.log('💰 New selection price calculation:', {
                 netCost,
                 markup,
@@ -1237,6 +1244,7 @@ export default class DealerPortalWarranty extends LightningElement {
             });
         } else {
             this.price = 0.00;
+            this._retailPriceDisplay = 0;
             console.log('💰 No valid pricing data, setting price to 0');
         }
         
@@ -1580,6 +1588,19 @@ export default class DealerPortalWarranty extends LightningElement {
     _applyPriceOverride() {
         const val = parseFloat(this.priceOverrideInput);
         if (!isNaN(val) && val >= 0) {
+            // Validate: custom price must not be less than dealer price (net cost)
+            const dealerPrice = (this.selectedWarrantyTerm ? this.selectedWarrantyTerm.netCost : null) 
+                             || (this.existingApplicationPackage ? this.existingApplicationPackage.dealerPackagePrice : null) 
+                             || 0;
+            if (dealerPrice > 0 && val < dealerPrice) {
+                this.priceValidationMessage = 'Custom price ($' + val.toFixed(2) + ') cannot be less than Dealer Price ($' + dealerPrice.toFixed(2) + ').';
+                this.isPriceEditMode = false;
+                // Auto-clear after 5 seconds
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                setTimeout(() => { this.priceValidationMessage = ''; }, 5000);
+                return;
+            }
+            this.priceValidationMessage = '';
             // Custom price is pre-tax; calculate tax and add to total
             const customPreTax = parseFloat(val.toFixed(2));
             const taxRate = this._getCurrentTaxRate();
@@ -1587,6 +1608,7 @@ export default class DealerPortalWarranty extends LightningElement {
             this._overridePreTaxPrice = customPreTax;
             this._overrideTaxAmount = parseFloat(taxAmount.toFixed(2));
             this.price = parseFloat((customPreTax + taxAmount).toFixed(2));
+            this._retailPriceDisplay = customPreTax;
             this.isPriceOverridden = true;
         } else {
             // Empty or invalid — revert to calculated price
@@ -1618,6 +1640,7 @@ export default class DealerPortalWarranty extends LightningElement {
         this.isPriceOverridden = false;
         this.isPriceEditMode = false;
         this.priceOverrideInput = '';
+        this.priceValidationMessage = '';
         this._overridePreTaxPrice = null;
         this._overrideTaxAmount = null;
 
@@ -1635,6 +1658,7 @@ export default class DealerPortalWarranty extends LightningElement {
             const basePrice = this.existingApplicationPackage.contractPremiumPriceWithoutTax || 0;
             const taxAmount = this.existingApplicationPackage.taxAmount || 0;
             this.price = parseFloat((basePrice + taxAmount).toFixed(2));
+            this._retailPriceDisplay = basePrice;
         } else {
             this.updatePrice();
         }
@@ -1912,6 +1936,10 @@ export default class DealerPortalWarranty extends LightningElement {
     }
     
     get formattedPrice() {
+        // Show retail price (before tax) in the sidebar
+        if (this._retailPriceDisplay != null) {
+            return this.formatPrice(this._retailPriceDisplay);
+        }
         return this.formatPrice(this.price);
     }
     

@@ -328,6 +328,13 @@
                                     <button class="price-reset-btn" onclick={handleResetPriceOverride} title="Reset to calculated price">Reset</button>
                                 </div>
                             </template>
+                            <!-- Inline price validation message -->
+                            <template if:true={priceValidationMessage}>
+                                <div class="price-validation-msg">
+                                    <lightning-icon icon-name="utility:warning" size="xx-small" variant="warning"></lightning-icon>
+                                    <span>{priceValidationMessage}</span>
+                                </div>
+                            </template>
                         </div>
                         
                         <!-- INCLUDES Section -->
@@ -640,7 +647,7 @@
                                             <div class="breakdown-section-header reference-header">Dealer Pricing</div>
                                             <div class="breakdown-item">
                                                 <span class="breakdown-label">Dealer Price:</span>
-                                                <span class="breakdown-value">{dealerReferenceBreakdown.netCost}</span>
+                                                <span class="breakdown-value">{currentPriceBreakdown.netCost}</span>
                                             </div>
                                         </div>
                                     </template>
