@@ -770,3 +770,7 @@ textarea {
 .next-label {
     line-height: 1;
 }
+.required-asterisk {
+    color: #e31c1c;
+    font-weight: 700;
+}

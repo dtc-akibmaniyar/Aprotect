@@ -4378,3 +4378,7 @@ div.term-option.selected {
     text-transform: uppercase;
     letter-spacing: 0.03em;
 }
+.required-asterisk {
+    color: #e31c1c;
+    font-weight: 700;
+}

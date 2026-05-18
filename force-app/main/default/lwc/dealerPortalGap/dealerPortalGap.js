@@ -1171,21 +1171,9 @@ export default class DealerPortalGap extends LightningElement {
     
     // Validate form before continuing
     validateForm() {
-        // Skip package selection validation when a disclaimer is shown (no plans available)
-        if (this.showNoPackageDisclaimer || this.showVehicleNotEligibleDisclaimer) {
-            this.showError = false;
-            this.errorMessage = '';
-            return true;
-        }
-
-        if (!this.selectedDealerPackage) {
-            this.errorMessage = 'Please select a Total Loss Protection package before continuing.';
-            this.showError = true;
-            return false;
-        }
-
-        if (!this.selectedWarrantyTerm) {
-            this.errorMessage = 'Please select a Total Loss Protection term before continuing.';
+        // Only Lien Holder is required
+        if (!this.lenderLienholder) {
+            this.errorMessage = 'Lien Holder / Financial Institution is required.';
             this.showError = true;
             return false;
         }
@@ -2151,6 +2139,28 @@ export default class DealerPortalGap extends LightningElement {
             this.loading = true;
             
             try {
+                // If no package selected, just save lien holder data and continue
+                if (!this.selectedDealerPackage || !this.selectedWarrantyTerm) {
+                    console.log('🔍 No GAP package selected — saving lien holder data and continuing');
+                    // Persist lien holder to session storage
+                    const gapData = {
+                        lenderLienholder: this.lenderLienholder || null,
+                        financeLoanTerm: this.financeLoanTerm || null,
+                        loanAmount: this.loanAmount !== '' ? this.loanAmount : null,
+                        interestRate: this.interestRate !== '' ? this.interestRate : null,
+                        paymentFrequency: this.paymentFrequency || null,
+                    };
+                    sessionStorage.setItem('gapInputData', JSON.stringify(gapData));
+                    this.loading = false;
+                    this.dispatchEvent(new CustomEvent('gapcomplete', {
+                        detail: {
+                            applicationId: this.applicationId,
+                            skipped: true
+                        }
+                    }));
+                    return;
+                }
+
                 // Create application package in Salesforce
                 console.log('========================================');
                 console.log('🔍 DEBUG: Starting Application Package Creation');
@@ -2609,8 +2619,7 @@ export default class DealerPortalGap extends LightningElement {
     }
 
     get isContinueDisabled() {
-        if (this.showNoPackageDisclaimer || this.showVehicleNotEligibleDisclaimer) return false;
-        return !this.selectedDealerPackage || !this.selectedWarrantyTerm;
+        return false;
     }
 
     // Back button handler - DUPLICATE REMOVED

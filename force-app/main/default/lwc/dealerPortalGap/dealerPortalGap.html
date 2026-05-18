@@ -27,7 +27,7 @@
             </div>
             <div class="loan-hero__content">
                 <div class="loan-hero__header-row">
-                    <h1>LOAN PROTECTION</h1>
+                    <h1>GAP</h1>
                     <div class="loan-hero__header-actions">
                         <template if:true={isQuoteStatus}>
                             <button class="convert-to-app-btn" onclick={handleConvertToApplication} title="Convert this quote to a pending application">Convert to Application</button>
@@ -58,7 +58,7 @@
                 <div class="gap-input-form">
                     <div class="loan-input-grid">
                         <label class="loan-field full-width">
-                            <span>Lien Holder / Financial Institution</span>
+                            <span>Lien Holder / Financial Institution <span class="required-asterisk">*</span></span>
                             <input
                                 type="text"
                                 value={lenderLienholder}
@@ -69,7 +69,7 @@
 
                         <label class="loan-field">
                             <span>Financed Loan Term (Months)</span>
-                            <select disabled={fieldDisabled} onchange={handleFinanceLoanTermChange} required>
+                            <select disabled={fieldDisabled} onchange={handleFinanceLoanTermChange}>
                                 <option value="">Select Term</option>
                                 <template for:each={financeLoanTermSelectOptions} for:item="option">
                                     <option key={option.value} value={option.value} selected={option.selected}>{option.label}</option>
@@ -85,8 +85,7 @@
                                 step="0.01"
                                 value={loanAmount}
                                 disabled={fieldDisabled}
-                                oninput={handleLoanAmountChange}
-                                required>
+                                oninput={handleLoanAmountChange}>
                         </label>
 
                         <label class="loan-field">
@@ -98,8 +97,7 @@
                                 step="0.01"
                                 value={interestRate}
                                 disabled={fieldDisabled}
-                                oninput={handleInterestRateChange}
-                                required>
+                                oninput={handleInterestRateChange}>
                         </label>
 
                         <label class="loan-field">
@@ -135,7 +133,8 @@
                         </label>
                     </div>
 
-                    <div class="gap-input-actions">
+                    <!-- Search button hidden - no packages available currently -->
+                    <!--<div class="gap-input-actions">
                         <button
                             type="button"
                             class="find-packages-btn"
@@ -144,7 +143,7 @@
                             aria-label="Search Available Loan Protection Plans">
                             <span class="find-packages-label">Search Available Loan Protection Plans</span>
                         </button>
-                    </div>
+                    </div>-->
                 </div>
             </div>
         </template>

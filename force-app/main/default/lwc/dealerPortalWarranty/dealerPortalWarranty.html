@@ -580,38 +580,16 @@
                                     <div class="reference-pricing-toggle">
                                         <label class="toggle-label">
                                             <input type="checkbox" checked={showDealerReferencePrice} onchange={handleToggleDealerReference} />
-                                            <span class="toggle-text">Show Dealer Pricing (Reference)</span>
+                                            <span class="toggle-text">Show Dealer Price</span>
                                         </label>
                                     </div>
 
                                     <template if:true={showDealerReferencePrice}>
                                         <div class="breakdown-section reference-section">
-                                            <div class="breakdown-section-header reference-header">Dealer Pricing <span class="reference-badge">Reference Only</span></div>
+                                            <div class="breakdown-section-header reference-header">Dealer Pricing</div>
                                             <div class="breakdown-item">
-                                                <span class="breakdown-label">Retail Price (Before Tax):</span>
-                                                <span class="breakdown-value">{dealerReferenceBreakdown.retailPrice}</span>
-                                            </div>
-                                            <template if:true={additionalOptionsPricing.existingOptionsPrice}>
-                                                <div class="breakdown-item">
-                                                    <span class="breakdown-label">Existing Additional Options:</span>
-                                                    <span class="breakdown-value">{additionalOptionsPricing.formattedExistingOptionsPrice}</span>
-                                                </div>
-                                            </template>
-                                            <template if:true={additionalOptionsPricing.newOptionsPrice}>
-                                                <div class="breakdown-item">
-                                                    <span class="breakdown-label">New Additional Options:</span>
-                                                    <span class="breakdown-value">+{additionalOptionsPricing.formattedNewOptionsPrice}</span>
-                                                </div>
-                                            </template>
-                                            <template if:true={dealerReferenceBreakdown.taxAmount}>
-                                                <div class="breakdown-item">
-                                                    <span class="breakdown-label">Tax ({dealerReferenceBreakdown.taxRate}):</span>
-                                                    <span class="breakdown-value">+{dealerReferenceBreakdown.taxAmount}</span>
-                                                </div>
-                                            </template>
-                                            <div class="breakdown-item total">
-                                                <span class="breakdown-label">Total Price:</span>
-                                                <span class="breakdown-value">{dealerReferenceBreakdown.totalPrice}</span>
+                                                <span class="breakdown-label">Dealer Price:</span>
+                                                <span class="breakdown-value">{dealerReferenceBreakdown.netCost}</span>
                                             </div>
                                         </div>
                                     </template>
@@ -647,6 +625,25 @@
                                             <span class="breakdown-value">{currentPriceBreakdown.totalPrice}</span>
                                         </div>
                                     </div>
+
+                                    
+                                    <!-- Toggle for Dealer Reference Pricing -->
+                                    <div class="reference-pricing-toggle">
+                                        <label class="toggle-label">
+                                            <input type="checkbox" checked={showDealerReferencePrice} onchange={handleToggleDealerReference} />
+                                            <span class="toggle-text">Show Dealer Price</span>
+                                        </label>
+                                    </div>
+
+                                    <template if:true={showDealerReferencePrice}>
+                                        <div class="breakdown-section reference-section">
+                                            <div class="breakdown-section-header reference-header">Dealer Pricing</div>
+                                            <div class="breakdown-item">
+                                                <span class="breakdown-label">Dealer Price:</span>
+                                                <span class="breakdown-value">{dealerReferenceBreakdown.netCost}</span>
+                                            </div>
+                                        </div>
+                                    </template>
                                 </template>
                             </div>
                             <div class="modal-footer">
