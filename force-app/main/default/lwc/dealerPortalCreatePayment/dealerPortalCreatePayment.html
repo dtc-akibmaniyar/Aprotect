@@ -11,7 +11,11 @@
 
     <!-- Payment Method Selector -->
     <div class="slds-m-top_medium">
-        <c-payment-method-selector disabled={isPaymentDisabled} onpaymentmethodselected={handlePaymentMethodSelected}></c-payment-method-selector>
+        <c-payment-method-selector
+            disabled={isPaymentDisabled}
+            available-credit={dealerAvailableCredit}
+            onpaymentmethodselected={handlePaymentMethodSelected}>
+        </c-payment-method-selector>
     </div>
 
 
@@ -489,6 +493,114 @@
                         class="slds-button slds-button_brand"
                         onclick={handleSubmitETransfer}>
                         Submit E-Transfer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Dealer Credit Modal -->
+    <template if:true={showDealerCreditModal}>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+        <div class="slds-modal slds-fade-in-open slds-modal_small" role="dialog" aria-labelledby="dealer-credit-modal-heading">
+            <div class="slds-modal__container">
+                <div class="slds-modal__header dealer-credit-modal-header">
+                    <div style="display: flex; align-items: center; gap: 1rem; flex: 1;">
+                        <div class="dealer-credit-icon">
+                            <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="4" y="8" width="40" height="28" rx="3" stroke="#5184B8" stroke-width="2.5" fill="none"/>
+                                <circle cx="24" cy="22" r="8" stroke="#5184B8" stroke-width="2" fill="none"/>
+                                <path d="M24 18v8M20 22h8" stroke="#5184B8" stroke-width="2" stroke-linecap="round"/>
+                                <rect x="8" y="30" width="32" height="3" rx="1" fill="#5184B8" opacity="0.3"/>
+                            </svg>
+                        </div>
+                        <h2 id="dealer-credit-modal-heading" class="slds-modal__title slds-hyphenate" style="margin: 0;">
+                            Apply Dealer Credit
+                        </h2>
+                    </div>
+                    <button 
+                        class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                        title="Close dialog"
+                        onclick={handleCloseDealerCreditModal}>
+                        <lightning-icon 
+                            icon-name="utility:close"
+                            alternative-text="close"
+                            variant="inverse">
+                        </lightning-icon>
+                    </button>
+                </div>
+                <div class="slds-modal__content dealer-credit-modal-content">
+                    <!-- Amount Summary Cards -->
+                    <div class="dc-amount-cards">
+                        <div class="dc-amount-card">
+                            <span class="dc-amount-label">Balance Amount</span>
+                            <span class="dc-amount-value">${remittanceFormAmount}</span>
+                        </div>
+                        <div class="dc-amount-card dc-amount-card-primary">
+                            <span class="dc-amount-label">Credit Amount to Apply</span>
+                            <span class="dc-amount-value">${remittanceFormAmount}</span>
+                        </div>
+                    </div>
+
+                    <!-- Credit Breakdown -->
+                    <div class="dc-credit-breakdown">
+                        <h3 class="dc-breakdown-title">Credit Summary</h3>
+                        <div class="dc-breakdown-row">
+                            <span class="dc-breakdown-label">Available Dealer Credit</span>
+                            <span class="dc-breakdown-value dc-value-available">{formattedDealerCredit}</span>
+                        </div>
+                        <div class="dc-breakdown-divider"></div>
+                        <div class="dc-breakdown-row">
+                            <span class="dc-breakdown-label">Amount to Apply</span>
+                            <span class="dc-breakdown-value dc-value-deduct">- ${remittanceFormAmount}</span>
+                        </div>
+                        <div class="dc-breakdown-divider"></div>
+                        <template if:false={isDealerCreditInsufficient}>
+                            <div class="dc-breakdown-row dc-breakdown-total">
+                                <span class="dc-breakdown-label">Remaining Credit After Payment</span>
+                                <span class="dc-breakdown-value dc-value-remaining">{formattedRemainingCredit}</span>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Insufficient Credit Warning -->
+                    <template if:true={isDealerCreditInsufficient}>
+                        <div class="dc-warning-banner">
+                            <lightning-icon icon-name="utility:warning" size="x-small" variant="warning" class="dc-warning-icon"></lightning-icon>
+                            <p class="dc-warning-text">
+                                <strong>Insufficient Credit:</strong> Your available credit ({formattedDealerCredit}) is less than the payable amount (${remittanceFormAmount}). Full payment by dealer credit is required.
+                            </p>
+                        </div>
+                    </template>
+
+                    <!-- Notes -->
+                    <div class="dc-notes-section">
+                        <lightning-textarea
+                            class="custom-textarea" 
+                            label="Notes (Optional)"
+                            placeholder="Add any notes about this payment..."
+                            value={dealerCreditNotes}
+                            onchange={handleDealerCreditNotesChange}>
+                        </lightning-textarea>
+                    </div>
+                </div>
+                <div class="slds-modal__footer">
+                    <button 
+                        class="slds-button slds-button_neutral"
+                        onclick={handleBackFromDealerCreditModal}>
+                        Back
+                    </button>
+                    <button 
+                        class="slds-button slds-button_brand"
+                        onclick={handleSubmitDealerCredit}
+                        disabled={isDealerCreditSubmitDisabled}>
+                        <template if:false={isProcessingDealerCredit}>
+                            Apply Credit
+                        </template>
+                        <template if:true={isProcessingDealerCredit}>
+                            <lightning-spinner alternative-text="Processing" size="small" variant="inverse"></lightning-spinner>
+                            Processing...
+                        </template>
                     </button>
                 </div>
             </div>

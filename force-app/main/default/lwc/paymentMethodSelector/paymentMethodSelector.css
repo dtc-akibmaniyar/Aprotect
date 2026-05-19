@@ -73,3 +73,36 @@
     display: inline-block;
     vertical-align: middle;
 }
+
+/* Dealer Credit Card Styling */
+.dealer-credit-card {
+    border-left: 4px solid #5184B8;
+}
+
+.dealer-credit-card:hover {
+    border-color: #5184B8;
+    border-left-color: #3a6fa0;
+}
+
+.credit-balance {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background-color: #f0f7ff;
+    border-radius: 4px;
+    border: 1px solid #d8e6f3;
+}
+
+.credit-balance-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #555;
+}
+
+.credit-amount {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0070d2;
+}

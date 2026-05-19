@@ -425,3 +425,153 @@ lightning-textarea ::part(textarea) {
     display: flex;
     border-right: 1px solid #ddd;
 }
+/* ─── Dealer Credit Modal ─── */
+.dealer-credit-modal-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+    border-bottom: 2px solid #5184B8;
+}
+
+.dealer-credit-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dealer-credit-modal-content {
+    padding: 1.5rem 2rem 2rem;
+}
+
+/* Amount Cards */
+.dc-amount-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.dc-amount-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    background-color: #f7f9fb;
+    border: 1px solid #e4e9f0;
+}
+
+.dc-amount-card-primary {
+    background-color: #eef5ff;
+    border-color: #b8d4f5;
+}
+
+.dc-amount-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dc-amount-value {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: #0070d2;
+    letter-spacing: -0.25px;
+}
+
+/* Credit Breakdown */
+.dc-credit-breakdown {
+    background: #fafbfc;
+    border: 1px solid #e4e9f0;
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.dc-breakdown-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #3e3e3c;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 1rem 0;
+}
+
+.dc-breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.625rem 0;
+}
+
+.dc-breakdown-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #444;
+}
+
+.dc-breakdown-value {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.dc-value-available {
+    color: #0070d2;
+}
+
+.dc-value-deduct {
+    color: #c23030;
+}
+
+.dc-value-remaining {
+    color: #2e844a;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.dc-breakdown-total {
+    background-color: #f0f7f3;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.dc-breakdown-total .dc-breakdown-label {
+    font-weight: 600;
+    color: #333;
+}
+
+.dc-breakdown-divider {
+    height: 1px;
+    background-color: #e8ecf0;
+}
+
+/* Warning Banner */
+.dc-warning-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background-color: #fef3e8;
+    border: 1px solid #f5a623;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.dc-warning-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.dc-warning-text {
+    margin: 0;
+    font-size: 13px;
+    color: #7c4500;
+    line-height: 1.5;
+}
+
+/* Notes Section */
+.dc-notes-section {
+    margin-top: 0.5rem;
+}

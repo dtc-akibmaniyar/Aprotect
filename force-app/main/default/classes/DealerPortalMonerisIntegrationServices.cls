@@ -9,15 +9,15 @@ public without sharing class DealerPortalMonerisIntegrationServices {
      * 1. Remittance Form is created (Dealer or Allocation type).
      * 2. Junction records (Remittance_Line_Item_Junction__c) are created at that time
      *    with Payment_Status__c = 'Planned' and Payment__c = null.
-     * 3. Dealer/Backend makes a payment via one of the three payment methods below.
-     * 4. A Payment__c record is inserted (card, cheque, or e-transfer).
+     * 3. Dealer/Backend makes a payment via one of the four payment methods below.
+     * 4. A Payment__c record is inserted (card, cheque, e-transfer, or dealer credit).
      *    - Flow: Update_Remittance_Line_Item_Junction (on Payment__c Create)
      *      → sets Junction.Payment__c = this Payment Id (links the junction records)
-     *      → for Card payments with status SUCCEEDED, also sets
+     *      → for Card/Dealer Credit payments with status SUCCEEDED, also sets
      *        Payment_Confirmation_Status__c = 'Transaction Completed'.
-     * 5a. Card (immediate): The status is set to 'Transaction Completed' by the Create
-     *     flow above → triggers Makr_Remittance_Line_Items_Junction_Records_Paid flow
-     *     → calls PaymentStatusInvocable → marks junctions, invoice line items,
+     * 5a. Card/Dealer Credit (immediate): The status is set to 'Transaction Completed'
+     *     by the Create flow above → triggers Makr_Remittance_Line_Items_Junction_Records_Paid
+     *     flow → calls PaymentStatusInvocable → marks junctions, invoice line items,
      *     invoices, applications, and application packages as Paid.
      * 5b. Cheque/ETransfer (deferred): Payment stays 'Deposit Pending'. When a finance
      *     user confirms the deposit and sets Payment_Confirmation_Status__c =
@@ -563,6 +563,151 @@ public without sharing class DealerPortalMonerisIntegrationServices {
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
+    // Payment Method 4: Dealer Credit
+    // Immediate confirmation — applies dealer's available credit to pay the
+    // remittance form. Updates Account credit fields and creates a Payment__c
+    // record with 'Transaction Completed' status for immediate cascade.
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Retrieves the available dealer credit for the account associated with
+     * the given Remittance Form. Called by the LWC to display the credit balance.
+     */
+    @AuraEnabled(cacheable=true)
+    public static Decimal getDealerAvailableCredit(String recordId) {
+        if (String.isBlank(recordId)) {
+            return 0;
+        }
+
+        try {
+            Remittance_Form__c rf = [
+                SELECT Id, Dealer_Name__c
+                FROM Remittance_Form__c
+                WHERE Id = :recordId
+                LIMIT 1
+            ];
+
+            if (rf.Dealer_Name__c == null) {
+                return 0;
+            }
+
+            Account dealer = [
+                SELECT Id, Total_Available_Credit__c
+                FROM Account
+                WHERE Id = :rf.Dealer_Name__c
+                LIMIT 1
+            ];
+
+            return dealer.Total_Available_Credit__c != null ? dealer.Total_Available_Credit__c : 0;
+        } catch (Exception e) {
+            System.debug('Error fetching dealer credit: ' + e.getMessage());
+            return 0;
+        }
+    }
+
+    @AuraEnabled
+    public static DealerCreditPaymentResponse processDealerCreditPayment(
+        String  recordId,
+        Decimal paymentAmount,
+        String  notes
+    ) {
+        DealerCreditPaymentResponse response = new DealerCreditPaymentResponse();
+
+        // ── Input validation ──────────────────────────────────────────────────────
+        if (String.isBlank(recordId)) {
+            response.success      = false;
+            response.errorMessage = 'Record ID is required';
+            return response;
+        }
+
+        if (paymentAmount == null || paymentAmount <= 0) {
+            response.success      = false;
+            response.errorMessage = 'Valid payment amount is required';
+            return response;
+        }
+
+        try {
+            // Query the Remittance Form to get the Dealer Account
+            Remittance_Form__c remittanceForm = [
+                SELECT Id, Amount__c, Balance__c, Dealer_Name__c
+                FROM Remittance_Form__c
+                WHERE Id = :recordId
+                LIMIT 1
+            ];
+
+            if (remittanceForm.Dealer_Name__c == null) {
+                response.success      = false;
+                response.errorMessage = 'No dealer account associated with this remittance form';
+                return response;
+            }
+
+            // Query the Dealer Account for available credit
+            Account dealerAccount = [
+                SELECT Id, Total_Available_Credit__c, Applied_Credit__c
+                FROM Account
+                WHERE Id = :remittanceForm.Dealer_Name__c
+                LIMIT 1
+            ];
+
+            Decimal availableCredit = dealerAccount.Total_Available_Credit__c != null
+                ? dealerAccount.Total_Available_Credit__c : 0;
+
+            // Validate sufficient credit (full payment only)
+            if (availableCredit < paymentAmount) {
+                response.success      = false;
+                response.errorMessage = 'Insufficient dealer credit. Available: $' +
+                    availableCredit.setScale(2) + ', Required: $' + paymentAmount.setScale(2);
+                return response;
+            }
+
+            // ── Create Payment__c record ──────────────────────────────────────────
+            Payment__c creditPayment = new Payment__c();
+            creditPayment.Remittance_Form__c            = recordId;
+            creditPayment.Payment_Initiated_Date__c     = DateTime.now();
+            creditPayment.Date_Time__c                  = DateTime.now();
+            creditPayment.Amount__c                     = paymentAmount;
+            creditPayment.Payment_Confirmation_Status__c = 'Transaction Completed'; // immediate
+            creditPayment.Notes__c                      = String.isBlank(notes) ? 'Dealer Credit Applied' : notes;
+            creditPayment.Transaction_Reference__c      = 'DC-' + String.valueOf(recordId).substring(0, 15);
+
+            // Set RecordType to Dealer_Credit
+            // NOTE: You must create this Record Type on Payment__c first.
+            // Developer Name: Dealer_Credit, Label: Dealer Credit
+            creditPayment.RecordTypeId = Schema.SObjectType.Payment__c
+                .getRecordTypeInfosByDeveloperName().get('Dealer_Credit').getRecordTypeId();
+
+            insert creditPayment;
+
+            // ── Update Account credit fields ──────────────────────────────────────
+            Decimal currentApplied = dealerAccount.Applied_Credit__c != null
+                ? dealerAccount.Applied_Credit__c : 0;
+            dealerAccount.Applied_Credit__c = currentApplied + paymentAmount;
+            update dealerAccount;
+
+            // Junction linking and status cascade are handled automatically by flows:
+            // 1. Update_Remittance_Line_Item_Junction (on Payment__c Create):
+            //    Sets Junction.Payment__c = this Payment Id, then sets
+            //    Payment_Confirmation_Status__c = 'Transaction Completed'.
+            // 2. Makr_Remittance_Line_Items_Junction_Records_Paid (on Payment__c Update):
+            //    Detects the status and calls PaymentStatusInvocable to mark
+            //    junctions, invoice line items, and invoices as Paid.
+
+            response.success        = true;
+            response.transactionId  = creditPayment.Id;
+            response.message        = 'Dealer credit applied successfully';
+            response.remainingCredit = availableCredit - paymentAmount;
+
+        } catch (Exception e) {
+            response.success      = false;
+            response.errorMessage = e.getMessage();
+            // Log the failure
+            logMonerisHistory('FAILED', recordId, null, null, null, 'Dealer credit payment error: ' + e.getMessage(), null, null, null);
+        }
+
+        return response;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
     // DTO Classes
     // ─────────────────────────────────────────────────────────────────────────────
 
@@ -680,6 +825,21 @@ public without sharing class DealerPortalMonerisIntegrationServices {
             this.success      = false;
             this.message      = '';
             this.errorMessage = '';
+        }
+    }
+
+    public class DealerCreditPaymentResponse {
+        @AuraEnabled public Boolean success         { get; set; }
+        @AuraEnabled public String  transactionId   { get; set; }
+        @AuraEnabled public String  message         { get; set; }
+        @AuraEnabled public String  errorMessage    { get; set; }
+        @AuraEnabled public Decimal remainingCredit { get; set; }
+
+        public DealerCreditPaymentResponse() {
+            this.success         = false;
+            this.message         = '';
+            this.errorMessage    = '';
+            this.remainingCredit = 0;
         }
     }
 }

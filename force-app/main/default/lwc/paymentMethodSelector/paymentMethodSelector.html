@@ -64,6 +64,34 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Dealer Credit Payment Option -->
+            <template if:true={hasDealerCredit}>
+                <div class="payment-option-card dealer-credit-card" onclick={handleSelectDealerCredit}>
+                    <div class="payment-option-content">
+                        <div class="payment-icon">
+                            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="4" y="8" width="40" height="28" rx="3" stroke="#5184B8" stroke-width="2.5" fill="none"/>
+                                <circle cx="24" cy="22" r="8" stroke="#5184B8" stroke-width="2" fill="none"/>
+                                <path d="M24 18v8M20 22h8" stroke="#5184B8" stroke-width="2" stroke-linecap="round"/>
+                                <rect x="8" y="30" width="32" height="3" rx="1" fill="#5184B8" opacity="0.3"/>
+                            </svg>
+                        </div>
+                        <div class="payment-details">
+                            <h3 class="slds-text-heading_small slds-m-bottom_x-small">
+                                <u>Apply Dealer Credit</u>
+                            </h3>
+                            <p class="slds-text-body_small slds-m-bottom_none">
+                                Apply your available dealer credit to pay this remittance form
+                            </p>
+                            <div class="credit-balance">
+                                <span class="credit-balance-label">Available Credit:</span>
+                                <span class="credit-amount">{formattedAvailableCredit}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
         </div>
     </template>
     <template if:true={disabled}>
@@ -131,5 +159,34 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Dealer Credit Payment Option (disabled) -->
+            <template if:true={hasDealerCredit}>
+                <div class="payment-option-card dealer-credit-card disabled" onclick={handleSelectDealerCredit}>
+                    <div class="payment-option-content">
+                        <div class="payment-icon">
+                            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="4" y="8" width="40" height="28" rx="3" stroke="#5184B8" stroke-width="2.5" fill="none"/>
+                                <circle cx="24" cy="22" r="8" stroke="#5184B8" stroke-width="2" fill="none"/>
+                                <path d="M24 18v8M20 22h8" stroke="#5184B8" stroke-width="2" stroke-linecap="round"/>
+                                <rect x="8" y="30" width="32" height="3" rx="1" fill="#5184B8" opacity="0.3"/>
+                            </svg>
+                        </div>
+                        <div class="payment-details">
+                            <h3 class="slds-text-heading_small slds-m-bottom_x-small">
+                                <u>Apply Dealer Credit</u>
+                            </h3>
+                            <p class="slds-text-body_small slds-m-bottom_none">
+                                Apply your available dealer credit to pay this remittance form
+                            </p>
+                            <div class="credit-balance">
+                                <span class="credit-balance-label">Available Credit:</span>
+                                <span class="credit-amount">{formattedAvailableCredit}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
         </div>
     </template>
+</template>

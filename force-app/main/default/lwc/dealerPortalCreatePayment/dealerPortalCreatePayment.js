@@ -2,9 +2,12 @@ import { LightningElement, api, wire, track } from 'lwc';
 import processPayment from '@salesforce/apex/DealerPortalMonerisIntegrationServices.processPayment';
 import processChequePayment from '@salesforce/apex/DealerPortalMonerisIntegrationServices.processChequePayment';
 import processETransferPayment from '@salesforce/apex/DealerPortalMonerisIntegrationServices.processETransferPayment';
+import processDealerCreditPayment from '@salesforce/apex/DealerPortalMonerisIntegrationServices.processDealerCreditPayment';
+import getDealerAvailableCredit from '@salesforce/apex/DealerPortalMonerisIntegrationServices.getDealerAvailableCredit';
 import getInvoiceBreakdown from '@salesforce/apex/DealerPortalInvoiceBreakdownHandler.getInvoiceBreakdown';
 import { updateRecord, getRecord, notifyRecordUpdateAvailable } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import { refreshApex } from '@salesforce/apex';
 import STATUS_FIELD from '@salesforce/schema/Remittance_Form__c.Status__c';
 import AMOUNT_FIELD from '@salesforce/schema/Remittance_Form__c.Balance__c';
 import CHEQUE_PAYMENT from '@salesforce/resourceUrl/ChequePayment';
@@ -60,8 +63,28 @@ export default class DealerPortalCreatePayment extends LightningElement {
     @track invoiceLoadError = null;
     @track selectedPaymentMethod = null;
 
+    // Dealer Credit Modal
+    @track showDealerCreditModal = false;
+    @track dealerAvailableCredit = 0;
+    @track dealerCreditNotes = '';
+    @track isProcessingDealerCredit = false;
+
     @track monerisObjectInfo;
     @track picklistError;
+
+    // Wire to get dealer available credit
+    _wiredCreditResult;
+
+    @wire(getDealerAvailableCredit, { recordId: '$recordId' })
+    wiredDealerCredit(result) {
+        this._wiredCreditResult = result;
+        if (result.data !== undefined) {
+            this.dealerAvailableCredit = result.data;
+        } else if (result.error) {
+            console.error('Error fetching dealer credit:', result.error);
+            this.dealerAvailableCredit = 0;
+        }
+    }
 
     @wire(getObjectInfo, { objectApiName: PAYMENT_OBJECT })
     wiredMonerisObjectInfo({ error, data }) {
@@ -108,6 +131,25 @@ export default class DealerPortalCreatePayment extends LightningElement {
 
     get isPaymentDisabled() {
         return this.remittanceFormStatus === 'Completed' || this.remittanceFormStatus === 'Cancelled' || this.remittanceFormStatus === 'Expired';
+    }
+
+    // Dealer Credit getters
+    get formattedDealerCredit() {
+        const credit = this.dealerAvailableCredit || 0;
+        return '$' + parseFloat(credit).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    get isDealerCreditInsufficient() {
+        return (this.dealerAvailableCredit || 0) < (this.remittanceFormAmount || 0);
+    }
+
+    get formattedRemainingCredit() {
+        const remaining = (this.dealerAvailableCredit || 0) - (this.remittanceFormAmount || 0);
+        return '$' + Math.max(0, remaining).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    get isDealerCreditSubmitDisabled() {
+        return this.isDealerCreditInsufficient || this.isProcessingDealerCredit;
     }
 
     handlePaymentMethodSelected(event) {
@@ -285,6 +327,9 @@ export default class DealerPortalCreatePayment extends LightningElement {
             case 'eTransfer':
                 this.eTransferAmount = this.remittanceFormAmount;
                 this.showETransferModal = true;
+                break;
+            case 'dealerCredit':
+                this.showDealerCreditModal = true;
                 break;
         }
     }
@@ -589,6 +634,87 @@ export default class DealerPortalCreatePayment extends LightningElement {
         } catch (error) {
             console.error('E-Transfer payment error:', error);
             this.showToast('Error', error.body?.message || 'An error occurred while saving E-Transfer details', 'error');
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Dealer Credit Payment Handlers
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    handleCloseDealerCreditModal() {
+        this.showDealerCreditModal = false;
+        this.dealerCreditNotes = '';
+    }
+
+    handleBackFromDealerCreditModal() {
+        this.showDealerCreditModal = false;
+        this.dealerCreditNotes = '';
+        this.showInvoiceSelectionModal = true;
+    }
+
+    handleDealerCreditNotesChange(event) {
+        this.dealerCreditNotes = event.target.value;
+    }
+
+    handleSubmitDealerCredit() {
+        // Validate sufficient credit
+        if (this.isDealerCreditInsufficient) {
+            this.showToast('Error', 'Insufficient dealer credit to complete this payment', 'error');
+            return;
+        }
+
+        // Call Apex method to process dealer credit payment
+        this.saveDealerCreditPayment();
+    }
+
+    async saveDealerCreditPayment() {
+        // Prevent payment when remittance form is already paid
+        if (this.isPaymentDisabled) {
+            return;
+        }
+
+        if (this.isProcessingDealerCredit) {
+            return;
+        }
+
+        this.isProcessingDealerCredit = true;
+
+        try {
+            const result = await processDealerCreditPayment({
+                recordId: this.recordId,
+                paymentAmount: this.remittanceFormAmount,
+                notes: this.dealerCreditNotes
+            });
+
+            if (result && result.success) {
+                this.showToast('Success', 'Dealer credit applied successfully', 'success');
+                this.dispatchEvent(new CustomEvent('dealercreditapplied', {
+                    detail: {
+                        method: 'dealerCredit',
+                        amount: this.remittanceFormAmount,
+                        notes: this.dealerCreditNotes,
+                        transactionId: result.transactionId,
+                        remainingCredit: result.remainingCredit
+                    }
+                }));
+                this.showDealerCreditModal = false;
+                this.dealerCreditNotes = '';
+                // Refresh the record data
+                notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
+                // Refresh dealer credit balance
+                refreshApex(this._wiredCreditResult);
+                // Refresh transaction history display
+                if (this.refs.transactionHistoryDisplay) {
+                    this.refs.transactionHistoryDisplay.refreshTransactions();
+                }
+            } else {
+                this.showToast('Error', result?.errorMessage || 'Failed to apply dealer credit', 'error');
+            }
+        } catch (error) {
+            console.error('Dealer credit payment error:', error);
+            this.showToast('Error', error.body?.message || 'An error occurred while applying dealer credit', 'error');
+        } finally {
+            this.isProcessingDealerCredit = false;
         }
     }
 
