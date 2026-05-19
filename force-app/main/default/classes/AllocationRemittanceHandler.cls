@@ -1,5 +1,39 @@
 public with sharing class AllocationRemittanceHandler {
 
+    /**
+     * Computes the customer-facing display price for an Application Package.
+     * If Dealer_Price_Override__c is set → use it as total (tax-inclusive).
+     * Otherwise → use Contract_Premium_Price__c (retail with tax).
+     */
+    private static Decimal getDisplayPrice(Application_Package__c pkg) {
+        if (pkg.Dealer_Price_Override__c != null) {
+            return pkg.Dealer_Price_Override__c;
+        }
+        return pkg.Contract_Premium_Price__c != null ? pkg.Contract_Premium_Price__c : 0;
+    }
+
+    /**
+     * Returns the pre-tax display price for an Application Package.
+     * If Dealer_Price_Override__c is set → back-calculate pre-tax from override.
+     * Otherwise → use Contract_Premium_Price_Without_Tax__c.
+     */
+    private static Decimal getDisplayPriceWithoutTax(Application_Package__c pkg) {
+        if (pkg.Dealer_Price_Override__c != null) {
+            Decimal taxPct = pkg.Tax_Percentage__c != null ? pkg.Tax_Percentage__c : 0;
+            return taxPct > 0
+                ? (pkg.Dealer_Price_Override__c / (1 + taxPct / 100)).setScale(2, System.RoundingMode.HALF_UP)
+                : pkg.Dealer_Price_Override__c;
+        }
+        return pkg.Contract_Premium_Price_Without_Tax__c != null ? pkg.Contract_Premium_Price_Without_Tax__c : 0;
+    }
+
+    /**
+     * Returns the tax amount for display purposes.
+     */
+    private static Decimal getDisplayTaxAmount(Application_Package__c pkg) {
+        return getDisplayPrice(pkg) - getDisplayPriceWithoutTax(pkg);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Get confirmation/preview data filtered by selected service types
     // ─────────────────────────────────────────────────────────────────────────
@@ -22,8 +56,9 @@ public with sharing class AllocationRemittanceHandler {
                        Vehicle_Model__c,
                        Vehicle_Trim__c,
                        (SELECT Id, RecordType.DeveloperName, RecordType.Name,
-                               Contract_Cost_Price__c, Contract_Cost_Price_Without_Tax__c,
-                               Tax_Amount_Cost__c, Tax_Percentage__c
+                               Contract_Premium_Price__c, Contract_Premium_Price_Without_Tax__c,
+                               Dealer_Price_Override__c,
+                               Tax_Amount__c, Tax_Percentage__c
                         FROM Application_Packages__r
                         WHERE Active__c = true
                         AND RecordType.DeveloperName IN :selectedServiceTypes
@@ -54,9 +89,9 @@ public with sharing class AllocationRemittanceHandler {
                     AllocationLineItem li = new AllocationLineItem();
                     li.packageId        = pkg.Id;
                     li.serviceName      = pkg.RecordType != null ? pkg.RecordType.Name : '';
-                    li.priceWithoutTax  = pkg.Contract_Cost_Price_Without_Tax__c;
-                    li.priceWithTax     = pkg.Contract_Cost_Price__c;
-                    li.taxAmount        = pkg.Tax_Amount_Cost__c;
+                    li.priceWithoutTax  = getDisplayPriceWithoutTax(pkg);
+                    li.priceWithTax     = getDisplayPrice(pkg);
+                    li.taxAmount        = getDisplayTaxAmount(pkg);
                     li.taxPercentage    = pkg.Tax_Percentage__c;
                     lineItems.add(li);
                 }
@@ -241,7 +276,10 @@ public with sharing class AllocationRemittanceHandler {
                 for (Invoice__c inv : invoices) invoiceIds.add(inv.Id);
 
                 eligibleLineItems = [
-                    SELECT Id, Invoice__c, Contract_Cost_Price__c
+                    SELECT Id, Invoice__c, Application_Package__c,
+                           Application_Package__r.Contract_Premium_Price__c,
+                           Application_Package__r.Dealer_Price_Override__c,
+                           Contract_Cost_Price__c
                     FROM Invoice_Line_Item__c
                     WHERE Invoice__c IN :invoiceIds
                     AND Status__c != 'Paid'
@@ -289,14 +327,23 @@ public with sharing class AllocationRemittanceHandler {
             }
             update invoices;
 
-            // Insert junctions for all eligible line items
+            // Insert junctions for all eligible line items using retail/custom prices
             List<Remittance_Line_Item_Junction__c> junctions = new List<Remittance_Line_Item_Junction__c>();
             for (Invoice_Line_Item__c li : eligibleLineItems) {
+                // Use retail/custom price instead of cost price
+                Decimal displayPrice = li.Contract_Cost_Price__c; // fallback
+                if (li.Application_Package__r != null) {
+                    if (li.Application_Package__r.Dealer_Price_Override__c != null) {
+                        displayPrice = li.Application_Package__r.Dealer_Price_Override__c;
+                    } else if (li.Application_Package__r.Contract_Premium_Price__c != null) {
+                        displayPrice = li.Application_Package__r.Contract_Premium_Price__c;
+                    }
+                }
                 junctions.add(new Remittance_Line_Item_Junction__c(
                     Remittance_Form__c    = remittanceForm.Id,
                     Invoice__c            = li.Invoice__c,
                     Invoice_Line_Item__c  = li.Id,
-                    Line_Item_Amount__c   = li.Contract_Cost_Price__c,
+                    Line_Item_Amount__c   = displayPrice,
                     Payment_Status__c     = 'Planned'
                 ));
             }

@@ -388,6 +388,25 @@ public without sharing class ApplicationSummaryController {
                 data.lienHolderInfo.lenderName = app.Financial_Institution_Lender__c;
                 data.lienHolderInfo.phone = app.Lender_Phone__c;
                 data.lienHolderInfo.street = app.Lender_Address__c;
+            } else {
+                // Fallback: try to read from GAP/Loan Protection Application_Package__c
+                try {
+                    List<Application_Package__c> gapPackages = [
+                        SELECT Lender_Lienholder__c
+                        FROM Application_Package__c
+                        WHERE Application__c = :applicationId
+                            AND (RecordType.DeveloperName = 'GAP_Coverage' OR RecordType.DeveloperName = 'Loan_Protection')
+                            AND Active__c = true
+                            AND Lender_Lienholder__c != null
+                        ORDER BY LastModifiedDate DESC
+                        LIMIT 1
+                    ];
+                    if (!gapPackages.isEmpty()) {
+                        data.lienHolderInfo.lenderName = gapPackages[0].Lender_Lienholder__c;
+                    }
+                } catch (Exception gapEx) {
+                    // Non-fatal: GAP package fallback failed
+                }
             }
             
             // Populate Financed Vehicle Loan Details - with null checks

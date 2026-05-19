@@ -217,6 +217,13 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             
             // Update price based on loaded data (don't use stored price value)
             this.updatePrice();
+            
+            // Restore custom price override if it was active
+            if (savedData.isPriceOverridden && savedData.price) {
+                this.price = savedData.price;
+                this.isPriceOverridden = true;
+                console.log('✅ Restored custom price override from session:', this.price);
+            }
         }
         
         // Check if we have an applicationId after a short delay
@@ -503,8 +510,12 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                 const hasExistingSelection = this.isExistingApplication && this.selectedDealerPackage;
                 this.currentView = 'planSelection';
                 
-                // Update price after checking for existing package
-                this.updatePrice();
+                // Update price after checking for existing package — but only if
+                // checkForExistingApplicationPackage didn't already restore a
+                // dealer price override (which updatePrice would wipe out).
+                if (!this.isPriceOverridden) {
+                    this.updatePrice();
+                }
                 
                 // Update selection highlighting after packages are loaded
                 setTimeout(() => {
@@ -1698,6 +1709,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             rimBrand: this.rimBrand,
             rimType: this.rimType,
             dealerComments: this.dealerComments,
+            isPriceOverridden: this.isPriceOverridden,
         };
         
         sessionStorage.setItem('moreProductsData', JSON.stringify(moreProductsData));
@@ -2322,7 +2334,8 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                     dealerPackageId: String(this.selectedDealerPackage.Id),
                     packageName: String(this.selectedDealerPackage.PackageName),
                     selectedTermId: String(this.selectedWarrantyTerm.Id),
-                    recordType: 'Tire_Rim_Protection_Plan'
+                    recordType: 'Tire_Rim_Protection_Plan',
+                    dealerPriceOverride: this.isPriceOverridden ? this.price : null
                 };
                 
                 // Add optional tire/rim details when present
@@ -2543,7 +2556,8 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                     dealerPackageId: String(this.selectedDealerPackage.Id),
                     packageName: String(this.selectedDealerPackage.PackageName),
                     selectedTermId: String(this.selectedWarrantyTerm.Id),
-                    recordType: 'Tire_Rim_Protection_Plan'
+                    recordType: 'Tire_Rim_Protection_Plan',
+                    dealerPriceOverride: this.isPriceOverridden ? this.price : null
                 };
 
                 // Add optional tire/rim details when present (will update existing record if created early)

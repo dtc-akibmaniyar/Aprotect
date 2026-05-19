@@ -837,6 +837,7 @@ public static VehicleResponse loadVehicleData(String applicationId) {
                 vehicleData.usageType = vehicle.Usage_Type__c;
                 vehicleData.vehicleSubType = vehicle.Vehicle_Sub_Type__c;
                 vehicleData.vehicleClass = vehicle.Vehicle_Class__c;
+                vehicleData.vehicleCategory = vehicle.Vehicle_Category__c;
                 
 
                 if (app.Dealer_Comments_Notes__c != null) {
@@ -1943,16 +1944,18 @@ packageToSave = existingPkg;
         packageToSave.Package_Tier__c = packageTierId;
         
 
+        Decimal dealerTaxRate = null; // Tax rate from dealer's region (percentage, e.g. 13 for 13%)
         if (String.isNotBlank(dealerId)) {
             try {
                 List<Account> dealers = [
-                    SELECT Id, Tax_Region__c
+                    SELECT Id, Tax_Region__c, Tax_Region__r.Total_Tax_Rate__c
                     FROM Account
                     WHERE Id = :dealerId
                     LIMIT 1
                 ];
                 if (!dealers.isEmpty() && dealers[0].Tax_Region__c != null) {
                     packageToSave.Tax_Region__c = dealers[0].Tax_Region__c;
+                    dealerTaxRate = dealers[0].Tax_Region__r != null ? dealers[0].Tax_Region__r.Total_Tax_Rate__c : null;
 }
             } catch (Exception e) {
 }
@@ -1968,10 +1971,48 @@ packageToSave = existingPkg;
             packageToSave.Dealer_Price_Override__c = (overrideValue != null && String.valueOf(overrideValue) != 'null')
                 ? Decimal.valueOf(String.valueOf(overrideValue))
                 : null;
+            // When custom pricing (override) is applied, zero out markups and
+            // back-calculate Dealer_Package_Price__c so formula fields like
+            // Contract_Premium_Price_Without_Tax__c, Tax_Amount__c, and
+            // Dealer_Package_Retail_Price__c reflect the custom price correctly.
+            if (packageToSave.Dealer_Price_Override__c != null) {
+                packageToSave.Dealer_Markup__c = 0;
+                packageToSave.Add_Ons_Markup__c = 0;
+                // Back-calculate pre-tax price: override includes tax, so divide it out
+                Decimal taxRateForCalc = (dealerTaxRate != null && dealerTaxRate > 0) ? dealerTaxRate : 0;
+                Decimal preTaxPrice = packageToSave.Dealer_Price_Override__c / (1 + taxRateForCalc / 100);
+                packageToSave.Dealer_Package_Price__c = preTaxPrice.setScale(2, RoundingMode.HALF_UP);
+            } else {
+                // Override removed — restore original base price and markup from
+                // the Dealer_Package_Term__c record so the summary shows the
+                // correct retail price instead of stale back-calculated values.
+                String termIdForRestore = (String) packageDataMap.get('selectedTermId');
+                if (String.isBlank(termIdForRestore)) {
+                    termIdForRestore = packageToSave.Dealer_Package_Term__c;
+                }
+                if (String.isNotBlank(termIdForRestore)) {
+                    List<Dealer_Package_Term__c> originalTerms = [
+                        SELECT Original_Package_Term_Cost__c, Net_Cost__c, Markup__c
+                        FROM Dealer_Package_Term__c
+                        WHERE Id = :termIdForRestore
+                        LIMIT 1
+                    ];
+                    if (!originalTerms.isEmpty()) {
+                        Dealer_Package_Term__c origTerm = originalTerms[0];
+                        Decimal origCost = origTerm.Net_Cost__c != null ? origTerm.Net_Cost__c : origTerm.Original_Package_Term_Cost__c;
+                        packageToSave.Dealer_Package_Price__c = origCost;
+                        packageToSave.Dealer_Markup__c = origTerm.Markup__c != null ? origTerm.Markup__c : 0;
+                        packageToSave.Add_Ons_Markup__c = 0;
+                    }
+                }
+            }
         }
         if (packageDataMap.containsKey('dealerMarkup')) {
-            Object markupValue = packageDataMap.get('dealerMarkup');
-            packageToSave.Dealer_Markup__c = markupValue != null ? Decimal.valueOf(String.valueOf(markupValue)) : null;
+            // Only apply markup from the map if no custom price override is active
+            if (packageToSave.Dealer_Price_Override__c == null) {
+                Object markupValue = packageDataMap.get('dealerMarkup');
+                packageToSave.Dealer_Markup__c = markupValue != null ? Decimal.valueOf(String.valueOf(markupValue)) : null;
+            }
         }
         if (packageDataMap.containsKey('deductible')) {
             Object deductibleValue = packageDataMap.get('deductible');
@@ -2074,6 +2115,18 @@ if (isNewPackage) {
                 }
             } catch (Exception relinkEx) {
                 // Non-fatal: log and continue
+            }
+        }
+
+        // Sync lien holder / financial institution to Application__c so the summary page can read it
+        if (packageDataMap.containsKey('lenderLienholder') && String.isNotBlank(applicationId)) {
+            try {
+                Application__c appToUpdate = new Application__c(Id = applicationId);
+                appToUpdate.Financial_Institution_Lender__c = (String) packageDataMap.get('lenderLienholder');
+                update appToUpdate;
+            } catch (Exception lienEx) {
+                // Non-fatal: log and continue
+                System.debug('Warning: Could not sync lien holder to Application: ' + lienEx.getMessage());
             }
         }
 
@@ -3111,6 +3164,7 @@ vehicle.Delivery_Date__c = null;
         vehicle.Usage_Type__c = (String) vehicleDataMap.get('usageType');
         vehicle.Vehicle_Sub_Type__c = (String) vehicleDataMap.get('vehicleSubType');
         vehicle.Vehicle_Class__c = (String) vehicleDataMap.get('vehicleClass');
+        vehicle.Vehicle_Category__c = (String) vehicleDataMap.get('vehicleCategory');
 
 
         String vehicleName = '';
@@ -4168,7 +4222,7 @@ private static List<Application__c> queryApplications(String applicationId, Bool
             'Vehicle__r.Odometer__c, Vehicle__r.Odometer_Unit__c, Vehicle__r.Business_Commercial_Use__c, Vehicle__r.Type_of_Commercial_Use__c, ' +
             'Vehicle__r.Engine__c, Vehicle__r.Transmission__c, Vehicle__r.Fuel_Type__c, Vehicle__r.Drive_Type__c, Vehicle__r.Body_Style__c, ' +
             'Vehicle__r.Color__c, Vehicle__r.GVWR__c, Vehicle__r.Manufacturer_Warranty_Type__c, Vehicle__r.Warranty_Term__c, ' +
-            'Vehicle__r.Deferral_Option__c, Vehicle__r.Delivery_Date__c, Vehicle__r.Usage_Type__c, Vehicle__r.Vehicle_Sub_Type__c, Vehicle__r.Vehicle_Class__c, ' +
+            'Vehicle__r.Deferral_Option__c, Vehicle__r.Delivery_Date__c, Vehicle__r.Usage_Type__c, Vehicle__r.Vehicle_Sub_Type__c, Vehicle__r.Vehicle_Class__c, Vehicle__r.Vehicle_Category__c, ' +
             'Dealer_Name__c, Dealer_Name__r.Id, Dealer_Name__r.Name, Dealer_Name__r.BillingStreet, Dealer_Name__r.BillingCity, ' +
             'Dealer_Name__r.BillingState, Dealer_Name__r.BillingPostalCode, Dealer_Comments_Notes__c, Show_Comments_On_Print__c, ' +
             'Sales_Rep__c, Sales_Rep__r.Id, Sales_Rep__r.Name, Dealer_Sales_ID_License__c' :
@@ -6355,4 +6409,36 @@ public class MileageComparator implements Comparator<Dealer_Package_Term__c> {
             return response;
         }
     }
+
+    /**
+     * Save lien holder / financial institution data directly to Application__c
+     * Called when the GAP tab is completed WITHOUT selecting a package (skip path).
+     * This ensures lien holder data is persisted even without a GAP Application_Package__c.
+     * @param applicationId The Application record ID
+     * @param lenderLienholder The lien holder / financial institution name
+     * @return Map with success status
+     */
+    @AuraEnabled
+    public static Map<String, Object> saveLienHolderToApplication(String applicationId, String lenderLienholder) {
+        Map<String, Object> result = new Map<String, Object>();
+        try {
+            if (String.isBlank(applicationId)) {
+                result.put('success', false);
+                result.put('message', 'Application ID is required');
+                return result;
+            }
+            
+            Application__c app = new Application__c(Id = applicationId);
+            app.Financial_Institution_Lender__c = String.isNotBlank(lenderLienholder) ? lenderLienholder : null;
+            update app;
+            
+            result.put('success', true);
+            result.put('message', 'Lien holder saved to application');
+        } catch (Exception e) {
+            result.put('success', false);
+            result.put('message', 'Error saving lien holder: ' + e.getMessage());
+        }
+        return result;
+    }
+
 }

@@ -3,5 +3,5 @@
     <apiVersion>59.0</apiVersion>
     <availableInTouch>false</availableInTouch>
     <confirmationTokenRequired>false</confirmationTokenRequired>
-    <label>Invoice Detail PDF</label>
+    <label>InvoiceDetailPDF</label>
 </ApexPage>

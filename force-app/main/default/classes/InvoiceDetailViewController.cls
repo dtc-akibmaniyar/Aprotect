@@ -1,5 +1,17 @@
 public without sharing class InvoiceDetailViewController {
 
+    /**
+     * Computes the customer-facing display price for an Application Package.
+     * If Dealer_Price_Override__c is set → use it as total (tax-inclusive).
+     * Otherwise → use Contract_Premium_Price__c (retail with tax).
+     */
+    private static Decimal getDisplayPrice(Application_Package__c pkg) {
+        if (pkg.Dealer_Price_Override__c != null) {
+            return pkg.Dealer_Price_Override__c;
+        }
+        return pkg.Contract_Premium_Price__c != null ? pkg.Contract_Premium_Price__c : 0;
+    }
+
     @AuraEnabled(cacheable=true)
     public static InvoiceDetailData getInvoiceDetail(String invoiceId) {
         try {
@@ -47,6 +59,7 @@ public without sharing class InvoiceDetailViewController {
         ];
 
         // ── 3. Query only the Application Packages referenced by line items ────
+        //       Now includes retail/custom pricing fields for display
         Set<Id> packageIds = new Set<Id>();
         for (Invoice_Line_Item__c li : lineItems) {
             if (li.Application_Package__c != null) packageIds.add(li.Application_Package__c);
@@ -57,16 +70,34 @@ public without sharing class InvoiceDetailViewController {
                 SELECT Id, Application__c, Package__r.Name, Package_Term__r.Name,
                        Odometer_Start__c, Odometer_End__c,
                        Contract_Start_Date__c, Contract_End_Date__c,
-                       RecordType.Name
+                       RecordType.Name,
+                       Contract_Premium_Price__c,
+                       Contract_Premium_Price_Without_Tax__c,
+                       Tax_Amount__c,
+                       Dealer_Price_Override__c,
+                       Tax_Percentage__c
                 FROM Application_Package__c
                 WHERE Id IN :packageIds
               ];
 
-        // ── 4. Map package → line items ───────────────────────────────────────
+        // Build a map of package Id → display price
+        Map<Id, Decimal> pkgDisplayPrice = new Map<Id, Decimal>();
+        for (Application_Package__c pkg : packages) {
+            pkgDisplayPrice.put(pkg.Id, getDisplayPrice(pkg));
+        }
+
+        // ── 4. Map package → line items using display prices ──────────────────
         Map<Id, List<Invoice_Line_Item__c>> pkgToLineItems = new Map<Id, List<Invoice_Line_Item__c>>();
+        // Track display price per line item (for grand total)
+        Map<Id, Decimal> lineItemDisplayPrice = new Map<Id, Decimal>();
         Decimal grandTotal = 0;
         for (Invoice_Line_Item__c li : lineItems) {
-            grandTotal += li.Contract_Cost_Price__c != null ? li.Contract_Cost_Price__c : 0;
+            // Use display price from package instead of cost price
+            Decimal displayAmt = (li.Application_Package__c != null && pkgDisplayPrice.containsKey(li.Application_Package__c))
+                ? pkgDisplayPrice.get(li.Application_Package__c)
+                : (li.Contract_Cost_Price__c != null ? li.Contract_Cost_Price__c : 0);
+            lineItemDisplayPrice.put(li.Id, displayAmt);
+            grandTotal += displayAmt;
             if (li.Application_Package__c != null) {
                 if (!pkgToLineItems.containsKey(li.Application_Package__c)) {
                     pkgToLineItems.put(li.Application_Package__c, new List<Invoice_Line_Item__c>());
@@ -128,7 +159,8 @@ public without sharing class InvoiceDetailViewController {
                     LineItemData ld = new LineItemData();
                     ld.lineItemId = li.Id;
                     ld.status     = li.Status__c;
-                    ld.amount     = li.Contract_Cost_Price__c;
+                    // Use retail/custom display price instead of cost
+                    ld.amount     = lineItemDisplayPrice.get(li.Id);
                     pd.lineItems.add(ld);
                 }
             }
@@ -213,16 +245,16 @@ public without sharing class InvoiceDetailViewController {
                 return new OperationResult(true, 'Cancellation request submitted successfully.');
             } else {
                 // Line item-level cancellation
-                List<Invoice_Line_Item__c> lineItems = [
+                List<Invoice_Line_Item__c> lineItems2 = [
                     SELECT Id, Status__c
                     FROM Invoice_Line_Item__c
                     WHERE Id = :lineItemId
                     LIMIT 1
                 ];
-                if (lineItems.isEmpty()) {
+                if (lineItems2.isEmpty()) {
                     return new OperationResult(false, 'Invoice line item not found.');
                 }
-                Invoice_Line_Item__c li = lineItems[0];
+                Invoice_Line_Item__c li = lineItems2[0];
                 if (li.Status__c == 'Cancelled') {
                     return new OperationResult(false, 'This line item is already cancelled.');
                 }
@@ -275,7 +307,7 @@ public without sharing class InvoiceDetailViewController {
             }
 
             String dealerId   = inv.Application__r?.Dealer_Name__c;
-            String dealerName = inv.Application__r?.Dealer_Name__r?.Name != null
+            String dealerName2 = inv.Application__r?.Dealer_Name__r?.Name != null
                 ? inv.Application__r.Dealer_Name__r.Name : '';
 
             Remittance_Form__c rf = new Remittance_Form__c(
@@ -283,7 +315,7 @@ public without sharing class InvoiceDetailViewController {
                                        .getRecordTypeInfosByDeveloperName()
                                        .get('Dealer_Remittance').getRecordTypeId(),
                 Receiver_Name__c = 'A-Protect',
-                Payer_Name__c    = dealerName,
+                Payer_Name__c    = dealerName2,
                 Dealer_Name__c   = dealerId,
                 Status__c        = 'Open'
             );
@@ -298,20 +330,18 @@ public without sharing class InvoiceDetailViewController {
             update new Invoice__c(Id = inv.Id, Remittance_Form__c = rf.Id);
 
             // Query unpaid line items for this invoice
-            List<Invoice_Line_Item__c> lineItems = [
+            List<Invoice_Line_Item__c> lineItems3 = [
                 SELECT Id, Contract_Cost_Price__c
                 FROM Invoice_Line_Item__c
                 WHERE Invoice__c = :invoiceId
                 AND Status__c != 'Paid'
             ];
 
-            if (!lineItems.isEmpty()) {
+            if (!lineItems3.isEmpty()) {
                 Set<Id> unpaidLineItemIds = new Set<Id>();
-                for (Invoice_Line_Item__c li : lineItems) unpaidLineItemIds.add(li.Id);
+                for (Invoice_Line_Item__c li : lineItems3) unpaidLineItemIds.add(li.Id);
 
                 // Delete stale Planned junctions from previous remittance attempts
-                // so we don't leave orphaned records on the old form.
-                // Paid junctions are intentionally preserved.
                 List<Remittance_Line_Item_Junction__c> staleJunctions = [
                     SELECT Id
                     FROM Remittance_Line_Item_Junction__c
@@ -322,7 +352,7 @@ public without sharing class InvoiceDetailViewController {
 
                 // Create fresh junction records on the new remittance form
                 List<Remittance_Line_Item_Junction__c> junctions = new List<Remittance_Line_Item_Junction__c>();
-                for (Invoice_Line_Item__c li : lineItems) {
+                for (Invoice_Line_Item__c li : lineItems3) {
                     junctions.add(new Remittance_Line_Item_Junction__c(
                         Remittance_Form__c   = rf.Id,
                         Invoice__c           = inv.Id,

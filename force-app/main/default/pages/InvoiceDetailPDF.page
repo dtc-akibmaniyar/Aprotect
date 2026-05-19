@@ -125,21 +125,21 @@
                                     <apex:repeat var="li" value="{!row.lineItems}">
                                         <div style="display:table; width:100%;">
                                             <span style="display:table-cell; padding-right:6px; font-size:8px; font-weight:bold; text-align:right; white-space:nowrap;">
-                                                <apex:outputPanel rendered="{!li.Status__c == 'Paid'}">
-                                                    <span style="color:#5cb85c;">{!li.Status__c}</span>
+                                                <apex:outputPanel rendered="{!li.lineItem.Status__c == 'Paid'}">
+                                                    <span style="color:#5cb85c;">{!li.lineItem.Status__c}</span>
                                                 </apex:outputPanel>
-                                                <apex:outputPanel rendered="{!li.Status__c == 'Planned'}">
-                                                    <span style="color:#5184B8;">{!li.Status__c}</span>
+                                                <apex:outputPanel rendered="{!li.lineItem.Status__c == 'Planned'}">
+                                                    <span style="color:#5184B8;">{!li.lineItem.Status__c}</span>
                                                 </apex:outputPanel>
-                                                <apex:outputPanel rendered="{!li.Status__c == 'Partial Paid'}">
-                                                    <span style="color:#f0ad4e;">{!li.Status__c}</span>
+                                                <apex:outputPanel rendered="{!li.lineItem.Status__c == 'Partial Paid'}">
+                                                    <span style="color:#f0ad4e;">{!li.lineItem.Status__c}</span>
                                                 </apex:outputPanel>
-                                                <apex:outputPanel rendered="{!AND(li.Status__c != 'Paid', li.Status__c != 'Planned', li.Status__c != 'Partial Paid')}">
-                                                    <span style="color:#d9534f;">{!li.Status__c}</span>
+                                                <apex:outputPanel rendered="{!AND(li.lineItem.Status__c != 'Paid', li.lineItem.Status__c != 'Planned', li.lineItem.Status__c != 'Partial Paid')}">
+                                                    <span style="color:#d9534f;">{!li.lineItem.Status__c}</span>
                                                 </apex:outputPanel>
                                             </span>
                                             <span style="display:table-cell; font-size:9px; font-weight:600; color:#5184B8; text-align:right;">
-                                                <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!li.Contract_Cost_Price__c}"/></apex:outputText>
+                                                <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!li.displayPrice}"/></apex:outputText>
                                             </span>
                                         </div>
                                     </apex:repeat>

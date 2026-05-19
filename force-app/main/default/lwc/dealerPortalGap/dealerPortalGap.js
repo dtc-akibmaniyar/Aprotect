@@ -13,6 +13,7 @@ import getTotalLossExistingAdditionalOptions from '@salesforce/apex/DealerPortal
 import updateTotalLossAdditionalOptions from '@salesforce/apex/DealerPortalController.updateTotalLossAdditionalOptions';
 import updateTotalLossFieldsSelective from '@salesforce/apex/DealerPortalController.updateTotalLossFieldsSelective';
 import loadVehicleData from '@salesforce/apex/DealerPortalController.loadVehicleData';
+import saveLienHolderToApplication from '@salesforce/apex/DealerPortalController.saveLienHolderToApplication';
 import convertQuoteToApplication from '@salesforce/apex/DealerPortalController.convertQuoteToApplication';
 
 export default class DealerPortalGap extends LightningElement {
@@ -2162,8 +2163,20 @@ export default class DealerPortalGap extends LightningElement {
             try {
                 // If no package selected, just save lien holder data and continue
                 if (!this.selectedDealerPackage || !this.selectedWarrantyTerm) {
-                    console.log('🔍 No GAP package selected — saving lien holder data and continuing');
-                    // Persist lien holder to session storage
+                    console.log('🔍 No GAP package selected — saving lien holder data to Application and continuing');
+                    // Persist lien holder to Application__c so the summary page can read it
+                    try {
+                        if (this.lenderLienholder) {
+                            await saveLienHolderToApplication({
+                                applicationId: this.applicationId,
+                                lenderLienholder: this.lenderLienholder
+                            });
+                            console.log('✅ Lien holder saved to Application__c');
+                        }
+                    } catch (lienErr) {
+                        console.warn('⚠️ Could not save lien holder to Application:', lienErr);
+                    }
+                    // Also persist to session storage for backward compatibility
                     const gapData = {
                         lenderLienholder: this.lenderLienholder || null,
                         financeLoanTerm: this.financeLoanTerm || null,

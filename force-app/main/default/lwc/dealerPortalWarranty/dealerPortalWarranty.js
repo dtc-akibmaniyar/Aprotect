@@ -347,7 +347,10 @@ export default class DealerPortalWarranty extends LightningElement {
                     this.isPriceOverridden = true;
                     // For override, extract pre-tax from stored override
                     const taxRate = result.data.taxPercentage || 0;
-                    this._retailPriceDisplay = taxRate > 0 ? this.price / (1 + taxRate / 100) : this.price;
+                    const preTax = taxRate > 0 ? this.price / (1 + taxRate / 100) : this.price;
+                    this._retailPriceDisplay = preTax;
+                    this._overridePreTaxPrice = preTax;
+                    this._overrideTaxAmount = parseFloat((this.price - preTax).toFixed(2));
                 }
                 
                 // Find the matching dealer package from our loaded packages

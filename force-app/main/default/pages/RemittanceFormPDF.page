@@ -253,24 +253,24 @@
                                             {!pkgWithOpts.applicationPackage.Package__r.Name}
                                         </div>
                                         <div style="display:table-cell; width:30%; text-align:right; vertical-align:middle;">
-                                            <apex:repeat var="lineItem" value="{!pkgWithOpts.packageLineItems}">
+                                            <apex:repeat var="dli" value="{!pkgWithOpts.displayLineItems}">
                                                 <div style="display:table; width:100%;">
                                                     <span style="display:table-cell; padding-right:6px; font-size:8px; font-weight:bold; text-align:right; white-space:nowrap;">
-                                                        <apex:outputPanel rendered="{!lineItem.Status__c == 'Paid'}">
-                                                            <span style="color:#5cb85c;">{!lineItem.Status__c}</span>
+                                                        <apex:outputPanel rendered="{!dli.status == 'Paid'}">
+                                                            <span style="color:#5cb85c;">{!dli.status}</span>
                                                         </apex:outputPanel>
-                                                        <apex:outputPanel rendered="{!lineItem.Status__c == 'Planned'}">
-                                                            <span style="color:#5184B8;">{!lineItem.Status__c}</span>
+                                                        <apex:outputPanel rendered="{!dli.status == 'Planned'}">
+                                                            <span style="color:#5184B8;">{!dli.status}</span>
                                                         </apex:outputPanel>
-                                                        <apex:outputPanel rendered="{!lineItem.Status__c == 'Partial Paid'}">
-                                                            <span style="color:#f0ad4e;">{!lineItem.Status__c}</span>
+                                                        <apex:outputPanel rendered="{!dli.status == 'Partial Paid'}">
+                                                            <span style="color:#f0ad4e;">{!dli.status}</span>
                                                         </apex:outputPanel>
-                                                        <apex:outputPanel rendered="{!AND(lineItem.Status__c != 'Paid', lineItem.Status__c != 'Planned', lineItem.Status__c != 'Partial Paid')}">
-                                                            <span style="color:#d9534f;">{!lineItem.Status__c}</span>
+                                                        <apex:outputPanel rendered="{!AND(dli.status != 'Paid', dli.status != 'Planned', dli.status != 'Partial Paid')}">
+                                                            <span style="color:#d9534f;">{!dli.status}</span>
                                                         </apex:outputPanel>
                                                     </span>
                                                     <span style="display:table-cell; font-size:9px; font-weight:600; color:#5184B8; text-align:right;">
-                                                        <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!lineItem.Contract_Cost_Price__c}"/></apex:outputText>
+                                                        <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!dli.displayPrice}"/></apex:outputText>
                                                     </span>
                                                 </div>
                                             </apex:repeat>

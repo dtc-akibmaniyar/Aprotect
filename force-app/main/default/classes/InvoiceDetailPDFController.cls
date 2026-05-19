@@ -1,4 +1,4 @@
-public without sharing class  InvoiceDetailPDFController {
+public without sharing class InvoiceDetailPDFController {
 
     public Invoice__c         invoice      { get; set; }
     public Application__c     application  { get; set; }
@@ -6,6 +6,18 @@ public without sharing class  InvoiceDetailPDFController {
     public String             billTo       { get; set; }
     public List<PackageRow>   packages     { get; set; }
     public Decimal            grandTotal   { get; set; }
+
+    /**
+     * Computes the customer-facing display price for an Application Package.
+     * If Dealer_Price_Override__c is set → use it as total (tax-inclusive).
+     * Otherwise → use Contract_Premium_Price__c (retail with tax).
+     */
+    private static Decimal getDisplayPrice(Application_Package__c pkg) {
+        if (pkg.Dealer_Price_Override__c != null) {
+            return pkg.Dealer_Price_Override__c;
+        }
+        return pkg.Contract_Premium_Price__c != null ? pkg.Contract_Premium_Price__c : 0;
+    }
 
     public InvoiceDetailPDFController() {
         packages   = new List<PackageRow>();
@@ -52,33 +64,56 @@ public without sharing class  InvoiceDetailPDFController {
         ];
 
         Map<Id, List<Invoice_Line_Item__c>> pkgMap = new Map<Id, List<Invoice_Line_Item__c>>();
+        Set<Id> packageIds = new Set<Id>();
         for (Invoice_Line_Item__c li : lineItems) {
-            grandTotal += li.Contract_Cost_Price__c != null ? li.Contract_Cost_Price__c : 0;
             if (li.Application_Package__c != null) {
+                packageIds.add(li.Application_Package__c);
                 if (!pkgMap.containsKey(li.Application_Package__c))
                     pkgMap.put(li.Application_Package__c, new List<Invoice_Line_Item__c>());
                 pkgMap.get(li.Application_Package__c).add(li);
             }
         }
 
-        // ── 3. Packages ───────────────────────────────────────────────────────
+        // ── 3. Packages with retail/custom pricing fields ─────────────────────
         if (invoice.Application__c != null) {
             List<Application_Package__c> appPkgs = [
                 SELECT Id, Package__r.Name, Package_Term__r.Name,
                        Odometer_Start__c, Odometer_End__c,
                        Contract_Start_Date__c, Contract_End_Date__c,
-                       RecordType.Name
+                       RecordType.Name,
+                       Contract_Premium_Price__c,
+                       Contract_Premium_Price_Without_Tax__c,
+                       Tax_Amount__c,
+                       Dealer_Price_Override__c,
+                       Tax_Percentage__c
                 FROM Application_Package__c
                 WHERE Application__c = :invoice.Application__c
                 LIMIT 200
             ];
+
+            // Build display price map
+            Map<Id, Decimal> pkgDisplayPrice = new Map<Id, Decimal>();
+            for (Application_Package__c pkg : appPkgs) {
+                pkgDisplayPrice.put(pkg.Id, getDisplayPrice(pkg));
+            }
+
             for (Application_Package__c pkg : appPkgs) {
                 PackageRow row    = new PackageRow();
                 row.pkg           = pkg;
-                row.lineItems     = pkgMap.containsKey(pkg.Id) ? pkgMap.get(pkg.Id) : new List<Invoice_Line_Item__c>();
+                row.lineItems     = new List<LineItemWrapper>();
                 row.packageTotal  = 0;
-                for (Invoice_Line_Item__c li : row.lineItems)
-                    row.packageTotal += li.Contract_Cost_Price__c != null ? li.Contract_Cost_Price__c : 0;
+
+                if (pkgMap.containsKey(pkg.Id)) {
+                    Decimal displayPrice = pkgDisplayPrice.get(pkg.Id);
+                    for (Invoice_Line_Item__c li : pkgMap.get(pkg.Id)) {
+                        LineItemWrapper liw = new LineItemWrapper();
+                        liw.lineItem = li;
+                        liw.displayPrice = displayPrice;
+                        row.lineItems.add(liw);
+                        row.packageTotal += displayPrice;
+                    }
+                }
+                grandTotal += row.packageTotal;
                 packages.add(row);
             }
         }
@@ -86,7 +121,12 @@ public without sharing class  InvoiceDetailPDFController {
 
     public class PackageRow {
         public Application_Package__c      pkg          { get; set; }
-        public List<Invoice_Line_Item__c>  lineItems    { get; set; }
+        public List<LineItemWrapper>        lineItems    { get; set; }
         public Decimal                     packageTotal { get; set; }
+    }
+
+    public class LineItemWrapper {
+        public Invoice_Line_Item__c lineItem     { get; set; }
+        public Decimal              displayPrice { get; set; }
     }
 }

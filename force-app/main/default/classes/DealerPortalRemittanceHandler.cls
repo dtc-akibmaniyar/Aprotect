@@ -1,4 +1,38 @@
 public class DealerPortalRemittanceHandler {
+
+    /**
+     * Computes the customer-facing display price for an Application Package.
+     * If Dealer_Price_Override__c is set → use it as total (tax-inclusive).
+     * Otherwise → use Contract_Premium_Price__c (retail with tax).
+     */
+    private static Decimal getDisplayPrice(Application_Package__c pkg) {
+        if (pkg.Dealer_Price_Override__c != null) {
+            return pkg.Dealer_Price_Override__c;
+        }
+        return pkg.Contract_Premium_Price__c != null ? pkg.Contract_Premium_Price__c : 0;
+    }
+
+    /**
+     * Returns the pre-tax display price for an Application Package.
+     * If Dealer_Price_Override__c is set → back-calculate pre-tax from override.
+     * Otherwise → use Contract_Premium_Price_Without_Tax__c.
+     */
+    private static Decimal getDisplayPriceWithoutTax(Application_Package__c pkg) {
+        if (pkg.Dealer_Price_Override__c != null) {
+            Decimal taxPct = pkg.Tax_Percentage__c != null ? pkg.Tax_Percentage__c : 0;
+            return taxPct > 0
+                ? (pkg.Dealer_Price_Override__c / (1 + taxPct / 100)).setScale(2, System.RoundingMode.HALF_UP)
+                : pkg.Dealer_Price_Override__c;
+        }
+        return pkg.Contract_Premium_Price_Without_Tax__c != null ? pkg.Contract_Premium_Price_Without_Tax__c : 0;
+    }
+
+    /**
+     * Returns the tax amount for display purposes.
+     */
+    private static Decimal getDisplayTaxAmount(Application_Package__c pkg) {
+        return getDisplayPrice(pkg) - getDisplayPriceWithoutTax(pkg);
+    }
     
     @AuraEnabled(cacheable=true)
     public static RemittanceFormData getRemittanceForm(List<String> applicationIds) {
@@ -100,13 +134,7 @@ public class DealerPortalRemittanceHandler {
                 ORDER BY CreatedDate DESC
             ];
 
-            // Deduplicate by Application + Name: multiple failed remittance-form attempts
-            // can leave several Invoice records with the same Name for the same Application.
-            // Key = AppId + Name so that genuinely different invoices on the same application
-            // (e.g. a second invoice for additional packages) are still included, while true
-            // duplicates (same App + same Name) are reduced to the most-recent copy only.
-            // This also preserves partial-payment scenarios where an older invoice still has
-            // unpaid line items — as long as it has a different Name it will not be dropped.
+            // Deduplicate by Application + Name
             Map<String, Invoice__c> seenInvoices = new Map<String, Invoice__c>();
             for (Invoice__c inv : allCandidateInvoices) {
                 String key = inv.Application__c + '|' + inv.Name;
@@ -127,9 +155,12 @@ public class DealerPortalRemittanceHandler {
                     invoiceIds.add(invoice.Id);
                 }
 
-                // Query unpaid line items for the deduplicated invoices only
+                // Query unpaid line items with their Application Package for retail/custom pricing
                 List<Invoice_Line_Item__c> lineItems = [
-                    SELECT Id, Invoice__c, Contract_Cost_Price__c
+                    SELECT Id, Invoice__c, Application_Package__c,
+                           Application_Package__r.Contract_Premium_Price__c,
+                           Application_Package__r.Dealer_Price_Override__c,
+                           Contract_Cost_Price__c
                     FROM Invoice_Line_Item__c
                     WHERE Invoice__c IN :invoiceIds
                     AND Status__c != 'Paid'
@@ -149,11 +180,20 @@ public class DealerPortalRemittanceHandler {
                 List<Remittance_Line_Item_Junction__c> newJunctionRecords = new List<Remittance_Line_Item_Junction__c>();
                 for (Invoice_Line_Item__c lineItem : lineItems) {
                     if (!existingLineItemIds.contains(lineItem.Id)) {
+                        // Use retail/custom price instead of cost price
+                        Decimal displayPrice = lineItem.Contract_Cost_Price__c; // fallback
+                        if (lineItem.Application_Package__r != null) {
+                            if (lineItem.Application_Package__r.Dealer_Price_Override__c != null) {
+                                displayPrice = lineItem.Application_Package__r.Dealer_Price_Override__c;
+                            } else if (lineItem.Application_Package__r.Contract_Premium_Price__c != null) {
+                                displayPrice = lineItem.Application_Package__r.Contract_Premium_Price__c;
+                            }
+                        }
                         newJunctionRecords.add(new Remittance_Line_Item_Junction__c(
                             Remittance_Form__c   = newRemittanceForm.Id,
                             Invoice__c           = lineItem.Invoice__c,
                             Invoice_Line_Item__c = lineItem.Id,
-                            Line_Item_Amount__c  = lineItem.Contract_Cost_Price__c,
+                            Line_Item_Amount__c  = displayPrice,
                             Payment_Status__c    = 'Planned'
                         ));
                     }
@@ -194,7 +234,7 @@ public class DealerPortalRemittanceHandler {
             BulkConfirmationData result = new BulkConfirmationData();
             List<BulkConfirmationRecord> confirmationList = new List<BulkConfirmationRecord>();
             
-            // Query all applications with their packages and fields needed for dynamic display
+            // Query all applications with their packages — now using retail/custom pricing fields
             List<Application__c> applications = [
                 SELECT Id,
                        Name,
@@ -205,8 +245,9 @@ public class DealerPortalRemittanceHandler {
                        Vehicle_Model__c,
                        Vehicle_Trim__c,
                        (SELECT Id, RecordType.DeveloperName, RecordType.Name, Name,
-                               Contract_Cost_Price__c, Contract_Cost_Price_Without_Tax__c,
-                               Tax_Amount_Cost__c, Tax_Percentage__c
+                               Contract_Premium_Price__c, Contract_Premium_Price_Without_Tax__c,
+                               Dealer_Price_Override__c,
+                               Tax_Amount__c, Tax_Percentage__c
                         FROM Application_Packages__r
                         WHERE Active__c = true ORDER BY RecordType.Name ASC )
                 FROM Application__c
@@ -231,7 +272,7 @@ public class DealerPortalRemittanceHandler {
                 record.vehicleName = String.join(parts, '/');
                 record.vehicleVin = app.Vehicle_VIN__c;
 
-                // Build packages list with pricing information
+                // Build packages list with retail/custom pricing
                 List<PackageItem> packageList = new List<PackageItem>();
                 Decimal applicationTax = 0;
                 Decimal applicationTaxPercentage = 0;
@@ -243,14 +284,14 @@ public class DealerPortalRemittanceHandler {
                     packageItem.id = pkg.Id;
                     packageItem.name = label;
                     packageItem.isSelected = true; // Select all by default
-                    packageItem.priceWithoutTax = pkg.Contract_Cost_Price_Without_Tax__c;
-                    packageItem.priceWithTax = pkg.Contract_Cost_Price__c;
-                    packageItem.taxAmount = pkg.Tax_Amount_Cost__c;
+                    packageItem.priceWithoutTax = getDisplayPriceWithoutTax(pkg);
+                    packageItem.priceWithTax = getDisplayPrice(pkg);
+                    packageItem.taxAmount = getDisplayTaxAmount(pkg);
                     packageItem.taxPercentage = pkg.Tax_Percentage__c;
                     
                     // Capture tax info from first package (same for all under this application)
-                    if (applicationTax == 0 && pkg.Tax_Amount_Cost__c != null) {
-                        applicationTax = pkg.Tax_Amount_Cost__c;
+                    if (applicationTax == 0 && packageItem.taxAmount != null && packageItem.taxAmount != 0) {
+                        applicationTax = packageItem.taxAmount;
                     }
                     if (applicationTaxPercentage == 0 && pkg.Tax_Percentage__c != null) {
                         applicationTaxPercentage = pkg.Tax_Percentage__c;
