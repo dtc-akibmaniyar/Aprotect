@@ -1978,10 +1978,11 @@ packageToSave = existingPkg;
             if (packageToSave.Dealer_Price_Override__c != null) {
                 packageToSave.Dealer_Markup__c = 0;
                 packageToSave.Add_Ons_Markup__c = 0;
-                // Back-calculate pre-tax price: override includes tax, so divide it out
-                Decimal taxRateForCalc = (dealerTaxRate != null && dealerTaxRate > 0) ? dealerTaxRate : 0;
-                Decimal preTaxPrice = packageToSave.Dealer_Price_Override__c / (1 + taxRateForCalc / 100);
-                packageToSave.Dealer_Package_Price__c = preTaxPrice.setScale(2, RoundingMode.HALF_UP);
+                // Override is now pre-tax (LWC sends the raw user-entered value).
+                // Store it directly as the base price so formula fields
+                // (Contract_Premium_Price_Without_Tax__c, Tax_Amount__c,
+                // Dealer_Package_Retail_Price__c) compute correctly.
+                packageToSave.Dealer_Package_Price__c = packageToSave.Dealer_Price_Override__c;
             } else {
                 // Override removed — restore original base price and markup from
                 // the Dealer_Package_Term__c record so the summary shows the

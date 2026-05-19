@@ -593,10 +593,15 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                     
                     // Check if there's a dealer price override
                     if (result.data.dealerPriceOverride != null && result.data.dealerPriceOverride !== undefined) {
-                        this.price = result.data.dealerPriceOverride;
-                        this.isPriceOverridden = true;
+                        // Override is stored as pre-tax; recalculate tax-inclusive total for display
+                        const preTax = result.data.dealerPriceOverride;
                         const txRate = result.data.taxPercentage || 0;
-                        this._retailPriceDisplay = txRate > 0 ? this.price / (1 + txRate / 100) : this.price;
+                        const taxAmt = txRate > 0 ? preTax * (txRate / 100) : 0;
+                        this._overridePreTaxPrice = preTax;
+                        this._overrideTaxAmount = parseFloat(taxAmt.toFixed(2));
+                        this.price = parseFloat((preTax + taxAmt).toFixed(2));
+                        this._retailPriceDisplay = preTax;
+                        this.isPriceOverridden = true;
                     }
                     
                     // Force re-render to update visual highlighting
@@ -2198,7 +2203,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                 packageName: this.selectedDealerPackage.PackageName,
                 selectedTermId: this.selectedWarrantyTerm.Id,
                 recordType: 'Tire_Rim_Protection_Plan',
-                dealerPriceOverride: this.isPriceOverridden ? this.price : null
+                dealerPriceOverride: this.isPriceOverridden ? (this._overridePreTaxPrice || this.price) : null
             };
             
             console.log('📦 [TIRE createOrUpdate] Saving with active management:', packageData);
@@ -2335,7 +2340,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                     packageName: String(this.selectedDealerPackage.PackageName),
                     selectedTermId: String(this.selectedWarrantyTerm.Id),
                     recordType: 'Tire_Rim_Protection_Plan',
-                    dealerPriceOverride: this.isPriceOverridden ? this.price : null
+                    dealerPriceOverride: this.isPriceOverridden ? (this._overridePreTaxPrice || this.price) : null
                 };
                 
                 // Add optional tire/rim details when present
@@ -2557,7 +2562,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                     packageName: String(this.selectedDealerPackage.PackageName),
                     selectedTermId: String(this.selectedWarrantyTerm.Id),
                     recordType: 'Tire_Rim_Protection_Plan',
-                    dealerPriceOverride: this.isPriceOverridden ? this.price : null
+                    dealerPriceOverride: this.isPriceOverridden ? (this._overridePreTaxPrice || this.price) : null
                 };
 
                 // Add optional tire/rim details when present (will update existing record if created early)

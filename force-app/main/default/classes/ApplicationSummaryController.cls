@@ -259,7 +259,7 @@ public without sharing class ApplicationSummaryController {
         @AuraEnabled public Boolean success { get; set; }
         @AuraEnabled public String message { get; set; }
         @AuraEnabled public String attachmentId { get; set; }
-        @AuraEnabled public String fileName { get; set; } // Added for file name
+        @AuraEnabled public String fileName { get; set; }
     }
 
     @AuraEnabled
@@ -292,7 +292,6 @@ public without sharing class ApplicationSummaryController {
                 Package_Plan_Type__r.Name, Package__r.Name, Package_Tier__r.Name, Package_Term__r.Name
                 FROM Application__c 
                 WHERE Id = :applicationId 
-                // WITH SECURITY_ENFORCED
                 LIMIT 1
             ];
 
@@ -444,7 +443,6 @@ public without sharing class ApplicationSummaryController {
                     data.vehicle.specifications.model = app.Vehicle__r.Model__c != null ? app.Vehicle__r.Model__c : '';
                 }
                 
-                // Always populate these fields if Vehicle exists (with null defaults)
                 data.vehicle.specifications.vin = app.Vehicle__r.VIN__c != null ? app.Vehicle__r.VIN__c : '';
                 data.vehicle.specifications.odometer = app.Vehicle__r.Odometer__c != null ? String.valueOf(app.Vehicle__r.Odometer__c) : '';
                 data.vehicle.specifications.odometerUnit = app.Vehicle__r.Odometer_Unit__c != null ? app.Vehicle__r.Odometer_Unit__c : '';
@@ -464,19 +462,13 @@ public without sharing class ApplicationSummaryController {
                 data.vehicle.specifications.color = app.Vehicle__r.Color__c != null ? app.Vehicle__r.Color__c : '';
                 data.vehicle.specifications.gvwr = app.Vehicle__r.GVWR__c != null ? String.valueOf(app.Vehicle__r.GVWR__c) : '';
                 
-                // Populate warranty information if available
                 data.vehicle.warranty.factoryWarrantyType = app.Vehicle__r.Manufacturer_Warranty_Type__c != null ? app.Vehicle__r.Manufacturer_Warranty_Type__c : '';
                 data.vehicle.warranty.coverageTerm = app.Vehicle__r.Warranty_Term__c != null ? app.Vehicle__r.Warranty_Term__c : '';
                 data.vehicle.warranty.inServiceDate = app.Vehicle__r.In_Service_Date__c != null ? String.valueOf(app.Vehicle__r.In_Service_Date__c) : '';
                 
-                // Populate Tire & Rim Details if available
                 data.vehicle.tireRimDetails = getTireRimDetails(applicationId);
             }
             
-            // data.includedOptions = getIncludedOptions(applicationId);
-            // data.optionalOptions = getOptionalOptions(applicationId);
-            
-            // Populate Application Packages
             data.applicationPackages = getApplicationPackagesForSummary(applicationId);
             
             return data;
@@ -488,19 +480,17 @@ public without sharing class ApplicationSummaryController {
     
     /**
      * @description Get Application Packages for Summary Display
-     * Groups packages by record type (Extended Warranty, Loan Protection, Total Loss Coverage, Tire & Rim Protection)
-     * and formats header as "Record Type Name - Package Name"
      */
     private static List<ApplicationPackageRecordTypeWrapper> getApplicationPackagesForSummary(Id applicationId) {
         Map<String, ApplicationPackageRecordTypeWrapper> recordTypeMap = new Map<String, ApplicationPackageRecordTypeWrapper>();
         
         try {
-            // Query Application_Package__c records for this application
             List<Application_Package__c> packages = [
                 SELECT Id, Name, RecordType.Name, Coverage_Plan__c, Coverage_Term__c,
                         Package__r.Name, Package_Term__r.Name,
                         Deductible__c, Tax_Amount__c,Tax_Amount_Cost__c, Total_Package_Price__c, Contract_Premium_Price__c,Contract_Premium_Price_Without_Tax__c,
                         Contract_Cost_Price_Without_Tax__c, Contract_Cost_Price__c,
+                        Dealer_Price_Override__c, Tax_Percentage__c,
                        Contract_Start_Date__c, Contract_End_Date__c, 
                        Odometer_Start__c, Odometer_End__c, Odometer_Start_Unit__c, Odometer_End_Unit__c
                 FROM Application_Package__c
@@ -508,7 +498,6 @@ public without sharing class ApplicationSummaryController {
                 ORDER BY RecordType.Name ASC, CreatedDate ASC
             ];
             
-            // Query all optional package options for all packages
             Set<Id> packageIds = new Set<Id>();
             for (Application_Package__c pkg : packages) {
                 packageIds.add(pkg.Id);
@@ -522,7 +511,6 @@ public without sharing class ApplicationSummaryController {
                     WHERE Selection_Type__c = 'Included' AND Application_Package__c IN :packageIds
                 ];
                 
-                // Group options by package ID (same as VF page - using includedOptions)
                 for (Application_Package_Option__c option : options) {
                     if (!packageOptionsMap.containsKey(option.Application_Package__c)) {
                         packageOptionsMap.put(option.Application_Package__c, new List<String>());
@@ -531,42 +519,42 @@ public without sharing class ApplicationSummaryController {
                 }
             }
             
-            // Process each package and group by record type
             for (Application_Package__c pkg : packages) {
                 String recordTypeName = pkg.RecordType.Name;
                 
-                // Create wrapper if not exists for this record type
                 if (!recordTypeMap.containsKey(recordTypeName)) {
                     recordTypeMap.put(recordTypeName, new ApplicationPackageRecordTypeWrapper(recordTypeName));
                 }
                 
-                // Create package wrapper
                 ApplicationPackageWrapper pkgWrapper = new ApplicationPackageWrapper();
                 
-                // Format header as "Record Type Name - Package Name"
                 String packageName = String.isNotBlank(pkg.Name) ? pkg.Name : '';
                 pkgWrapper.packageHeaderName = recordTypeName + ' - ' + packageName;
                 
-                // Populate plan details - use Package and Package_Term relationships (same as VF page)
                 pkgWrapper.planName = pkg.Package__r != null && String.isNotBlank(pkg.Package__r.Name) ? pkg.Package__r.Name : pkg.Coverage_Plan__c;
                 pkgWrapper.coverageTerm = pkg.Package_Term__r != null && String.isNotBlank(pkg.Package_Term__r.Name) ? pkg.Package_Term__r.Name : '';
                 
-                // Populate financial details with formatting
-                pkgWrapper.retailCost = pkg.Contract_Premium_Price_Without_Tax__c;
-                pkgWrapper.formattedRetailCost = pkg.Contract_Premium_Price_Without_Tax__c != null ? 
-                    formatCurrency(pkg.Contract_Premium_Price_Without_Tax__c) : '$0.00';
+                if (pkg.Dealer_Price_Override__c != null) {
+                    pkgWrapper.retailCost = pkg.Dealer_Price_Override__c;
+                    pkgWrapper.formattedRetailCost = formatCurrency(pkg.Dealer_Price_Override__c);
+                    pkgWrapper.tax = pkg.Tax_Amount__c;
+                    pkgWrapper.formattedTax = formatCurrency(pkg.Tax_Amount__c);
+                    pkgWrapper.total = pkg.Contract_Premium_Price__c;
+                    pkgWrapper.formattedTotal = formatCurrency(pkg.Contract_Premium_Price__c);
+                } else {
+                    pkgWrapper.retailCost = pkg.Contract_Premium_Price_Without_Tax__c;
+                    pkgWrapper.formattedRetailCost = pkg.Contract_Premium_Price_Without_Tax__c != null ? 
+                        formatCurrency(pkg.Contract_Premium_Price_Without_Tax__c) : '$0.00';
+                    pkgWrapper.tax = pkg.Tax_Amount__c;
+                    pkgWrapper.formattedTax = formatCurrency(pkg.Tax_Amount__c);
+                    pkgWrapper.total = pkg.Contract_Premium_Price__c;
+                    pkgWrapper.formattedTotal = formatCurrency(pkg.Contract_Premium_Price__c);
+                }
                 
                 pkgWrapper.deductible = pkg.Deductible__c;
                 pkgWrapper.formattedDeductible = pkg.Deductible__c != null ? 
                     formatCurrency(pkg.Deductible__c) : '$0.00';
                 
-                pkgWrapper.tax = pkg.Tax_Amount__c;
-                pkgWrapper.formattedTax = formatCurrency(pkg.Tax_Amount__c);
-                
-                pkgWrapper.total = pkg.Contract_Premium_Price__c;
-                pkgWrapper.formattedTotal = formatCurrency(pkg.Contract_Premium_Price__c);
-                
-                // Populate contract dates and odometer readings
                 pkgWrapper.contractStartDate = pkg.Contract_Start_Date__c != null ? 
                     pkg.Contract_Start_Date__c.format() : '';
                 pkgWrapper.contractExpiryDate = formatDate(pkg.Contract_End_Date__c);
@@ -576,11 +564,9 @@ public without sharing class ApplicationSummaryController {
                 pkgWrapper.contractStartOdometerUnit = pkg.Odometer_Start_Unit__c != null ? pkg.Odometer_Start_Unit__c : 'KM';
                 pkgWrapper.contractExpiryOdometerUnit = pkg.Odometer_End_Unit__c != null ? pkg.Odometer_End_Unit__c : 'KM';
                 
-                // Populate optional package options
                 pkgWrapper.additionalOptionsPurchased = packageOptionsMap.containsKey(pkg.Id) ? 
                     packageOptionsMap.get(pkg.Id) : new List<String>();
                 
-                // Add wrapper to record type group
                 recordTypeMap.get(recordTypeName).packages.add(pkgWrapper);
             }
             
@@ -588,29 +574,25 @@ public without sharing class ApplicationSummaryController {
             System.debug('Error retrieving application packages: ' + e.getMessage());
         }
         
-        // Return sorted list of record type wrappers
         List<ApplicationPackageRecordTypeWrapper> result = new List<ApplicationPackageRecordTypeWrapper>();
         for (String key : recordTypeMap.keySet()) {
             result.add(recordTypeMap.get(key));
         }
         return result;
     }    
+
     @AuraEnabled
     public static ApplicationPackageData getApplicationPackageData(Id applicationId) {
         try {
-            // Create a mock StandardController for ApplicationPDFExtension
             Application__c app = [SELECT Id FROM Application__c WHERE Id = :applicationId LIMIT 1];
             ApexPages.StandardController stdController = new ApexPages.StandardController(app);
             
-            // Initialize ApplicationPDFExtension
             ApplicationPDFExtension pdfExtension = new ApplicationPDFExtension(stdController);
             
-            // Convert to DTO for LWC consumption
             ApplicationPackageData packageData = new ApplicationPackageData();
             packageData.dealerLogoUrl = pdfExtension.dealerLogoUrl;
             packageData.hasDealerLogo = pdfExtension.hasDealerLogo;
             
-            // Convert recordTypeWrappersList to DTOs
             for (ApplicationPDFExtension.RecordTypeWrapper rtWrapper : pdfExtension.recordTypeWrappersList) {
                 RecordTypeWrapperDTO rtDTO = new RecordTypeWrapperDTO(rtWrapper.recordTypeName);
                 
@@ -644,7 +626,6 @@ public without sharing class ApplicationSummaryController {
             FROM Application_Package_Option__c 
             WHERE Application__c = :applicationId 
             AND Selection_Type__c = 'Included'
-            //WITH SECURITY_ENFORCED
         ];
     }
 
@@ -655,32 +636,71 @@ public without sharing class ApplicationSummaryController {
             FROM Application_Package_Option__c 
             WHERE Application__c = :applicationId 
             AND Selection_Type__c = 'Optional'
-            //WITH SECURITY_ENFORCED
         ];
     }
 
+    /**
+     * @description Generate and attach versioned PDFs for each package record type.
+     * File naming: {RecordTypeLabel}_{YYYY-MM-DD}_v{N}.pdf
+     * Each call creates new versioned files; all previous versions remain on the record.
+     */
     @AuraEnabled
     public static PDFResponse generateAndAttachPDF(Id applicationId) {
         PDFResponse response = new PDFResponse();
 
         try {
-            // Collect record types for this application (no GROUP BY to avoid non-groupable field issues)
+            // Collect record types for this application
             Set<String> recordTypeSet = new Set<String>();
             for (Application_Package__c pkg : [
                 SELECT Package_Record_Type__c
                 FROM Application_Package__c
                 WHERE Application__c = :applicationId
+                  AND Active__c = true
             ]) {
                 String rt = String.isBlank(pkg.Package_Record_Type__c) ? 'Other' : pkg.Package_Record_Type__c;
                 recordTypeSet.add(rt);
             }
 
-            // Fallback: if no record types, generate a single combined PDF
             if (recordTypeSet.isEmpty()) {
-                recordTypeSet.add(''); // empty to render all
+                recordTypeSet.add('');
             }
 
             List<String> recordTypes = new List<String>(recordTypeSet);
+
+            // ── VERSION TRACKING ──
+            // Query existing PDF files attached to this application to determine next version number
+            String todayStr = Date.today().year() + '-' +
+                              String.valueOf(Date.today().month()).leftPad(2, '0') + '-' +
+                              String.valueOf(Date.today().day()).leftPad(2, '0');
+
+            Map<String, Integer> maxVersionByType = new Map<String, Integer>();
+            List<ContentDocumentLink> existingLinks = [
+                SELECT ContentDocument.Title
+                FROM ContentDocumentLink
+                WHERE LinkedEntityId = :applicationId
+            ];
+            for (ContentDocumentLink cdl : existingLinks) {
+                String title = cdl.ContentDocument.Title;
+                if (title == null) continue;
+                // Parse titles like "Extended_Limited_Warranty_2026-05-19_v3"
+                for (String rtName : recordTypes) {
+                    String rtLabel = resolvePackageRecordTypeLabel(rtName);
+                    String rtSuffix = (String.isBlank(rtLabel) ? 'All' : rtLabel).replaceAll('[^A-Za-z0-9_\\-]', '_');
+                    String prefix = rtSuffix + '_' + todayStr + '_v';
+                    if (title.startsWith(prefix)) {
+                        String vStr = title.substring(prefix.length());
+                        try {
+                            Integer v = Integer.valueOf(vStr);
+                            Integer current = maxVersionByType.containsKey(rtName) ? maxVersionByType.get(rtName) : 0;
+                            if (v > current) {
+                                maxVersionByType.put(rtName, v);
+                            }
+                        } catch (Exception ex) {
+                            // not a version number, skip
+                        }
+                    }
+                }
+            }
 
             List<ContentVersion> versionsToInsert = new List<ContentVersion>();
 
@@ -691,7 +711,6 @@ public without sharing class ApplicationSummaryController {
                 if (String.isNotBlank(rtName)) {
                     pdfPage.getParameters().put('rt', rtName);
                 }
-                // Set proper session context for VF page rendering
                 pdfPage.getParameters().put('sfdc.override', '1');
                 pdfPage.getParameters().put('core.apexpages.request.devconsole', '1');
 
@@ -702,12 +721,17 @@ public without sharing class ApplicationSummaryController {
                     pdfBlob = pdfPage.getContentAsPDF();
                 }
 
-                // Create ContentVersion (File) for this record type
-                ContentVersion cv = new ContentVersion();
+                // Determine next version number
+                Integer nextVersion = (maxVersionByType.containsKey(rtName) ? maxVersionByType.get(rtName) : 0) + 1;
+
                 String rtSuffixRaw = String.isBlank(rtLabel) ? 'All' : rtLabel;
-                String rtSuffix = rtSuffixRaw.replaceAll('[^A-Za-z0-9_-]', '_');
-                cv.Title = rtSuffixRaw;
-                cv.PathOnClient = rtSuffix + '.pdf';
+                String rtSuffix = rtSuffixRaw.replaceAll('[^A-Za-z0-9_\\-]', '_');
+                String versionedTitle = rtSuffix + '_' + todayStr + '_v' + nextVersion;
+                String versionedFileName = versionedTitle + '.pdf';
+
+                ContentVersion cv = new ContentVersion();
+                cv.Title = versionedTitle;
+                cv.PathOnClient = versionedFileName;
                 cv.VersionData = pdfBlob;
                 cv.FirstPublishLocationId = applicationId;
                 cv.IsMajorVersion = true;
@@ -716,7 +740,6 @@ public without sharing class ApplicationSummaryController {
 
             insert versionsToInsert;
 
-            // FirstPublishLocationId already links the file to the Application; just collect doc ids
             Set<Id> cvIds = new Set<Id>();
             for (ContentVersion cv : versionsToInsert) {
                 cvIds.add(cv.Id);
@@ -732,7 +755,7 @@ public without sharing class ApplicationSummaryController {
 
             response.success = true;
             response.message = 'PDFs generated and attached successfully';
-            response.attachmentId = firstDocId; // return first for backward compatibility
+            response.attachmentId = firstDocId;
 
         } catch (Exception e) {
             response.success = false;
@@ -773,7 +796,6 @@ public without sharing class ApplicationSummaryController {
                 response.success = true;
                 response.message = 'PDF content retrieved successfully';
                 response.attachmentId = EncodingUtil.base64Encode(cv.VersionData);
-                // Adding PathOnClient for filename, will use a similar DTO structure as the one used by reusableFileUpload
                 response.fileName = cv.PathOnClient;
             } else {
                 response.success = false;
@@ -877,80 +899,45 @@ public without sharing class ApplicationSummaryController {
         vm.dealerPhone = app.Dealer_Phone__c;
     }
 
-    // Helper methods
-    // private static String formatCurrency(Decimal amount) {
-    //     if (amount == null) return '$0.00';
-    //     try {
-    //         return String.format('${0,number,#,##0.00}', new List<Object>{amount});
-    //     } catch (Exception e) {
-    //         System.debug('Error formatting currency: ' + e.getMessage());
-    //         return '$0.00';
-    //     }
-    // }
-   private static String formatCurrency(Decimal amount) {
-    // Return default if null
-    if (amount == null) {
-        return '$0.00';
+    private static String formatCurrency(Decimal amount) {
+        if (amount == null) {
+            return '$0.00';
+        }
+        Decimal formatted = amount.setScale(2);
+        return '$' + formatted.format();
     }
 
-    // Format using Decimal.toPlainString() + custom padding
-    Decimal formatted = amount.setScale(2); // ensures 2 decimal places
-    return '$' + formatted.format();        // adds commas automatically
-}
-
-private static String formatPercentage(Decimal amount) {
-    // Return default if null
-    if (amount == null) {
-        return '0.00%';
+    private static String formatPercentage(Decimal amount) {
+        if (amount == null) {
+            return '0.00%';
+        }
+        Decimal formatted = amount.setScale(2);
+        return formatted.format() + '%';
     }
 
-    // Format using Decimal.toPlainString() + custom padding
-    Decimal formatted = amount.setScale(2); // ensures 2 decimal places
-    return formatted.format() + '%';       
-}
-
-private static String formatTerms(Decimal terms) {
-    // Return default if null
-    if (terms == null) {
-        return '';
+    private static String formatTerms(Decimal terms) {
+        if (terms == null) {
+            return '';
+        }
+        return terms.format() + ' Months';
     }
-
-    return terms.format() + ' Months'; 
-}
-
 
     private static String formatDate(Date dt) {
         if (dt == null) return '';
         return dt.format();
     }
 
-    /**
-     * @description Format address components into a single string
-     * @param city - City name
-     * @param state - State/Province
-     * @param postalCode - Postal code
-     * @param country - Country
-     * @return Formatted address string
-     */
     private static String formatAddress(String city, String state, String postalCode, String country) {
         List<String> parts = new List<String>();
-        
         if (String.isNotBlank(city)) parts.add(city);
         if (String.isNotBlank(state)) parts.add(state);
         if (String.isNotBlank(postalCode)) parts.add(postalCode);
         if (String.isNotBlank(country)) parts.add(country);
-        
         return String.join(parts, ', ');
     }
 
-    /**
-     * @description Get Tire & Rim Details from Application Package
-     * @param applicationId - Application ID
-     * @return TireRimDetails object with tire and rim information
-     */
     private static TireRimDetails getTireRimDetails(Id applicationId) {
         TireRimDetails details = new TireRimDetails();
-        
         try {
             List<Application_Package__c> tireRimPackages = [
                 SELECT Id, Tire_Brand__c, Tire_Type__c, Tread_Depth__c, Tread_Depth_Unit__c,
@@ -960,7 +947,6 @@ private static String formatTerms(Decimal terms) {
                 AND RecordType.DeveloperName = 'Tire_Rim_Protection_Plan'
                 LIMIT 1
             ];
-            
             if (!tireRimPackages.isEmpty()) {
                 Application_Package__c pkg = tireRimPackages[0];
                 details.tireBrand = pkg.Tire_Brand__c != null ? pkg.Tire_Brand__c : '';
@@ -975,32 +961,23 @@ private static String formatTerms(Decimal terms) {
         } catch (Exception e) {
             System.debug('Error retrieving Tire & Rim details: ' + e.getMessage());
         }
-        
         return details;
     }
 
-    /**
-     * @description Get all attached PDFs for an application
-     */
     @AuraEnabled
     public static List<PDFFileWrapper> getAttachedPDFs(Id applicationId) {
         List<PDFFileWrapper> pdfFiles = new List<PDFFileWrapper>();
-        
         try {
-            // Query ContentDocumentLinks to get files attached to the Application
             List<ContentDocumentLink> docLinks = [
                 SELECT ContentDocumentId, ContentDocument.Title, ContentDocument.CreatedDate
                 FROM ContentDocumentLink
                 WHERE LinkedEntityId = :applicationId
                 ORDER BY ContentDocument.CreatedDate DESC
             ];
-            
-            // Get the ContentVersion records for preview URLs
             Set<Id> docIds = new Set<Id>();
             for (ContentDocumentLink link : docLinks) {
                 docIds.add(link.ContentDocumentId);
             }
-            
             Map<Id, ContentVersion> versionMap = new Map<Id, ContentVersion>();
             for (ContentVersion cv : [
                 SELECT Id, ContentDocumentId, VersionData, Title, FileType
@@ -1010,7 +987,6 @@ private static String formatTerms(Decimal terms) {
             ]) {
                 versionMap.put(cv.ContentDocumentId, cv);
             }
-            
             for (ContentDocumentLink link : docLinks) {
                 ContentVersion cv = versionMap.get(link.ContentDocumentId);
                 pdfFiles.add(new PDFFileWrapper(
@@ -1024,23 +1000,16 @@ private static String formatTerms(Decimal terms) {
             System.debug('Error getting attached PDFs: ' + e.getMessage());
             throw new AuraHandledException('Failed to retrieve PDFs: ' + e.getMessage());
         }
-        
         return pdfFiles;
     }
 
-    /**
-     * @description Send PDF by email
-     */
     @AuraEnabled
     public static PDFEmailResponse sendPDFByEmail(String contentDocumentId, String recipientEmail, String subject, Id applicationId) {
         PDFEmailResponse response = new PDFEmailResponse();
-        
         try {
             if (String.isBlank(contentDocumentId) || String.isBlank(recipientEmail)) {
                 throw new IllegalArgumentException('Missing required parameters');
             }
-            
-            // Get the ContentVersion to retrieve the file
             List<ContentVersion> versions = [
                 SELECT Id, VersionData, Title, FileType
                 FROM ContentVersion
@@ -1048,28 +1017,19 @@ private static String formatTerms(Decimal terms) {
                 AND IsLatest = true
                 LIMIT 1
             ];
-            
             if (versions.isEmpty()) {
                 throw new IllegalArgumentException('PDF file not found');
             }
-            
             ContentVersion cv = versions[0];
-            
-            // Create email
             Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
             mail.setToAddresses(new String[] { recipientEmail });
             mail.setSubject(subject);
-            mail.setPlainTextBody('Please find the attached A-Protect Warranty Application PDF.');
-            
-            // Attach the PDF
+            mail.setPlainTextBody('Please find the attached application PDF.');
             Messaging.EmailFileAttachment attachment = new Messaging.EmailFileAttachment();
             attachment.setFileName(cv.Title + '.' + cv.FileType);
             attachment.setBody(cv.VersionData);
             mail.setFileAttachments(new Messaging.EmailFileAttachment[] { attachment });
-            
-            // Send email
             Messaging.SendEmailResult[] results = Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
-            
             if (results[0].isSuccess()) {
                 response.success = true;
                 response.message = 'Email sent successfully';
@@ -1082,27 +1042,21 @@ private static String formatTerms(Decimal terms) {
             response.message = 'Error sending email: ' + e.getMessage();
             System.debug('Email send error: ' + e.getMessage());
         }
-        
         return response;
     }
 
-    /**
-     * @description Get PDF as base64-encoded data URL for embedding in iframe
-     */
     @AuraEnabled
     public static String getPDFDataUrl(String contentVersionId) {
         try {
             if (String.isBlank(contentVersionId)) {
                 throw new IllegalArgumentException('ContentVersionId is required');
             }
-            
             ContentVersion cv = [
                 SELECT VersionData
                 FROM ContentVersion
                 WHERE Id = :contentVersionId
                 LIMIT 1
             ];
-            
             String base64PDF = EncodingUtil.base64Encode(cv.VersionData);
             return 'data:application/pdf;base64,' + base64PDF;
         } catch (Exception e) {
@@ -1111,7 +1065,6 @@ private static String formatTerms(Decimal terms) {
         }
     }
 
-    // DTO class for PDF file information
     public class PDFFileWrapper {
         @AuraEnabled public String contentDocumentId { get; set; }
         @AuraEnabled public String contentVersionId { get; set; }
@@ -1124,117 +1077,78 @@ private static String formatTerms(Decimal terms) {
             this.contentVersionId = contentVersionId;
             this.title = title;
             this.createdDate = createdDate;
-            this.base64PDF = null; // Will be populated on demand via getPDFDataUrl()
+            this.base64PDF = null;
         }
     }
 
-    // DTO class for email response
     public class PDFEmailResponse {
         @AuraEnabled public Boolean success { get; set; }
         @AuraEnabled public String message { get; set; }
     }
     
-    /**
-     * Create invoice on application submission with all active packages
-     * @param applicationId The ID of the application
-     * @return InvoiceOperationResult with success status and invoice ID
-     */
     @AuraEnabled
     public static InvoiceOperationResult createInvoiceOnApplicationSubmit(String applicationId) {
         try {
             if (String.isBlank(applicationId)) {
                 return new InvoiceOperationResult(false, 'Application ID is required');
             }
-            
-            // Query application to get dealer information and packages
             List<Application__c> applicationsWithDealer = [
-                SELECT Id, 
-                       Name,
-                       Dealer_Name__r.Name, 
-                       Dealer_Name__c,
+                SELECT Id, Name, Dealer_Name__r.Name, Dealer_Name__c,
                        (SELECT Id, Name FROM Application_Packages__r WHERE Active__c = true)
                 FROM Application__c
                 WHERE Id = :applicationId
                 LIMIT 1
             ];
-            
             if (applicationsWithDealer.isEmpty()) {
                 return new InvoiceOperationResult(false, 'Application not found');
             }
-            
             Application__c application = applicationsWithDealer[0];
             List<Application_Package__c> activePackages = application.Application_Packages__r;
-            
             if (activePackages.isEmpty()) {
                 return new InvoiceOperationResult(false, 'No active packages found for this application');
             }
-            
-            // Create Invoice record
             Invoice__c newInvoice = new Invoice__c();
             newInvoice.Application__c = applicationId;
             newInvoice.Status__c = 'Due';
-            
-            // Generate invoice name by replacing APP with INV in application name
-            // Example: APP000001 -> INV000001
             if (String.isNotBlank(application.Name)) {
                 newInvoice.Name = application.Name.replaceAll('APP', 'INV');
             }
-            
-            // Calculate invoice due date from custom metadata
             try {
                 Dealer_Portal_Configs__mdt config = Dealer_Portal_Configs__mdt.getInstance('A_Protect_Configs');
-                
                 if (config != null) {
                     Date dueDate = Date.today();
-                    
                     if (config.Invoice_Due_Duration_Type__c == 'Days') {
                         dueDate = dueDate.addDays(config.Invoice_Due_Duration__c.intValue());
                     } else if (config.Invoice_Due_Duration_Type__c == 'Months') {
                         dueDate = dueDate.addMonths(config.Invoice_Due_Duration__c.intValue());
                     }
-                    
                     newInvoice.Invoice_Due_Date__c = dueDate;
-                    System.debug('Invoice_Due_Date__c calculated: ' + dueDate + ' (Duration: ' + config.Invoice_Due_Duration__c + ' ' + config.Invoice_Due_Duration_Type__c + ')');
-                } else {
-                    System.debug('A-Protect_Configs metadata not found for invoice due date calculation');
                 }
             } catch (Exception metadataError) {
                 System.debug('Error processing custom metadata for Invoice_Due_Date__c: ' + metadataError.getMessage());
             }
-            
             insert newInvoice;
-            
-            // Create Invoice Line Items for all active packages
             List<Invoice_Line_Item__c> lineItems = new List<Invoice_Line_Item__c>();
             for (Application_Package__c pkg : activePackages) {
                 Invoice_Line_Item__c lineItem = new Invoice_Line_Item__c();
                 lineItem.Invoice__c = newInvoice.Id;
                 lineItem.Application_Package__c = pkg.Id;
                 lineItem.Status__c = 'Due';
-                
-                // Populate line item name from application package name
-                // Replace APP with INV to match invoice naming convention
-                // Example: APP000207 - Extended Warranty -> INV000207 - Extended Warranty
                 if (String.isNotBlank(pkg.Name)) {
                     lineItem.Name = pkg.Name.replaceAll('APP', 'INV');
                 }
-                
                 lineItems.add(lineItem);
             }
-            
             if (!lineItems.isEmpty()) {
                 insert lineItems;
             }
-            
             return new InvoiceOperationResult(true, 'Invoice created successfully for submitted application', newInvoice.Id);
-            
         } catch (Exception e) {
             System.debug('ApplicationSummaryController createInvoiceOnApplicationSubmit error: ' + e.getMessage());
             return new InvoiceOperationResult(false, 'Error creating invoice: ' + e.getMessage());
         }
     }
     
-    // Wrapper class for invoice operation result
     public class InvoiceOperationResult {
         @AuraEnabled public Boolean success { get; set; }
         @AuraEnabled public String message { get; set; }
