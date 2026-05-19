@@ -329,9 +329,9 @@ public without sharing class InvoiceDetailViewController {
             // Link Invoice to the new remittance form
             update new Invoice__c(Id = inv.Id, Remittance_Form__c = rf.Id);
 
-            // Query unpaid line items for this invoice
+            // Query unpaid line items for this invoice (include package reference)
             List<Invoice_Line_Item__c> lineItems3 = [
-                SELECT Id, Contract_Cost_Price__c
+                SELECT Id, Contract_Cost_Price__c, Application_Package__c
                 FROM Invoice_Line_Item__c
                 WHERE Invoice__c = :invoiceId
                 AND Status__c != 'Paid'
@@ -339,7 +339,23 @@ public without sharing class InvoiceDetailViewController {
 
             if (!lineItems3.isEmpty()) {
                 Set<Id> unpaidLineItemIds = new Set<Id>();
-                for (Invoice_Line_Item__c li : lineItems3) unpaidLineItemIds.add(li.Id);
+                Set<Id> packageIds = new Set<Id>();
+                for (Invoice_Line_Item__c li : lineItems3) {
+                    unpaidLineItemIds.add(li.Id);
+                    if (li.Application_Package__c != null) packageIds.add(li.Application_Package__c);
+                }
+
+                // ── FIX: Query Application Packages for retail pricing ──
+                Map<Id, Application_Package__c> pkgMap = new Map<Id, Application_Package__c>();
+                if (!packageIds.isEmpty()) {
+                    for (Application_Package__c pkg : [
+                        SELECT Id, Contract_Premium_Price__c, Dealer_Price_Override__c
+                        FROM Application_Package__c
+                        WHERE Id IN :packageIds
+                    ]) {
+                        pkgMap.put(pkg.Id, pkg);
+                    }
+                }
 
                 // Delete stale Planned junctions from previous remittance attempts
                 List<Remittance_Line_Item_Junction__c> staleJunctions = [
@@ -353,11 +369,18 @@ public without sharing class InvoiceDetailViewController {
                 // Create fresh junction records on the new remittance form
                 List<Remittance_Line_Item_Junction__c> junctions = new List<Remittance_Line_Item_Junction__c>();
                 for (Invoice_Line_Item__c li : lineItems3) {
+                    // ── FIX: Use retail/custom price instead of dealer cost ──
+                    Decimal displayAmount = li.Contract_Cost_Price__c; // fallback
+                    if (li.Application_Package__c != null && pkgMap.containsKey(li.Application_Package__c)) {
+                        Application_Package__c pkg = pkgMap.get(li.Application_Package__c);
+                        displayAmount = getDisplayPrice(pkg);
+                    }
+
                     junctions.add(new Remittance_Line_Item_Junction__c(
                         Remittance_Form__c   = rf.Id,
                         Invoice__c           = inv.Id,
                         Invoice_Line_Item__c = li.Id,
-                        Line_Item_Amount__c  = li.Contract_Cost_Price__c,
+                        Line_Item_Amount__c  = displayAmount,
                         Payment_Status__c    = 'Planned'
                     ));
                 }
