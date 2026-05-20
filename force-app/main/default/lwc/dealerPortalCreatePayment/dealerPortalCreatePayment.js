@@ -8,6 +8,8 @@ import getInvoiceBreakdown from '@salesforce/apex/DealerPortalInvoiceBreakdownHa
 import { updateRecord, getRecord, notifyRecordUpdateAvailable } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { refreshApex } from '@salesforce/apex';
+import { publish, MessageContext } from 'lightning/messageService';
+import PAYMENT_STATUS_CHANNEL from '@salesforce/messageChannel/PaymentStatusChange__c';
 import STATUS_FIELD from '@salesforce/schema/Remittance_Form__c.Status__c';
 import AMOUNT_FIELD from '@salesforce/schema/Remittance_Form__c.Balance__c';
 import CHEQUE_PAYMENT from '@salesforce/resourceUrl/ChequePayment';
@@ -27,6 +29,9 @@ export default class DealerPortalCreatePayment extends LightningElement {
         eTransfer: ETRANSFER_PAYMENT,
         cardsIcons: CARDS_ICONS
     };
+
+    @wire(MessageContext)
+    messageContext;
 
     @track isGenerating = false;
     @track showPaymentModal = false;
@@ -506,10 +511,8 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 this.resetChequeForm();
                 // Refresh the record data
                 notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
-                // Refresh transaction history display
-                if (this.refs.transactionHistoryDisplay) {
-                    this.refs.transactionHistoryDisplay.refreshTransactions();
-                }
+                // Notify all sibling components via LMS
+                this.publishPaymentUpdate('cheque');
             } else {
                 this.showToast('Error', result?.errorMessage || 'Failed to save cheque details', 'error');
             }
@@ -624,10 +627,8 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 this.resetETransferForm();
                 // Refresh the record data
                 notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
-                // Refresh transaction history display
-                if (this.refs.transactionHistoryDisplay) {
-                    this.refs.transactionHistoryDisplay.refreshTransactions();
-                }
+                // Notify all sibling components via LMS
+                this.publishPaymentUpdate('eTransfer');
             } else {
                 this.showToast('Error', result?.errorMessage || 'Failed to save E-Transfer details', 'error');
             }
@@ -703,10 +704,8 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
                 // Refresh dealer credit balance
                 refreshApex(this._wiredCreditResult);
-                // Refresh transaction history display
-                if (this.refs.transactionHistoryDisplay) {
-                    this.refs.transactionHistoryDisplay.refreshTransactions();
-                }
+                // Notify all sibling components via LMS
+                this.publishPaymentUpdate('dealerCredit');
             } else {
                 this.showToast('Error', result?.errorMessage || 'Failed to apply dealer credit', 'error');
             }
@@ -783,10 +782,8 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 this.cardData = null;
                 // Refresh the record data
                 notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
-                // Refresh transaction history display
-                if (this.refs.transactionHistoryDisplay) {
-                    this.refs.transactionHistoryDisplay.refreshTransactions();
-                }
+                // Notify all sibling components via LMS
+                this.publishPaymentUpdate('creditCard');
             } else {
                 this.showToast('Error', result?.errorMessage || 'Payment processing failed', 'error');
             }
@@ -857,6 +854,15 @@ export default class DealerPortalCreatePayment extends LightningElement {
             return parseInt(expiryString.split('/')[1], 10);
         }
         return null;
+    }
+
+    publishPaymentUpdate(paymentMethod) {
+        publish(this.messageContext, PAYMENT_STATUS_CHANNEL, {
+            remittanceFormId: this.recordId,
+            action: 'PAYMENT_COMPLETED',
+            paymentMethod: paymentMethod,
+            timestamp: Date.now()
+        });
     }
 
     showToast(title, message, variant) {

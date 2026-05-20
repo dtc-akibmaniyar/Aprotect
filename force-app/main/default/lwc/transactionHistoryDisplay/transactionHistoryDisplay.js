@@ -1,6 +1,8 @@
 import { LightningElement, api, wire } from 'lwc';
 import { refreshApex } from '@salesforce/apex';
 import { NavigationMixin } from 'lightning/navigation';
+import { subscribe, unsubscribe, MessageContext } from 'lightning/messageService';
+import PAYMENT_STATUS_CHANNEL from '@salesforce/messageChannel/PaymentStatusChange__c';
 import getTransactionHistory from '@salesforce/apex/DealerPortalTransactionHistoryController.getTransactionHistory';
 
 export default class TransactionHistoryDisplay extends NavigationMixin(LightningElement) {
@@ -11,6 +13,13 @@ export default class TransactionHistoryDisplay extends NavigationMixin(Lightning
 
     // hold wire result to allow manual refreshApex
     _wiredResult;
+
+    // LMS subscription
+    _subscription = null;
+    _pollTimers = [];
+
+    @wire(MessageContext)
+    messageContext;
 
     @wire(getTransactionHistory, { recordId: '$recordId' })
     wiredTransactions(result) {
@@ -41,6 +50,38 @@ export default class TransactionHistoryDisplay extends NavigationMixin(Lightning
             this.transactions = [];
         }
         this.isLoading = false;
+    }
+
+    connectedCallback() {
+        this._subscription = subscribe(
+            this.messageContext,
+            PAYMENT_STATUS_CHANNEL,
+            (message) => this.handlePaymentMessage(message)
+        );
+    }
+
+    disconnectedCallback() {
+        if (this._subscription) {
+            unsubscribe(this._subscription);
+            this._subscription = null;
+        }
+        this._pollTimers.forEach(t => clearTimeout(t));
+        this._pollTimers = [];
+    }
+
+    handlePaymentMessage(message) {
+        // Only react to messages for our remittance form
+        if (message.remittanceFormId !== this.recordId) return;
+
+        // Immediate refresh
+        this.refreshTransactions();
+
+        // Delayed polls to catch flow-driven updates (junction status, date stamps)
+        this._pollTimers.forEach(t => clearTimeout(t));
+        this._pollTimers = [
+            setTimeout(() => this.refreshTransactions(), 3000),
+            setTimeout(() => this.refreshTransactions(), 6000)
+        ];
     }
 
     get variables() {

@@ -1944,22 +1944,8 @@ packageToSave = existingPkg;
         packageToSave.Package_Tier__c = packageTierId;
         
 
-        Decimal dealerTaxRate = null; // Tax rate from dealer's region (percentage, e.g. 13 for 13%)
-        if (String.isNotBlank(dealerId)) {
-            try {
-                List<Account> dealers = [
-                    SELECT Id, Tax_Region__c, Tax_Region__r.Total_Tax_Rate__c
-                    FROM Account
-                    WHERE Id = :dealerId
-                    LIMIT 1
-                ];
-                if (!dealers.isEmpty() && dealers[0].Tax_Region__c != null) {
-                    packageToSave.Tax_Region__c = dealers[0].Tax_Region__c;
-                    dealerTaxRate = dealers[0].Tax_Region__r != null ? dealers[0].Tax_Region__r.Total_Tax_Rate__c : null;
-}
-            } catch (Exception e) {
-}
-        }
+        // Use TaxRegionHelper to populate tax fields from dealer's region
+        Decimal dealerTaxRate = TaxRegionHelper.applyDealerTax(packageToSave, dealerId);
         
 
         if (packageDataMap.containsKey('dealerPackagePrice')) {
@@ -4340,6 +4326,9 @@ return null;
         }
         
 
+        // Populate tax from dealer's region
+        TaxRegionHelper.applyDealerTax(appPackage, dealerId);
+        
         insert appPackage;
         
 
@@ -5332,6 +5321,9 @@ throw new CalloutException('Package data cannot be null');
             }
         }
         
+        // Populate tax from dealer's region
+        TaxRegionHelper.applyDealerTax(appPackage, dealerId);
+        
         String recordId;
         try {
             insert appPackage;
@@ -5935,6 +5927,9 @@ private static String createTotalLossApplicationPackageWithoutSharing(String app
                 appPackage.RecordTypeId = recordTypes[0].Id;
             }
         }
+        
+        // Populate tax from dealer's region
+        TaxRegionHelper.applyDealerTax(appPackage, dealerId);
         
         insert appPackage;
 return appPackage.Id;

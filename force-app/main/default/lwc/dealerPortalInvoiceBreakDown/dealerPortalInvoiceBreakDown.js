@@ -1,6 +1,8 @@
 import { LightningElement, api, wire, track } from 'lwc';
 import { CurrentPageReference, NavigationMixin } from 'lightning/navigation';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import { subscribe, unsubscribe, MessageContext } from 'lightning/messageService';
+import PAYMENT_STATUS_CHANNEL from '@salesforce/messageChannel/PaymentStatusChange__c';
 import getInvoiceBreakdown from '@salesforce/apex/DealerPortalInvoiceBreakdownHandler.getInvoiceBreakdown';
 import downloadRemittanceFormPDF from '@salesforce/apex/DealerPortalRemittanceHandler.downloadRemittanceFormPDF';
 
@@ -19,14 +21,16 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
 
     _dataLoaded = false;
 
+    // LMS subscription
+    _subscription = null;
+    _pollTimers = [];
+
+    @wire(MessageContext)
+    messageContext;
+
     @wire(CurrentPageReference)
     handlePageReference(pageRef) {
         if (!pageRef || this._dataLoaded) return;
-        // Never override @api recordId — it is the authoritative source.
-        // The CurrentPageReference wire can transiently fire with the *previous*
-        // page's recordId (e.g. the invoice record) while navigating away or
-        // returning via browser back, which would cause a "not found" error.
-        // We only fall back to pageRef when @api recordId was not provided at all.
         if (!this.recordId) {
             this.recordId = pageRef.attributes?.recordId;
         }
@@ -41,6 +45,36 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
             this._dataLoaded = true;
             this.loadInvoiceData();
         }
+        // Subscribe to payment status changes
+        this._subscription = subscribe(
+            this.messageContext,
+            PAYMENT_STATUS_CHANNEL,
+            (message) => this.handlePaymentMessage(message)
+        );
+    }
+
+    disconnectedCallback() {
+        if (this._subscription) {
+            unsubscribe(this._subscription);
+            this._subscription = null;
+        }
+        this._pollTimers.forEach(t => clearTimeout(t));
+        this._pollTimers = [];
+    }
+
+    handlePaymentMessage(message) {
+        // Only react to messages for our remittance form
+        if (message.remittanceFormId !== this.recordId) return;
+
+        // Immediate refresh
+        this.loadInvoiceData();
+
+        // Delayed polls to catch flow-driven updates (invoice status, balance, junction statuses)
+        this._pollTimers.forEach(t => clearTimeout(t));
+        this._pollTimers = [
+            setTimeout(() => this.loadInvoiceData(), 3000),
+            setTimeout(() => this.loadInvoiceData(), 6000)
+        ];
     }
 
     async loadInvoiceData() {
@@ -88,7 +122,6 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
                 }
             });
 
-            // Sub-total = sum of prices WITH tax across all service line items for this row
             const subtotal = (cols.warranty?.costPriceWithTax || 0)
                            + (cols.tireRim?.costPriceWithTax || 0)
                            + (cols.loanProtection?.costPriceWithTax || 0);
@@ -131,7 +164,6 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
             statusBadgeClass:                     this._remittanceStatusClass(result.status),
             isAllocationRemittance:               result.isAllocationRemittance === true,
             selectedServiceLabels:                result.selectedServiceLabels || '',
-            // Table-specific
             tableRows,
             invoiceCount:           tableRows.length,
             warrantyColTotal:       this._fmt(colTotals.warranty),
@@ -161,7 +193,6 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
         };
     }
 
-    // Assign each line item to a service column key (first match wins)
     _mapServiceCols(lineItems) {
         const cols = { warranty: null, tireRim: null, loanProtection: null };
         lineItems.forEach(item => {
