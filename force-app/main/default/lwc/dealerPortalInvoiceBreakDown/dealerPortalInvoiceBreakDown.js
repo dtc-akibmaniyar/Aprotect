@@ -106,19 +106,26 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
         }, 0);
     }
 
-    // ─── Transform ────────────────────────────────────────────────────────────
+    // ─── Transform ────────────────────────────────────────────────────
 
     transformInvoiceData(result) {
-        const colTotals = { warranty: 0, tireRim: 0, loanProtection: 0 };
-        const colCounts = { warranty: 0, tireRim: 0, loanProtection: 0 };
+        const colTotals    = { warranty: 0, tireRim: 0, loanProtection: 0 };
+        const colTotalsNet = { warranty: 0, tireRim: 0, loanProtection: 0 };
+        const colTotalsTax = { warranty: 0, tireRim: 0, loanProtection: 0 };
+        const colCounts    = { warranty: 0, tireRim: 0, loanProtection: 0 };
+        // Track tax percentages to compute weighted average
+        const colTaxPctWeighted = { warranty: 0, tireRim: 0, loanProtection: 0 };
 
         const tableRows = (result.invoices || []).map((invoice, idx) => {
             const cols = this._mapServiceCols(invoice.lineItems || []);
 
             ['warranty', 'tireRim', 'loanProtection'].forEach(k => {
                 if (cols[k]) {
-                    colTotals[k] += cols[k].costPriceWithoutTax || 0;
+                    colTotals[k]    += cols[k].costPriceWithTax    || 0;
+                    colTotalsNet[k] += cols[k].costPriceWithoutTax || 0;
+                    colTotalsTax[k] += cols[k].taxAmount           || 0;
                     colCounts[k]++;
+                    colTaxPctWeighted[k] += (cols[k].taxPercentage || 0) * (cols[k].costPriceWithoutTax || 0);
                 }
             });
 
@@ -140,6 +147,16 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
                 loanProtection:  cols.loanProtection ? this._colCell(cols.loanProtection) : null,
                 formattedSubTotal: this._fmt(subtotal)
             };
+        });
+
+        // Compute average tax percentage per column (weighted by net amount)
+        const colAvgTaxPct = {};
+        ['warranty', 'tireRim', 'loanProtection'].forEach(k => {
+            if (colTotalsNet[k] > 0) {
+                colAvgTaxPct[k] = colTaxPctWeighted[k] / colTotalsNet[k];
+            } else {
+                colAvgTaxPct[k] = 0;
+            }
         });
 
         return {
@@ -169,6 +186,18 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
             warrantyColTotal:       this._fmt(colTotals.warranty),
             tireRimColTotal:        this._fmt(colTotals.tireRim),
             loanProtectionColTotal: this._fmt(colTotals.loanProtection),
+            // Net (excl. tax) totals
+            warrantyColNet:         this._fmt(colTotalsNet.warranty),
+            tireRimColNet:          this._fmt(colTotalsNet.tireRim),
+            loanProtectionColNet:   this._fmt(colTotalsNet.loanProtection),
+            // Tax amount totals
+            warrantyColTax:         this._fmt(colTotalsTax.warranty),
+            tireRimColTax:          this._fmt(colTotalsTax.tireRim),
+            loanProtectionColTax:   this._fmt(colTotalsTax.loanProtection),
+            // Average tax percentage per column
+            warrantyTaxPct:         this._fmtPct(colAvgTaxPct.warranty),
+            tireRimTaxPct:          this._fmtPct(colAvgTaxPct.tireRim),
+            loanProtectionTaxPct:   this._fmtPct(colAvgTaxPct.loanProtection),
             warrantyCount:          colCounts.warranty,
             tireRimCount:           colCounts.tireRim,
             loanProtectionCount:    colCounts.loanProtection,
@@ -208,8 +237,8 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
     _colCell(item) {
         const status = item.status || '';
         return {
-            amount:          item.costPriceWithoutTax || 0,
-            formattedAmount: this._fmt(item.costPriceWithoutTax || 0),
+            amount:          item.costPriceWithTax || 0,
+            formattedAmount: this._fmt(item.costPriceWithTax || 0),
             status,
             statusClass:     this._statusClass(status),
             hasStatus:       !!status
@@ -246,7 +275,11 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
         return '$' + (parseFloat(value) || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     }
 
-    // ─── Navigation ───────────────────────────────────────────────────────────
+    _fmtPct(value) {
+        return (parseFloat(value) || 0).toFixed(2) + '%';
+    }
+
+    // ─── Navigation ───────────────────────────────────────────────────
 
     handleInvoiceClick(event) {
         event.preventDefault();
@@ -262,7 +295,7 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
         });
     }
 
-    // ─── PDF Download ─────────────────────────────────────────────────────────
+    // ─── PDF Download ─────────────────────────────────────────────────
 
     async handleDownloadPDF() {
         try {

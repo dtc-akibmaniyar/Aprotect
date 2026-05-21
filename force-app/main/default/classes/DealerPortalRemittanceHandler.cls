@@ -1,37 +1,26 @@
 public class DealerPortalRemittanceHandler {
 
     /**
-     * Computes the customer-facing display price for an Application Package.
-     * If Dealer_Price_Override__c is set → use it as total (tax-inclusive).
-     * Otherwise → use Contract_Premium_Price__c (retail with tax).
+     * Computes the display price for an Application Package (cost/base price).
      */
     private static Decimal getDisplayPrice(Application_Package__c pkg) {
-        if (pkg.Dealer_Price_Override__c != null) {
-            return pkg.Dealer_Price_Override__c;
-        }
-        return pkg.Contract_Premium_Price__c != null ? pkg.Contract_Premium_Price__c : 0;
+        return pkg.Contract_Cost_Price__c != null ? pkg.Contract_Cost_Price__c : 0;
     }
 
     /**
      * Returns the pre-tax display price for an Application Package.
-     * If Dealer_Price_Override__c is set → back-calculate pre-tax from override.
-     * Otherwise → use Contract_Premium_Price_Without_Tax__c.
      */
     private static Decimal getDisplayPriceWithoutTax(Application_Package__c pkg) {
-        if (pkg.Dealer_Price_Override__c != null) {
-            Decimal taxPct = pkg.Tax_Percentage__c != null ? pkg.Tax_Percentage__c : 0;
-            return taxPct > 0
-                ? (pkg.Dealer_Price_Override__c / (1 + taxPct / 100)).setScale(2, System.RoundingMode.HALF_UP)
-                : pkg.Dealer_Price_Override__c;
-        }
-        return pkg.Contract_Premium_Price_Without_Tax__c != null ? pkg.Contract_Premium_Price_Without_Tax__c : 0;
+        Decimal totalPrice = pkg.Contract_Cost_Price__c != null ? pkg.Contract_Cost_Price__c : 0;
+        Decimal taxAmt = pkg.Tax_Amount__c != null ? pkg.Tax_Amount__c : 0;
+        return totalPrice - taxAmt;
     }
 
     /**
      * Returns the tax amount for display purposes.
      */
     private static Decimal getDisplayTaxAmount(Application_Package__c pkg) {
-        return getDisplayPrice(pkg) - getDisplayPriceWithoutTax(pkg);
+        return pkg.Tax_Amount__c != null ? pkg.Tax_Amount__c : 0;
     }
     
     @AuraEnabled(cacheable=true)
@@ -155,11 +144,9 @@ public class DealerPortalRemittanceHandler {
                     invoiceIds.add(invoice.Id);
                 }
 
-                // Query unpaid line items with their Application Package for retail/custom pricing
+                // Query unpaid line items
                 List<Invoice_Line_Item__c> lineItems = [
                     SELECT Id, Invoice__c, Application_Package__c,
-                           Application_Package__r.Contract_Premium_Price__c,
-                           Application_Package__r.Dealer_Price_Override__c,
                            Contract_Cost_Price__c
                     FROM Invoice_Line_Item__c
                     WHERE Invoice__c IN :invoiceIds
@@ -180,15 +167,7 @@ public class DealerPortalRemittanceHandler {
                 List<Remittance_Line_Item_Junction__c> newJunctionRecords = new List<Remittance_Line_Item_Junction__c>();
                 for (Invoice_Line_Item__c lineItem : lineItems) {
                     if (!existingLineItemIds.contains(lineItem.Id)) {
-                        // Use retail/custom price instead of cost price
-                        Decimal displayPrice = lineItem.Contract_Cost_Price__c; // fallback
-                        if (lineItem.Application_Package__r != null) {
-                            if (lineItem.Application_Package__r.Dealer_Price_Override__c != null) {
-                                displayPrice = lineItem.Application_Package__r.Dealer_Price_Override__c;
-                            } else if (lineItem.Application_Package__r.Contract_Premium_Price__c != null) {
-                                displayPrice = lineItem.Application_Package__r.Contract_Premium_Price__c;
-                            }
-                        }
+                        Decimal displayPrice = lineItem.Contract_Cost_Price__c != null ? lineItem.Contract_Cost_Price__c : 0;
                         newJunctionRecords.add(new Remittance_Line_Item_Junction__c(
                             Remittance_Form__c   = newRemittanceForm.Id,
                             Invoice__c           = lineItem.Invoice__c,
@@ -245,8 +224,7 @@ public class DealerPortalRemittanceHandler {
                        Vehicle_Model__c,
                        Vehicle_Trim__c,
                        (SELECT Id, RecordType.DeveloperName, RecordType.Name, Name,
-                               Contract_Premium_Price__c, Contract_Premium_Price_Without_Tax__c,
-                               Dealer_Price_Override__c,
+                               Contract_Cost_Price__c,
                                Tax_Amount__c, Tax_Percentage__c
                         FROM Application_Packages__r
                         WHERE Active__c = true ORDER BY RecordType.Name ASC )

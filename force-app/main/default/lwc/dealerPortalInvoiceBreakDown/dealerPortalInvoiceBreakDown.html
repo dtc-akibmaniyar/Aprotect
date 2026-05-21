@@ -87,7 +87,7 @@
                     </div>
                 </div>
 
-                <!-- ── Invoice Table ───────────────────────────────────────── -->
+                <!-- ── Invoice Table ───────────────────────────────── -->
                 <div class="table-wrapper">
                     <table class="inv-table">
                         <thead>
@@ -162,14 +162,32 @@
                             </template>
                         </tbody>
                         <tfoot>
-                            <!-- Row 1: QTY + column totals -->
+                            <!-- Row 1: QTY + column totals with breakdown -->
                             <tr class="footer-row">
                                 <td colspan="4" class="footer-qty">
                                     <strong>QTY: {invoiceData.invoiceCount}</strong>
                                 </td>
-                                <td class="col-service footer-total">{invoiceData.warrantyColTotal}</td>
-                                <td class="col-service footer-total">{invoiceData.tireRimColTotal}</td>
-                                <td class="col-service footer-total">{invoiceData.loanProtectionColTotal}</td>
+                                <td class="col-service footer-total">
+                                    <span class="footer-total-amount">{invoiceData.warrantyColTotal}</span>
+                                    <template if:true={invoiceData.hasWarrantyCol}>
+                                        <span class="footer-breakdown">Net: {invoiceData.warrantyColNet}</span>
+                                        <span class="footer-breakdown">Tax ({invoiceData.warrantyTaxPct}): {invoiceData.warrantyColTax}</span>
+                                    </template>
+                                </td>
+                                <td class="col-service footer-total">
+                                    <span class="footer-total-amount">{invoiceData.tireRimColTotal}</span>
+                                    <template if:true={invoiceData.hasTireRimCol}>
+                                        <span class="footer-breakdown">Net: {invoiceData.tireRimColNet}</span>
+                                        <span class="footer-breakdown">Tax ({invoiceData.tireRimTaxPct}): {invoiceData.tireRimColTax}</span>
+                                    </template>
+                                </td>
+                                <td class="col-service footer-total">
+                                    <span class="footer-total-amount">{invoiceData.loanProtectionColTotal}</span>
+                                    <template if:true={invoiceData.hasLoanProtectionCol}>
+                                        <span class="footer-breakdown">Net: {invoiceData.loanProtectionColNet}</span>
+                                        <span class="footer-breakdown">Tax ({invoiceData.loanProtectionTaxPct}): {invoiceData.loanProtectionColTax}</span>
+                                    </template>
+                                </td>
                                 <td class="col-subtotal"></td>
                             </tr>
                             <!-- Row 2: service counts aligned under their columns -->

@@ -8,37 +8,26 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
     };
 
     /**
-     * Computes the customer-facing display price for an Application Package.
-     * If Dealer_Price_Override__c is set → use it as total (tax-inclusive).
-     * Otherwise → use Contract_Premium_Price__c (retail with tax).
+     * Computes the display price for an Application Package (cost/base price).
      */
     private static Decimal getDisplayPrice(Application_Package__c pkg) {
-        if (pkg.Dealer_Price_Override__c != null) {
-            return pkg.Dealer_Price_Override__c;
-        }
-        return pkg.Contract_Premium_Price__c != null ? pkg.Contract_Premium_Price__c : 0;
+        return pkg.Contract_Cost_Price__c != null ? pkg.Contract_Cost_Price__c : 0;
     }
 
     /**
      * Returns the pre-tax display price for an Application Package.
-     * If Dealer_Price_Override__c is set → back-calculate pre-tax from override.
-     * Otherwise → use Contract_Premium_Price_Without_Tax__c.
      */
     private static Decimal getDisplayPriceWithoutTax(Application_Package__c pkg) {
-        if (pkg.Dealer_Price_Override__c != null) {
-            Decimal taxPct = pkg.Tax_Percentage__c != null ? pkg.Tax_Percentage__c : 0;
-            return taxPct > 0
-                ? (pkg.Dealer_Price_Override__c / (1 + taxPct / 100)).setScale(2, System.RoundingMode.HALF_UP)
-                : pkg.Dealer_Price_Override__c;
-        }
-        return pkg.Contract_Premium_Price_Without_Tax__c != null ? pkg.Contract_Premium_Price_Without_Tax__c : 0;
+        Decimal totalPrice = pkg.Contract_Cost_Price__c != null ? pkg.Contract_Cost_Price__c : 0;
+        Decimal taxAmt = pkg.Tax_Amount__c != null ? pkg.Tax_Amount__c : 0;
+        return totalPrice - taxAmt;
     }
 
     /**
      * Returns the tax amount for display purposes.
      */
     private static Decimal getDisplayTaxAmount(Application_Package__c pkg) {
-        return getDisplayPrice(pkg) - getDisplayPriceWithoutTax(pkg);
+        return pkg.Tax_Amount__c != null ? pkg.Tax_Amount__c : 0;
     }
 
     @AuraEnabled(cacheable=false)
@@ -193,24 +182,6 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                     ];
             }
 
-            // ── 3b. Query Application Packages for retail pricing ─────────────
-            Set<Id> packageIds = new Set<Id>();
-            for (Invoice_Line_Item__c item : lineItems) {
-                if (item.Application_Package__c != null) packageIds.add(item.Application_Package__c);
-            }
-
-            Map<Id, Application_Package__c> packageMap = new Map<Id, Application_Package__c>();
-            if (!packageIds.isEmpty()) {
-                for (Application_Package__c pkg : [
-                    SELECT Id, Contract_Premium_Price__c, Contract_Premium_Price_Without_Tax__c,
-                           Dealer_Price_Override__c, Tax_Amount__c, Tax_Percentage__c
-                    FROM Application_Package__c
-                    WHERE Id IN :packageIds
-                ]) {
-                    packageMap.put(pkg.Id, pkg);
-                }
-            }
-
             // ── 4. Build map Invoice → line items ─────────────────────────────
             Map<Id, List<Invoice_Line_Item__c>> invoiceToLineItems = new Map<Id, List<Invoice_Line_Item__c>>();
             for (Invoice_Line_Item__c item : lineItems) {
@@ -246,25 +217,10 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                         LineItemRecord li      = new LineItemRecord();
                         li.id                  = item.Id;
                         li.name                = item.Application_Package_Name__c;
-
-                        // ── FIX: Use retail prices from Application_Package__c ──
-                        Application_Package__c pkg = item.Application_Package__c != null
-                            ? packageMap.get(item.Application_Package__c)
-                            : null;
-
-                        if (pkg != null) {
-                            li.costPriceWithTax    = getDisplayPrice(pkg);
-                            li.costPriceWithoutTax = getDisplayPriceWithoutTax(pkg);
-                            li.taxAmount           = getDisplayTaxAmount(pkg);
-                            li.taxPercentage       = pkg.Tax_Percentage__c;
-                        } else {
-                            // Fallback to line item values if package not found
-                            li.costPriceWithoutTax = item.Contract_Cost_Price_Without_Tax__c;
-                            li.costPriceWithTax    = item.Contract_Cost_Price__c;
-                            li.taxAmount           = item.Tax_Amount__c;
-                            li.taxPercentage       = item.Tax_Percentage__c;
-                        }
-
+                        li.costPriceWithoutTax = item.Contract_Cost_Price_Without_Tax__c;
+                        li.costPriceWithTax    = item.Contract_Cost_Price__c;
+                        li.taxAmount           = item.Tax_Amount__c;
+                        li.taxPercentage       = item.Tax_Percentage__c;
                         li.status              = item.Status__c;
                         invRecord.lineItems.add(li);
                     }

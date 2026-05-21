@@ -1,4 +1,4 @@
-/* ── Page wrapper ──────────────────────────────────────────────────────────── */
+/* ── Page wrapper ──────────────────────────────────────────────────── */
 .remittance-modal-content {
     display: flex;
     flex-direction: column;
@@ -6,7 +6,7 @@
     font-family: Arial, sans-serif;
 }
 
-/* ── Header ────────────────────────────────────────────────────────────────── */
+/* ── Header ──────────────────────────────────────────────────────── */
 .header-section {
     display: flex;
     justify-content: space-between;
@@ -27,7 +27,7 @@
     margin: 0;
 }
 
-/* ── Details / Credit grid ─────────────────────────────────────────────────── */
+/* ── Details / Credit grid ─────────────────────────────────────────── */
 .remittance-details-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -68,13 +68,13 @@
     margin-bottom: 12px;
 }
 
-/* ── Table wrapper ─────────────────────────────────────────────────────────── */
+/* ── Table wrapper ─────────────────────────────────────────────────── */
 .table-wrapper {
     overflow-x: auto;
     margin-bottom: 0;
 }
 
-/* ── Invoice Table ─────────────────────────────────────────────────────────── */
+/* ── Invoice Table ─────────────────────────────────────────────────── */
 .inv-table {
     width: 100%;
     border-collapse: collapse;
@@ -164,7 +164,24 @@
     margin-right: 2px;
 }
 
-/* ── Column widths ─────────────────────────────────────────────────────────── */
+/* ── Footer breakdown (Net / Tax lines) ──────────────────────────── */
+.footer-total-amount {
+    display: block;
+    font-weight: 700;
+    font-size: 13px;
+    color: #5184b8;
+}
+
+.footer-breakdown {
+    display: block;
+    font-size: 10px;
+    font-weight: 400;
+    color: #666;
+    line-height: 1.5;
+    margin-top: 1px;
+}
+
+/* ── Column widths ─────────────────────────────────────────────────── */
 .col-index    { width: 42px;  text-align: center; }
 .col-inv      { width: 100px; text-align: center; }
 .col-customer { width: 200px; text-align: left; }
@@ -178,7 +195,7 @@
     text-align: left;
 }
 
-/* ── INV # cell ────────────────────────────────────────────────────────────── */
+/* ── INV # cell ──────────────────────────────────────────────────── */
 .col-inv {
     display: table-cell; /* keep as table cell */
 }
@@ -190,7 +207,7 @@
     gap: 3px;
 }
 
-/* ── INV # link ────────────────────────────────────────────────────────────── */
+/* ── INV # link ──────────────────────────────────────────────────── */
 .inv-link {
     color: #0070d2;
     text-decoration: none;
@@ -203,7 +220,7 @@
     color: #005ba1;
 }
 
-/* ── Service cell content ─────────────────────────────────────────────────── */
+/* ── Service cell content ───────────────────────────────────────── */
 .svc-amount {
     display: block;
     font-weight: 500;
@@ -216,7 +233,7 @@
     font-weight: 600;
 }
 
-/* ── Line-item status badges ───────────────────────────────────────────────── */
+/* ── Line-item status badges ─────────────────────────────────────── */
 .li-badge {
     display: inline-block;
     margin-top: 4px;
@@ -272,7 +289,7 @@
 }
 
 
-/* ── Remittance Form Status badges ─────────────────────────────────────────── */
+/* ── Remittance Form Status badges ───────────────────────────────── */
 .rf-badge {
     display: inline-block;
     padding: 3px 10px;
@@ -326,7 +343,7 @@
     border-color: #ced4da;
 }
 
-/* ── Summary Section ───────────────────────────────────────────────────────── */
+/* ── Summary Section ───────────────────────────────────────────────── */
 .remittance-summary {
     padding: 12px 0;
     margin-left: 50%;
@@ -385,7 +402,7 @@
 .paid-row .summary-label { color: #155724; font-weight: 600; }
 .paid-row .summary-value { color: #155724; font-weight: 700; }
 
-/* ── Available Credit ──────────────────────────────────────────────────────── */
+/* ── Available Credit ──────────────────────────────────────────────── */
 .available-credit-value {
     font-size: 15px;
     font-weight: 700;
