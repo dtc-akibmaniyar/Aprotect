@@ -108,7 +108,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     
     // Getter for skip button label - "Next" when locked, "Skip" when not locked
     get skipButtonLabel() {
-        return this.isLocked ? 'Next' : 'Decline Tyre & Rim';
+        return this.isLocked ? 'Next' : 'Decline Tire & Rim';
     }
     defaultPlanIncludes = [
         { id: 'repair', label: 'Tire & Rim Repair & Replacement' },
