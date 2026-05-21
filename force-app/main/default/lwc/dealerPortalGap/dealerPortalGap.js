@@ -218,6 +218,7 @@ export default class DealerPortalGap extends LightningElement {
     }
 
     // GAP Input Fields
+    @track isVehicleFinanced = false;
     @track lenderLienholder = '';
     @track financeLoanTerm = '';
     @track loanAmount = '';
@@ -288,6 +289,7 @@ export default class DealerPortalGap extends LightningElement {
         if (this.isExistingApplication && this.existingApplicationPackage) {
             const pkg = this.existingApplicationPackage;
             this.lenderLienholder = (pkg.lenderLienholder != null && pkg.lenderLienholder !== '') ? pkg.lenderLienholder : this.lenderLienholder;
+            if (this.lenderLienholder) { this.isVehicleFinanced = true; }
             this.financeLoanTerm = (pkg.financeLoanTerm != null && pkg.financeLoanTerm !== '') ? String(pkg.financeLoanTerm) : this.financeLoanTerm;
             this.loanAmount = (pkg.loanAmount != null && pkg.loanAmount !== '') ? String(pkg.loanAmount) : this.loanAmount;
             this.interestRate = (pkg.interestRate != null && pkg.interestRate !== '') ? String(pkg.interestRate) : this.interestRate;
@@ -357,6 +359,7 @@ export default class DealerPortalGap extends LightningElement {
                         // Hydrate from server payload FIRST so UI getters have values on first paint
                         const pkg = this.existingApplicationPackage;
                         this.lenderLienholder = (pkg.lenderLienholder != null && pkg.lenderLienholder !== '') ? pkg.lenderLienholder : this.lenderLienholder;
+            if (this.lenderLienholder) { this.isVehicleFinanced = true; }
                         this.financeLoanTerm = (pkg.financeLoanTerm != null && pkg.financeLoanTerm !== '') ? String(pkg.financeLoanTerm) : this.financeLoanTerm;
                         this.loanAmount = (pkg.loanAmount != null && pkg.loanAmount !== '') ? String(pkg.loanAmount) : this.loanAmount;
                         this.interestRate = (pkg.interestRate != null && pkg.interestRate !== '') ? String(pkg.interestRate) : this.interestRate;
@@ -1174,9 +1177,27 @@ export default class DealerPortalGap extends LightningElement {
     
     
     // Validate form before continuing
+    // Handle finance toggle change
+    handleFinanceToggle(event) {
+        this.isVehicleFinanced = event.target.checked;
+        if (!this.isVehicleFinanced) {
+            // Clear lien holder fields when switching to not financed
+            this.lenderLienholder = '';
+            this.financeLoanTerm = '';
+            this.loanAmount = '';
+            this.interestRate = '';
+            this.paymentFrequency = '';
+        }
+    }
+
+    // Label for finance toggle status
+    get financeToggleStatusLabel() {
+        return this.isVehicleFinanced ? 'Financed' : 'Not Financed';
+    }
+
     validateForm() {
-        // Only Lien Holder is required
-        if (!this.lenderLienholder) {
+        // Lien Holder is required only when vehicle is financed
+        if (this.isVehicleFinanced && !this.lenderLienholder) {
             this.errorMessage = 'Lien Holder / Financial Institution is required.';
             this.showError = true;
             return false;
@@ -2118,6 +2139,7 @@ export default class DealerPortalGap extends LightningElement {
                     if (this.isExistingApplication && this.existingApplicationPackage) {
                         const pkg = this.existingApplicationPackage;
                         this.lenderLienholder = (pkg.lenderLienholder != null && pkg.lenderLienholder !== '') ? pkg.lenderLienholder : this.lenderLienholder;
+            if (this.lenderLienholder) { this.isVehicleFinanced = true; }
                         this.financeLoanTerm = (pkg.financeLoanTerm != null && pkg.financeLoanTerm !== '') ? String(pkg.financeLoanTerm) : this.financeLoanTerm;
                         this.loanAmount = (pkg.loanAmount != null && pkg.loanAmount !== '') ? String(pkg.loanAmount) : this.loanAmount;
                         this.interestRate = (pkg.interestRate != null && pkg.interestRate !== '') ? String(pkg.interestRate) : this.interestRate;

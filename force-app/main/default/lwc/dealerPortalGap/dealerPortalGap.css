@@ -4402,3 +4402,82 @@ div.term-option.selected {
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* Vehicle Finance Toggle */
+.finance-toggle-section {
+    margin: 1.5rem 0;
+    padding: 1rem 1.5rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #e1e5eb;
+}
+
+.finance-toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.finance-toggle-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.finance-toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 28px;
+    cursor: pointer;
+}
+
+.finance-toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.finance-toggle-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    border-radius: 28px;
+    transition: background-color 0.3s ease;
+}
+
+.finance-toggle-slider::before {
+    content: "";
+    position: absolute;
+    height: 22px;
+    width: 22px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.finance-toggle-switch input:checked + .finance-toggle-slider {
+    background-color: #0070d2;
+}
+
+.finance-toggle-switch input:checked + .finance-toggle-slider::before {
+    transform: translateX(24px);
+}
+
+.finance-toggle-switch input:disabled + .finance-toggle-slider {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.finance-toggle-status {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #666;
+    min-width: 100px;
+}
