@@ -67,17 +67,15 @@
                     </lightning-button>
                 </template>
 
-                <template if:true={isVehicleFinanced}>
                 <div class="gap-input-form">
                     <div class="loan-input-grid">
                         <label class="loan-field full-width">
-                            <span>Lien Holder / Financial Institution <span class="required-asterisk">*</span></span>
+                            <span>Lien Holder / Financial Institution <template if:true={isVehicleFinanced}><span class="required-asterisk">*</span></template></span>
                             <input
                                 type="text"
                                 value={lenderLienholder}
                                 disabled={fieldDisabled}
-                                oninput={handleLenderLienholderChange}
-                                required>
+                                oninput={handleLenderLienholderChange}>
                         </label>
 
                         <label class="loan-field">
@@ -158,7 +156,6 @@
                         </button>
                     </div>-->
                 </div>
-                </template>
             </div>
         </template>
         <!-- Main Content (Show when existing package or after input) -->

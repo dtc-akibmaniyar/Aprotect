@@ -400,6 +400,65 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     
     // Called when warranty tab is activated
     @api
+    handleVehicleConfigChanged() {
+        console.log('⚠️ MORE PRODUCTS - Vehicle config changed, revalidating packages');
+        // Store current selection before reload
+        this._previousPackageId = this.selectedDealerPackage ? this.selectedDealerPackage.Id : null;
+        this._previousTermId = this.selectedWarrantyTerm ? this.selectedWarrantyTerm.Id : null;
+        this._previousPackageName = this.selectedDealerPackage ? this.selectedDealerPackage.PackageName : null;
+        this._previousTermName = this.selectedWarrantyTerm ? (this.selectedWarrantyTerm.packageTermName || this.selectedWarrantyTerm.Name) : null;
+        this.vehicleConfigChangedMessage = 'Vehicle details have been updated. Reloading available packages...';
+        // Reload packages - they will be filtered by new vehicle config
+        this.loadDealerPackages().then(() => {
+            this._validatePreviousSelection();
+        });
+    }
+
+    _validatePreviousSelection() {
+        if (!this._previousPackageId) {
+            this.vehicleConfigChangedMessage = '';
+            return;
+        }
+        // Check if previous package still exists in the reloaded list
+        const pkgStillExists = this.allDealerPackages && this.allDealerPackages.some(pkg => pkg.Id === this._previousPackageId);
+        if (!pkgStillExists) {
+            // Package no longer available - clear selection and show message
+            this.vehicleConfigChangedMessage = 'The previously selected package "' + (this._previousPackageName || '') + '" is no longer available for the updated vehicle configuration. Please select a new package.';
+            this.selectedDealerPackage = null;
+            this.selectedWarrantyTerm = null;
+            this.selectedWarrantyTermName = '';
+            this.price = 0;
+            this._retailPriceDisplay = 0;
+            this.isPriceOverridden = false;
+            // No additional options to clear for more products
+            this.selectedNewOptions = [];
+            this.availableAdditionalOptionsData = [];
+        } else if (this._previousTermId) {
+            // Package exists, check if term still exists
+            const pkg = this.allDealerPackages.find(p => p.Id === this._previousPackageId);
+            const termStillExists = pkg && pkg.warrantyTerms && pkg.warrantyTerms.some(t => t.Id === this._previousTermId);
+            if (!termStillExists) {
+                this.vehicleConfigChangedMessage = 'The previously selected term "' + (this._previousTermName || '') + '" is no longer available for the updated vehicle. Please select a new term.';
+                this.selectedWarrantyTerm = null;
+                this.selectedWarrantyTermName = '';
+                this.price = 0;
+                this._retailPriceDisplay = 0;
+            } else {
+                this.vehicleConfigChangedMessage = 'Vehicle details updated. Your current package selection is still valid.';
+                // Auto-clear the success message after 5 seconds
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                setTimeout(() => { this.vehicleConfigChangedMessage = ''; }, 5000);
+            }
+        } else {
+            this.vehicleConfigChangedMessage = '';
+        }
+    }
+    dismissVehicleConfigMessage() {
+        this.vehicleConfigChangedMessage = '';
+    }
+
+
+    @api
     onTabActivated() {
         console.log('🎯 ===== MORE PRODUCTS TAB ACTIVATED =====');
         console.log('🔄 Application ID:', this.applicationId);
@@ -489,7 +548,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                 // Map the data to include warranty terms and options
                 this.allDealerPackages = result.data.map(pkg => ({
                     ...pkg,
-                    warrantyTerms: pkg.terms || [],
+                    warrantyTerms: this._sortTerms(pkg.terms || []),
                     options: pkg.options || []
                 }));
                 this.dealerPackages = [...this.allDealerPackages];
@@ -655,7 +714,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             const isSelected = this.selectedDealerPackage && this.selectedDealerPackage.Id === pkg.Id;
             
             // Process terms for display
-            const processedTerms = (pkg.warrantyTerms || []).map(term => {
+            const processedTerms = this._sortTerms(pkg.warrantyTerms || []).map(term => {
                 const isTermSelected = this.selectedWarrantyTerm && 
                                      this.selectedWarrantyTerm.Id === term.Id;
                 
@@ -927,12 +986,39 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     }
     
     // Get warranty terms for display
+
+    // Sort terms by km ascending, then months ascending
+    _parseKmFromName(name) {
+        if (!name) return 0;
+        var m = name.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:KM|km|Km)/i);
+        if (m) return parseFloat(m[1].replace(/,/g, ""));
+        return 0;
+    }
+
+    _parseMonthsFromName(name) {
+        if (!name) return 0;
+        var m = name.match(/(\d+)\s*(?:Month|Months|month|months|Mo)/i);
+        if (m) return parseInt(m[1], 10);
+        return 0;
+    }
+
+    _sortTerms(terms) {
+        return [...terms].sort((a, b) => {
+            var kmA = Number(a.mileageRestriction) || this._parseKmFromName(a.packageTermName || a.Name || a.name);
+            var kmB = Number(b.mileageRestriction) || this._parseKmFromName(b.packageTermName || b.Name || b.name);
+            if (kmA !== kmB) return kmA - kmB;
+            var moA = Number(a.durationRestrictionInMonths) || this._parseMonthsFromName(a.packageTermName || a.Name || a.name);
+            var moB = Number(b.durationRestrictionInMonths) || this._parseMonthsFromName(b.packageTermName || b.Name || b.name);
+            return moA - moB;
+        });
+    }
+
     get warrantyTermsDisplay() {
         if (!this.selectedDealerPackage || !this.selectedDealerPackage.warrantyTerms) {
             return [];
         }
         
-        return this.selectedDealerPackage.warrantyTerms.map(term => {
+        return this._sortTerms(this.selectedDealerPackage.warrantyTerms).map(term => {
             const isSelected = this.selectedWarrantyTerm && 
                              this.selectedWarrantyTerm.Id === term.Id;
             
@@ -1365,6 +1451,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             this.selectedNewOptions = [];
             this.optionsToRemove = [];
             
+            this.vehicleConfigChangedMessage = '';
             this.selectedDealerPackage = pkg;
             this.selectedProgram = pkg.PackageName;
             this.setSelectedPlanTypeFromPackage(pkg);
@@ -2834,7 +2921,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         if (!this.selectedDealerPackage || !this.selectedDealerPackage.warrantyTerms) {
             return [];
         }
-        return this.selectedDealerPackage.warrantyTerms;
+        return this._sortTerms(this.selectedDealerPackage.warrantyTerms);
     }
     
     

@@ -61,6 +61,16 @@
                     </div>
                 </template>
 
+
+        <!-- Vehicle Config Changed Info Banner -->
+        <template if:true={vehicleConfigChangedMessage}>
+            <div class="vehicle-config-changed-banner">
+                <lightning-icon icon-name="utility:info" size="x-small" variant="inverse" class="banner-icon"></lightning-icon>
+                <span class="banner-text">{vehicleConfigChangedMessage}</span>
+                <button class="banner-dismiss" onclick={dismissVehicleConfigMessage}>×</button>
+            </div>
+        </template>
+
                 <template if:true={showPlanCards}>
                     <div class="slds-grid slds-wrap details-grid">
                         <!-- Left Column - Accordion Plan Selection -->

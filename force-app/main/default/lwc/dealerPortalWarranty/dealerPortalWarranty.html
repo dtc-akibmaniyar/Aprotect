@@ -36,6 +36,16 @@
             <div class="warranty-hero__image"></div>
         </div>
 
+
+        <!-- Vehicle Config Changed Info Banner -->
+        <template if:true={vehicleConfigChangedMessage}>
+            <div class="vehicle-config-changed-banner">
+                <lightning-icon icon-name="utility:info" size="x-small" variant="inverse" class="banner-icon"></lightning-icon>
+                <span class="banner-text">{vehicleConfigChangedMessage}</span>
+                <button class="banner-dismiss" onclick={dismissVehicleConfigMessage}>×</button>
+            </div>
+        </template>
+
         <div class="warranty-container" data-render-key={renderKey}>
                 <div class="slds-grid slds-wrap details-grid">
                     <!-- Left Column - All Packages with Terms -->
@@ -402,7 +412,6 @@
                                                                 $ RETAIL
                                                             </template>
                                                         </span>
-                                                        <div class="additional-option-d-icon">D</div>
                                                         <template if:false={fieldDisabled}>
                                                             <button 
                                                             type="button"
@@ -470,7 +479,6 @@
                                                                     $ RETAIL
                                                                 </template>
                                                             </span>
-                                                            <div class="additional-option-d-icon">D</div>
                                                         </div>
                                                     </label>
                                                 </div>
@@ -571,6 +579,23 @@
                                             <span class="breakdown-label">Custom Price (Before Tax):</span>
                                             <span class="breakdown-value">{currentPriceBreakdown.retailPrice}</span>
                                         </div>
+                                        <!-- Additional Options Breakdown -->
+                                        <template if:true={hasSelectedAdditionalOptions}>
+                                            <div class="breakdown-options-section">
+                                                <div class="breakdown-options-header">
+                                                    <span class="breakdown-label">Additional Options</span>
+                                                    <span class="breakdown-value">{additionalOptionsPricing.formattedTotalAdditionalOptionsPrice}</span>
+                                                </div>
+                                                <div class="breakdown-options-list">
+                                                    <template for:each={selectedAdditionalOptionsBreakdown} for:item="option">
+                                                        <div key={option.id} class="breakdown-option-item">
+                                                            <span class="breakdown-option-name">{option.name}</span>
+                                                            <span class="breakdown-option-price">{option.formattedPrice}</span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
                                         <template if:true={currentPriceBreakdown.taxAmount}>
                                             <div class="breakdown-item">
                                                 <span class="breakdown-label">Tax ({currentPriceBreakdown.taxRate}):</span>
@@ -598,6 +623,19 @@
                                                 <span class="breakdown-label">Dealer Price:</span>
                                                 <span class="breakdown-value">{dealerReferenceBreakdown.netCost}</span>
                                             </div>
+                                            <template if:true={hasDealerAdditionalOptions}>
+                                                <div class="breakdown-options-section dealer-options-section">
+                                                    <div class="breakdown-options-header">Additional Options (Dealer Price)</div>
+                                                    <div class="breakdown-options-list">
+                                                        <template for:each={dealerAdditionalOptionsBreakdown} for:item="optItem">
+                                                            <div key={optItem.id} class="breakdown-option-item">
+                                                                <span class="breakdown-option-name">{optItem.name}</span>
+                                                                <span class="breakdown-option-price">{optItem.formattedDealerPrice}</span>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </template>
                                         </div>
                                     </template>
                                 </template>
@@ -609,16 +647,21 @@
                                             <span class="breakdown-label">Retail Price (Before Tax):</span>
                                             <span class="breakdown-value">{currentPriceBreakdown.retailPrice}</span>
                                         </div>
-                                        <template if:true={additionalOptionsPricing.existingOptionsPrice}>
-                                            <div class="breakdown-item">
-                                                <span class="breakdown-label">Existing Additional Options:</span>
-                                                <span class="breakdown-value">{additionalOptionsPricing.formattedExistingOptionsPrice}</span>
-                                            </div>
-                                        </template>
-                                        <template if:true={additionalOptionsPricing.newOptionsPrice}>
-                                            <div class="breakdown-item">
-                                                <span class="breakdown-label">New Additional Options:</span>
-                                                <span class="breakdown-value">+{additionalOptionsPricing.formattedNewOptionsPrice}</span>
+                                        <!-- Additional Options Breakdown -->
+                                        <template if:true={hasSelectedAdditionalOptions}>
+                                            <div class="breakdown-options-section">
+                                                <div class="breakdown-options-header">
+                                                    <span class="breakdown-label">Additional Options</span>
+                                                    <span class="breakdown-value">{additionalOptionsPricing.formattedTotalAdditionalOptionsPrice}</span>
+                                                </div>
+                                                <div class="breakdown-options-list">
+                                                    <template for:each={selectedAdditionalOptionsBreakdown} for:item="option">
+                                                        <div key={option.id} class="breakdown-option-item">
+                                                            <span class="breakdown-option-name">{option.name}</span>
+                                                            <span class="breakdown-option-price">{option.formattedPrice}</span>
+                                                        </div>
+                                                    </template>
+                                                </div>
                                             </div>
                                         </template>
                                         <template if:true={currentPriceBreakdown.taxAmount}>
@@ -649,6 +692,19 @@
                                                 <span class="breakdown-label">Dealer Price:</span>
                                                 <span class="breakdown-value">{currentPriceBreakdown.netCost}</span>
                                             </div>
+                                            <template if:true={hasDealerAdditionalOptions}>
+                                                <div class="breakdown-options-section dealer-options-section">
+                                                    <div class="breakdown-options-header">Additional Options (Dealer Price)</div>
+                                                    <div class="breakdown-options-list">
+                                                        <template for:each={dealerAdditionalOptionsBreakdown} for:item="optItem">
+                                                            <div key={optItem.id} class="breakdown-option-item">
+                                                                <span class="breakdown-option-name">{optItem.name}</span>
+                                                                <span class="breakdown-option-price">{optItem.formattedDealerPrice}</span>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </template>
                                         </div>
                                     </template>
                                 </template>

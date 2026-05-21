@@ -17,6 +17,7 @@ import convertApplicationToQuote from '@salesforce/apex/DealerPortalController.c
 export default class DealerPortalContainer extends NavigationMixin(LightningElement) {
     _applicationId;
     @track activeTab = 'vehicle';
+    @track _lastVehicleSignature = null;
     @track applicationStatus = null;
     @track applicationLockDate = null;
     // @track isApplicationLocked = false;
@@ -211,6 +212,22 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         console.log('🔍 Vehicle completion event details:', event.detail);
         console.log('🔍 Current activeTab before switch:', this.activeTab);
         
+        
+        // Check if vehicle config changed (affects package filtering)
+        const vData = event.detail && event.detail.vehicleData ? event.detail.vehicleData : {};
+        const newSig = [vData.year, vData.make, vData.model, vData.odometerReading, vData.odometerUnit, vData.isCommercial, vData.vehicleCategory].join('|');
+        const vehicleChanged = this._lastVehicleSignature !== null && this._lastVehicleSignature !== newSig;
+        this._lastVehicleSignature = newSig;
+        if (vehicleChanged) {
+            console.log('Vehicle config changed - notifying package tabs');
+            const wComp = this.template.querySelector('c-dealer-portal-warranty');
+            if (wComp && typeof wComp.handleVehicleConfigChanged === 'function') wComp.handleVehicleConfigChanged();
+            const mpComp = this.template.querySelector('c-dealer-portal-more-products');
+            if (mpComp && typeof mpComp.handleVehicleConfigChanged === 'function') mpComp.handleVehicleConfigChanged();
+            this.tabCompletionStatus.warranty = false;
+            this.tabCompletionStatus.moreProducts = false;
+            this.tabCompletionStatus.gap = false;
+        }
         this.markTabAsCompleted('vehicle');
         this.switchToTab('warranty');
         

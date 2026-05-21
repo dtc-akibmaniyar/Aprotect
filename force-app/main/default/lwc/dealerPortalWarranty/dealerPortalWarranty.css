@@ -4589,3 +4589,124 @@ lightning-accordion-section[data-package-id].gradient-default .slds-accordion__s
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: translateY(0); }
 }
+/* Additional Options Breakdown in Price Modal */
+.breakdown-options-section {
+    margin: 0.75rem 0;
+    border-top: 1px dashed #d8dde6;
+    padding-top: 0.75rem;
+}
+
+.breakdown-options-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0;
+    font-weight: 600;
+}
+
+.breakdown-options-header .breakdown-label {
+    font-size: 0.9rem;
+    color: #333;
+}
+
+.breakdown-options-header .breakdown-value {
+    font-weight: 700;
+    color: #0070d2;
+}
+
+.breakdown-options-list {
+    margin-top: 0.35rem;
+    padding-left: 0.75rem;
+    border-left: 3px solid #0070d2;
+}
+
+.breakdown-option-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.35rem 0.5rem;
+    margin: 0.15rem 0;
+    background: #f4f6f9;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.breakdown-option-name {
+    color: #444;
+    flex: 1;
+    margin-right: 1rem;
+}
+
+.breakdown-option-price {
+    font-weight: 600;
+    color: #0070d2;
+    white-space: nowrap;
+}
+
+/* Dealer Additional Options in Dealer Pricing Section */
+.dealer-options-section {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #d8dde6;
+}
+.dealer-options-section .breakdown-options-header {
+    font-size: 11px;
+    font-weight: 600;
+    color: #706e6b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+.dealer-options-section .breakdown-option-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    font-size: 13px;
+}
+.dealer-options-section .breakdown-option-name {
+    color: #444;
+}
+.dealer-options-section .breakdown-option-price {
+    font-weight: 600;
+    color: #0070d2;
+}
+
+/* Vehicle Config Changed Info Banner */
+.vehicle-config-changed-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    margin: 0 0 16px 0;
+    background: linear-gradient(135deg, #1a73e8, #0d47a1);
+    color: white;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(26, 115, 232, 0.3);
+    animation: slideDown 0.3s ease-out;
+}
+.vehicle-config-changed-banner .banner-icon {
+    flex-shrink: 0;
+}
+.vehicle-config-changed-banner .banner-text {
+    flex: 1;
+}
+.vehicle-config-changed-banner .banner-dismiss {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 4px;
+    opacity: 0.8;
+    line-height: 1;
+}
+.vehicle-config-changed-banner .banner-dismiss:hover {
+    opacity: 1;
+}
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

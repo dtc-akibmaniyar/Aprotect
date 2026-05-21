@@ -28,6 +28,7 @@ export default class DealerPortalWarranty extends LightningElement {
     @track selectedTerm = '4';
     @track selectedClaim = '5000';
     @track selectedAdditionalOptions = []; // Array of selected additional option IDs
+    @track vehicleConfigChangedMessage = '';
     @track availableAdditionalOptionsData = []; // Raw additional options data
     @track existingAdditionalOptions = []; // Already selected options (from Salesforce)
     @track selectedNewOptions = []; // New selections (not saved yet)
@@ -169,6 +170,57 @@ export default class DealerPortalWarranty extends LightningElement {
         }
     }
     
+    
+    @api
+    handleVehicleConfigChanged() {
+        console.log('WARRANTY - Vehicle config changed, revalidating packages');
+        this._previousPackageId = this.selectedDealerPackage ? this.selectedDealerPackage.Id : null;
+        this._previousTermId = this.selectedWarrantyTerm ? this.selectedWarrantyTerm.Id : null;
+        this._previousPackageName = this.selectedDealerPackage ? (this.selectedDealerPackage.PackageName || this.selectedDealerPackage.Name) : null;
+        this._previousTermName = this.selectedWarrantyTerm ? (this.selectedWarrantyTerm.packageTermName || this.selectedWarrantyTerm.Name) : null;
+        this.vehicleConfigChangedMessage = 'Vehicle details have been updated. Reloading available packages...';
+        this.loadDealerPackages().then(() => { this._validatePreviousSelection(); });
+    }
+
+    _validatePreviousSelection() {
+        if (!this._previousPackageId) {
+            this.vehicleConfigChangedMessage = '';
+            return;
+        }
+        const pkgExists = this.allDealerPackages && this.allDealerPackages.some(pkg => pkg.Id === this._previousPackageId);
+        if (!pkgExists) {
+            this.vehicleConfigChangedMessage = 'The previously selected package "' + (this._previousPackageName || '') + '" is no longer available for the updated vehicle configuration. Please select an appropriate package.';
+            this.selectedDealerPackage = null;
+            this.selectedWarrantyTerm = null;
+            this.selectedWarrantyTermName = '';
+            this.price = 0;
+            this._retailPriceDisplay = 0;
+            this.isPriceOverridden = false;
+            this.existingAdditionalOptions = [];
+            this.selectedNewOptions = [];
+            this.availableAdditionalOptionsData = [];
+        } else if (this._previousTermId) {
+            const pkg = this.allDealerPackages.find(p => p.Id === this._previousPackageId);
+            const termExists = pkg && pkg.warrantyTerms && pkg.warrantyTerms.some(t => t.Id === this._previousTermId);
+            if (!termExists) {
+                this.vehicleConfigChangedMessage = 'The previously selected term "' + (this._previousTermName || '') + '" is no longer available. Please select a new term.';
+                this.selectedWarrantyTerm = null;
+                this.selectedWarrantyTermName = '';
+                this.price = 0;
+                this._retailPriceDisplay = 0;
+            } else {
+                this.vehicleConfigChangedMessage = 'Vehicle details updated. Your current selection is still valid.';
+                setTimeout(() => { this.vehicleConfigChangedMessage = ''; }, 5000);
+            }
+        } else {
+            this.vehicleConfigChangedMessage = '';
+        }
+    }
+    dismissVehicleConfigMessage() {
+        this.vehicleConfigChangedMessage = '';
+    }
+
+
     // Called when warranty tab is activated
     @api
     async onTabActivated() {
@@ -276,7 +328,7 @@ export default class DealerPortalWarranty extends LightningElement {
                     
                     return {
                         ...pkg,
-                        warrantyTerms: pkg.terms || [], // Keep for backward compatibility
+                        warrantyTerms: this._sortTerms(pkg.terms || []), // Keep for backward compatibility - sorted by km then months
                         tiers: pkg.tiers || [], // NEW: Grouped by tiers
                         options: pkg.options || []
                     };
@@ -444,7 +496,7 @@ export default class DealerPortalWarranty extends LightningElement {
             // Process tiers for display (NEW: Grouped structure)
             const processedTiers = (pkg.tiers || []).map(tier => {
                 // Process terms within this tier
-                const processedTerms = (tier.terms || []).map(term => {
+                const processedTerms = this._sortTerms(tier.terms || []).map(term => {
                     const isTermSelected = this.selectedWarrantyTerm && 
                                          this.selectedWarrantyTerm.Id === term.Id;
                     
@@ -504,7 +556,7 @@ export default class DealerPortalWarranty extends LightningElement {
             });
             
             // Process terms for backward compatibility (flat list)
-            const processedTerms = (pkg.warrantyTerms || []).map(term => {
+            const processedTerms = this._sortTerms(pkg.warrantyTerms || []).map(term => {
                 const isTermSelected = this.selectedWarrantyTerm && 
                                      this.selectedWarrantyTerm.Id === term.Id;
                 
@@ -576,12 +628,39 @@ export default class DealerPortalWarranty extends LightningElement {
     }
     
     // Get warranty terms for display
+
+    // Sort terms by km ascending, then months ascending
+    _parseKmFromName(name) {
+        if (!name) return 0;
+        var m = name.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:KM|km|Km)/i);
+        if (m) return parseFloat(m[1].replace(/,/g, ""));
+        return 0;
+    }
+
+    _parseMonthsFromName(name) {
+        if (!name) return 0;
+        var m = name.match(/(\d+)\s*(?:Month|Months|month|months|Mo)/i);
+        if (m) return parseInt(m[1], 10);
+        return 0;
+    }
+
+    _sortTerms(terms) {
+        return [...terms].sort((a, b) => {
+            var kmA = Number(a.mileageRestriction) || this._parseKmFromName(a.packageTermName || a.Name || a.name);
+            var kmB = Number(b.mileageRestriction) || this._parseKmFromName(b.packageTermName || b.Name || b.name);
+            if (kmA !== kmB) return kmA - kmB;
+            var moA = Number(a.durationRestrictionInMonths) || this._parseMonthsFromName(a.packageTermName || a.Name || a.name);
+            var moB = Number(b.durationRestrictionInMonths) || this._parseMonthsFromName(b.packageTermName || b.Name || b.name);
+            return moA - moB;
+        });
+    }
+
     get warrantyTermsDisplay() {
         if (!this.selectedDealerPackage || !this.selectedDealerPackage.warrantyTerms) {
             return [];
         }
         
-        return this.selectedDealerPackage.warrantyTerms.map(term => {
+        return this._sortTerms(this.selectedDealerPackage.warrantyTerms).map(term => {
             const isSelected = this.selectedWarrantyTerm && 
                              this.selectedWarrantyTerm.Id === term.Id;
             
@@ -1591,18 +1670,7 @@ export default class DealerPortalWarranty extends LightningElement {
     _applyPriceOverride() {
         const val = parseFloat(this.priceOverrideInput);
         if (!isNaN(val) && val >= 0) {
-            // Validate: custom price must not be less than dealer price (net cost)
-            const dealerPrice = (this.selectedWarrantyTerm ? this.selectedWarrantyTerm.netCost : null) 
-                             || (this.existingApplicationPackage ? this.existingApplicationPackage.dealerPackagePrice : null) 
-                             || 0;
-            if (dealerPrice > 0 && val < dealerPrice) {
-                this.priceValidationMessage = 'Custom price ($' + val.toFixed(2) + ') cannot be less than Dealer Price ($' + dealerPrice.toFixed(2) + ').';
-                this.isPriceEditMode = false;
-                // Auto-clear after 5 seconds
-                // eslint-disable-next-line @lwc/lwc/no-async-operation
-                setTimeout(() => { this.priceValidationMessage = ''; }, 5000);
-                return;
-            }
+            // Price floor validation removed - dealers can enter any custom price
             this.priceValidationMessage = '';
             // Custom price is pre-tax; calculate tax and add to total
             const customPreTax = parseFloat(val.toFixed(2));
@@ -1951,7 +2019,7 @@ export default class DealerPortalWarranty extends LightningElement {
         if (!this.selectedDealerPackage || !this.selectedDealerPackage.warrantyTerms) {
             return [];
         }
-        return this.selectedDealerPackage.warrantyTerms;
+        return this._sortTerms(this.selectedDealerPackage.warrantyTerms);
     }
     
     
@@ -2040,7 +2108,7 @@ export default class DealerPortalWarranty extends LightningElement {
         if (!this.selectedDealerPackage || !this.selectedDealerPackage.warrantyTerms) {
             return [];
         }
-        return this.selectedDealerPackage.warrantyTerms;
+        return this._sortTerms(this.selectedDealerPackage.warrantyTerms);
     }
     
     // Back button handler - DUPLICATE REMOVED
@@ -2446,6 +2514,51 @@ export default class DealerPortalWarranty extends LightningElement {
         };
     }
 
+    // Check if there are any selected additional options (existing or new)
+    get hasSelectedAdditionalOptions() {
+        const existingCount = this.existingAdditionalOptions
+            ? this.existingAdditionalOptions.filter(opt => !this.optionsToRemove.includes(opt.id)).length
+            : 0;
+        const newCount = this.selectedNewOptions ? this.selectedNewOptions.length : 0;
+        return (existingCount + newCount) > 0;
+    }
+
+    // Get itemized breakdown of all selected additional options
+    get selectedAdditionalOptionsBreakdown() {
+        const items = [];
+        
+        // Existing additional options (not marked for removal)
+        if (this.existingAdditionalOptions) {
+            this.existingAdditionalOptions
+                .filter(opt => !this.optionsToRemove.includes(opt.id))
+                .forEach(option => {
+                    items.push({
+                        id: option.id,
+                        name: option.optionName || 'Unknown Option',
+                        price: option.retailPrice || 0,
+                        formattedPrice: this.formatPrice(option.retailPrice || 0)
+                    });
+                });
+        }
+        
+        // Newly selected additional options
+        if (this.selectedNewOptions && this.availableAdditionalOptionsData) {
+            this.selectedNewOptions.forEach(optionId => {
+                const option = this.availableAdditionalOptionsData.find(opt => opt.id === optionId);
+                if (option) {
+                    items.push({
+                        id: option.id,
+                        name: option.optionName || 'Unknown Option',
+                        price: option.retailPrice || option.netCost || 0,
+                        formattedPrice: this.formatPrice(option.retailPrice || option.netCost || 0)
+                    });
+                }
+            });
+        }
+        
+        return items;
+    }
+
     // Initialize original warranty data for change tracking
     initializeOriginalWarrantyData() {
         this.originalWarrantyData = {
@@ -2844,7 +2957,7 @@ export default class DealerPortalWarranty extends LightningElement {
 
         const groupsMap = new Map();
 
-        this.selectedDealerPackage.warrantyTerms.forEach(term => {
+        this._sortTerms(this.selectedDealerPackage.warrantyTerms).forEach(term => {
             const perClaimLimitValue = Number(term.perClaimLimit ?? 0);
             const deductibleValue = Number(term.deductible ?? 0);
             const groupKey = `${perClaimLimitValue}-${deductibleValue}`;
@@ -2938,7 +3051,7 @@ export default class DealerPortalWarranty extends LightningElement {
         const deductibleValue = Number(firstTerm.deductible ?? 0);
         const packageLabel = `${this.formatPrice(perClaimLimitValue)} Per Claim, ${this.formatPrice(deductibleValue)} Deductible`;
         const processedTiers = hasTiers ? pkg.tiers.map(tier => {
-            const formattedTerms = (tier.terms || []).map(term => {
+            const formattedTerms = this._sortTerms(tier.terms || []).map(term => {
                 const isTermSelected = this.selectedWarrantyTerm &&
                     this.selectedWarrantyTerm.Id === term.Id &&
                     this.selectedDealerPackage &&
@@ -2956,7 +3069,7 @@ export default class DealerPortalWarranty extends LightningElement {
             }
             return { id: tier.Id || 'tier-' + Math.random(), name: tierDisplayName, terms: formattedTerms, hasTerms: formattedTerms.length > 0 };
         }) : [];
-        const formattedTerms = hasTerms ? pkg.warrantyTerms.map(term => {
+        const formattedTerms = hasTerms ? this._sortTerms(pkg.warrantyTerms).map(term => {
             const isTermSelected = this.selectedWarrantyTerm &&
                 this.selectedWarrantyTerm.Id === term.Id &&
                 this.selectedDealerPackage &&
@@ -3009,7 +3122,7 @@ export default class DealerPortalWarranty extends LightningElement {
 
             // Process tiers (NEW: Grouped structure)
             const processedTiers = hasTiers ? pkg.tiers.map(tier => {
-                const formattedTerms = (tier.terms || []).map(term => {
+                const formattedTerms = this._sortTerms(tier.terms || []).map(term => {
                     const isTermSelected = this.selectedWarrantyTerm && 
                                           this.selectedWarrantyTerm.Id === term.Id &&
                                           this.selectedDealerPackage && 
@@ -3048,7 +3161,7 @@ export default class DealerPortalWarranty extends LightningElement {
             }) : [];
 
             // Format all terms for backward compatibility (flat list)
-            const formattedTerms = hasTerms ? pkg.warrantyTerms.map(term => {
+            const formattedTerms = hasTerms ? this._sortTerms(pkg.warrantyTerms).map(term => {
                 const isTermSelected = this.selectedWarrantyTerm && 
                                       this.selectedWarrantyTerm.Id === term.Id &&
                                       this.selectedDealerPackage && 

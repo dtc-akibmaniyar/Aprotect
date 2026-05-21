@@ -40,6 +40,7 @@ public class VehicleDataDTO {
     @AuraEnabled public Decimal odometer;
     @AuraEnabled public String odometerUnit;
     @AuraEnabled public Boolean businessCommercialUse;
+    @AuraEnabled public Boolean isVehicleFinanced;
     @AuraEnabled public String typeOfCommercialUse;
     
 
@@ -773,6 +774,7 @@ public static VehicleResponse loadVehicleData(String applicationId) {
                 vehicleData.odometer = vehicle.Odometer__c;
                 vehicleData.odometerUnit = vehicle.Odometer_Unit__c;
                 vehicleData.businessCommercialUse = vehicle.Business_Commercial_Use__c;
+                vehicleData.isVehicleFinanced = app.Is_Vehicle_Financed__c;
                 vehicleData.typeOfCommercialUse = vehicle.Type_of_Commercial_Use__c;
                 
 
@@ -2110,6 +2112,9 @@ if (isNewPackage) {
             try {
                 Application__c appToUpdate = new Application__c(Id = applicationId);
                 appToUpdate.Financial_Institution_Lender__c = (String) packageDataMap.get('lenderLienholder');
+                if (packageDataMap.containsKey('isVehicleFinanced')) {
+                    appToUpdate.Is_Vehicle_Financed__c = Boolean.valueOf(String.valueOf(packageDataMap.get('isVehicleFinanced')));
+                }
                 update appToUpdate;
             } catch (Exception lienEx) {
                 // Non-fatal: log and continue
@@ -4215,7 +4220,7 @@ private static List<Application__c> queryApplications(String applicationId, Bool
             'Sales_Rep__c, Sales_Rep__r.Id, Sales_Rep__r.Name, Dealer_Sales_ID_License__c' :
             'Vehicle__r.Id, Vehicle__r.Name, Vehicle__r.Year__c, Vehicle__r.Make__c, Vehicle__r.Model__c, Vehicle__r.Trim__c';
         
-        String query = 'SELECT Id, Name, CreatedDate, Application_Status__c, ' + vehicleFields + ' ' +
+        String query = 'SELECT Id, Name, CreatedDate, Application_Status__c, Is_Vehicle_Financed__c, ' + vehicleFields + ' ' +
                         'FROM Application__c ' + whereClause + ' ' +
                         'ORDER BY CreatedDate DESC';
         
@@ -5311,6 +5316,17 @@ throw new CalloutException('Package data cannot be null');
         }
         if (packageDataMap.containsKey('paymentFrequency')) {
             appPackage.Payment_Frequency__c = (String) packageDataMap.get('paymentFrequency');
+        }
+
+        // Save Is_Vehicle_Financed__c on the parent Application__c
+        if (packageDataMap.containsKey('isVehicleFinanced') && String.isNotBlank(applicationId)) {
+            try {
+                Application__c appForFinance = new Application__c(Id = applicationId);
+                appForFinance.Is_Vehicle_Financed__c = Boolean.valueOf(String.valueOf(packageDataMap.get('isVehicleFinanced')));
+                update appForFinance;
+            } catch (Exception finEx) {
+                System.debug('Warning: Could not update Is_Vehicle_Financed__c: ' + finEx.getMessage());
+            }
         }
         
 
@@ -6415,7 +6431,7 @@ public class MileageComparator implements Comparator<Dealer_Package_Term__c> {
      * @return Map with success status
      */
     @AuraEnabled
-    public static Map<String, Object> saveLienHolderToApplication(String applicationId, String lenderLienholder) {
+    public static Map<String, Object> saveLienHolderToApplication(String applicationId, String lenderLienholder, Boolean isVehicleFinanced) {
         Map<String, Object> result = new Map<String, Object>();
         try {
             if (String.isBlank(applicationId)) {
@@ -6426,6 +6442,7 @@ public class MileageComparator implements Comparator<Dealer_Package_Term__c> {
             
             Application__c app = new Application__c(Id = applicationId);
             app.Financial_Institution_Lender__c = String.isNotBlank(lenderLienholder) ? lenderLienholder : null;
+            app.Is_Vehicle_Financed__c = isVehicleFinanced != null ? isVehicleFinanced : false;
             update app;
             
             result.put('success', true);

@@ -402,6 +402,10 @@ export default class DealerPortalGap extends LightningElement {
                     odometerUnit: vData.odometerUnit || 'KM',
                     purchasePrice: vData.vehiclePurchasePrice || vData.purchasePrice || ''
                 };
+                // Load Is_Vehicle_Financed flag from Application__c
+                if (vData.isVehicleFinanced != null) {
+                    this.isVehicleFinanced = vData.isVehicleFinanced;
+                }
             }
         } catch (error) {
             console.error('Error loading vehicle data:', error);
@@ -2019,6 +2023,7 @@ export default class DealerPortalGap extends LightningElement {
                 loanAmount: this.loanAmount !== '' ? this.loanAmount : null,
                 interestRate: this.interestRate !== '' ? this.interestRate : null,
                 paymentFrequency: this.paymentFrequency || null,
+                isVehicleFinanced: this.isVehicleFinanced,
             };
             
             console.log('📦 [GAP createOrUpdate] Saving with active management:', packageData);
@@ -2191,7 +2196,8 @@ export default class DealerPortalGap extends LightningElement {
                         if (this.lenderLienholder) {
                             await saveLienHolderToApplication({
                                 applicationId: this.applicationId,
-                                lenderLienholder: this.lenderLienholder
+                                lenderLienholder: this.lenderLienholder,
+                                isVehicleFinanced: this.isVehicleFinanced
                             });
                             console.log('✅ Lien holder saved to Application__c');
                         }
