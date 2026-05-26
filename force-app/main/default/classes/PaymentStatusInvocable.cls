@@ -277,21 +277,39 @@ public with sharing class PaymentStatusInvocable {
         // Determine invoice updates
         List<Invoice__c> invoicesToUpdate = new List<Invoice__c>();
         Set<Id> fullyPaidInvoiceIds = new Set<Id>(); // invoices where every line item is now Paid
-        for (Id invId : invoiceIds) {
-            AggregateCounts c = countsByInvoice.get(invId);
-            if (c == null || c.total == 0) {
-                // No line items found - skip
-                continue;
+        // Build a map of invoice → remittance form balance to determine if fully paid
+            Map<Id, Decimal> remittanceBalanceByInvoice = new Map<Id, Decimal>();
+            for (Remittance_Line_Item_Junction__c rlj : remittanceLineItemJunctionList) {
+                if (rlj.Invoice__c != null && rlj.Payment__c != null) {
+                    Payment__c pmt = paymentsByIdById.get(rlj.Payment__c);
+                    if (pmt != null && pmt.Remittance_Form__r != null) {
+                        Decimal bal = pmt.Remittance_Form__r.Balance__c;
+                        remittanceBalanceByInvoice.put(rlj.Invoice__c, bal != null ? bal : 0);
+                    }
+                }
             }
-            String newInvStatus = (c.paid == c.total) ? 'Paid' : 'Partial Paid';
-            invoicesToUpdate.add(new Invoice__c(
-                Id = invId,
-                Status__c = newInvStatus
-            ));
-            if (c.paid == c.total) {
-                fullyPaidInvoiceIds.add(invId);
+
+            for (Id invId : invoiceIds) {
+                AggregateCounts c = countsByInvoice.get(invId);
+                if (c == null || c.total == 0) {
+                    // No line items found - skip
+                    continue;
+                }
+                // Mark invoice as Paid if all its line items are paid
+                // (Balance check removed — DLRS rollup timing means Balance__c may not
+                //  be updated yet when this invocable runs in the same transaction.)
+                String newInvStatus;
+                if (c.paid == c.total) {
+                    newInvStatus = 'Paid';
+                    fullyPaidInvoiceIds.add(invId);
+                } else {
+                    newInvStatus = 'Due';
+                }
+                invoicesToUpdate.add(new Invoice__c(
+                    Id = invId,
+                    Status__c = newInvStatus
+                ));
             }
-        }
 
         Database.SaveResult[] invoiceSaveResults = new Database.SaveResult[0];
         if (!invoicesToUpdate.isEmpty()) {

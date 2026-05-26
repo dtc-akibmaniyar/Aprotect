@@ -192,6 +192,8 @@ public without sharing class ApplicationSummaryController {
         @AuraEnabled public String formattedDeductible { get; set; }
         @AuraEnabled public Decimal tax { get; set; }
         @AuraEnabled public String formattedTax { get; set; }
+        @AuraEnabled public Decimal taxRate { get; set; }
+        @AuraEnabled public String formattedTaxRate { get; set; }
         @AuraEnabled public Decimal total { get; set; }
         @AuraEnabled public String formattedTotal { get; set; }
         @AuraEnabled public String contractStartDate { get; set; }
@@ -539,6 +541,8 @@ public without sharing class ApplicationSummaryController {
                     pkgWrapper.formattedRetailCost = formatCurrency(pkg.Dealer_Price_Override__c);
                     pkgWrapper.tax = pkg.Tax_Amount__c;
                     pkgWrapper.formattedTax = formatCurrency(pkg.Tax_Amount__c);
+                    pkgWrapper.taxRate = pkg.Tax_Percentage__c;
+                    pkgWrapper.formattedTaxRate = pkg.Tax_Percentage__c != null ? String.valueOf(pkg.Tax_Percentage__c.setScale(2)) + '%' : '0%';
                     pkgWrapper.total = pkg.Contract_Premium_Price__c;
                     pkgWrapper.formattedTotal = formatCurrency(pkg.Contract_Premium_Price__c);
                 } else {
@@ -547,6 +551,8 @@ public without sharing class ApplicationSummaryController {
                         formatCurrency(pkg.Contract_Premium_Price_Without_Tax__c) : '$0.00';
                     pkgWrapper.tax = pkg.Tax_Amount__c;
                     pkgWrapper.formattedTax = formatCurrency(pkg.Tax_Amount__c);
+                    pkgWrapper.taxRate = pkg.Tax_Percentage__c;
+                    pkgWrapper.formattedTaxRate = pkg.Tax_Percentage__c != null ? String.valueOf(pkg.Tax_Percentage__c.setScale(2)) + '%' : '0%';
                     pkgWrapper.total = pkg.Contract_Premium_Price__c;
                     pkgWrapper.formattedTotal = formatCurrency(pkg.Contract_Premium_Price__c);
                 }

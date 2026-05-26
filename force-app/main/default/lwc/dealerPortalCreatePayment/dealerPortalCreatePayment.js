@@ -71,6 +71,7 @@ export default class DealerPortalCreatePayment extends LightningElement {
     // Dealer Credit Modal
     @track showDealerCreditModal = false;
     @track dealerAvailableCredit = 0;
+    @track dealerCreditAmount = 0;
     @track dealerCreditNotes = '';
     @track isProcessingDealerCredit = false;
 
@@ -145,16 +146,25 @@ export default class DealerPortalCreatePayment extends LightningElement {
     }
 
     get isDealerCreditInsufficient() {
-        return (this.dealerAvailableCredit || 0) < (this.remittanceFormAmount || 0);
+        return (this.dealerAvailableCredit || 0) < (this.dealerCreditAmount || 0);
     }
 
     get formattedRemainingCredit() {
-        const remaining = (this.dealerAvailableCredit || 0) - (this.remittanceFormAmount || 0);
+        const remaining = (this.dealerAvailableCredit || 0) - (this.dealerCreditAmount || 0);
         return '$' + Math.max(0, remaining).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     }
 
     get isDealerCreditSubmitDisabled() {
-        return this.isDealerCreditInsufficient || this.isProcessingDealerCredit;
+        return this.isDealerCreditInsufficient || this.isProcessingDealerCredit || !this.dealerCreditAmount || this.dealerCreditAmount <= 0 || this.dealerCreditAmount > this.remittanceFormAmount;
+    }
+
+    get formattedDealerCreditAmount() {
+        const amount = this.dealerCreditAmount || 0;
+        return '$' + parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    get dealerCreditAmountMaxError() {
+        return `Amount cannot exceed $${(this.remittanceFormAmount || 0).toFixed(2)}`;
     }
 
     handlePaymentMethodSelected(event) {
@@ -323,6 +333,7 @@ export default class DealerPortalCreatePayment extends LightningElement {
         // Open the appropriate payment modal based on selected payment method
         switch(this.selectedPaymentMethod) {
             case 'creditCard':
+                this.paymentAmount = this.remittanceFormAmount;
                 this.showPaymentModal = true;
                 break;
             case 'cheque':
@@ -334,6 +345,7 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 this.showETransferModal = true;
                 break;
             case 'dealerCredit':
+                this.dealerCreditAmount = this.remittanceFormAmount;
                 this.showDealerCreditModal = true;
                 break;
         }
@@ -392,6 +404,10 @@ export default class DealerPortalCreatePayment extends LightningElement {
         });
 
         return Math.round(total * 100) / 100;
+    }
+
+    get paymentAmountMaxError() {
+        return `Payment amount cannot exceed the balance of ${this.remittanceFormAmount?.toFixed(2)}`;
     }
 
     // Disable remove button when only one invoice remains
@@ -495,6 +511,11 @@ export default class DealerPortalCreatePayment extends LightningElement {
             });
 
             if (result && result.success) {
+                // Immediately update local balance (DLRS rollup is async)
+                this.remittanceFormAmount = Math.max(0, (this.remittanceFormAmount || 0) - (this.chequeAmount || 0));
+                this.paymentAmount = this.remittanceFormAmount;
+                setTimeout(() => { notifyRecordUpdateAvailable([{ recordId: this.recordId }]); }, 3000);
+
                 this.showToast('Success', 'Cheque details submitted successfully', 'success');
                 this.dispatchEvent(new CustomEvent('chequesubmitted', {
                     detail: {
@@ -611,6 +632,11 @@ export default class DealerPortalCreatePayment extends LightningElement {
             });
 
             if (result && result.success) {
+                // Immediately update local balance (DLRS rollup is async)
+                this.remittanceFormAmount = Math.max(0, (this.remittanceFormAmount || 0) - (this.eTransferAmount || 0));
+                this.paymentAmount = this.remittanceFormAmount;
+                setTimeout(() => { notifyRecordUpdateAvailable([{ recordId: this.recordId }]); }, 3000);
+
                 this.showToast('Success', 'E-Transfer details submitted successfully', 'success');
                 this.dispatchEvent(new CustomEvent('etransfersubmitted', {
                     detail: {
@@ -645,12 +671,21 @@ export default class DealerPortalCreatePayment extends LightningElement {
     handleCloseDealerCreditModal() {
         this.showDealerCreditModal = false;
         this.dealerCreditNotes = '';
+        this.dealerCreditAmount = 0;
     }
 
     handleBackFromDealerCreditModal() {
         this.showDealerCreditModal = false;
         this.dealerCreditNotes = '';
+        this.dealerCreditAmount = 0;
         this.showInvoiceSelectionModal = true;
+    }
+
+    handleDealerCreditAmountChange(event) {
+        const inputValue = parseFloat(event.target.value);
+        if (!isNaN(inputValue)) {
+            this.dealerCreditAmount = inputValue;
+        }
     }
 
     handleDealerCreditNotesChange(event) {
@@ -658,6 +693,18 @@ export default class DealerPortalCreatePayment extends LightningElement {
     }
 
     handleSubmitDealerCredit() {
+        // Validate amount entered
+        if (!this.dealerCreditAmount || this.dealerCreditAmount <= 0) {
+            this.showToast('Error', 'Please enter a valid credit amount', 'error');
+            return;
+        }
+
+        // Validate amount doesn't exceed balance
+        if (this.dealerCreditAmount > this.remittanceFormAmount) {
+            this.showToast('Error', `Credit amount cannot exceed the balance of $${this.remittanceFormAmount.toFixed(2)}`, 'error');
+            return;
+        }
+
         // Validate sufficient credit
         if (this.isDealerCreditInsufficient) {
             this.showToast('Error', 'Insufficient dealer credit to complete this payment', 'error');
@@ -683,16 +730,23 @@ export default class DealerPortalCreatePayment extends LightningElement {
         try {
             const result = await processDealerCreditPayment({
                 recordId: this.recordId,
-                paymentAmount: this.remittanceFormAmount,
+                paymentAmount: this.dealerCreditAmount,
                 notes: this.dealerCreditNotes
             });
 
             if (result && result.success) {
+                // Immediately update local balance (DLRS rollup is async)
+                this.remittanceFormAmount = Math.max(0, (this.remittanceFormAmount || 0) - (this.dealerCreditAmount || 0));
+                this.paymentAmount = this.remittanceFormAmount;
+                // Delayed refresh to pick up DLRS rollup update
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                setTimeout(() => { notifyRecordUpdateAvailable([{ recordId: this.recordId }]); }, 3000);
+
                 this.showToast('Success', 'Dealer credit applied successfully', 'success');
                 this.dispatchEvent(new CustomEvent('dealercreditapplied', {
                     detail: {
                         method: 'dealerCredit',
-                        amount: this.remittanceFormAmount,
+                        amount: this.dealerCreditAmount,
                         notes: this.dealerCreditNotes,
                         transactionId: result.transactionId,
                         remainingCredit: result.remainingCredit
@@ -771,17 +825,23 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 expiryMonth: this.parseExpiryMonth(this.cardData.cardExpiry),
                 expiryYear: this.parseExpiryYear(this.cardData.cardExpiry),
                 cvv: this.cardData.cardCVV,
-                paymentAmount: this.selectedInvoicesTotalAmount,
+                paymentAmount: this.paymentAmount,
                 cardHolderName: this.cardData.cardHolderName
             });
 
             if (result && result.success) {
+                // Immediately update local balance (DLRS rollup is async)
+                this.remittanceFormAmount = Math.max(0, (this.remittanceFormAmount || 0) - (this.paymentAmount || 0));
+                this.paymentAmount = this.remittanceFormAmount;
                 this.showToast('Success', 'Payment processed successfully', 'success');
                 this.dispatchEvent(new CustomEvent('paymentprocessed', { detail: result }));
                 this.showPaymentModal = false;
                 this.cardData = null;
                 // Refresh the record data
                 notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
+                // Delayed refresh to pick up DLRS rollup update
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                setTimeout(() => { notifyRecordUpdateAvailable([{ recordId: this.recordId }]); }, 3000);
                 // Notify all sibling components via LMS
                 this.publishPaymentUpdate('creditCard');
             } else {

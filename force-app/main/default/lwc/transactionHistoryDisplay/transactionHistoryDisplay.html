@@ -157,6 +157,56 @@
                             </template>
                         </div>
                     </template>
+                    <!-- Dealer Credit Payment -->
+                    <template if:true={transaction.isDealerCredit}>
+                        <div class="transaction-content dealer-credit-payment">
+                            <template if:true={transaction.statusHistory.length}>
+                                <div class="status-timeline">
+                                    <div class="timeline-header">
+                                        <div class="timeline-title">STATUS HISTORY</div>
+                                        <button
+                                            class="view-button"
+                                            onclick={handleViewTransaction}
+                                            data-id={transaction.id}
+                                            title="View transaction details">
+                                            View
+                                        </button>
+                                    </div>
+                                    <template for:each={transaction.statusHistory} for:item="entry">
+                                        <div key={entry.label} class="timeline-entry">
+                                            <span class={entry.iconClass}></span>
+                                            <div class="timeline-info">
+                                                <span class="timeline-label">{entry.label}</span>
+                                                <span class="timeline-date">{entry.formattedDate}</span>
+                                                <template if:true={entry.isFirst}>
+                                                    <div class="entry-payment-details">
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Payment Method:</span>
+                                                            <span class="value">Dealer Credit</span>
+                                                        </div>
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Credit Amount:</span>
+                                                            <span class="value">{transaction.formattedAmount}</span>
+                                                        </div>
+                                                        <div class="transaction-detail">
+                                                            <span class="label">Status:</span>
+                                                            <span class={transaction.statusBadgeClass}>{transaction.status}</span>
+                                                        </div>
+                                                        <template if:true={transaction.notes}>
+                                                            <div class="transaction-detail">
+                                                                <span class="label">Notes:</span>
+                                                                <span class="value">{transaction.notes}</span>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
                 </div>
             </template>
         </template>

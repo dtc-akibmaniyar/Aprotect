@@ -666,7 +666,7 @@ public without sharing class DealerPortalMonerisIntegrationServices {
             creditPayment.Payment_Initiated_Date__c     = DateTime.now();
             creditPayment.Date_Time__c                  = DateTime.now();
             creditPayment.Amount__c                     = paymentAmount;
-            creditPayment.Payment_Confirmation_Status__c = 'Transaction Completed'; // immediate
+            creditPayment.Payment_Confirmation_Status__c = 'Payment Initiated'; // insert with initial status first
             creditPayment.Notes__c                      = String.isBlank(notes) ? 'Dealer Credit Applied' : notes;
             creditPayment.Transaction_Reference__c      = 'DC-' + String.valueOf(recordId).substring(0, 15);
 
@@ -674,9 +674,14 @@ public without sharing class DealerPortalMonerisIntegrationServices {
             // NOTE: You must create this Record Type on Payment__c first.
             // Developer Name: Dealer_Credit, Label: Dealer Credit
             creditPayment.RecordTypeId = Schema.SObjectType.Payment__c
-                .getRecordTypeInfosByDeveloperName().get('Dealer_Credit').getRecordTypeId();
+                .getRecordTypeInfosByDeveloperName().get('Dealer_Credit').getRecordTypeId();            insert creditPayment;
 
-            insert creditPayment;
+            // Update to 'Transaction Completed' in a separate DML so that:
+            // 1. The 'Update_Remittance_Line_Item_Junction' flow (on Create) links junctions first
+            // 2. The 'Makr_Remittance_Line_Items_Junction_Records_Paid' flow (on Update + ISCHANGED)
+            //    fires and marks junctions, invoice line items, invoices as Paid
+            creditPayment.Payment_Confirmation_Status__c = 'Transaction Completed';
+            update creditPayment;
 
             // ── Update Account credit fields ──────────────────────────────────────
             Decimal currentApplied = dealerAccount.Applied_Credit__c != null

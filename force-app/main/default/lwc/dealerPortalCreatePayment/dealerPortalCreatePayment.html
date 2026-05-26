@@ -248,10 +248,20 @@
                         </p>
                     </div>
                     <div class="slds-m-bottom_large" style="display: flex; gap: 1rem; align-items: center;">
-                        <label class="slds-form-element__label" style="margin: 0;">Payable Amount:</label>
-                        <p class="slds-text-body_regular" style="margin: 0; font-size: 1.25rem; font-weight: bold; color: #0070d2;">
-                            {selectedInvoicesTotalFormatted}
-                        </p>
+                        <label class="slds-form-element__label" style="margin: 0;">Payment Amount:</label>
+                        <lightning-input
+                            type="number"
+                            value={paymentAmount}
+                            onchange={handlePaymentAmountChange}
+                            step="0.01"
+                            min="0.01"
+                            max={remittanceFormAmount}
+                            formatter="currency"
+                            variant="label-hidden"
+                            style="width: 150px; margin-left: 0.5rem;"
+                            message-when-range-overflow={paymentAmountMaxError}
+                            message-when-range-underflow="Amount must be greater than 0">
+                        </lightning-input>
                     </div>
                     <div class="slds-m-bottom_medium">
                         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
@@ -538,7 +548,18 @@
                         </div>
                         <div class="dc-amount-card dc-amount-card-primary">
                             <span class="dc-amount-label">Credit Amount to Apply</span>
-                            <span class="dc-amount-value">${remittanceFormAmount}</span>
+                            <lightning-input
+                                type="number"
+                                value={dealerCreditAmount}
+                                onchange={handleDealerCreditAmountChange}
+                                step="0.01"
+                                min="0.01"
+                                formatter="currency"
+                                variant="label-hidden"
+                                class="dc-amount-input"
+                                message-when-range-underflow="Amount must be greater than 0"
+                                message-when-range-overflow={dealerCreditAmountMaxError}>
+                            </lightning-input>
                         </div>
                     </div>
 
@@ -552,7 +573,7 @@
                         <div class="dc-breakdown-divider"></div>
                         <div class="dc-breakdown-row">
                             <span class="dc-breakdown-label">Amount to Apply</span>
-                            <span class="dc-breakdown-value dc-value-deduct">- ${remittanceFormAmount}</span>
+                            <span class="dc-breakdown-value dc-value-deduct">- {formattedDealerCreditAmount}</span>
                         </div>
                         <div class="dc-breakdown-divider"></div>
                         <template if:false={isDealerCreditInsufficient}>

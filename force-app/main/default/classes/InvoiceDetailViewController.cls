@@ -1,15 +1,11 @@
 public without sharing class InvoiceDetailViewController {
 
     /**
-     * Computes the customer-facing display price for an Application Package.
-     * If Dealer_Price_Override__c is set → use it as total (tax-inclusive).
-     * Otherwise → use Contract_Premium_Price__c (retail with tax).
+     * Returns the dealer cost price (base + tax) for an Application Package.
+     * Used on the dealer portal invoice page to show what the dealer owes.
      */
     private static Decimal getDisplayPrice(Application_Package__c pkg) {
-        if (pkg.Dealer_Price_Override__c != null) {
-            return pkg.Dealer_Price_Override__c;
-        }
-        return pkg.Contract_Premium_Price__c != null ? pkg.Contract_Premium_Price__c : 0;
+        return pkg.Contract_Cost_Price__c != null ? pkg.Contract_Cost_Price__c : 0;
     }
 
     @AuraEnabled(cacheable=true)
@@ -71,9 +67,12 @@ public without sharing class InvoiceDetailViewController {
                        Odometer_Start__c, Odometer_End__c,
                        Contract_Start_Date__c, Contract_End_Date__c,
                        RecordType.Name,
+                       Contract_Cost_Price__c,
+                       Contract_Cost_Price_Without_Tax__c,
                        Contract_Premium_Price__c,
                        Contract_Premium_Price_Without_Tax__c,
                        Tax_Amount__c,
+                       Tax_Amount_Cost__c,
                        Dealer_Price_Override__c,
                        Tax_Percentage__c
                 FROM Application_Package__c
@@ -369,12 +368,8 @@ public without sharing class InvoiceDetailViewController {
                 // Create fresh junction records on the new remittance form
                 List<Remittance_Line_Item_Junction__c> junctions = new List<Remittance_Line_Item_Junction__c>();
                 for (Invoice_Line_Item__c li : lineItems3) {
-                    // ── FIX: Use retail/custom price instead of dealer cost ──
-                    Decimal displayAmount = li.Contract_Cost_Price__c; // fallback
-                    if (li.Application_Package__c != null && pkgMap.containsKey(li.Application_Package__c)) {
-                        Application_Package__c pkg = pkgMap.get(li.Application_Package__c);
-                        displayAmount = getDisplayPrice(pkg);
-                    }
+                    // Use dealer cost price for remittance payable amount
+                    Decimal displayAmount = li.Contract_Cost_Price__c != null ? li.Contract_Cost_Price__c : 0;
 
                     junctions.add(new Remittance_Line_Item_Junction__c(
                         Remittance_Form__c   = rf.Id,

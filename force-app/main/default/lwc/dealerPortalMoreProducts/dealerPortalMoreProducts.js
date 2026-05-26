@@ -2845,17 +2845,17 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     _applyPriceOverride() {
         const val = parseFloat(this.priceOverrideInput);
         if (!isNaN(val) && val >= 0) {
-            // Validate: custom price must not be less than dealer price (net cost)
-            const dealerPrice = (this.selectedWarrantyTerm ? this.selectedWarrantyTerm.netCost : null)
-                             || (this.existingApplicationPackage ? this.existingApplicationPackage.dealerPackagePrice : null)
-                             || 0;
-            if (dealerPrice > 0 && val < dealerPrice) {
-                this.priceValidationMessage = 'Custom price ($' + val.toFixed(2) + ') cannot be less than Dealer Price ($' + dealerPrice.toFixed(2) + ').';
-                this.isPriceEditMode = false;
-                // eslint-disable-next-line @lwc/lwc/no-async-operation
-                setTimeout(() => { this.priceValidationMessage = ''; }, 5000);
-                return;
-            }
+            // DISABLED: Validation that prevented custom price below dealer price
+            // const dealerPrice = (this.selectedWarrantyTerm ? this.selectedWarrantyTerm.netCost : null)
+            //                  || (this.existingApplicationPackage ? this.existingApplicationPackage.dealerPackagePrice : null)
+            //                  || 0;
+            // if (dealerPrice > 0 && val < dealerPrice) {
+            //     this.priceValidationMessage = 'Custom price ($' + val.toFixed(2) + ') cannot be less than Dealer Price ($' + dealerPrice.toFixed(2) + ').';
+            //     this.isPriceEditMode = false;
+            //     // eslint-disable-next-line @lwc/lwc/no-async-operation
+            //     setTimeout(() => { this.priceValidationMessage = ''; }, 5000);
+            //     return;
+            // }
             this.priceValidationMessage = '';
             // Custom price is pre-tax; calculate tax and add to total
             const customPreTax = parseFloat(val.toFixed(2));

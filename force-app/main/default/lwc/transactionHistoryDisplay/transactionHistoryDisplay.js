@@ -34,6 +34,7 @@ export default class TransactionHistoryDisplay extends NavigationMixin(Lightning
                 isCheque: t.RecordType.DeveloperName === 'Cheque_Payment',
                 isCard: t.RecordType.DeveloperName === 'Card_Payment',
                 isETransfer: t.RecordType.DeveloperName === 'E_Transfer',
+                isDealerCredit: t.RecordType.DeveloperName === 'Dealer_Credit',
                 chequeNumber: t.Cheque_Number__c,
                 amount: t.Amount__c,
                 formattedAmount: this.formatCurrency(t.Amount__c),
