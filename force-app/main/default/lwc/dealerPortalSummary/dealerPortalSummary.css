@@ -684,3 +684,25 @@
 .remittance-form-wrapper {
     scroll-margin-top: 100px;
 }
+.view-invoice-button {
+    background: #2E75B5;
+    border: none;
+    border-radius: 9px;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 12px 24px;
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.2s ease;
+}
+
+.view-invoice-button:hover:not(:disabled) {
+    background: #1e5a94;
+}
+
+.view-invoice-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

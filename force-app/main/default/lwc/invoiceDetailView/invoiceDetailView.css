@@ -1,308 +1,437 @@
-/* ── Invoice Wrapper ─────────────────────────────────────────────────────── */
-.invoice-wrapper {
-    font-family: Arial, sans-serif;
-    font-size: 13px;
-    color: #333;
-    margin: 0 auto;
-    padding: 24px;
-    background: #fff;
+/* ===== Invoice Detail View - Complete Stylesheet ===== */
+
+/* Loading */
+.loading-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
 }
 
-/* ── Invoice Header ──────────────────────────────────────────────────────── */
+/* Error */
+.error-container {
+    padding: 16px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    margin: 16px;
+}
+.error-icon-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.error-title {
+    font-weight: 600;
+    color: #991b1b;
+    font-size: 14px;
+}
+.error-message {
+    color: #7f1d1d;
+    font-size: 13px;
+    margin: 0;
+}
+
+/* Invoice Wrapper */
+.invoice-wrapper {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 24px;
+    margin: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-family: Arial, sans-serif;
+    color: #333;
+}
+
+/* ===== INVOICE HEADER ===== */
 .invoice-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     border-bottom: 2px solid #5184B8;
-    padding-bottom: 10px;
+    padding-bottom: 12px;
     margin-bottom: 20px;
 }
-
 .invoice-title {
     font-size: 22px;
-    font-weight: 700;
+    font-weight: 600;
     color: #5184B8;
-    letter-spacing: 1px;
 }
-
 .invoice-id {
-    font-size: 11px;
+    font-size: 13px;
     color: #666;
-    margin-top: 2px;
+    margin-top: 4px;
+}
+.invoice-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
-/* ── Date / Status Row ───────────────────────────────────────────────────── */
+/* ===== DATE & STATUS ROW ===== */
 .date-status-row {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
 }
-
 .date-section,
 .status-section {
-    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
-
 .status-section {
     text-align: right;
 }
-
-.field-label,
-.status-label {
+.field-label {
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 600;
     color: #000;
-    margin-bottom: 2px;
+    margin-bottom: 4px;
 }
-
 .field-value {
-    font-size: 12px;
+    font-size: 13px;
     color: #666;
 }
 
-/* ── Status Colors ───────────────────────────────────────────────────────── */
-.invoice-status {
-    /* font-size: 26px; */
-    font-weight: 700;
+/* Status badges */
+.status-due {
+    font-size: 22px;
+    font-weight: bold;
+    color: #d9534f;
+}
+.status-overdue {
+    font-size: 22px;
+    font-weight: bold;
+    color: #d9534f;
+}
+.status-paid {
+    font-size: 22px;
+    font-weight: bold;
+    color: #5cb85c;
+}
+.status-partial-paid {
+    font-size: 22px;
+    font-weight: bold;
+    color: #f0ad4e;
+}
+.status-cancelled {
+    font-size: 22px;
+    font-weight: bold;
+    color: #d9534f;
+}
+.status-planned {
+    font-size: 22px;
+    font-weight: bold;
+    color: #5bc0de;
+}
+.status-default {
+    font-size: 22px;
+    font-weight: bold;
+    color: #999;
 }
 
-.status-paid     { color: #5cb85c; }
-.status-due      { color: #d9534f; }
-.status-partial  { color: #f0ad4e; }
-.status-planned  { color: #5184B8; }
-.status-canceled { color: #d9534f; }
-.status-default  { color: #999; }
-
-/* ── Bill To ─────────────────────────────────────────────────────────────── */
+/* ===== BILL TO ===== */
 .bill-to-section {
     margin-bottom: 20px;
 }
-.icon-btn {
-	/* width: 28px;
-	height: 28px; */
-	border: 0px solid #cfd6df;
-	background: #f8f8f8;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	cursor: pointer;
-	/* border-radius: 6px; */
-}
-
 .dealer-name {
     font-size: 14px;
-    font-weight: 700;
+    font-weight: bold;
     color: #333;
-    margin-top: 4px;
+    margin-bottom: 4px;
 }
-
 .bill-to-content {
     font-size: 13px;
     color: #333;
     line-height: 1.6;
 }
 
-/* ── Info Table (3 columns) ──────────────────────────────────────────────── */
+/* ===== 3-COLUMN INFO TABLE ===== */
 .info-table {
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 20px;
 }
-
 .info-table-header {
+    padding: 8px 12px;
     background: #5184B8;
-    color: #fff;
+    color: #ffffff;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: bold;
     text-align: center;
-    padding: 8px 10px;
+    text-transform: uppercase;
     border: 1px solid #4070a0;
 }
-
-.col-app-id   { width: 20%; }
-.col-customer { width: 40%; }
-.col-vehicle  { width: 40%; }
-
+.col-app-id {
+    width: 20%;
+}
+.col-customer {
+    width: 40%;
+}
+.col-vehicle {
+    width: 40%;
+}
 .info-table-cell {
-    padding: 10px;
-    font-size: 11px;
+    padding: 10px 12px;
+    font-size: 12px;
     vertical-align: top;
     border: 1px solid #ddd;
     color: #333;
 }
-
 .cell-app-id {
-    font-weight: 700;
-    font-size: 12px;
     text-align: center;
+    font-weight: bold;
 }
-
 .app-id-link {
     color: #5184B8;
     text-decoration: underline;
     cursor: pointer;
-    font-weight: 700;
+    font-weight: bold;
 }
-
+.app-id-link:hover {
+    color: #3a6699;
+}
 .customer-name {
-    font-weight: 700;
-    font-size: 12px;
+    font-weight: bold;
+    font-size: 13px;
     text-transform: uppercase;
-    margin-bottom: 3px;
+    margin-bottom: 4px;
 }
-
 .customer-address {
-    font-size: 11px;
-    color: #555;
-}
-
-.vehicle-info {
-    font-weight: 700;
     font-size: 12px;
-    text-transform: uppercase;
-    margin-bottom: 3px;
-}
-
-.vehicle-detail {
-    font-size: 11px;
     color: #555;
+    line-height: 1.5;
+}
+.vehicle-info {
+    font-weight: bold;
+    font-size: 13px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.vehicle-detail {
+    font-size: 12px;
+    color: #555;
+    margin-top: 2px;
 }
 
-/* ── Services Section ────────────────────────────────────────────────────── */
+/* ===== SERVICES SECTION ===== */
 .services-header {
+    font-size: 13px;
+    font-weight: bold;
+    color: #ffffff;
     background: #5184B8;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 700;
-    text-align: center;
-    letter-spacing: 1.5px;
-    padding: 8px;
+    padding: 8px 12px;
+    text-transform: uppercase;
     margin-bottom: 0;
 }
 
 .service-item {
     border: 1px solid #ddd;
     border-top: none;
-    padding: 14px 16px;
+    padding: 12px;
+    margin-bottom: 0;
 }
-
-.service-item + .service-item {
-    border-top: 1px solid #ddd;
+.service-item:last-child {
+    margin-bottom: 0;
 }
 
 .service-record-type {
     font-size: 10px;
-    font-weight: 700;
+    font-weight: bold;
     color: #5184B8;
     text-transform: uppercase;
+    margin-bottom: 6px;
     letter-spacing: 0.5px;
-    margin-bottom: 4px;
 }
 
 .service-name-row {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 6px;
+    gap: 16px;
 }
-
 .service-name {
-    font-weight: 700;
     font-size: 13px;
+    font-weight: 600;
     color: #333;
-    text-transform: uppercase;
     flex: 1;
-    padding-right: 12px;
 }
 
 .service-line-items {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    min-width: 140px;
+    gap: 6px;
 }
 
 .line-item-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 2px;
+    gap: 8px;
 }
 
-/* Line item status colors */
-.line-item-status.status-paid     { color: #5cb85c; font-size: 11px; font-weight: 700; }
-.line-item-status.status-due      { color: #d9534f; font-size: 11px; font-weight: 700; }
-.line-item-status.status-partial  { color: #f0ad4e; font-size: 11px; font-weight: 700; }
-.line-item-status.status-planned  { color: #5184B8; font-size: 11px; font-weight: 700; }
-.line-item-status.status-canceled { color: #d9534f; font-size: 11px; font-weight: 700; }
-.line-item-status.status-default  { color: #999;    font-size: 11px; font-weight: 700; }
+/* Line item status badges */
+.li-status-due {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #fef2f2;
+    color: #d9534f;
+    border: 1px solid #fecaca;
+}
+.li-status-overdue {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #fef2f2;
+    color: #d9534f;
+    border: 1px solid #fecaca;
+}
+.li-status-paid {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #f0fdf4;
+    color: #5cb85c;
+    border: 1px solid #bbf7d0;
+}
+.li-status-partial-paid {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #fffbeb;
+    color: #f0ad4e;
+    border: 1px solid #fde68a;
+}
+.li-status-planned {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #eff6ff;
+    color: #5bc0de;
+    border: 1px solid #bfdbfe;
+}
+.li-status-cancelled {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #fef2f2;
+    color: #d9534f;
+    border: 1px solid #fecaca;
+}
+.li-status-default {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #f3f4f6;
+    color: #999;
+    border: 1px solid #e5e7eb;
+}
 
 .line-item-amount {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
-    color: #5184B8;
-    min-width: 70px;
+    color: #333;
+    min-width: 80px;
     text-align: right;
 }
 
+/* Cancel button */
+.icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: opacity 0.2s;
+}
+.icon-btn:hover {
+    opacity: 0.7;
+}
+.icon-btn.danger svg {
+    width: 20px;
+    height: 20px;
+}
+
+.li-cancel-btn {
+    background: #d9534f;
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+.li-cancel-btn:hover {
+    background: #c9302c;
+}
+
+/* Service details (term, dates, odometer) */
 .service-details {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed #e5e7eb;
     font-size: 11px;
-    color: #333;
+    color: #666;
     line-height: 1.8;
 }
 
-/* ── Invoice Footer ──────────────────────────────────────────────────────── */
+/* ===== FOOTER ===== */
 .invoice-footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 14px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 2px solid #5184B8;
 }
-
 .footer-qty {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
+    font-size: 13px;
     color: #333;
-    width: 80px;
-    flex-shrink: 0;
 }
-
 .total-table {
     border-collapse: collapse;
 }
-
 .total-label {
-    padding: 8px 12px;
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 14px;
+    font-weight: bold;
     color: #333;
-    border: 1px solid #ddd;
+    padding-right: 16px;
     text-align: right;
-    white-space: nowrap;
 }
-
 .total-value {
-    padding: 8px 12px;
-    font-size: 13px;
-    font-weight: 700;
-    color: #333;
-    border: 1px solid #ddd;
+    font-size: 18px;
+    font-weight: bold;
+    color: #5184B8;
     text-align: right;
-    white-space: nowrap;
-    min-width: 100px;
 }
 
-/* ── Invoice Header Actions ──────────────────────────────────────────────── */
-.invoice-header-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-/* ── Pay Now Modal ───────────────────────────────────────────────────────── */
+/* ===== PAY NOW MODAL ===== */
 .pay-modal-overlay {
     position: fixed;
     top: 0;
@@ -310,191 +439,162 @@
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
-    z-index: 9000;
     display: flex;
-    align-items: center;
     justify-content: center;
+    align-items: center;
+    z-index: 9999;
 }
-
 .pay-modal-box {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 28px;
+    max-width: 440px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     position: relative;
-    background: #fff;
-    border-radius: 8px;
-    width: 360px;
-    padding: 24px 24px 20px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
-
 .pay-modal-close {
     position: absolute;
-    top: 10px;
-    right: 14px;
+    top: 12px;
+    right: 12px;
     background: none;
     border: none;
     cursor: pointer;
     padding: 4px;
-    line-height: 0;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-
-.pay-modal-close:hover { opacity: 0.7; }
-
+.pay-modal-close:hover {
+    background: #f3f4f6;
+}
 .pay-modal-title {
-    font-size: 13px;
+    font-size: 18px;
     font-weight: 700;
-    color: #000;
-    margin: 0 0 12px;
-    padding-right: 24px;
-}
-
-.pay-modal-message {
-    font-size: 12px;
-    line-height: 1.6;
     color: #333;
-    margin: 0 0 20px;
+    margin: 0 0 12px 0;
 }
-
+.pay-modal-message {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.6;
+    margin: 0 0 20px 0;
+}
 .pay-modal-footer {
     display: flex;
-    justify-content: flex-start;
+    justify-content: flex-end;
 }
-
 .pay-modal-btn {
-    background: linear-gradient(180deg, #5184B8 0%, #3d6a96 100%);
-    color: #fff;
+    background: #5184B8;
+    color: #ffffff;
     border: none;
-    border-radius: 6px;
-    padding: 8px 18px;
-    font-size: 12px;
+    border-radius: 8px;
+    padding: 10px 24px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    transition: box-shadow 120ms ease, transform 120ms ease;
+    transition: background 0.2s;
 }
-
 .pay-modal-btn:hover {
-    background: linear-gradient(180deg, #5D89B1 0%, #4a6f8f 100%);
-    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.28);
-    transform: translateY(-1px);
+    background: #3a6699;
+}
+.pay-modal-btn:disabled {
+    background: #93c5fd;
+    cursor: not-allowed;
 }
 
-.pay-modal-btn:active { transform: translateY(0); }
-
-.pay-modal-btn[disabled] {
-    cursor: default;
-    opacity: 0.6;
-    box-shadow: none;
-    transform: none;
-}
-
-/* ── Line Item Cancel Button ─────────────────────────────────────────────── */
-.li-cancel-btn {
-    background: none;
-    border: none;
-    color: #d9534f;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    padding: 0 4px;
-    line-height: 1;
-    opacity: 0.6;
-    transition: opacity 120ms ease;
-    margin-left: 6px;
-}
-
-.li-cancel-btn:hover { opacity: 1; }
-
-/* ── Cancel Modal Extras ─────────────────────────────────────────────────── */
+/* ===== CANCEL MODAL ===== */
 .cancel-modal-box {
-    width: 420px;
+    max-width: 500px;
 }
-
 .cancel-reason-section {
-    margin-bottom: 16px;
+    margin-bottom: 20px;
 }
-
 .cancel-reason-label {
     display: block;
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 600;
     color: #333;
     margin-bottom: 6px;
 }
-
 .cancel-required {
     color: #d9534f;
-    margin-left: 2px;
 }
-
 .cancel-reason-input {
     width: 100%;
     min-height: 80px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    padding: 8px;
-    font-size: 12px;
+    padding: 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
     font-family: Arial, sans-serif;
-    color: #333;
     resize: vertical;
     box-sizing: border-box;
-    transition: border-color 120ms ease;
 }
-
 .cancel-reason-input:focus {
     outline: none;
     border-color: #5184B8;
     box-shadow: 0 0 0 2px rgba(81, 132, 184, 0.2);
 }
-
 .cancel-submit-btn {
-    background: linear-gradient(180deg, #d9534f 0%, #b52b27 100%);
+    background: #d9534f;
 }
-
 .cancel-submit-btn:hover {
-    background: linear-gradient(180deg, #e05a56 0%, #c0302c 100%);
+    background: #c9302c;
+}
+.cancel-submit-btn:disabled {
+    background: #f8a0a0;
+    cursor: not-allowed;
 }
 
-/* ── Loading / Error / No Data ───────────────────────────────────────────── */
-.loading-container {
-    padding: 40px;
-    text-align: center;
-}
-
-.error-container {
-    padding: 16px 20px 20px;
-    background: #fff3f3;
-    border: 1px solid #f5c6cb;
-    border-left: 4px solid #d9534f;
-    border-radius: 4px;
-    max-width: 600px;
-    margin: 16px auto;
-}
-
-.error-icon-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-}
-
-.error-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: #a94442;
-}
-
-.error-message {
-    font-size: 13px;
-    color: #6b2020;
-    margin: 0 0 14px 0;
-    line-height: 1.5;
-}
-
-.error-retry-btn {
-    display: block;
-}
-
+/* ===== NO DATA ===== */
 .no-data-container {
-    padding: 20px;
-    color: #666;
     text-align: center;
+    padding: 40px;
+    color: #999;
+    font-size: 14px;
+}
+
+/* ===== STATUS LABEL CLASSES (for cancel modal) ===== */
+.status-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #000;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .invoice-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+    .invoice-header-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    .date-status-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+    .status-section {
+        text-align: left;
+    }
+    .info-table-header,
+    .info-table-cell {
+        padding: 6px 8px;
+        font-size: 11px;
+    }
+    .service-name-row {
+        flex-direction: column;
+        gap: 8px;
+    }
+    .service-line-items {
+        align-items: flex-start;
+    }
+    .invoice-footer {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
 }

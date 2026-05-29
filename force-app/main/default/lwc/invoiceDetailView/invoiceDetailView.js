@@ -45,6 +45,21 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
         return status !== 'Paid' && status !== 'Cancelled';
     }
 
+    get hasApplication() {
+        return this.invoiceData && this.invoiceData.applicationRecordId;
+    }
+
+    handleBackToApplication() {
+        if (!this.invoiceData?.applicationRecordId) return;
+        this[NavigationMixin.Navigate]({
+            type: 'standard__recordPage',
+            attributes: {
+                recordId: this.invoiceData.applicationRecordId,
+                actionName: 'view'
+            }
+        });
+    }
+
     handlePayNow() {
         this.showPayModal = true;
     }

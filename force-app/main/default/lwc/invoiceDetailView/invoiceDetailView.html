@@ -28,6 +28,14 @@
                     <div class="invoice-id">Invoice ID # {invoiceData.invoiceName}</div>
                 </div>
                 <div class="invoice-header-actions">
+                    <template if:true={hasApplication}>
+                        <lightning-button
+                            variant="neutral"
+                            label="Back to Application"
+                            icon-name="utility:back"
+                            onclick={handleBackToApplication}>
+                        </lightning-button>
+                    </template>
                     <template if:true={canCancelInvoice}>
                         <lightning-button
                             variant="destructive"

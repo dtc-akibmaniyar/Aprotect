@@ -381,6 +381,12 @@
               onclick={handleSubmitApplication}
               disabled={isSubmitButtonDisabled}
             >SUBMIT</button>
+            <template if:true={hasInvoice}>
+              <button
+                class="view-invoice-button"
+                onclick={handleViewInvoice}
+              >VIEW INVOICE</button>
+            </template>
           </template>
           <template if:true={isLocked}>
             <button
@@ -388,6 +394,12 @@
               onclick={handlePreviewPdf}
               disabled={isBusy}
             >PREVIEW PDF</button>
+            <template if:true={hasInvoice}>
+              <button
+                class="view-invoice-button"
+                onclick={handleViewInvoice}
+              >VIEW INVOICE</button>
+            </template>
           </template>
         </div>
 

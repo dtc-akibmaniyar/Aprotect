@@ -1172,4 +1172,31 @@ public without sharing class ApplicationSummaryController {
             this.invoiceId = invoiceId;
         }
     }
+
+    /**
+     * @description Get the invoice associated with an application (if any)
+     * @param applicationId The Application record Id
+     * @return Map with invoiceId and invoiceName, or null if no invoice exists
+     */
+    @AuraEnabled(cacheable=false)
+    public static Map<String, String> getInvoiceForApplication(String applicationId) {
+        if (String.isBlank(applicationId)) {
+            return null;
+        }
+        List<Invoice__c> invoices = [
+            SELECT Id, Name 
+            FROM Invoice__c 
+            WHERE Application__c = :applicationId 
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        if (invoices.isEmpty()) {
+            return null;
+        }
+        Map<String, String> result = new Map<String, String>();
+        result.put('invoiceId', invoices[0].Id);
+        result.put('invoiceName', invoices[0].Name);
+        return result;
+    }
+
 }

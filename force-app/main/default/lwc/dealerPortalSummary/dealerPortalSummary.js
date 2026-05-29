@@ -13,6 +13,7 @@ import generateAndAttachPDF from '@salesforce/apex/ApplicationSummaryController.
 import createInvoiceOnApplicationSubmit from '@salesforce/apex/ApplicationSummaryController.createInvoiceOnApplicationSubmit';
 // Update application status
 import updateApplicationStatus from '@salesforce/apex/DealerPortalController.updateApplicationStatus';
+import getInvoiceForApplication from '@salesforce/apex/ApplicationSummaryController.getInvoiceForApplication';
 
 export default class DealerPortalSummary extends NavigationMixin(LightningElement) {
     @api recordId;
@@ -60,6 +61,9 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     @track taxAmount = 0;
     @track contractPremium = 0;
     
+    @track invoiceId = null;
+    @track invoiceName = null;
+
     @track saveAsQuoteButtonLabel = 'Save as Quote';
     @track saveAsQuoteButtonDisabled = false;
 
@@ -149,6 +153,22 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
             });
             this.packageData = clonedPackageData; // Assign the modified shallow copy back
             console.log('🔄 loadData - packageData processed', this.packageData);
+            // Load invoice data
+            try {
+                const invoiceResult = await getInvoiceForApplication({ applicationId: this.effectiveApplicationId });
+                if (invoiceResult) {
+                    this.invoiceId = invoiceResult.invoiceId;
+                    this.invoiceName = invoiceResult.invoiceName;
+                } else {
+                    this.invoiceId = null;
+                    this.invoiceName = null;
+                }
+            } catch (invoiceError) {
+                console.warn('Could not load invoice data:', invoiceError);
+                this.invoiceId = null;
+                this.invoiceName = null;
+            }
+
             this.error = undefined;
             
         } catch (error) {
@@ -242,6 +262,10 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
         return this.isBusy || this.isApplicationSubmitted;
     }
     
+    get hasInvoice() {
+        return !!this.invoiceId;
+    }
+
     calculateTotal() {
         this.totalPrice = 0;
         this.taxAmount = 0;
@@ -477,6 +501,7 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
                 console.warn('⚠️ Invoice creation failed:', invoiceResponse?.message);
             } else {
                 console.log('✅ Invoice created successfully:', invoiceResponse?.invoiceId);
+                this.invoiceId = invoiceResponse.invoiceId;
             }
             
             // Check PDF generation result
@@ -540,6 +565,18 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
             message: message,
             variant: variant
         }));
+    }
+
+    handleViewInvoice() {
+        if (!this.invoiceId) return;
+        this[NavigationMixin.Navigate]({
+            type: 'standard__recordPage',
+            attributes: {
+                recordId: this.invoiceId,
+                objectApiName: 'Invoice__c',
+                actionName: 'view'
+            }
+        });
     }
 
     handleBack() {
