@@ -146,6 +146,26 @@
                                 </div>
                             </div>
 
+                            <!-- Price Breakdown (if add-ons exist) -->
+                            <apex:outputPanel rendered="{!row.hasBreakdown}" layout="none">
+                                <div style="margin-top:6px; padding:6px 10px; background:#f8f9fa; border:1px solid #e9ecef; border-radius:3px; font-size:8px; color:#555;">
+                                    <div style="display:table; width:100%; margin-bottom:2px;">
+                                        <span style="display:table-cell; width:75%;">Base Package Price:</span>
+                                        <span style="display:table-cell; text-align:right; font-weight:600;">
+                                            <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!row.baseCostPrice}"/></apex:outputText>
+                                        </span>
+                                    </div>
+                                    <apex:repeat var="opt" value="{!row.options}">
+                                        <div style="display:table; width:100%; margin-bottom:2px;">
+                                            <span style="display:table-cell; width:75%;">{!opt.optionName} (add-on):</span>
+                                            <span style="display:table-cell; text-align:right; font-weight:600;">
+                                                <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!opt.costPrice}"/></apex:outputText>
+                                            </span>
+                                        </div>
+                                    </apex:repeat>
+                                </div>
+                            </apex:outputPanel>
+
                             <!-- Package Details -->
                             <div style="font-size:9px; color:#333; line-height:1.7;">
                                 <apex:outputPanel rendered="{!row.pkg.Package_Term__r != null}">

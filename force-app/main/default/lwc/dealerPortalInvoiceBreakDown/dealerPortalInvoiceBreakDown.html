@@ -125,6 +125,20 @@
                                             <template if:true={row.warranty.hasStatus}>
                                                 <span class={row.warranty.statusClass}>{row.warranty.status}</span>
                                             </template>
+                                            <template if:true={row.warranty.hasBreakdown}>
+                                                <div class="svc-breakdown">
+                                                    <div class="svc-breakdown-row">
+                                                        <span>Base:</span>
+                                                        <span>{row.warranty.formattedBaseCostPrice}</span>
+                                                    </div>
+                                                    <template for:each={row.warranty.additionalOptions} for:item="opt">
+                                                        <div key={opt.key} class="svc-breakdown-row">
+                                                            <span>{opt.optionName}:</span>
+                                                            <span>{opt.formattedCostPrice}</span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
                                         </template>
                                         <template if:false={row.warranty}>
                                             <span class="svc-dash">-</span>
@@ -138,6 +152,20 @@
                                             <template if:true={row.tireRim.hasStatus}>
                                                 <span class={row.tireRim.statusClass}>{row.tireRim.status}</span>
                                             </template>
+                                            <template if:true={row.tireRim.hasBreakdown}>
+                                                <div class="svc-breakdown">
+                                                    <div class="svc-breakdown-row">
+                                                        <span>Base:</span>
+                                                        <span>{row.tireRim.formattedBaseCostPrice}</span>
+                                                    </div>
+                                                    <template for:each={row.tireRim.additionalOptions} for:item="opt">
+                                                        <div key={opt.key} class="svc-breakdown-row">
+                                                            <span>{opt.optionName}:</span>
+                                                            <span>{opt.formattedCostPrice}</span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
                                         </template>
                                         <template if:false={row.tireRim}>
                                             <span class="svc-dash">-</span>
@@ -150,6 +178,20 @@
                                             <span class="svc-amount">{row.loanProtection.formattedAmount}</span>
                                             <template if:true={row.loanProtection.hasStatus}>
                                                 <span class={row.loanProtection.statusClass}>{row.loanProtection.status}</span>
+                                            </template>
+                                            <template if:true={row.loanProtection.hasBreakdown}>
+                                                <div class="svc-breakdown">
+                                                    <div class="svc-breakdown-row">
+                                                        <span>Base:</span>
+                                                        <span>{row.loanProtection.formattedBaseCostPrice}</span>
+                                                    </div>
+                                                    <template for:each={row.loanProtection.additionalOptions} for:item="opt">
+                                                        <div key={opt.key} class="svc-breakdown-row">
+                                                            <span>{opt.optionName}:</span>
+                                                            <span>{opt.formattedCostPrice}</span>
+                                                        </div>
+                                                    </template>
+                                                </div>
                                             </template>
                                         </template>
                                         <template if:false={row.loanProtection}>

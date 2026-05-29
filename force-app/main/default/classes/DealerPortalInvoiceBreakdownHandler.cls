@@ -182,6 +182,47 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                     ];
             }
 
+            // ── 3b. Collect package IDs and query options for breakdown ────────
+            Set<Id> allPackageIds = new Set<Id>();
+            for (Invoice_Line_Item__c item : lineItems) {
+                if (item.Application_Package__c != null) {
+                    allPackageIds.add(item.Application_Package__c);
+                }
+            }
+
+            // Query Application Packages for base price info
+            Map<Id, Application_Package__c> appPkgMap = new Map<Id, Application_Package__c>();
+            if (!allPackageIds.isEmpty()) {
+                for (Application_Package__c pkg : [
+                    SELECT Id, Dealer_Package_Price__c, Add_Ons_Price__c
+                    FROM Application_Package__c
+                    WHERE Id IN :allPackageIds
+                ]) {
+                    appPkgMap.put(pkg.Id, pkg);
+                }
+            }
+
+            // Query Application Package Options for breakdown
+            Map<Id, List<OptionRecord>> pkgToOptions = new Map<Id, List<OptionRecord>>();
+            if (!allPackageIds.isEmpty()) {
+                for (Application_Package_Option__c opt : [
+                    SELECT Id, Application_Package__c, Option__c, Net_Cost__c, Selection_Type__c
+                    FROM Application_Package_Option__c
+                    WHERE Application_Package__c IN :allPackageIds
+                    AND Net_Cost__c != null AND Net_Cost__c != 0
+                    ORDER BY Option__c ASC
+                ]) {
+                    if (!pkgToOptions.containsKey(opt.Application_Package__c)) {
+                        pkgToOptions.put(opt.Application_Package__c, new List<OptionRecord>());
+                    }
+                    OptionRecord or2 = new OptionRecord();
+                    or2.optionName = opt.Option__c;
+                    or2.costPrice  = opt.Net_Cost__c != null ? opt.Net_Cost__c : 0;
+                    or2.selectionType = opt.Selection_Type__c;
+                    pkgToOptions.get(opt.Application_Package__c).add(or2);
+                }
+            }
+
             // ── 4. Build map Invoice → line items ─────────────────────────────
             Map<Id, List<Invoice_Line_Item__c>> invoiceToLineItems = new Map<Id, List<Invoice_Line_Item__c>>();
             for (Invoice_Line_Item__c item : lineItems) {
@@ -222,6 +263,23 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                         li.taxAmount           = item.Tax_Amount__c;
                         li.taxPercentage       = item.Tax_Percentage__c;
                         li.status              = item.Status__c;
+
+                        // Price breakdown
+                        if (item.Application_Package__c != null && appPkgMap.containsKey(item.Application_Package__c)) {
+                            Application_Package__c pkg = appPkgMap.get(item.Application_Package__c);
+                            li.baseCostPrice = pkg.Dealer_Package_Price__c != null ? pkg.Dealer_Package_Price__c : 0;
+                            li.addOnsTotal   = pkg.Add_Ons_Price__c != null ? pkg.Add_Ons_Price__c : 0;
+                            li.hasBreakdown  = li.addOnsTotal > 0;
+                            li.additionalOptions = pkgToOptions.containsKey(item.Application_Package__c)
+                                ? pkgToOptions.get(item.Application_Package__c)
+                                : new List<OptionRecord>();
+                        } else {
+                            li.baseCostPrice = 0;
+                            li.addOnsTotal   = 0;
+                            li.hasBreakdown  = false;
+                            li.additionalOptions = new List<OptionRecord>();
+                        }
+
                         invRecord.lineItems.add(li);
                     }
                 }
@@ -300,5 +358,15 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         @AuraEnabled public Decimal taxAmount;
         @AuraEnabled public Decimal taxPercentage;
         @AuraEnabled public String  status;
+        @AuraEnabled public Decimal baseCostPrice;
+        @AuraEnabled public Decimal addOnsTotal;
+        @AuraEnabled public Boolean hasBreakdown;
+        @AuraEnabled public List<OptionRecord> additionalOptions;
+    }
+
+    public class OptionRecord {
+        @AuraEnabled public String  optionName;
+        @AuraEnabled public Decimal costPrice;
+        @AuraEnabled public String  selectionType;
     }
 }

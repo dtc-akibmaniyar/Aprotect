@@ -298,6 +298,16 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
             formattedExpiryOdometer: pkg.expiryOdometer != null
                 ? this.formatNumber(pkg.expiryOdometer) + ' KM'
                 : null,
+            // Price breakdown
+            hasBreakdown: pkg.hasBreakdown === true,
+            formattedBaseCostPrice: this.formatCurrency(pkg.baseCostPrice),
+            formattedAddOnsTotal: this.formatCurrency(pkg.addOnsTotal),
+            additionalOptions: (pkg.additionalOptions || []).map(opt => ({
+                optionId:          opt.optionId,
+                optionName:        opt.optionName || 'Additional Option',
+                formattedCostPrice: this.formatCurrency(opt.costPrice),
+                selectionType:     opt.selectionType
+            })),
             lineItems: (pkg.lineItems || []).map(li => ({
                 lineItemId:      li.lineItemId,
                 packageName:     pkg.packageName,

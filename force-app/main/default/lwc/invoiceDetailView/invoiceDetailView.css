@@ -401,6 +401,49 @@
     line-height: 1.8;
 }
 
+/* ===== PRICE BREAKDOWN ===== */
+.price-breakdown {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 11px;
+}
+
+.breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    color: #555;
+}
+
+.breakdown-label {
+    font-weight: 500;
+}
+
+.breakdown-value {
+    font-weight: 600;
+    color: #333;
+    min-width: 70px;
+    text-align: right;
+}
+
+.breakdown-addon-tag {
+    display: inline-block;
+    padding: 0 5px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 600;
+    background: #e8f0fe;
+    color: #5184B8;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
 /* ===== FOOTER ===== */
 .invoice-footer {
     display: flex;

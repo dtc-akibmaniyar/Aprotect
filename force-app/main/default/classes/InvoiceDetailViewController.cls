@@ -74,7 +74,9 @@ public without sharing class InvoiceDetailViewController {
                        Tax_Amount__c,
                        Tax_Amount_Cost__c,
                        Dealer_Price_Override__c,
-                       Tax_Percentage__c
+                       Tax_Percentage__c,
+                       Dealer_Package_Price__c,
+                       Add_Ons_Price__c
                 FROM Application_Package__c
                 WHERE Id IN :packageIds
               ];
@@ -83,6 +85,24 @@ public without sharing class InvoiceDetailViewController {
         Map<Id, Decimal> pkgDisplayPrice = new Map<Id, Decimal>();
         for (Application_Package__c pkg : packages) {
             pkgDisplayPrice.put(pkg.Id, getDisplayPrice(pkg));
+        }
+
+        // ── 3b. Query Application Package Options for breakdown ──────────────
+        Map<Id, List<Application_Package_Option__c>> pkgToOptions = new Map<Id, List<Application_Package_Option__c>>();
+        if (!packageIds.isEmpty()) {
+            for (Application_Package_Option__c opt : [
+                SELECT Id, Application_Package__c, Option__c, Net_Cost__c,
+                       Selection_Type__c
+                FROM Application_Package_Option__c
+                WHERE Application_Package__c IN :packageIds
+                AND Net_Cost__c != null AND Net_Cost__c != 0
+                ORDER BY Option__c ASC
+            ]) {
+                if (!pkgToOptions.containsKey(opt.Application_Package__c)) {
+                    pkgToOptions.put(opt.Application_Package__c, new List<Application_Package_Option__c>());
+                }
+                pkgToOptions.get(opt.Application_Package__c).add(opt);
+            }
         }
 
         // ── 4. Map package → line items using display prices ──────────────────
@@ -151,6 +171,24 @@ public without sharing class InvoiceDetailViewController {
                 : null;
             pd.startOdometer  = pkg.Odometer_Start__c;
             pd.expiryOdometer = pkg.Odometer_End__c;
+
+            // Price breakdown
+            pd.baseCostPrice = pkg.Dealer_Package_Price__c != null ? pkg.Dealer_Package_Price__c : 0;
+            pd.addOnsTotal   = pkg.Add_Ons_Price__c != null ? pkg.Add_Ons_Price__c : 0;
+            pd.hasBreakdown  = pd.addOnsTotal > 0;
+
+            // Additional options
+            pd.additionalOptions = new List<OptionData>();
+            if (pkgToOptions.containsKey(pkg.Id)) {
+                for (Application_Package_Option__c opt : pkgToOptions.get(pkg.Id)) {
+                    OptionData od = new OptionData();
+                    od.optionId   = opt.Id;
+                    od.optionName = opt.Option__c;
+                    od.costPrice  = opt.Net_Cost__c != null ? opt.Net_Cost__c : 0;
+                    od.selectionType = opt.Selection_Type__c;
+                    pd.additionalOptions.add(od);
+                }
+            }
 
             pd.lineItems = new List<LineItemData>();
             if (pkgToLineItems.containsKey(pkg.Id)) {
@@ -474,11 +512,22 @@ public without sharing class InvoiceDetailViewController {
         @AuraEnabled public Decimal startOdometer;
         @AuraEnabled public Decimal expiryOdometer;
         @AuraEnabled public List<LineItemData> lineItems;
+        @AuraEnabled public Decimal baseCostPrice;
+        @AuraEnabled public Decimal addOnsTotal;
+        @AuraEnabled public Boolean hasBreakdown;
+        @AuraEnabled public List<OptionData> additionalOptions;
     }
 
     public class LineItemData {
         @AuraEnabled public String  lineItemId;
         @AuraEnabled public String  status;
         @AuraEnabled public Decimal amount;
+    }
+
+    public class OptionData {
+        @AuraEnabled public String  optionId;
+        @AuraEnabled public String  optionName;
+        @AuraEnabled public Decimal costPrice;
+        @AuraEnabled public String  selectionType;
     }
 }

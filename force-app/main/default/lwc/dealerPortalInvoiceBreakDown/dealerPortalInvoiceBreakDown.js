@@ -236,12 +236,22 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
 
     _colCell(item) {
         const status = item.status || '';
+        const hasBreakdown = item.hasBreakdown === true;
         return {
             amount:          item.costPriceWithTax || 0,
             formattedAmount: this._fmt(item.costPriceWithTax || 0),
             status,
             statusClass:     this._statusClass(status),
-            hasStatus:       !!status
+            hasStatus:       !!status,
+            // Breakdown fields
+            hasBreakdown,
+            formattedBaseCostPrice: this._fmt(item.baseCostPrice || 0),
+            formattedAddOnsTotal:   this._fmt(item.addOnsTotal || 0),
+            additionalOptions: (item.additionalOptions || []).map((opt, i) => ({
+                key: 'opt-' + i,
+                optionName: opt.optionName || 'Additional Option',
+                formattedCostPrice: this._fmt(opt.costPrice || 0)
+            }))
         };
     }
 

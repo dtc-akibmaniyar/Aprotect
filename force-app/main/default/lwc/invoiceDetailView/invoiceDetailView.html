@@ -140,36 +140,45 @@
                                         <span class={li.statusClass}>{li.status}</span>
                                         <span class="line-item-amount">{li.formattedAmount}</span>
                                         <template if:true={li.canCancel}>
-                                            <!-- <button class="li-cancel-btn"
+                                            <button class="icon-btn danger"
                                                 data-lineitemid={li.lineItemId}
                                                 data-packagename={li.packageName}
                                                 data-status={li.status}
+                                                title="Request Cancellation"
                                                 onclick={handleCancelLineItem}
-                                                title="Request Cancellation">&#x2715;</button> -->
-
-                                                <button class="icon-btn danger"
-                                                    data-lineitemid={li.lineItemId}
-                                                    data-packagename={li.packageName}
-                                                    data-status={li.status}
-                                                    title="Request Cancellation"
-                                                    onclick={handleCancelLineItem}
-                                                    aria-label="Request Cancellation">
-                                                    <svg width="25" height="25" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                        <g clip-path="url(#clip0_34_2206)">
-                                                            <path d="M8.00736 0C3.57682 0 0 3.35327 0 7.5069C0 11.6605 3.57682 15.0138 8.00736 15.0138C12.4379 15.0138 16.0147 11.6605 16.0147 7.5069C16.0147 3.35327 12.4232 0 8.00736 0ZM10.3919 10.943L8.00736 8.70745L5.65225 10.9154L4.34223 9.68721L6.69733 7.4793L4.31279 5.24379L5.59338 4.04324L7.97792 6.27875L10.333 4.07084L11.6431 5.29899L9.28795 7.5069L11.6725 9.74241L10.3919 10.943Z" fill="#E61E25" />
-                                                        </g>
-                                                        <defs>
-                                                            <clipPath id="clip0_34_2206">
-                                                                <rect width="16" height="15" fill="white" />
-                                                            </clipPath>
-                                                        </defs>
-                                                    </svg>
-                                                </button>
+                                                aria-label="Request Cancellation">
+                                                <svg width="25" height="25" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <g clip-path="url(#clip0_34_2206)">
+                                                        <path d="M8.00736 0C3.57682 0 0 3.35327 0 7.5069C0 11.6605 3.57682 15.0138 8.00736 15.0138C12.4379 15.0138 16.0147 11.6605 16.0147 7.5069C16.0147 3.35327 12.4232 0 8.00736 0ZM10.3919 10.943L8.00736 8.70745L5.65225 10.9154L4.34223 9.68721L6.69733 7.4793L4.31279 5.24379L5.59338 4.04324L7.97792 6.27875L10.333 4.07084L11.6431 5.29899L9.28795 7.5069L11.6725 9.74241L10.3919 10.943Z" fill="#E61E25" />
+                                                    </g>
+                                                    <defs>
+                                                        <clipPath id="clip0_34_2206">
+                                                            <rect width="16" height="15" fill="white" />
+                                                        </clipPath>
+                                                    </defs>
+                                                </svg>
+                                            </button>
                                         </template>
                                     </div>
                                 </template>
                             </div>
                         </div>
+
+                        <!-- Price Breakdown (if add-ons exist) -->
+                        <template if:true={pkg.hasBreakdown}>
+                            <div class="price-breakdown">
+                                <div class="breakdown-row">
+                                    <span class="breakdown-label">Base Package Price:</span>
+                                    <span class="breakdown-value">{pkg.formattedBaseCostPrice}</span>
+                                </div>
+                                <template for:each={pkg.additionalOptions} for:item="opt">
+                                    <div key={opt.optionId} class="breakdown-row">
+                                        <span class="breakdown-label">{opt.optionName} <span class="breakdown-addon-tag">add-on</span></span>
+                                        <span class="breakdown-value">{opt.formattedCostPrice}</span>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
 
                         <!-- Package Details -->
                         <div class="service-details">

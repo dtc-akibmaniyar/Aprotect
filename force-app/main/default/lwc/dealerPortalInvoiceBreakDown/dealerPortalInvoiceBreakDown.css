@@ -233,6 +233,24 @@
     font-weight: 600;
 }
 
+/* ── Service cell price breakdown ────────────────────────────────── */
+.svc-breakdown {
+    margin-top: 4px;
+    padding: 4px 6px;
+    background: #f0f4f8;
+    border-radius: 4px;
+    font-size: 9px;
+    color: #666;
+    text-align: left;
+}
+
+.svc-breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    line-height: 1.6;
+}
+
 /* ── Line-item status badges ─────────────────────────────────────── */
 .li-badge {
     display: inline-block;
