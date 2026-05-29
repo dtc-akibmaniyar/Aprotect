@@ -831,11 +831,19 @@
                                                 <span class="breakdown-label">Commercial/Business Premium Use ({additionalOptionsPricing.existingCommercialCount}):</span>
                                                 <span class="breakdown-value">{additionalOptionsPricing.formattedExistingCommercialPrice}</span>
                                             </div>
+                                            <div class="breakdown-option-base" style="padding-left: 32px; font-size: 0.8rem; color: #6b7280;">
+                                                <span>Base Price:</span>
+                                                <span>{additionalOptionsPricing.formattedExistingCommercialNetCost}</span>
+                                            </div>
                                         </template>
                                         <template if:true={additionalOptionsPricing.existingDownPaymentPrice}>
                                             <div class="breakdown-item" style="padding-left: 16px;">
                                                 <span class="breakdown-label">Down Payment Protection ({additionalOptionsPricing.existingDownPaymentCount}):</span>
                                                 <span class="breakdown-value">{additionalOptionsPricing.formattedExistingDownPaymentPrice}</span>
+                                            </div>
+                                            <div class="breakdown-option-base" style="padding-left: 32px; font-size: 0.8rem; color: #6b7280;">
+                                                <span>Base Price:</span>
+                                                <span>{additionalOptionsPricing.formattedExistingDownPaymentNetCost}</span>
                                             </div>
                                         </template>
                                     </template>
@@ -850,11 +858,19 @@
                                                 <span class="breakdown-label">Commercial/Business Premium Use ({additionalOptionsPricing.newCommercialCount}):</span>
                                                 <span class="breakdown-value">+{additionalOptionsPricing.formattedNewCommercialPrice}</span>
                                             </div>
+                                            <div class="breakdown-option-base" style="padding-left: 32px; font-size: 0.8rem; color: #6b7280;">
+                                                <span>Base Price:</span>
+                                                <span>{additionalOptionsPricing.formattedNewCommercialNetCost}</span>
+                                            </div>
                                         </template>
                                         <template if:true={additionalOptionsPricing.newDownPaymentPrice}>
                                             <div class="breakdown-item" style="padding-left: 16px;">
                                                 <span class="breakdown-label">Down Payment Protection ({additionalOptionsPricing.newDownPaymentCount}):</span>
                                                 <span class="breakdown-value">+{additionalOptionsPricing.formattedNewDownPaymentPrice}</span>
+                                            </div>
+                                            <div class="breakdown-option-base" style="padding-left: 32px; font-size: 0.8rem; color: #6b7280;">
+                                                <span>Base Price:</span>
+                                                <span>{additionalOptionsPricing.formattedNewDownPaymentNetCost}</span>
                                             </div>
                                         </template>
                                     </template>
@@ -943,6 +959,59 @@
                                         <span class="breakdown-label">Dealer Price:</span>
                                         <span class="breakdown-value">{currentPriceBreakdown.netCost}</span>
                                     </div>
+                                    <template if:true={additionalOptionsPricing.existingOptionsPrice}>
+                                        <div class="breakdown-item">
+                                            <span class="breakdown-label"><strong><u>Existing Additional Options:</u></strong></span>
+                                        </div>
+                                        <div class="breakdown-divider"></div>
+                                        <template if:true={additionalOptionsPricing.existingCommercialPrice}>
+                                            <div class="breakdown-item" style="padding-left: 16px;">
+                                                <span class="breakdown-label">Commercial/Business Premium Use ({additionalOptionsPricing.existingCommercialCount}):</span>
+                                                <span class="breakdown-value">{additionalOptionsPricing.formattedExistingCommercialPrice}</span>
+                                            </div>
+                                            <div class="breakdown-option-base" style="padding-left: 32px; font-size: 0.8rem; color: #6b7280;">
+                                                <span>Base Price:</span>
+                                                <span>{additionalOptionsPricing.formattedExistingCommercialNetCost}</span>
+                                            </div>
+                                        </template>
+                                        <template if:true={additionalOptionsPricing.existingDownPaymentPrice}>
+                                            <div class="breakdown-item" style="padding-left: 16px;">
+                                                <span class="breakdown-label">Down Payment Protection ({additionalOptionsPricing.existingDownPaymentCount}):</span>
+                                                <span class="breakdown-value">{additionalOptionsPricing.formattedExistingDownPaymentPrice}</span>
+                                            </div>
+                                            <div class="breakdown-option-base" style="padding-left: 32px; font-size: 0.8rem; color: #6b7280;">
+                                                <span>Base Price:</span>
+                                                <span>{additionalOptionsPricing.formattedExistingDownPaymentNetCost}</span>
+                                            </div>
+                                        </template>
+                                    </template>
+                                    <template if:true={additionalOptionsPricing.newOptionsPrice}>
+                                        <div class="breakdown-item">
+                                            <span class="breakdown-label">New Additional Options:</span>
+                                            <span class="breakdown-value">+{additionalOptionsPricing.formattedNewOptionsPrice}</span>
+                                        </div>
+                                        <div class="breakdown-divider"></div>
+                                        <template if:true={additionalOptionsPricing.newCommercialPrice}>
+                                            <div class="breakdown-item" style="padding-left: 16px;">
+                                                <span class="breakdown-label">Commercial/Business Premium Use ({additionalOptionsPricing.newCommercialCount}):</span>
+                                                <span class="breakdown-value">+{additionalOptionsPricing.formattedNewCommercialPrice}</span>
+                                            </div>
+                                            <div class="breakdown-option-base" style="padding-left: 32px; font-size: 0.8rem; color: #6b7280;">
+                                                <span>Base Price:</span>
+                                                <span>{additionalOptionsPricing.formattedNewCommercialNetCost}</span>
+                                            </div>
+                                        </template>
+                                        <template if:true={additionalOptionsPricing.newDownPaymentPrice}>
+                                            <div class="breakdown-item" style="padding-left: 16px;">
+                                                <span class="breakdown-label">Down Payment Protection ({additionalOptionsPricing.newDownPaymentCount}):</span>
+                                                <span class="breakdown-value">+{additionalOptionsPricing.formattedNewDownPaymentPrice}</span>
+                                            </div>
+                                            <div class="breakdown-option-base" style="padding-left: 32px; font-size: 0.8rem; color: #6b7280;">
+                                                <span>Base Price:</span>
+                                                <span>{additionalOptionsPricing.formattedNewDownPaymentNetCost}</span>
+                                            </div>
+                                        </template>
+                                    </template>
                                 </div>
                             </template>
                         </template>

@@ -623,14 +623,14 @@
                                                 <span class="breakdown-label">Dealer Price:</span>
                                                 <span class="breakdown-value">{dealerReferenceBreakdown.netCost}</span>
                                             </div>
-                                            <template if:true={hasDealerAdditionalOptions}>
+                                            <template if:true={hasSelectedAdditionalOptions}>
                                                 <div class="breakdown-options-section dealer-options-section">
-                                                    <div class="breakdown-options-header">Additional Options (Dealer Price)</div>
+                                                    <div class="breakdown-options-header">Additional Options (Base Price)</div>
                                                     <div class="breakdown-options-list">
-                                                        <template for:each={dealerAdditionalOptionsBreakdown} for:item="optItem">
+                                                        <template for:each={selectedAdditionalOptionsBreakdown} for:item="optItem">
                                                             <div key={optItem.id} class="breakdown-option-item">
                                                                 <span class="breakdown-option-name">{optItem.name}</span>
-                                                                <span class="breakdown-option-price">{optItem.formattedDealerPrice}</span>
+                                                                <span class="breakdown-option-price">{optItem.formattedNetCost}</span>
                                                             </div>
                                                         </template>
                                                     </div>
@@ -692,14 +692,14 @@
                                                 <span class="breakdown-label">Dealer Price:</span>
                                                 <span class="breakdown-value">{currentPriceBreakdown.netCost}</span>
                                             </div>
-                                            <template if:true={hasDealerAdditionalOptions}>
+                                            <template if:true={hasSelectedAdditionalOptions}>
                                                 <div class="breakdown-options-section dealer-options-section">
-                                                    <div class="breakdown-options-header">Additional Options (Dealer Price)</div>
+                                                    <div class="breakdown-options-header">Additional Options (Base Price)</div>
                                                     <div class="breakdown-options-list">
-                                                        <template for:each={dealerAdditionalOptionsBreakdown} for:item="optItem">
+                                                        <template for:each={selectedAdditionalOptionsBreakdown} for:item="optItem">
                                                             <div key={optItem.id} class="breakdown-option-item">
                                                                 <span class="breakdown-option-name">{optItem.name}</span>
-                                                                <span class="breakdown-option-price">{optItem.formattedDealerPrice}</span>
+                                                                <span class="breakdown-option-price">{optItem.formattedNetCost}</span>
                                                             </div>
                                                         </template>
                                                     </div>

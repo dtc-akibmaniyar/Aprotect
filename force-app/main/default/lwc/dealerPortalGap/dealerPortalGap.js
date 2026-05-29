@@ -3298,6 +3298,30 @@ export default class DealerPortalGap extends LightningElement {
             return count + (option && option.category === 'Down Payment Protection' ? 1 : 0);
         }, 0);
 
+        // Net cost (base price) breakdowns per category
+        const existingCommercialNetCost = this.existingAdditionalOptions
+            .filter(option => !this.optionsToRemove.includes(option.id))
+            .filter(option => option.category === 'Commercial/Business Premium Use')
+            .reduce((total, option) => total + (option.netCost || 0), 0);
+        const existingDownPaymentNetCost = this.existingAdditionalOptions
+            .filter(option => !this.optionsToRemove.includes(option.id))
+            .filter(option => option.category === 'Down Payment Protection')
+            .reduce((total, option) => total + (option.netCost || 0), 0);
+        const newCommercialNetCost = this.selectedNewOptions.reduce((total, optionId) => {
+            const option = this.availableAdditionalOptionsData.find(opt => opt.id === optionId);
+            if (option && option.category === 'Commercial/Business Premium Use') {
+                return total + (option.netCost || 0);
+            }
+            return total;
+        }, 0);
+        const newDownPaymentNetCost = this.selectedNewOptions.reduce((total, optionId) => {
+            const option = this.availableAdditionalOptionsData.find(opt => opt.id === optionId);
+            if (option && option.category === 'Down Payment Protection') {
+                return total + (option.netCost || 0);
+            }
+            return total;
+        }, 0);
+
         return {
             existingOptionsPrice,
             newOptionsPrice,
@@ -3314,6 +3338,15 @@ export default class DealerPortalGap extends LightningElement {
             formattedExistingDownPaymentPrice: this.formatPrice(existingDownPaymentPrice),
             formattedNewCommercialPrice: this.formatPrice(newCommercialPrice),
             formattedNewDownPaymentPrice: this.formatPrice(newDownPaymentPrice),
+            // Net cost (base price) per category
+            existingCommercialNetCost,
+            existingDownPaymentNetCost,
+            newCommercialNetCost,
+            newDownPaymentNetCost,
+            formattedExistingCommercialNetCost: this.formatPrice(existingCommercialNetCost),
+            formattedExistingDownPaymentNetCost: this.formatPrice(existingDownPaymentNetCost),
+            formattedNewCommercialNetCost: this.formatPrice(newCommercialNetCost),
+            formattedNewDownPaymentNetCost: this.formatPrice(newDownPaymentNetCost),
             // Counts
             existingCommercialCount,
             existingDownPaymentCount,

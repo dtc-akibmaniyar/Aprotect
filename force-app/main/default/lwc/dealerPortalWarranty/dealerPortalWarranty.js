@@ -2536,7 +2536,9 @@ export default class DealerPortalWarranty extends LightningElement {
                         id: option.id,
                         name: option.optionName || 'Unknown Option',
                         price: option.retailPrice || 0,
-                        formattedPrice: this.formatPrice(option.retailPrice || 0)
+                        formattedPrice: this.formatPrice(option.retailPrice || 0),
+                        netCost: option.netCost || 0,
+                        formattedNetCost: this.formatPrice(option.netCost || 0)
                     });
                 });
         }
@@ -2550,7 +2552,9 @@ export default class DealerPortalWarranty extends LightningElement {
                         id: option.id,
                         name: option.optionName || 'Unknown Option',
                         price: option.retailPrice || option.netCost || 0,
-                        formattedPrice: this.formatPrice(option.retailPrice || option.netCost || 0)
+                        formattedPrice: this.formatPrice(option.retailPrice || option.netCost || 0),
+                        netCost: option.netCost || 0,
+                        formattedNetCost: this.formatPrice(option.netCost || 0)
                     });
                 }
             });
