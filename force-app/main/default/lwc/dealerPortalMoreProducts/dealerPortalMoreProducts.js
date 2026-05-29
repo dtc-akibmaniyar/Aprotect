@@ -377,12 +377,12 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             packageClass: pkgClass,
             vehicleClassLength: vehicleClass.length,
             packageClassLength: pkgClass.length,
-            isSelectable: vehicleClass === pkgClass,
+            isSelectable: vehicleClass.toLowerCase() === pkgClass.toLowerCase(),
             vehicleClassCharCodes: vehicleClass.split('').map(c => c.charCodeAt(0)),
             packageClassCharCodes: pkgClass.split('').map(c => c.charCodeAt(0))
         });
         
-        return vehicleClass === pkgClass;
+        return vehicleClass.toLowerCase() === pkgClass.toLowerCase();
     }
     
     // Get package status for display

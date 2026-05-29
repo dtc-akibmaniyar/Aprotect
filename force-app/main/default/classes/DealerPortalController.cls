@@ -1251,8 +1251,8 @@ continue;
                     
 
                     if (!isTireRimRequest && term.Dealer_Package_Tier__c == null) {
-filteredByTier++;
-                        continue;
+                        // Allow tier-less terms to proceed - they will be grouped under the package ID
+                        filteredByTier++;
                     }
 
                     Boolean isEligible = false;
@@ -4061,7 +4061,8 @@ return false;
 
 
         if (String.isBlank(vehicleYear) || vehicleOdometer == null) {
-return false;
+            // Vehicle data incomplete - treat term as eligible until vehicle is fully populated
+            return true;
         }
         
 
@@ -4111,46 +4112,37 @@ return false;
 
 
 
-        if (term.Mileage__c == null) {
-return false;
+        if (term.Mileage__c != null) {
+            Decimal termMileageKM = term.Mileage__c;
+            if (String.isNotBlank(term.Mileage_Unit__c) && term.Mileage_Unit__c.equalsIgnoreCase('Miles')) {
+                termMileageKM = term.Mileage__c * 1.60934;
+            }
+            if (vehicleOdometerKM > termMileageKM) {
+                return false;
+            }
         }
-        
-
-        Decimal termMileageKM = term.Mileage__c;
-        if (String.isNotBlank(term.Mileage_Unit__c) && term.Mileage_Unit__c.equalsIgnoreCase('Miles')) {
-            termMileageKM = term.Mileage__c * 1.60934;
-}
-        
-
-        if (vehicleOdometerKM > termMileageKM) {
-return false;
-        }
+        // null Mileage__c = no mileage restriction
         
 
 
 
 
-        if (term.ByYear__c == null) {
-return false;
+        if (term.ByYear__c != null && term.ByYear__c > 0) {
+            Integer vehicleAge;
+            try {
+                Integer vehicleYearInt = Integer.valueOf(vehicleYear);
+                vehicleAge = Date.today().year() - vehicleYearInt;
+            } catch (Exception e) {
+                return false;
+            }
+            if (vehicleAge < 0) {
+                return false;
+            }
+            if (vehicleAge > term.ByYear__c) {
+                return false;
+            }
         }
-        
-
-        Integer vehicleAge;
-        try {
-            Integer vehicleYearInt = Integer.valueOf(vehicleYear);
-            vehicleAge = Date.today().year() - vehicleYearInt;
-        } catch (Exception e) {
-return false;
-        }
-        
-
-        if (vehicleAge < 0) {
-return false;
-        }
-        
-        if (vehicleAge > term.ByYear__c) {
-return false;
-        }
+        // null ByYear__c = no year restriction
 return true;
         
     } catch (Exception e) {
