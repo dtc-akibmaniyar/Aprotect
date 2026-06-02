@@ -585,7 +585,7 @@ public without sharing class DealerPortalMonerisIntegrationServices {
      * Retrieves the available dealer credit for the account associated with
      * the given Remittance Form. Called by the LWC to display the credit balance.
      */
-    @AuraEnabled(cacheable=true)
+    @AuraEnabled(cacheable=false)
     public static Decimal getDealerAvailableCredit(String recordId) {
         if (String.isBlank(recordId)) {
             return 0;
@@ -610,7 +610,25 @@ public without sharing class DealerPortalMonerisIntegrationServices {
                 LIMIT 1
             ];
 
-            return dealer.Total_Available_Credit__c != null ? dealer.Total_Available_Credit__c : 0;
+            Decimal baseAvailable = dealer.Total_Available_Credit__c != null
+                ? dealer.Total_Available_Credit__c : 0;
+
+            // Subtract all completed Dealer Credit payments for this dealer.
+            // Account.Applied_Credit__c is managed by a DLRS rollup of
+            // Remittance_Form__c.Discount_Amount__c (discounts only), so it does
+            // not include Dealer Credit payments.  We compute the real available
+            // credit by also subtracting those payment amounts.
+            AggregateResult[] dcPayments = [
+                SELECT SUM(Amount__c) total
+                FROM Payment__c
+                WHERE Remittance_Form__r.Dealer_Name__c = :rf.Dealer_Name__c
+                  AND RecordType.DeveloperName = 'Dealer_Credit'
+                  AND Payment_Confirmation_Status__c IN ('Transaction Completed', 'Deposit Completed')
+            ];
+            Decimal totalDCApplied = dcPayments != null && dcPayments[0].get('total') != null
+                ? (Decimal) dcPayments[0].get('total') : 0;
+
+            return baseAvailable - totalDCApplied;
         } catch (Exception e) {
             System.debug('Error fetching dealer credit: ' + e.getMessage());
             return 0;
@@ -697,11 +715,9 @@ public without sharing class DealerPortalMonerisIntegrationServices {
             creditPayment.Payment_Confirmation_Status__c = 'Transaction Completed';
             update creditPayment;
 
-            // ── Update Account credit fields ──────────────────────────────────────
-            Decimal currentApplied = dealerAccount.Applied_Credit__c != null
-                ? dealerAccount.Applied_Credit__c : 0;
-            dealerAccount.Applied_Credit__c = currentApplied + paymentAmount;
-            update dealerAccount;
+            // NOTE: Account.Applied_Credit__c is managed by DLRS (sums Discount_Amount__c).
+            // Dealer credit payment deduction is handled in getDealerAvailableCredit()
+            // by querying completed Dealer_Credit Payment__c amounts.
 
             // Junction linking and status cascade are handled automatically by flows:
             // 1. Update_Remittance_Line_Item_Junction (on Payment__c Create):

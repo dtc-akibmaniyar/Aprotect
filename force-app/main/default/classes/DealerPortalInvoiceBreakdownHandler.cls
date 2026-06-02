@@ -78,7 +78,22 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                                                       form.RecordType.DeveloperName == 'Allocation_Remittance';
             result.totalCredit     = form.Dealer_Name__r?.Total_Credit_Amount__c   != null ? form.Dealer_Name__r.Total_Credit_Amount__c   : 0;
             result.appliedCredit   = form.Dealer_Name__r?.Applied_Credit__c         != null ? form.Dealer_Name__r.Applied_Credit__c         : 0;
-            result.availableCredit = form.Dealer_Name__r?.Total_Available_Credit__c != null ? form.Dealer_Name__r.Total_Available_Credit__c : 0;
+            // Base available credit from Account formula
+            Decimal baseAvailable = form.Dealer_Name__r?.Total_Available_Credit__c != null ? form.Dealer_Name__r.Total_Available_Credit__c : 0;
+            // Subtract completed Dealer Credit payments (not tracked by DLRS rollup)
+            if (form.Dealer_Name__c != null) {
+                AggregateResult[] dcPayments = [
+                    SELECT SUM(Amount__c) total
+                    FROM Payment__c
+                    WHERE Remittance_Form__r.Dealer_Name__c = :form.Dealer_Name__c
+                      AND RecordType.DeveloperName = 'Dealer_Credit'
+                      AND Payment_Confirmation_Status__c IN ('Transaction Completed', 'Deposit Completed')
+                ];
+                Decimal totalDCApplied = dcPayments != null && dcPayments[0].get('total') != null
+                    ? (Decimal) dcPayments[0].get('total') : 0;
+                baseAvailable -= totalDCApplied;
+            }
+            result.availableCredit = baseAvailable;
 
             // Friendly service labels
             if (result.isAllocationRemittance == true && String.isNotBlank(form.Services_To_Pay__c)) {

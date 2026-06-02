@@ -78,18 +78,19 @@ export default class DealerPortalCreatePayment extends LightningElement {
     @track monerisObjectInfo;
     @track picklistError;
 
-    // Wire to get dealer available credit
-    _wiredCreditResult;
-
-    @wire(getDealerAvailableCredit, { recordId: '$recordId' })
-    wiredDealerCredit(result) {
-        this._wiredCreditResult = result;
-        if (result.data !== undefined) {
-            this.dealerAvailableCredit = result.data;
-        } else if (result.error) {
-            console.error('Error fetching dealer credit:', result.error);
+    // Fetch dealer credit imperatively (not cached) to always get fresh data
+    async fetchDealerCredit() {
+        try {
+            const credit = await getDealerAvailableCredit({ recordId: this.recordId });
+            this.dealerAvailableCredit = credit !== undefined ? credit : 0;
+        } catch (error) {
+            console.error('Error fetching dealer credit:', error);
             this.dealerAvailableCredit = 0;
         }
+    }
+
+    connectedCallback() {
+        this.fetchDealerCredit();
     }
 
     @wire(getObjectInfo, { objectApiName: PAYMENT_OBJECT })
@@ -514,8 +515,6 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 // Immediately update local balance (DLRS rollup is async)
                 this.remittanceFormAmount = Math.max(0, (this.remittanceFormAmount || 0) - (this.chequeAmount || 0));
                 this.paymentAmount = this.remittanceFormAmount;
-                setTimeout(() => { notifyRecordUpdateAvailable([{ recordId: this.recordId }]); }, 3000);
-
                 this.showToast('Success', 'Cheque details submitted successfully', 'success');
                 this.dispatchEvent(new CustomEvent('chequesubmitted', {
                     detail: {
@@ -530,10 +529,11 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 }));
                 this.showChequeModal = false;
                 this.resetChequeForm();
-                // Refresh the record data
-                notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
-                // Notify all sibling components via LMS
+                // Notify sibling components via LMS
                 this.publishPaymentUpdate('cheque');
+                // Single delayed refresh for DLRS rollup + flow updates
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                setTimeout(() => { notifyRecordUpdateAvailable([{ recordId: this.recordId }]); }, 4000);
             } else {
                 this.showToast('Error', result?.errorMessage || 'Failed to save cheque details', 'error');
             }
@@ -635,8 +635,6 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 // Immediately update local balance (DLRS rollup is async)
                 this.remittanceFormAmount = Math.max(0, (this.remittanceFormAmount || 0) - (this.eTransferAmount || 0));
                 this.paymentAmount = this.remittanceFormAmount;
-                setTimeout(() => { notifyRecordUpdateAvailable([{ recordId: this.recordId }]); }, 3000);
-
                 this.showToast('Success', 'E-Transfer details submitted successfully', 'success');
                 this.dispatchEvent(new CustomEvent('etransfersubmitted', {
                     detail: {
@@ -651,10 +649,11 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 }));
                 this.showETransferModal = false;
                 this.resetETransferForm();
-                // Refresh the record data
-                notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
-                // Notify all sibling components via LMS
+                // Notify sibling components via LMS
                 this.publishPaymentUpdate('eTransfer');
+                // Single delayed refresh for DLRS rollup + flow updates
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                setTimeout(() => { notifyRecordUpdateAvailable([{ recordId: this.recordId }]); }, 4000);
             } else {
                 this.showToast('Error', result?.errorMessage || 'Failed to save E-Transfer details', 'error');
             }
@@ -738,10 +737,6 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 // Immediately update local balance (DLRS rollup is async)
                 this.remittanceFormAmount = Math.max(0, (this.remittanceFormAmount || 0) - (this.dealerCreditAmount || 0));
                 this.paymentAmount = this.remittanceFormAmount;
-                // Delayed refresh to pick up DLRS rollup update
-                // eslint-disable-next-line @lwc/lwc/no-async-operation
-                setTimeout(() => { notifyRecordUpdateAvailable([{ recordId: this.recordId }]); }, 3000);
-
                 this.showToast('Success', 'Dealer credit applied successfully', 'success');
                 this.dispatchEvent(new CustomEvent('dealercreditapplied', {
                     detail: {
@@ -754,12 +749,14 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 }));
                 this.showDealerCreditModal = false;
                 this.dealerCreditNotes = '';
-                // Refresh the record data
-                notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
-                // Refresh dealer credit balance
-                refreshApex(this._wiredCreditResult);
-                // Notify all sibling components via LMS
+                // Notify sibling components via LMS
                 this.publishPaymentUpdate('dealerCredit');
+                // Single delayed refresh for DLRS rollup + flow updates
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                setTimeout(() => {
+                    notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
+                    this.fetchDealerCredit();
+                }, 4000);
             } else {
                 this.showToast('Error', result?.errorMessage || 'Failed to apply dealer credit', 'error');
             }
@@ -837,13 +834,11 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 this.dispatchEvent(new CustomEvent('paymentprocessed', { detail: result }));
                 this.showPaymentModal = false;
                 this.cardData = null;
-                // Refresh the record data
-                notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
-                // Delayed refresh to pick up DLRS rollup update
-                // eslint-disable-next-line @lwc/lwc/no-async-operation
-                setTimeout(() => { notifyRecordUpdateAvailable([{ recordId: this.recordId }]); }, 3000);
-                // Notify all sibling components via LMS
+                // Notify sibling components via LMS
                 this.publishPaymentUpdate('creditCard');
+                // Single delayed refresh for DLRS rollup + flow updates
+                // eslint-disable-next-line @lwc/lwc/no-async-operation
+                setTimeout(() => { notifyRecordUpdateAvailable([{ recordId: this.recordId }]); }, 4000);
             } else {
                 this.showToast('Error', result?.errorMessage || 'Payment processing failed', 'error');
             }

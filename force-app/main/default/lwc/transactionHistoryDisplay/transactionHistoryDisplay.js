@@ -74,14 +74,11 @@ export default class TransactionHistoryDisplay extends NavigationMixin(Lightning
         // Only react to messages for our remittance form
         if (message.remittanceFormId !== this.recordId) return;
 
-        // Immediate refresh
-        this.refreshTransactions();
-
-        // Delayed polls to catch flow-driven updates (junction status, date stamps)
+        // Single delayed refresh to catch flow-driven updates
+        // Avoids multiple visible refreshes that cause UI flickering
         this._pollTimers.forEach(t => clearTimeout(t));
         this._pollTimers = [
-            setTimeout(() => this.refreshTransactions(), 3000),
-            setTimeout(() => this.refreshTransactions(), 6000)
+            setTimeout(() => this.refreshTransactions(), 4000)
         ];
     }
 
