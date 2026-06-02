@@ -772,6 +772,92 @@ public without sharing class ApplicationSummaryController {
         return response;
     }
 
+    /**
+     * @description Generate and attach a versioned PDF for a single package record type.
+     * Called from the per-package PDF button on the summary page.
+     */
+    @AuraEnabled
+    public static PDFResponse generatePDFForPackageRecordType(Id applicationId, String recordTypeName) {
+        PDFResponse response = new PDFResponse();
+
+        try {
+            if (String.isBlank(recordTypeName)) {
+                recordTypeName = '';
+            }
+
+            // ── VERSION TRACKING ──
+            String todayStr = Date.today().year() + '-' +
+                              String.valueOf(Date.today().month()).leftPad(2, '0') + '-' +
+                              String.valueOf(Date.today().day()).leftPad(2, '0');
+
+            String rtLabel = resolvePackageRecordTypeLabel(recordTypeName);
+            String rtSuffix = (String.isBlank(rtLabel) ? 'All' : rtLabel).replaceAll('[^A-Za-z0-9_\\-]', '_');
+            String prefix = rtSuffix + '_' + todayStr + '_v';
+
+            Integer maxVersion = 0;
+            List<ContentDocumentLink> existingLinks = [
+                SELECT ContentDocument.Title
+                FROM ContentDocumentLink
+                WHERE LinkedEntityId = :applicationId
+            ];
+            for (ContentDocumentLink cdl : existingLinks) {
+                String title = cdl.ContentDocument.Title;
+                if (title != null && title.startsWith(prefix)) {
+                    String vStr = title.substring(prefix.length());
+                    try {
+                        Integer v = Integer.valueOf(vStr);
+                        if (v > maxVersion) {
+                            maxVersion = v;
+                        }
+                    } catch (Exception ex) {
+                        // not a version number, skip
+                    }
+                }
+            }
+
+            PageReference pdfPage = Page.DealerPortalVehicleApplicationPDFs;
+            pdfPage.getParameters().put('id', applicationId);
+            if (String.isNotBlank(recordTypeName)) {
+                pdfPage.getParameters().put('rt', recordTypeName);
+            }
+            pdfPage.getParameters().put('sfdc.override', '1');
+            pdfPage.getParameters().put('core.apexpages.request.devconsole', '1');
+
+            Blob pdfBlob;
+            if (Test.isRunningTest()) {
+                pdfBlob = Blob.valueOf('Test PDF Content for Application: ' + applicationId + ' RT: ' + recordTypeName);
+            } else {
+                pdfBlob = pdfPage.getContentAsPDF();
+            }
+
+            Integer nextVersion = maxVersion + 1;
+            String versionedTitle = rtSuffix + '_' + todayStr + '_v' + nextVersion;
+            String versionedFileName = versionedTitle + '.pdf';
+
+            ContentVersion cv = new ContentVersion();
+            cv.Title = versionedTitle;
+            cv.PathOnClient = versionedFileName;
+            cv.VersionData = pdfBlob;
+            cv.FirstPublishLocationId = applicationId;
+            cv.IsMajorVersion = true;
+            insert cv;
+
+            ContentVersion inserted = [SELECT Id, ContentDocumentId FROM ContentVersion WHERE Id = :cv.Id LIMIT 1];
+
+            response.success = true;
+            response.message = 'PDF generated successfully for ' + (String.isBlank(rtLabel) ? 'All' : rtLabel);
+            response.attachmentId = inserted.ContentDocumentId;
+            response.fileName = versionedFileName;
+
+        } catch (Exception e) {
+            response.success = false;
+            response.message = 'Error generating PDF: ' + e.getMessage();
+            System.debug('PDF Generation Error (single RT): ' + e.getMessage() + ' | Stack: ' + e.getStackTraceString());
+        }
+
+        return response;
+    }
+
     // Map record type name/developer name to label for filenames
     private static String resolvePackageRecordTypeLabel(String rtName) {
         if (String.isBlank(rtName)) {

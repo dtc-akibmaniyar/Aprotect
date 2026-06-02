@@ -267,6 +267,16 @@
           </div>
         </div>
 
+        <!-- PDF Generation Spinner Overlay -->
+        <template if:true={generatingPdfRecordType}>
+          <div class="pdf-generating-overlay">
+            <div class="pdf-generating-content">
+              <lightning-spinner alternative-text="Generating PDF" size="medium"></lightning-spinner>
+              <p class="pdf-generating-text">Generating PDF...</p>
+            </div>
+          </div>
+        </template>
+
         <!-- WARRANTY PACKAGES Section -->
         <template if:true={summaryData.applicationPackages}>
           <template for:each={summaryData.applicationPackages} for:item="recordTypeWrapper">
@@ -274,11 +284,17 @@
               <div class="package-section" key={packageWrapper.packageHeaderName}>
                 <div class="package-header">
                     {packageWrapper.packageHeaderName}
-                    <template if:false={isLocked}>
-                        <button class="edit-section-btn edit-section-btn--dark" data-recordtype={recordTypeWrapper.recordTypeName} onclick={handleEditSection} title="Edit this package">
-                            <lightning-icon icon-name="utility:edit" size="x-small"></lightning-icon>
+                    <div class="package-header-actions">
+                        <button class="package-pdf-btn" data-recordtype={recordTypeWrapper.recordTypeName} onclick={handlePackagePdf} title="Generate PDF for this package">
+                            <lightning-icon icon-name="utility:pdf_ext" size="x-small"></lightning-icon>
+                            <span>PDF</span>
                         </button>
-                    </template>
+                        <template if:false={isLocked}>
+                            <button class="edit-section-btn edit-section-btn--dark" data-recordtype={recordTypeWrapper.recordTypeName} onclick={handleEditSection} title="Edit this package">
+                                <lightning-icon icon-name="utility:edit" size="x-small"></lightning-icon>
+                            </button>
+                        </template>
+                    </div>
                 </div>
                 
                 <div class="package-content">
@@ -366,11 +382,6 @@
             >SAVE AS QUOTE</button>
             </template>
             
-            <button
-              class="generate-pdf-button"
-              onclick={handleCreatePdf}
-              disabled={isBusy}
-            >GENERATE PDF</button>
             <button
               class="preview-pdf-button"
               onclick={handlePreviewPdf}

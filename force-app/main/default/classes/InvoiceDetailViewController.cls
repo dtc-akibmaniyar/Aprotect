@@ -177,6 +177,14 @@ public without sharing class InvoiceDetailViewController {
             pd.addOnsTotal   = pkg.Add_Ons_Price__c != null ? pkg.Add_Ons_Price__c : 0;
             pd.hasBreakdown  = pd.addOnsTotal > 0;
 
+            // Tax breakdown
+            pd.basePriceWithoutTax = pkg.Contract_Cost_Price_Without_Tax__c != null ? pkg.Contract_Cost_Price_Without_Tax__c : 0;
+            pd.taxPercentage = pkg.Tax_Percentage__c != null ? pkg.Tax_Percentage__c : 0;
+            Decimal costWithTax = pkg.Contract_Cost_Price__c != null ? pkg.Contract_Cost_Price__c : 0;
+            Decimal costWithoutTax = pd.basePriceWithoutTax;
+            pd.taxAmount = costWithTax - costWithoutTax;
+            pd.hasTax = pd.taxPercentage > 0 || pd.taxAmount > 0;
+
             // Additional options
             pd.additionalOptions = new List<OptionData>();
             if (pkgToOptions.containsKey(pkg.Id)) {
@@ -516,6 +524,11 @@ public without sharing class InvoiceDetailViewController {
         @AuraEnabled public Decimal addOnsTotal;
         @AuraEnabled public Boolean hasBreakdown;
         @AuraEnabled public List<OptionData> additionalOptions;
+        // Tax breakdown fields
+        @AuraEnabled public Decimal basePriceWithoutTax;
+        @AuraEnabled public Decimal taxPercentage;
+        @AuraEnabled public Decimal taxAmount;
+        @AuraEnabled public Boolean hasTax;
     }
 
     public class LineItemData {

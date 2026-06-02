@@ -96,11 +96,12 @@ public without sharing class DealerPortalMonerisIntegrationServices {
      * Creates a Payment__c record to log every Moneris attempt (success or failure).
      * Returns the Id of the inserted record so it can be linked to junction records.
      *
-     * NOTE: For SUCCEEDED card payments, Payment_Confirmation_Status__c is intentionally
-     * left null here. The Update_Remittance_Line_Item_Junction flow (on Payment__c Create)
-     * first links the junction records and then sets 'Transaction Completed', ensuring the
-     * downstream Makr_Remittance_Line_Items_Junction_Records_Paid flow fires only after
-     * the Payment__c → Junction relationship is already established.
+     * NOTE: For SUCCEEDED payments, uses 2-step DML (mirrors Dealer Credit pattern):
+     * Step 1: INSERT with Payment_Confirmation_Status__c = 'Payment Initiated'
+     *   → Update_Remittance_Line_Item_Junction flow links junction records.
+     * Step 2: UPDATE to Payment_Confirmation_Status__c = 'Transaction Completed'
+     *   → Makr_Remittance_Line_Items_Junction_Records_Paid flow fires AFTER
+     *     junctions are linked, ensuring the paid cascade works correctly.
      */
     private static String logMonerisHistory(
         String status,
@@ -155,12 +156,24 @@ public without sharing class DealerPortalMonerisIntegrationServices {
             // Mark non-succeeded attempts immediately so the flow can identify failures
             if (!status.equalsIgnoreCase('SUCCEEDED')) {
                 h.Payment_Confirmation_Status__c = 'Failed Payment';
+            } else {
+                // SUCCEEDED payments: use 2-step DML pattern (mirrors Dealer Credit).
+                // Step 1: Insert with 'Payment Initiated' so the
+                // Update_Remittance_Line_Item_Junction flow links junction records
+                // WITHOUT triggering the paid cascade yet.
+                h.Payment_Confirmation_Status__c = 'Payment Initiated';
             }
-            // SUCCEEDED card payments: Payment_Confirmation_Status__c remains null here.
-            // The Update_Remittance_Line_Item_Junction flow sets it to 'Transaction Completed'
-            // after linking junction records, ensuring the paid cascade fires in the right order.
 
             insert(h);
+
+            // Step 2: For SUCCEEDED payments, update to 'Transaction Completed' in a
+            // separate DML so that the Makr_Remittance_Line_Items_Junction_Records_Paid
+            // flow fires AFTER junctions are already linked.
+            if (status.equalsIgnoreCase('SUCCEEDED')) {
+                h.Payment_Confirmation_Status__c = 'Transaction Completed';
+                update h;
+            }
+
             return h.Id;
         } catch (Exception ex) {
             // Swallow logging exceptions — never let logging break the payment flow
@@ -396,13 +409,12 @@ public without sharing class DealerPortalMonerisIntegrationServices {
             // ── Business updates on SUCCEEDED ─────────────────────────────────────
             if (response != null && response.paymentStatus != null && response.paymentStatus.equalsIgnoreCase('SUCCEEDED')) {
                 response.success = true;
-                // Junction linking and status cascade are handled automatically by flows:
-                // 1. Update_Remittance_Line_Item_Junction (on Payment__c Create):
-                //    Sets Junction.Payment__c = this Payment Id, then sets
-                //    Payment_Confirmation_Status__c = 'Transaction Completed'.
-                // 2. Makr_Remittance_Line_Items_Junction_Records_Paid (on Payment__c Update):
-                //    Detects the status change and calls PaymentStatusInvocable to mark
-                //    junctions, invoice line items, and invoices as Paid.
+                // Junction linking and status cascade are handled by 2-step DML in logMonerisHistory:
+                // 1. INSERT with 'Payment Initiated' → Update_Remittance_Line_Item_Junction
+                //    flow links Junction.Payment__c = this Payment Id.
+                // 2. UPDATE to 'Transaction Completed' → Makr_Remittance_Line_Items_Junction_Records_Paid
+                //    flow fires PaymentStatusInvocable to mark junctions, invoice line items,
+                //    and invoices as Paid (junctions are already linked at this point).
             } else {
                 if (response == null) {
                     // Already logged as UNKNOWN; ensure outward response has the failure flag
@@ -667,6 +679,8 @@ public without sharing class DealerPortalMonerisIntegrationServices {
             creditPayment.Date_Time__c                  = DateTime.now();
             creditPayment.Amount__c                     = paymentAmount;
             creditPayment.Payment_Confirmation_Status__c = 'Payment Initiated'; // insert with initial status first
+            creditPayment.Payment_Status__c             = 'SUCCEEDED'; // required by Update_Remittance_Line_Item_Junction flow decision
+            creditPayment.Status_Code__c                = '201';
             creditPayment.Notes__c                      = String.isBlank(notes) ? 'Dealer Credit Applied' : notes;
             creditPayment.Transaction_Reference__c      = 'DC-' + String.valueOf(recordId).substring(0, 15);
 

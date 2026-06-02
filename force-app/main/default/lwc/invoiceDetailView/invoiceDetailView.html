@@ -164,6 +164,24 @@
                             </div>
                         </div>
 
+                        <!-- Tax Breakdown -->
+                        <template if:true={pkg.hasTax}>
+                            <div class="tax-breakdown">
+                                <div class="tax-breakdown-row">
+                                    <span class="tax-breakdown-label">Base Price:</span>
+                                    <span class="tax-breakdown-value">{pkg.formattedBasePriceWithoutTax}</span>
+                                </div>
+                                <div class="tax-breakdown-row">
+                                    <span class="tax-breakdown-label">Tax ({pkg.taxPercentageDisplay}%):</span>
+                                    <span class="tax-breakdown-value">{pkg.formattedTaxAmount}</span>
+                                </div>
+                                <div class="tax-breakdown-row tax-breakdown-total">
+                                    <span class="tax-breakdown-label">Total:</span>
+                                    <span class="tax-breakdown-value">{pkg.formattedTotalWithTax}</span>
+                                </div>
+                            </div>
+                        </template>
+
                         <!-- Price Breakdown (if add-ons exist) -->
                         <template if:true={pkg.hasBreakdown}>
                             <div class="price-breakdown">

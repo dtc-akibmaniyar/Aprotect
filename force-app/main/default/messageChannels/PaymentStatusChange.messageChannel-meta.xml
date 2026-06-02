@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningMessageChannel xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Cross-component notification when payment status changes. Published by dealerPortalCreatePayment after successful payment. Subscribed by transactionHistoryDisplay and dealerPortalInvoiceBreakDown for real-time refresh.</description>
+    <isExposed>true</isExposed>
+    <lightningMessageFields>
+        <description>The Remittance Form record ID</description>
+        <fieldName>remittanceFormId</fieldName>
+    </lightningMessageFields>
+    <lightningMessageFields>
+        <description>PAYMENT_COMPLETED | PAYMENT_FAILED | STATUS_CHANGED</description>
+        <fieldName>action</fieldName>
+    </lightningMessageFields>
+    <lightningMessageFields>
+        <description>creditCard | cheque | eTransfer | dealerCredit</description>
+        <fieldName>paymentMethod</fieldName>
+    </lightningMessageFields>
+    <lightningMessageFields>
+        <description>Event timestamp for dedup</description>
+        <fieldName>timestamp</fieldName>
+    </lightningMessageFields>
+    <masterLabel>Payment Status Change</masterLabel>
+</LightningMessageChannel>

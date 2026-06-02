@@ -109,6 +109,7 @@ public without sharing class InvoiceDetailPDFController {
                        Contract_Start_Date__c, Contract_End_Date__c,
                        RecordType.Name,
                        Contract_Cost_Price__c,
+                       Contract_Cost_Price_Without_Tax__c,
                        Contract_Premium_Price__c,
                        Contract_Premium_Price_Without_Tax__c,
                        Tax_Amount__c,
@@ -139,6 +140,13 @@ public without sharing class InvoiceDetailPDFController {
                     ? pkgToOptions.get(pkg.Id)
                     : new List<OptionWrapper>();
 
+                // Tax breakdown
+                row.basePriceWithoutTax = pkg.Contract_Cost_Price_Without_Tax__c != null ? pkg.Contract_Cost_Price_Without_Tax__c : 0;
+                row.taxPercentage = pkg.Tax_Percentage__c != null ? pkg.Tax_Percentage__c : 0;
+                Decimal costWithTax = pkg.Contract_Cost_Price__c != null ? pkg.Contract_Cost_Price__c : 0;
+                row.taxAmount = costWithTax - row.basePriceWithoutTax;
+                row.hasTax = row.taxPercentage > 0 || row.taxAmount > 0;
+
                 if (pkgMap.containsKey(pkg.Id)) {
                     Decimal displayPrice = pkgDisplayPrice.get(pkg.Id);
                     for (Invoice_Line_Item__c li : pkgMap.get(pkg.Id)) {
@@ -163,6 +171,11 @@ public without sharing class InvoiceDetailPDFController {
         public Decimal                     addOnsTotal   { get; set; }
         public Boolean                     hasBreakdown  { get; set; }
         public List<OptionWrapper>         options       { get; set; }
+        // Tax breakdown fields
+        public Decimal                     basePriceWithoutTax { get; set; }
+        public Decimal                     taxPercentage       { get; set; }
+        public Decimal                     taxAmount           { get; set; }
+        public Boolean                     hasTax              { get; set; }
     }
 
     public class LineItemWrapper {

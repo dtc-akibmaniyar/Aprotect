@@ -444,6 +444,48 @@
     vertical-align: middle;
 }
 
+/* ===== TAX BREAKDOWN ===== */
+.tax-breakdown {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #f0f7ff;
+    border: 1px solid #d0e3f7;
+    border-radius: 6px;
+    font-size: 11px;
+}
+
+.tax-breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    color: #555;
+}
+
+.tax-breakdown-row.tax-breakdown-total {
+    border-top: 1px solid #c0d6ec;
+    margin-top: 4px;
+    padding-top: 6px;
+    font-weight: 700;
+    color: #333;
+}
+
+.tax-breakdown-label {
+    font-weight: 500;
+}
+
+.tax-breakdown-value {
+    font-weight: 600;
+    color: #333;
+    min-width: 70px;
+    text-align: right;
+}
+
+.tax-breakdown-row.tax-breakdown-total .tax-breakdown-value {
+    color: #5184B8;
+    font-weight: 700;
+}
+
 /* ===== FOOTER ===== */
 .invoice-footer {
     display: flex;

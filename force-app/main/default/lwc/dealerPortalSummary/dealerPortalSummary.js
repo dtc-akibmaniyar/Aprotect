@@ -9,6 +9,7 @@ import getApplicationSummaryData from '@salesforce/apex/ApplicationSummaryContro
 import getApplicationPackageData from '@salesforce/apex/ApplicationSummaryController.getApplicationPackageData';
 // Keep existing PDF flow: attach file via ApplicationSummaryController
 import generateAndAttachPDF from '@salesforce/apex/ApplicationSummaryController.generateAndAttachPDF';
+import generatePDFForPackageRecordType from '@salesforce/apex/ApplicationSummaryController.generatePDFForPackageRecordType';
 // Create invoice on application submit
 import createInvoiceOnApplicationSubmit from '@salesforce/apex/ApplicationSummaryController.createInvoiceOnApplicationSubmit';
 // Update application status
@@ -22,6 +23,7 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     
     @track loading = false;
     @track isBusy = false;
+    @track generatingPdfRecordType = null;
 
     // Initialize summaryData with all nested objects to prevent undefined errors
     @track summaryData = {
@@ -351,6 +353,47 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
 
     handleCreatePdf() {
         return this.handleClick();
+    }
+
+    async handlePackagePdf(event) {
+        const recordTypeName = event.currentTarget.dataset.recordtype || '';
+        const appId = this.effectiveApplicationId;
+        console.log('📄 Package PDF requested for recordType:', recordTypeName);
+
+        if (!appId) {
+            this.showToast('Error', 'No Application ID available', 'error');
+            return;
+        }
+
+        this.isBusy = true;
+        this.generatingPdfRecordType = recordTypeName;
+        try {
+            const response = await generatePDFForPackageRecordType({
+                applicationId: appId,
+                recordTypeName: recordTypeName
+            });
+            console.log('📄 Package PDF response:', response);
+
+            if (!response?.success) {
+                throw new Error(response?.message || 'PDF generation failed');
+            }
+
+            this.showToast('Success', response.message || 'PDF Generated Successfully', 'success');
+
+            // Navigate to the generated PDF view
+            if (response.attachmentId) {
+                const baseUrl = 'https://' + location.host;
+                const fileUrl = baseUrl + '/dealerportal/sfc/servlet.shepherd/document/download/' + response.attachmentId + '?operationContext=S1';
+                window.open(fileUrl, '_blank');
+            }
+        } catch (error) {
+            console.error('❌ Package PDF error:', error);
+            const errorMessage = error?.body?.message || error?.message || 'PDF generation failed';
+            this.showToast('Error', errorMessage, 'error');
+        } finally {
+            this.isBusy = false;
+            this.generatingPdfRecordType = null;
+        }
     }
 
     handlePreviewPdf() {

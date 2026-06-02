@@ -146,6 +146,30 @@
                                 </div>
                             </div>
 
+                            <!-- Tax Breakdown -->
+                            <apex:outputPanel rendered="{!row.hasTax}" layout="none">
+                                <div style="margin-top:6px; padding:6px 10px; background:#f0f7ff; border:1px solid #d0e3f7; border-radius:3px; font-size:8px; color:#555;">
+                                    <div style="display:table; width:100%; margin-bottom:2px;">
+                                        <span style="display:table-cell; width:75%;">Base Price:</span>
+                                        <span style="display:table-cell; text-align:right; font-weight:600;">
+                                            <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!row.basePriceWithoutTax}"/></apex:outputText>
+                                        </span>
+                                    </div>
+                                    <div style="display:table; width:100%; margin-bottom:2px;">
+                                        <span style="display:table-cell; width:75%;">Tax (<apex:outputText value="{0,number,0.00}"><apex:param value="{!row.taxPercentage}"/></apex:outputText>%):</span>
+                                        <span style="display:table-cell; text-align:right; font-weight:600;">
+                                            <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!row.taxAmount}"/></apex:outputText>
+                                        </span>
+                                    </div>
+                                    <div style="display:table; width:100%; border-top:1px solid #c0d6ec; margin-top:3px; padding-top:3px;">
+                                        <span style="display:table-cell; width:75%; font-weight:700; color:#333;">Total:</span>
+                                        <span style="display:table-cell; text-align:right; font-weight:700; color:#5184B8;">
+                                            <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!row.basePriceWithoutTax + row.taxAmount}"/></apex:outputText>
+                                        </span>
+                                    </div>
+                                </div>
+                            </apex:outputPanel>
+
                             <!-- Price Breakdown (if add-ons exist) -->
                             <apex:outputPanel rendered="{!row.hasBreakdown}" layout="none">
                                 <div style="margin-top:6px; padding:6px 10px; background:#f8f9fa; border:1px solid #e9ecef; border-radius:3px; font-size:8px; color:#555;">

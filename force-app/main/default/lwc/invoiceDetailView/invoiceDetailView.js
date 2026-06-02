@@ -308,6 +308,12 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
                 formattedCostPrice: this.formatCurrency(opt.costPrice),
                 selectionType:     opt.selectionType
             })),
+            // Tax breakdown
+            hasTax: pkg.hasTax === true,
+            formattedBasePriceWithoutTax: this.formatCurrency(pkg.basePriceWithoutTax),
+            taxPercentageDisplay: pkg.taxPercentage != null ? parseFloat(pkg.taxPercentage).toFixed(2) : '0.00',
+            formattedTaxAmount: this.formatCurrency(pkg.taxAmount),
+            formattedTotalWithTax: this.formatCurrency((pkg.basePriceWithoutTax || 0) + (pkg.taxAmount || 0)),
             lineItems: (pkg.lineItems || []).map(li => ({
                 lineItemId:      li.lineItemId,
                 packageName:     pkg.packageName,

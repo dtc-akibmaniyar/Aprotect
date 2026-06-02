@@ -158,11 +158,16 @@ public with sharing class PaymentStatusInvocable {
         ];
 
         if (remittanceLineItemJunctionList.isEmpty()) {
-            // Nothing to do; update messages
+            // Defensive warning: 0 junctions for a completed payment may indicate a
+            // race condition where the Flow has not yet linked junctions to the Payment.
             for (Result r : results) {
                 if (r.paymentId != null && completedPaymentIds.contains(r.paymentId)) {
                     r.success = true;
                     r.message = 'No Remittance_Line_Item_Junction__c records found for Payment. No updates required.';
+                    System.debug(LoggingLevel.WARN, 'PaymentStatusInvocable.markPaid(): '
+                        + '0 junction records found for completed Payment ' + r.paymentId
+                        + '. This may indicate junction linking has not committed yet. '
+                        + 'Verify Update_Remittance_Line_Item_Junction flow executed before this invocable.');
                 }
             }
             return results;
@@ -372,7 +377,46 @@ public with sharing class PaymentStatusInvocable {
             }
         }
 
-        // 8) Credit stored — overpayment handling
+        // 8) Update Remittance Form status to Completed when all line items are paid
+        // This handles the case where the record-triggered flow doesn't re-fire due to
+        // transaction recursion limits when DLRS rollups update the form.
+        Set<Id> remittanceFormIds = new Set<Id>();
+        for (Remittance_Line_Item_Junction__c rlj : remittanceLineItemJunctionList) {
+            if (rlj.Payment__c != null) {
+                Payment__c pmt = paymentsByIdById.get(rlj.Payment__c);
+                if (pmt != null && pmt.Remittance_Form__c != null) {
+                    remittanceFormIds.add(pmt.Remittance_Form__c);
+                }
+            }
+        }
+
+        if (!remittanceFormIds.isEmpty()) {
+            List<Remittance_Form__c> formsToComplete = new List<Remittance_Form__c>();
+            for (Remittance_Form__c rf : [
+                SELECT Id, Status__c, Balance__c, Paid_Amount__c,
+                       Paid_Line_Items_Count__c, Planned_Line_Items_Count__c
+                FROM Remittance_Form__c
+                WHERE Id IN :remittanceFormIds
+                  AND Status__c != 'Completed'
+            ]) {
+                // Re-check conditions: all items paid and balance zero
+                if (rf.Paid_Amount__c != null && rf.Paid_Amount__c > 0
+                    && rf.Balance__c != null && rf.Balance__c <= 0
+                    && rf.Paid_Line_Items_Count__c != null
+                    && rf.Planned_Line_Items_Count__c != null
+                    && rf.Paid_Line_Items_Count__c >= rf.Planned_Line_Items_Count__c) {
+                    formsToComplete.add(new Remittance_Form__c(
+                        Id = rf.Id,
+                        Status__c = 'Completed'
+                    ));
+                }
+            }
+            if (!formsToComplete.isEmpty()) {
+                Database.update(formsToComplete, false);
+            }
+        }
+
+        // 9) Credit stored — overpayment handling
         // If a completed payment's Amount__c exceeds the remittance form's planned total,
         // the excess is stored as Credit_Stored__c on the Payment and a Credit__c record
         // of type 'Overpayment Credit' is created against the dealer account.
