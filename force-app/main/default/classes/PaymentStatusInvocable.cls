@@ -191,34 +191,100 @@ public with sharing class PaymentStatusInvocable {
             if (remittanceLineItemJunction.Invoice__c != null) invoiceIds.add(remittanceLineItemJunction.Invoice__c);
         }
 
-        // Map Invoice_Line_Item__c Id → amount paid (from junction Line_Item_Amount__c)
-        // Used to populate Invoice_Line_Item__c.Paid_Amount__c during the paid update.
+        // 2) Payment Allocation: sort junctions by amount ascending per payment,
+        //    mark as Paid only until payment amount is exhausted (lowest-first allocation).
+        //    Track which line items were actually paid for downstream updates.
+        Date today = Date.today();
+        Set<Id> paidLineItemIds = new Set<Id>(); // line items covered by payment
         Map<Id, Decimal> paidAmountByLineItemId = new Map<Id, Decimal>();
-        for (Remittance_Line_Item_Junction__c rlj : remittanceLineItemJunctionList) {
-            if (rlj.Invoice_Line_Item__c != null && rlj.Line_Item_Amount__c != null) {
-                paidAmountByLineItemId.put(rlj.Invoice_Line_Item__c, rlj.Line_Item_Amount__c);
+        List<Remittance_Line_Item_Junction__c> remittanceLineItemJunctionsToUpdate = new List<Remittance_Line_Item_Junction__c>();
+
+        for (Id paymentId : remittanceLineItemJunctionsByPaymentId.keySet()) {
+            Payment__c pmt = paymentsByIdById.get(paymentId);
+            Decimal paymentAmount = (pmt != null && pmt.Amount__c != null) ? pmt.Amount__c : 0;
+            Decimal remaining = paymentAmount;
+
+            // Invoice-level-first allocation: group junctions by invoice,
+            // sort invoices by total amount ascending, then try to pay whole
+            // invoices first. If remaining can't cover a whole invoice, try
+            // individual line items within it sorted by amount ascending.
+            List<Remittance_Line_Item_Junction__c> junctions = remittanceLineItemJunctionsByPaymentId.get(paymentId);
+
+            // Group by Invoice
+            Map<Id, List<Remittance_Line_Item_Junction__c>> jxByInv = new Map<Id, List<Remittance_Line_Item_Junction__c>>();
+            Map<Id, Decimal> invTotals = new Map<Id, Decimal>();
+            for (Remittance_Line_Item_Junction__c rlj : junctions) {
+                Id invId = rlj.Invoice__c;
+                if (invId == null) continue;
+                if (!jxByInv.containsKey(invId)) {
+                    jxByInv.put(invId, new List<Remittance_Line_Item_Junction__c>());
+                    invTotals.put(invId, 0);
+                }
+                jxByInv.get(invId).add(rlj);
+                Decimal amt = rlj.Line_Item_Amount__c != null ? rlj.Line_Item_Amount__c : 0;
+                invTotals.put(invId, invTotals.get(invId) + amt);
+            }
+
+            // Sort invoices by total amount ascending
+            List<InvoiceSortWrapper> sortedInvs = new List<InvoiceSortWrapper>();
+            for (Id invId : jxByInv.keySet()) {
+                sortedInvs.add(new InvoiceSortWrapper(invId, invTotals.get(invId)));
+            }
+            sortedInvs.sort();
+
+            for (InvoiceSortWrapper sw : sortedInvs) {
+                List<Remittance_Line_Item_Junction__c> invJx = jxByInv.get(sw.invoiceId);
+
+                // Collect unpaid junctions and their total
+                List<Remittance_Line_Item_Junction__c> unpaid = new List<Remittance_Line_Item_Junction__c>();
+                Decimal unpaidTotal = 0;
+                for (Remittance_Line_Item_Junction__c rlj : invJx) {
+                    if (rlj.Payment_Status__c != stringValue(PAYMENT_STATUS.PAID)) {
+                        unpaid.add(rlj);
+                        unpaidTotal += (rlj.Line_Item_Amount__c != null ? rlj.Line_Item_Amount__c : 0);
+                    }
+                }
+                if (unpaid.isEmpty()) continue;
+
+                if (remaining >= unpaidTotal && unpaidTotal > 0) {
+                    // Pay the entire invoice
+                    for (Remittance_Line_Item_Junction__c rlj : unpaid) {
+                        Decimal amt = rlj.Line_Item_Amount__c != null ? rlj.Line_Item_Amount__c : 0;
+                        remaining -= amt;
+                        remittanceLineItemJunctionsToUpdate.add(new Remittance_Line_Item_Junction__c(
+                            Id = rlj.Id,
+                            Payment_Status__c = stringValue(PAYMENT_STATUS.PAID),
+                            Paid_Date__c = (rlj.Paid_Date__c == null ? today : rlj.Paid_Date__c)
+                        ));
+                        if (rlj.Invoice_Line_Item__c != null) {
+                            paidLineItemIds.add(rlj.Invoice_Line_Item__c);
+                            paidAmountByLineItemId.put(rlj.Invoice_Line_Item__c, amt);
+                        }
+                    }
+                } else {
+                    // Can't pay whole invoice — try individual line items
+                    unpaid.sort(new RLJAmountComparator());
+                    for (Remittance_Line_Item_Junction__c rlj : unpaid) {
+                        Decimal amt = rlj.Line_Item_Amount__c != null ? rlj.Line_Item_Amount__c : 0;
+                        if (remaining >= amt && amt > 0) {
+                            remaining -= amt;
+                            remittanceLineItemJunctionsToUpdate.add(new Remittance_Line_Item_Junction__c(
+                                Id = rlj.Id,
+                                Payment_Status__c = stringValue(PAYMENT_STATUS.PAID),
+                                Paid_Date__c = (rlj.Paid_Date__c == null ? today : rlj.Paid_Date__c)
+                            ));
+                            if (rlj.Invoice_Line_Item__c != null) {
+                                paidLineItemIds.add(rlj.Invoice_Line_Item__c);
+                                paidAmountByLineItemId.put(rlj.Invoice_Line_Item__c, amt);
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // 2) Prepare RLJ updates: mark as Paid with today&#39;s date if not already
-        Date today = Date.today();
-        List<Remittance_Line_Item_Junction__c> remittanceLineItemJunctionsToUpdate = new List<Remittance_Line_Item_Junction__c>();
-        for (Remittance_Line_Item_Junction__c remittanceLineItemJunction : remittanceLineItemJunctionList) {
-            if (remittanceLineItemJunction.Payment_Status__c != stringValue(PAYMENT_STATUS.PAID)) {
-                Remittance_Line_Item_Junction__c updateRecord = new Remittance_Line_Item_Junction__c(
-                    Id = remittanceLineItemJunction.Id,
-                    Payment_Status__c = stringValue(PAYMENT_STATUS.PAID),
-                    Paid_Date__c = (remittanceLineItemJunction.Paid_Date__c == null ? today : remittanceLineItemJunction.Paid_Date__c)
-                );
-                remittanceLineItemJunctionsToUpdate.add(updateRecord);
-            } else if (remittanceLineItemJunction.Paid_Date__c == null) {
-                Remittance_Line_Item_Junction__c updateRecord = new Remittance_Line_Item_Junction__c(
-                    Id = remittanceLineItemJunction.Id,
-                    Paid_Date__c = today
-                );
-                remittanceLineItemJunctionsToUpdate.add(updateRecord);
-            }
-        }
+        // Narrow invoiceLineItemIds to only those actually paid
+        invoiceLineItemIds.retainAll(paidLineItemIds);
 
         Database.SaveResult[] remittanceLineItemJunctionSaveResults = new Database.SaveResult[0];
         if (!remittanceLineItemJunctionsToUpdate.isEmpty()) {
@@ -535,6 +601,39 @@ public with sharing class PaymentStatusInvocable {
             if (ok.contains(i)) n++;
         }
         return n;
+    }
+
+    /**
+     * Wrapper for sorting invoices by total amount ascending.
+     */
+    private class InvoiceSortWrapper implements Comparable {
+        public Id invoiceId;
+        public Decimal totalAmount;
+        public InvoiceSortWrapper(Id iId, Decimal tAmt) {
+            this.invoiceId = iId;
+            this.totalAmount = tAmt;
+        }
+        public Integer compareTo(Object other) {
+            InvoiceSortWrapper o = (InvoiceSortWrapper) other;
+            Decimal a2 = this.totalAmount != null ? this.totalAmount : 0;
+            Decimal b2 = o.totalAmount != null ? o.totalAmount : 0;
+            if (a2 < b2) return -1;
+            if (a2 > b2) return 1;
+            return 0;
+        }
+    }
+
+    /**
+     * Comparator to sort Remittance_Line_Item_Junction__c by Line_Item_Amount__c ascending
+     */
+    private class RLJAmountComparator implements Comparator<Remittance_Line_Item_Junction__c> {
+        public Integer compare(Remittance_Line_Item_Junction__c a, Remittance_Line_Item_Junction__c b) {
+            Decimal amtA = a.Line_Item_Amount__c != null ? a.Line_Item_Amount__c : 0;
+            Decimal amtB = b.Line_Item_Amount__c != null ? b.Line_Item_Amount__c : 0;
+            if (amtA < amtB) return -1;
+            if (amtA > amtB) return 1;
+            return 0;
+        }
     }
 
     private static Map<Id, Integer> countSuccessByPayment(Database.SaveResult[] srs, List<Remittance_Line_Item_Junction__c> updates, Map<Id, List<Remittance_Line_Item_Junction__c>> rljByPayment) {

@@ -1285,4 +1285,57 @@ public without sharing class ApplicationSummaryController {
         return result;
     }
 
+
+    /**
+     * @description Generate and attach a Quote PDF showing ALL packages with QUOTE watermark.
+     * File naming: Quote_{YYYY-MM-DD}_v{N}.pdf
+     */
+    @AuraEnabled
+    public static PDFResponse generateQuotePDF(Id applicationId) {
+        PDFResponse response = new PDFResponse();
+        try {
+            String todayStr = Date.today().year() + '-' +
+                              String.valueOf(Date.today().month()).leftPad(2, '0') + '-' +
+                              String.valueOf(Date.today().day()).leftPad(2, '0');
+            String prefix = 'Quote_' + todayStr + '_v';
+            Integer maxVersion = 0;
+            List<ContentDocumentLink> existingLinks = [
+                SELECT ContentDocument.Title FROM ContentDocumentLink WHERE LinkedEntityId = :applicationId
+            ];
+            for (ContentDocumentLink cdl : existingLinks) {
+                String title = cdl.ContentDocument.Title;
+                if (title != null && title.startsWith(prefix)) {
+                    String vStr = title.substring(prefix.length());
+                    try { Integer v = Integer.valueOf(vStr); if (v > maxVersion) maxVersion = v; } catch (Exception ex) { }
+                }
+            }
+            PageReference pdfPage = Page.QuotePDF;
+            pdfPage.getParameters().put('id', applicationId);
+            Blob pdfBlob;
+            if (Test.isRunningTest()) {
+                pdfBlob = Blob.valueOf('Test Quote PDF for: ' + applicationId);
+            } else {
+                pdfBlob = pdfPage.getContentAsPDF();
+            }
+            Integer nextVersion = maxVersion + 1;
+            String versionedTitle = 'Quote_' + todayStr + '_v' + nextVersion;
+            ContentVersion cv = new ContentVersion();
+            cv.Title = versionedTitle;
+            cv.PathOnClient = versionedTitle + '.pdf';
+            cv.VersionData = pdfBlob;
+            cv.FirstPublishLocationId = applicationId;
+            cv.IsMajorVersion = true;
+            insert cv;
+            ContentVersion inserted = [SELECT Id, ContentDocumentId FROM ContentVersion WHERE Id = :cv.Id LIMIT 1];
+            response.success = true;
+            response.message = 'Quote PDF generated successfully';
+            response.attachmentId = inserted.ContentDocumentId;
+            response.fileName = versionedTitle + '.pdf';
+        } catch (Exception e) {
+            response.success = false;
+            response.message = 'Error generating Quote PDF: ' + e.getMessage();
+        }
+        return response;
+    }
+
 }

@@ -29,6 +29,25 @@ export default class DealerActionBoard extends NavigationMixin(LightningElement)
 
     // Tab state
     activeTab = 'aprotect';
+
+    connectedCallback() {
+        this.loadUnpaidAppCount();
+    }
+
+    async loadUnpaidAppCount() {
+        try {
+            const apps = await getUnpaidApplications();
+            this.unpaidAppCount = (apps || []).length;
+        } catch (err) {
+            console.error('Error loading unpaid app count:', err);
+            this.unpaidAppCount = 0;
+        }
+    }
+
+    get unpaidAppCountLabel() {
+        if (this.unpaidAppCount === 1) return '1 application pending';
+        return this.unpaidAppCount + ' applications pending';
+    }
     
     // Modal states
     @track showNewQuoteModal = false;
@@ -41,6 +60,9 @@ export default class DealerActionBoard extends NavigationMixin(LightningElement)
     @track selectedAppIds = [];
     @track isLoadingApplications = false;
     @track isCreatingRemittance = false;
+
+    // Unpaid application count (loaded on init for badge)
+    @track unpaidAppCount = 0;
 
     // Company notices
     companyNotices = [];
@@ -253,6 +275,10 @@ export default class DealerActionBoard extends NavigationMixin(LightningElement)
 
     get selectedCount() {
         return this.selectedAppIds.length;
+    }
+
+    get totalAppCount() {
+        return this.unpaidApplications.length;
     }
 
     get remittanceFormTotalFormatted() {

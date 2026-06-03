@@ -555,3 +555,120 @@
     opacity: 0.5;
     cursor: default;
 }
+
+/* Payment tile badge */
+.tile-payment {
+    position: relative;
+}
+
+.payment-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #e53935;
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(229, 57, 53, 0.4);
+    line-height: 1;
+}
+
+.payment-subtitle {
+    font-size: 10px;
+    font-weight: 600;
+    color: #5184B7;
+    margin-top: -4px;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+/* Select All label in modal header */
+.rf-select-all-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+}
+
+.rf-header-separator {
+    color: rgba(255,255,255,0.4);
+    font-weight: 300;
+    margin: 0 2px;
+}
+
+/* Selection Summary Bar */
+.rf-selection-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    margin-top: 12px;
+    background: linear-gradient(135deg, #eef4fb 0%, #e8f0f8 100%);
+    border: 1px solid #b8d4f5;
+    border-radius: 8px;
+}
+
+.rf-summary-left {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 13px;
+    color: #444;
+}
+
+.rf-summary-count {
+    font-weight: 700;
+    color: #0070d2;
+    font-size: 15px;
+}
+
+.rf-summary-count-label {
+    font-weight: 500;
+}
+
+.rf-summary-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rf-summary-total-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.rf-summary-total-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0070d2;
+}
+
+/* Scrollable rows inside table */
+.rf-table-rows-scroll {
+    overflow-y: auto;
+    max-height: 45vh;
+}
+
+/* Ensure modal content doesn't scroll — only the rows area scrolls */
+.make-payment-modal-content {
+    overflow-y: hidden !important;
+    flex: unset !important;
+}
+
+/* Selection summary is outside scroll, always visible */
+.rf-selection-summary {
+    flex-shrink: 0;
+    margin: 0;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 14px 28px;
+}

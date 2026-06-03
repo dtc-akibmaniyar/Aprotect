@@ -19,12 +19,37 @@
                             <p class="services-label">Services: {invoiceData.selectedServiceLabels}</p>
                         </template>
                     </div>
-                    <lightning-button
-                        variant="brand"
-                        label="Download PDF"
-                        icon-name="utility:download"
-                        onclick={handleDownloadPDF}>
-                    </lightning-button>
+                    <div class="header-actions">
+                        <template if:true={invoiceData.canModifyInvoices}>
+                            <lightning-button
+                                variant="neutral"
+                                label="Add Invoice"
+                                icon-name="utility:add"
+                                onclick={handleOpenAddInvoice}
+                                class="slds-m-right_small">
+                            </lightning-button>
+                        </template>
+                        <lightning-button
+                            variant="brand"
+                            label="Download PDF"
+                            icon-name="utility:download"
+                            onclick={handleDownloadPDF}>
+                        </lightning-button>
+                    </div>
+                </div>
+
+                <!-- Info Banner -->
+                <div class="info-banner">
+                    <lightning-icon icon-name="utility:info" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                    <div class="info-banner-text">
+                        <p>Invoices are sorted by amount (lowest first). Payments are allocated starting from the lowest amount invoice.</p>
+                        <template if:true={invoiceData.canModifyInvoices}>
+                            <p>You can add or remove invoices before initiating a payment. Once a payment has been initiated, invoices cannot be added or removed.</p>
+                        </template>
+                        <template if:true={invoiceData.hasPayments}>
+                            <p>A payment has been initiated. Invoices can no longer be added or removed.</p>
+                        </template>
+                    </div>
                 </div>
 
                 <!-- Remittance Form Details -->
@@ -100,6 +125,9 @@
                                 <th class="col-service">TIRE AND RIM</th>
                                 <th class="col-service">LOAN PROTECTION</th>
                                 <th class="col-subtotal">SUB-TOTAL</th>
+                                <template if:true={invoiceData.canModifyInvoices}>
+                                    <th class="col-actions">ACTIONS</th>
+                                </template>
                             </tr>
                         </thead>
                         <tbody>
@@ -200,6 +228,22 @@
                                     </td>
 
                                     <td class="col-subtotal">{row.formattedSubTotal}</td>
+
+                                    <template if:true={invoiceData.canModifyInvoices}>
+                                        <td class="col-actions">
+                                            <template if:true={row.canRemove}>
+                                                <lightning-button-icon
+                                                    icon-name="utility:delete"
+                                                    alternative-text="Remove invoice"
+                                                    variant="bare"
+                                                    size="small"
+                                                    data-id={row.id}
+                                                    onclick={handleRemoveInvoice}
+                                                    class="remove-btn">
+                                                </lightning-button-icon>
+                                            </template>
+                                        </td>
+                                    </template>
                                 </tr>
                             </template>
                         </tbody>
@@ -231,6 +275,9 @@
                                     </template>
                                 </td>
                                 <td class="col-subtotal"></td>
+                                <template if:true={invoiceData.canModifyInvoices}>
+                                    <td class="col-actions"></td>
+                                </template>
                             </tr>
                             <!-- Row 2: service counts aligned under their columns -->
                             <tr class="footer-count-row">
@@ -251,6 +298,9 @@
                                     </template>
                                 </td>
                                 <td class="col-subtotal"></td>
+                                <template if:true={invoiceData.canModifyInvoices}>
+                                    <td class="col-actions"></td>
+                                </template>
                             </tr>
                         </tfoot>
                     </table>
@@ -300,5 +350,69 @@
                 <p>No invoice data available.</p>
             </div>
         </template>
+    </template>
+
+    <!-- Add Invoice Modal -->
+    <template if:true={showAddInvoiceModal}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <lightning-button-icon
+                        icon-name="utility:close"
+                        alternative-text="Close"
+                        class="slds-modal__close"
+                        onclick={handleCloseAddInvoice}>
+                    </lightning-button-icon>
+                    <h2 class="slds-modal__title">Add Invoice to Remittance</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <template if:true={isLoadingAvailable}>
+                        <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+                    </template>
+                    <template if:false={isLoadingAvailable}>
+                        <template if:true={availableInvoices.length}>
+                            <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                                <thead>
+                                    <tr>
+                                        <th>Invoice</th>
+                                        <th>Application</th>
+                                        <th>Customer</th>
+                                        <th>Vehicle</th>
+                                        <th>Amount</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template for:each={availableInvoices} for:item="inv">
+                                        <tr key={inv.id}>
+                                            <td>{inv.invoiceName}</td>
+                                            <td>{inv.applicationNumber}</td>
+                                            <td>{inv.customerName}</td>
+                                            <td>{inv.vehicleInfo}</td>
+                                            <td>{inv.formattedAmount}</td>
+                                            <td>
+                                                <lightning-button
+                                                    variant="brand"
+                                                    label="Add"
+                                                    data-id={inv.id}
+                                                    onclick={handleSelectInvoice}>
+                                                </lightning-button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </template>
+                        <template if:false={availableInvoices.length}>
+                            <p class="slds-text-align_center slds-p-around_medium">No available invoices found.</p>
+                        </template>
+                    </template>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Cancel" onclick={handleCloseAddInvoice}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
     </template>
 </template>

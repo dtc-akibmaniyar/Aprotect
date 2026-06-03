@@ -1,8 +1,12 @@
 import { LightningElement, track, api, wire } from 'lwc';
 import { refreshApex } from 'lightning/uiRecordApi';
 import { NavigationMixin } from 'lightning/navigation';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getApplicationStatus from '@salesforce/apex/DealerPortalController.getApplicationStatus';
 import convertApplicationToQuote from '@salesforce/apex/DealerPortalController.convertApplicationToQuote';
+import convertQuoteToApplication from '@salesforce/apex/DealerPortalController.convertQuoteToApplication';
+import generateQuotePDF from '@salesforce/apex/QuotePDFGeneratorService.generateQuotePDF';
+import communityBasePath from '@salesforce/community/basePath';
 
 /**
  * 🔓 TAB LOCKING TEMPORARILY DISABLED
@@ -22,6 +26,9 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     @track applicationLockDate = null;
     // @track isApplicationLocked = false;
     applicationPaymentStatus = null;
+    @track showConvertToAppModal = false;
+    @track isConvertingToApp = false;
+    @track isGeneratingQuotePDF = false;
     
     // Removed @wire decorator - using imperative approach instead for better cache control
     
@@ -288,6 +295,11 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     handleSummaryComplete() {
         console.log('✅ Summary tab completed');
         this.markTabAsCompleted('summary');
+    }
+
+    // Computed property: show convert button when status is Quote
+    get showConvertToApplicationButton() {
+        return this.applicationStatus === 'Quote' && !this.isApplicationLocked;
     }
 
     // Computed properties for tab classes with completion status and locking
@@ -814,6 +826,87 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
                 pageName: 'quotes'
             }
         });
+    }
+
+    
+    // Computed property: show generate quote PDF button when status is Quote
+    get showGenerateQuotePDFButton() {
+        return this.applicationStatus === 'Quote';
+    }
+
+    // Handle Generate Quote PDF button click
+    async handleGenerateQuotePDF() {
+        if (!this._applicationId || this.isGeneratingQuotePDF) return;
+        this.isGeneratingQuotePDF = true;
+        try {
+            const contentVersionId = await generateQuotePDF({ applicationId: this._applicationId });
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Success',
+                message: 'Quote PDF generated successfully',
+                variant: 'success'
+            }));
+            // Open the generated PDF in a new browser tab (community-safe URL)
+            if (contentVersionId) {
+                let basePath = communityBasePath || '';
+                // Remove trailing /s from community base path — servlet URLs don't use it
+                basePath = basePath.replace(/\/s$/, '');
+                const downloadUrl = basePath + '/sfc/servlet.shepherd/version/download/' + contentVersionId;
+                window.open(downloadUrl, '_blank');
+            }
+        } catch (err) {
+            const msg = (err && err.body && err.body.message) || err.message || JSON.stringify(err);
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Error generating Quote PDF',
+                message: msg,
+                variant: 'error'
+            }));
+        } finally {
+            this.isGeneratingQuotePDF = false;
+        }
+    }
+
+// Convert to Application handlers
+    handleConvertToApplication() {
+        this.showConvertToAppModal = true;
+    }
+
+    handleCloseConvertToAppModal() {
+        this.showConvertToAppModal = false;
+    }
+
+    async handleContinueConvertToApp() {
+        if (!this._applicationId) return;
+        this.isConvertingToApp = true;
+        try {
+            const result = await convertQuoteToApplication({ applicationId: this._applicationId });
+            if (result.success) {
+                console.log('✅ Quote converted to Application');
+                // Update local status immediately
+                this.applicationStatus = 'Draft';
+                this.showConvertToAppModal = false;
+                
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Success',
+                    message: 'Quote converted to application successfully',
+                    variant: 'success'
+                }));
+                
+                // Reload application status to ensure fresh data
+                await this.loadApplicationStatus();
+            } else {
+                throw new Error(result.message || 'Failed to convert quote');
+            }
+        } catch (err) {
+            const msg = (err && err.body && err.body.message) || err.message || JSON.stringify(err);
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Error converting quote',
+                message: msg,
+                variant: 'error'
+            }));
+            console.error('Error converting quote to application', err);
+        } finally {
+            this.isConvertingToApp = false;
+        }
     }
 
     handleGapNavigate(event) {

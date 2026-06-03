@@ -65,6 +65,28 @@
                     Summary
                 </button>
             </div>
+
+            <!-- Generate Quote PDF button -->
+            <template if:true={showGenerateQuotePDFButton}>
+                <button class="generate-quote-pdf-btn" onclick={handleGenerateQuotePDF} disabled={isGeneratingQuotePDF}>
+                    <template if:true={isGeneratingQuotePDF}>
+                        Generating PDF...
+                    </template>
+                    <template if:false={isGeneratingQuotePDF}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 6px; vertical-align: middle;">
+                            <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M14 2V8H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Generate Quote PDF
+                    </template>
+                </button>
+            </template>
+            <!-- Convert to Application button -->
+            <template if:true={showConvertToApplicationButton}>
+                <button class="convert-to-app-btn" onclick={handleConvertToApplication}>
+                    Convert to Application
+                </button>
+            </template>
         </div>
 
         <!-- Tab Content -->
@@ -138,5 +160,34 @@
                 ></c-dealer-portal-summary>
             </div>
         </div>
+
+        <!-- Convert to Application Modal -->
+        <template if:true={showConvertToAppModal}>
+            <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="modal-heading-convert-app" class="slds-modal slds-fade-in-open">
+                <div class="slds-modal__container convert-modal">
+                    <button class="modal-close-btn" onclick={handleCloseConvertToAppModal} aria-label="Close">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M18 6L6 18M6 6L18 18" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <div class="slds-p-left_medium slds-p-right_medium slds-p-top_medium">
+                        <h2 id="modal-heading-convert-app" class="modal-title">Convert to Application</h2>
+                    </div>
+                    <div class="slds-p-left_medium slds-p-right_medium">
+                        <p class="convert-message">
+                            Would you like to convert this quote to an application?<br/><br/>
+                            All quote details will be preserved. You will be able to fill in customer details and submit the application.
+                        </p>
+                    </div>
+                    <div class="slds-p-left_medium slds-p-right_medium slds-p-top_medium slds-p-bottom_medium">
+                        <button class="modal-btn-continue slds-p-around_x-small" onclick={handleContinueConvertToApp} disabled={isConvertingToApp}>
+                            <template if:true={isConvertingToApp}>Converting…</template>
+                            <template if:false={isConvertingToApp}>Convert to Application</template>
+                        </button>
+                    </div>
+                </div>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open" onclick={handleCloseConvertToAppModal}></div>
+        </template>
     </div>
 </template>

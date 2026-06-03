@@ -1,10 +1,14 @@
 import { LightningElement, api, wire, track } from 'lwc';
 import { CurrentPageReference, NavigationMixin } from 'lightning/navigation';
+import { notifyRecordUpdateAvailable } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { subscribe, unsubscribe, MessageContext } from 'lightning/messageService';
 import PAYMENT_STATUS_CHANNEL from '@salesforce/messageChannel/PaymentStatusChange__c';
 import getInvoiceBreakdown from '@salesforce/apex/DealerPortalInvoiceBreakdownHandler.getInvoiceBreakdown';
 import downloadRemittanceFormPDF from '@salesforce/apex/DealerPortalRemittanceHandler.downloadRemittanceFormPDF';
+import removeInvoiceFromRemittance from '@salesforce/apex/DealerPortalInvoiceBreakdownHandler.removeInvoiceFromRemittance';
+import getAvailableInvoicesForRemittance from '@salesforce/apex/DealerPortalInvoiceBreakdownHandler.getAvailableInvoicesForRemittance';
+import addInvoiceToRemittance from '@salesforce/apex/DealerPortalInvoiceBreakdownHandler.addInvoiceToRemittance';
 
 // Maps a line-item name to one of three service column keys
 const SERVICE_COLS = [
@@ -18,6 +22,11 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
     @track isLoading = true;
     @track invoiceData = null;
     @track error = null;
+
+    // Add Invoice modal state
+    @track showAddInvoiceModal = false;
+    @track availableInvoices = [];
+    @track isLoadingAvailable = false;
 
     _dataLoaded = false;
 
@@ -116,6 +125,9 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
         // Track tax percentages to compute weighted average
         const colTaxPctWeighted = { warranty: 0, tireRim: 0, loanProtection: 0 };
 
+        const hasPayments = result.hasPayments === true;
+        const invoiceCount = (result.invoices || []).length;
+
         const tableRows = (result.invoices || []).map((invoice, idx) => {
             const cols = this._mapServiceCols(invoice.lineItems || []);
 
@@ -136,7 +148,7 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
             return {
                 id:              invoice.id,
                 invoiceName:     invoice.invoiceName || invoice.applicationNumber,
-                rowIndex:        idx + 1,
+                rowIndex:        invoice.rowIndex || (idx + 1),
                 customerName:    invoice.customerName || '',
                 vehicleInfo:     invoice.vehicleInfo  || '',
                 vin:             invoice.vin           || '',
@@ -145,7 +157,8 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
                 warranty:        cols.warranty       ? this._colCell(cols.warranty)       : null,
                 tireRim:         cols.tireRim        ? this._colCell(cols.tireRim)        : null,
                 loanProtection:  cols.loanProtection ? this._colCell(cols.loanProtection) : null,
-                formattedSubTotal: this._fmt(subtotal)
+                formattedSubTotal: this._fmt(subtotal),
+                canRemove: !hasPayments && invoiceCount > 1
             };
         });
 
@@ -181,6 +194,8 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
             statusBadgeClass:                     this._remittanceStatusClass(result.status),
             isAllocationRemittance:               result.isAllocationRemittance === true,
             selectedServiceLabels:                result.selectedServiceLabels || '',
+            hasPayments,
+            canModifyInvoices: !hasPayments,
             tableRows,
             invoiceCount:           tableRows.length,
             warrantyColTotal:       this._fmt(colTotals.warranty),
@@ -303,6 +318,74 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
                 actionName:    'view'
             }
         });
+    }
+
+    // ─── Remove Invoice ───────────────────────────────────────────────
+
+    async handleRemoveInvoice(event) {
+        const invoiceId = event.currentTarget.dataset.id;
+        if (!invoiceId) return;
+        try {
+            this.isLoading = true;
+            await removeInvoiceFromRemittance({
+                remittanceFormId: this.recordId,
+                invoiceId: invoiceId
+            });
+            this.showToast('Success', 'Invoice removed from remittance', 'success');
+            await this.loadInvoiceData();
+            // Notify LDS cache so sibling components (e.g. payment) refresh Balance__c
+            notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
+        } catch (error) {
+            this.showToast('Error', error.body?.message || 'Error removing invoice', 'error');
+            this.isLoading = false;
+        }
+    }
+
+    // ─── Add Invoice Modal ────────────────────────────────────────────
+
+    async handleOpenAddInvoice() {
+        this.showAddInvoiceModal = true;
+        this.isLoadingAvailable = true;
+        try {
+            const invoices = await getAvailableInvoicesForRemittance({
+                remittanceFormId: this.recordId
+            });
+            this.availableInvoices = (invoices || []).map(inv => ({
+                ...inv,
+                formattedAmount: this._fmt(inv.amount || 0)
+            }));
+        } catch (error) {
+            this.showToast('Error', error.body?.message || 'Error loading available invoices', 'error');
+            this.availableInvoices = [];
+        } finally {
+            this.isLoadingAvailable = false;
+        }
+    }
+
+    handleCloseAddInvoice() {
+        this.showAddInvoiceModal = false;
+        this.availableInvoices = [];
+    }
+
+    async handleSelectInvoice(event) {
+        const invoiceId = event.currentTarget.dataset.id;
+        if (!invoiceId) return;
+        try {
+            this.isLoadingAvailable = true;
+            await addInvoiceToRemittance({
+                remittanceFormId: this.recordId,
+                invoiceId: invoiceId
+            });
+            this.showToast('Success', 'Invoice added to remittance', 'success');
+            this.showAddInvoiceModal = false;
+            this.availableInvoices = [];
+            await this.loadInvoiceData();
+            // Notify LDS cache so sibling components (e.g. payment) refresh Balance__c
+            notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
+        } catch (error) {
+            this.showToast('Error', error.body?.message || 'Error adding invoice', 'error');
+            this.isLoadingAvailable = false;
+        }
     }
 
     // ─── PDF Download ─────────────────────────────────────────────────

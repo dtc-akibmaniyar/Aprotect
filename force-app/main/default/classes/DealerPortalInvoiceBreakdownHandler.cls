@@ -301,6 +301,19 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                 invoiceRecords.add(invRecord);
             }
 
+            // Sort invoices by total payable amount ascending (lowest first)
+            invoiceRecords.sort(new InvoiceAmountComparator());
+            // Re-number rows after sorting
+            for (Integer i = 0; i < invoiceRecords.size(); i++) {
+                invoiceRecords[i].rowIndex = i + 1;
+            }
+
+            // Check if payments exist for this remittance
+            Integer paymentCount = [
+                SELECT COUNT() FROM Payment__c WHERE Remittance_Form__c = :remittanceFormId LIMIT 1
+            ];
+            result.hasPayments = paymentCount > 0;
+
             result.invoices = invoiceRecords;
             result.success  = true;
             return result;
@@ -331,6 +344,156 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
     }
 
     // ── Wrapper classes ───────────────────────────────────────────────────────
+    // ── Remove Invoice from Remittance ────────────────────────────────
+    @AuraEnabled
+    public static void removeInvoiceFromRemittance(String remittanceFormId, String invoiceId) {
+        if (String.isBlank(remittanceFormId) || String.isBlank(invoiceId)) {
+            throw new AuraHandledException('Remittance Form ID and Invoice ID are required');
+        }
+        // Check no payments exist
+        Integer paymentCount = [SELECT COUNT() FROM Payment__c WHERE Remittance_Form__c = :remittanceFormId LIMIT 1];
+        if (paymentCount > 0) {
+            throw new AuraHandledException('Cannot remove invoices after a payment has been initiated');
+        }
+        // Must keep at least 1 invoice
+        Integer invoiceCount = [SELECT COUNT() FROM Invoice__c WHERE Remittance_Form__c = :remittanceFormId];
+        // Also count via junctions for allocation remittances
+        Set<Id> junctionInvoiceIds = new Set<Id>();
+        for (Remittance_Line_Item_Junction__c j : [
+            SELECT Invoice__c FROM Remittance_Line_Item_Junction__c
+            WHERE Remittance_Form__c = :remittanceFormId AND Invoice__c != null
+        ]) {
+            junctionInvoiceIds.add(j.Invoice__c);
+        }
+        Integer totalInvoices = Math.max(invoiceCount, junctionInvoiceIds.size());
+        if (totalInvoices <= 1) {
+            throw new AuraHandledException('Cannot remove the last invoice from a remittance');
+        }
+        // Delete junction records for this invoice on this remittance
+        List<Remittance_Line_Item_Junction__c> junctions = [
+            SELECT Id FROM Remittance_Line_Item_Junction__c
+            WHERE Remittance_Form__c = :remittanceFormId AND Invoice__c = :invoiceId
+        ];
+        if (!junctions.isEmpty()) {
+            delete junctions;
+        }
+        // Clear the Remittance_Form__c lookup on the invoice
+        update new Invoice__c(Id = invoiceId, Remittance_Form__c = null);
+    }
+
+    // ── Get Available Invoices for Remittance ─────────────────────────
+    @AuraEnabled
+    public static List<AvailableInvoice> getAvailableInvoicesForRemittance(String remittanceFormId) {
+        if (String.isBlank(remittanceFormId)) {
+            throw new AuraHandledException('Remittance Form ID is required');
+        }
+        // Check no payments exist
+        Integer paymentCount = [SELECT COUNT() FROM Payment__c WHERE Remittance_Form__c = :remittanceFormId LIMIT 1];
+        if (paymentCount > 0) {
+            throw new AuraHandledException('Cannot add invoices after a payment has been initiated');
+        }
+        // Get the dealer from the remittance form
+        Remittance_Form__c form = [SELECT Dealer_Name__c FROM Remittance_Form__c WHERE Id = :remittanceFormId LIMIT 1];
+        if (form.Dealer_Name__c == null) {
+            throw new AuraHandledException('Remittance Form has no dealer');
+        }
+        // Get invoice IDs already on this remittance
+        Set<Id> existingInvoiceIds = new Set<Id>();
+        for (Invoice__c inv : [SELECT Id FROM Invoice__c WHERE Remittance_Form__c = :remittanceFormId]) {
+            existingInvoiceIds.add(inv.Id);
+        }
+        for (Remittance_Line_Item_Junction__c j : [
+            SELECT Invoice__c FROM Remittance_Line_Item_Junction__c
+            WHERE Remittance_Form__c = :remittanceFormId AND Invoice__c != null
+        ]) {
+            existingInvoiceIds.add(j.Invoice__c);
+        }
+        // Query available invoices: same dealer, submitted applications, Due status, not on this remittance
+        List<Invoice__c> available = [
+            SELECT Id, Name, Application_Id__c, Customer_Name__c, Amount__c, Status__c,
+                   Vehicle_Year__c, Vehicle_Make__c, Vehicle_Model__c
+            FROM Invoice__c
+            WHERE Application__r.Dealer_Name__c = :form.Dealer_Name__c
+              AND Application__r.Application_Status__c = 'Submitted'
+              AND Status__c = 'Due'
+              AND Remittance_Form__c = null
+              AND Id NOT IN :existingInvoiceIds
+            ORDER BY Amount__c ASC
+            LIMIT 200
+        ];
+        List<AvailableInvoice> results = new List<AvailableInvoice>();
+        for (Invoice__c inv : available) {
+            AvailableInvoice ai = new AvailableInvoice();
+            ai.id = inv.Id;
+            ai.invoiceName = inv.Name;
+            ai.applicationNumber = inv.Application_Id__c;
+            ai.customerName = inv.Customer_Name__c;
+            ai.amount = inv.Amount__c;
+            List<String> vParts = new List<String>();
+            if (inv.Vehicle_Year__c != null) vParts.add(String.valueOf(inv.Vehicle_Year__c));
+            if (String.isNotBlank(inv.Vehicle_Make__c)) vParts.add(inv.Vehicle_Make__c);
+            if (String.isNotBlank(inv.Vehicle_Model__c)) vParts.add(inv.Vehicle_Model__c);
+            ai.vehicleInfo = String.join(vParts, ' ');
+            results.add(ai);
+        }
+        return results;
+    }
+
+    // ── Add Invoice to Remittance ─────────────────────────────────────
+    @AuraEnabled
+    public static void addInvoiceToRemittance(String remittanceFormId, String invoiceId) {
+        if (String.isBlank(remittanceFormId) || String.isBlank(invoiceId)) {
+            throw new AuraHandledException('Remittance Form ID and Invoice ID are required');
+        }
+        // Check no payments exist
+        Integer paymentCount = [SELECT COUNT() FROM Payment__c WHERE Remittance_Form__c = :remittanceFormId LIMIT 1];
+        if (paymentCount > 0) {
+            throw new AuraHandledException('Cannot add invoices after a payment has been initiated');
+        }
+        // Link the invoice to the remittance form
+        update new Invoice__c(Id = invoiceId, Remittance_Form__c = remittanceFormId);
+        // Create junction records for each line item
+        List<Invoice_Line_Item__c> lineItems = [
+            SELECT Id, Contract_Cost_Price__c FROM Invoice_Line_Item__c WHERE Invoice__c = :invoiceId AND Status__c != 'Paid'
+        ];
+        List<Remittance_Line_Item_Junction__c> junctions = new List<Remittance_Line_Item_Junction__c>();
+        for (Invoice_Line_Item__c ili : lineItems) {
+            Decimal displayPrice = ili.Contract_Cost_Price__c != null ? ili.Contract_Cost_Price__c : 0;
+            junctions.add(new Remittance_Line_Item_Junction__c(
+                Remittance_Form__c = remittanceFormId,
+                Invoice__c = invoiceId,
+                Invoice_Line_Item__c = ili.Id,
+                Line_Item_Amount__c = displayPrice,
+                Payment_Status__c = 'Planned'
+            ));
+        }
+        if (!junctions.isEmpty()) {
+            insert junctions;
+        }
+    }
+
+    // ── Comparator for sorting invoices by total amount ascending ─────
+    private class InvoiceAmountComparator implements Comparator<InvoiceRecord> {
+        public Integer compare(InvoiceRecord a, InvoiceRecord b) {
+            Decimal amtA = 0;
+            Decimal amtB = 0;
+            if (a.lineItems != null) {
+                for (LineItemRecord li : a.lineItems) {
+                    amtA += li.costPriceWithTax != null ? li.costPriceWithTax : 0;
+                }
+            }
+            if (b.lineItems != null) {
+                for (LineItemRecord li : b.lineItems) {
+                    amtB += li.costPriceWithTax != null ? li.costPriceWithTax : 0;
+                }
+            }
+            if (amtA < amtB) return -1;
+            if (amtA > amtB) return 1;
+            return 0;
+        }
+    }
+
+    // ── Wrapper classes ───────────────────────────────────────────────────────
     public class InvoiceBreakdownData {
         @AuraEnabled public List<InvoiceRecord> invoices;
         @AuraEnabled public Boolean success;
@@ -352,6 +515,7 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         @AuraEnabled public Decimal totalCredit;
         @AuraEnabled public Decimal appliedCredit;
         @AuraEnabled public Decimal availableCredit;
+        @AuraEnabled public Boolean hasPayments;
     }
 
     public class InvoiceRecord {
@@ -362,7 +526,17 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         @AuraEnabled public String vehicleInfo;
         @AuraEnabled public String vin;
         @AuraEnabled public String status;
+        @AuraEnabled public Integer rowIndex;
         @AuraEnabled public List<LineItemRecord> lineItems;
+    }
+
+    public class AvailableInvoice {
+        @AuraEnabled public String id;
+        @AuraEnabled public String invoiceName;
+        @AuraEnabled public String applicationNumber;
+        @AuraEnabled public String customerName;
+        @AuraEnabled public Decimal amount;
+        @AuraEnabled public String vehicleInfo;
     }
 
     public class LineItemRecord {

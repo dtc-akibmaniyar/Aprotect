@@ -35,11 +35,17 @@
             </button>
 
             <!-- MAKE A PAYMENT -->
-            <button class="tile" type="button" data-action="make-a-payment" onclick={handleClick}>
+            <button class="tile tile-payment" type="button" data-action="make-a-payment" onclick={handleClick}>
+                <template if:true={unpaidAppCount}>
+                    <span class="payment-badge">{unpaidAppCount}</span>
+                </template>
                 <div class="icon">
                     <img src={staticResources.makePayment} alt="Make A Payment" class="tile-image" />
                 </div>
                 <p>MAKE A PAYMENT</p>
+                <template if:true={unpaidAppCount}>
+                    <span class="payment-subtitle">{unpaidAppCountLabel}</span>
+                </template>
             </button>
 
             <!-- DEALER SUPPORT -->
@@ -116,71 +122,67 @@
                     </template>
                     <template if:false={isLoadingApplications}>
                         <template if:true={hasUnpaidApplications}>
-                            <!-- Table -->
+                            <!-- Fixed Table Header -->
                             <div class="rf-table">
-                                <!-- Column Headers -->
                                 <div class="rf-table-header">
                                     <div class="rf-col-app">
                                         <input type="checkbox" class="rf-select-all" checked={isAllAppsSelected} onchange={handleSelectAllApps} title="Select all" />
+                                        <span class="rf-select-all-label">Select All</span>
+                                        <span class="rf-header-separator">|</span>
                                         APPLICATION
                                     </div>
                                     <div class="rf-col-invoice">INVOICE DETAILS</div>
                                 </div>
 
-                                <!-- Application Rows -->
-                                <template for:each={applicationsWithSelection} for:item="app">
-                                    <div key={app.id} class="rf-table-row">
-                                        <!-- Left: Application info -->
-                                        <div class="rf-col-app rf-app-cell">
-                                            <div class="rf-app-id-row">
-                                                <input
-                                                    type="checkbox"
-                                                    class="rf-row-checkbox"
-                                                    data-id={app.id}
-                                                    checked={app.isSelected}
-                                                    onchange={handleAppCheckboxChange}
-                                                />
-                                                <span class="rf-label">Application ID #</span>
-                                                <span class="rf-value">{app.appNumber}</span>
-                                            </div>
-                                            <div class="rf-app-detail">
-                                                <span class="rf-label">Customer Name</span>
-                                                <span class="rf-value">{app.customerName}</span>
-                                            </div>
-                                            <div class="rf-app-detail">
-                                                <span class="rf-label">Vehicle Year/Make/Model/Trim</span>
-                                                <span class="rf-value">{app.vehicleInfo}</span>
-                                            </div>
-                                            <div class="rf-app-detail">
-                                                <span class="rf-label">VIN #</span>
-                                                <span class="rf-value">{app.vin}</span>
-                                            </div>
-                                        </div>
-                                        <!-- Right: Invoice details -->
-                                        <div class="rf-col-invoice rf-invoice-cell">
-                                            <template for:each={app.packages} for:item="pkg">
-                                                <div key={pkg.id} class="rf-invoice-line">
-                                                    <span class="rf-inv-label">{pkg.name}:</span>
-                                                    <span class="rf-inv-value">{pkg.formattedPrice}</span>
+                                <!-- Scrollable Application Rows -->
+                                <div class="rf-table-rows-scroll">
+                                    <template for:each={applicationsWithSelection} for:item="app">
+                                        <div key={app.id} class="rf-table-row">
+                                            <div class="rf-col-app rf-app-cell">
+                                                <div class="rf-app-id-row">
+                                                    <input
+                                                        type="checkbox"
+                                                        class="rf-row-checkbox"
+                                                        data-id={app.id}
+                                                        checked={app.isSelected}
+                                                        onchange={handleAppCheckboxChange}
+                                                    />
+                                                    <span class="rf-label">Application ID #</span>
+                                                    <span class="rf-value">{app.appNumber}</span>
                                                 </div>
-                                            </template>
-                                            <div class="rf-invoice-divider"></div>
-                                            <div class="rf-invoice-line">
-                                                <span class="rf-inv-label">Sub Total:</span>
-                                                <span class="rf-inv-value">{app.formattedSubTotal}</span>
+                                                <div class="rf-app-detail">
+                                                    <span class="rf-label">Customer Name</span>
+                                                    <span class="rf-value">{app.customerName}</span>
+                                                </div>
+                                                <div class="rf-app-detail">
+                                                    <span class="rf-label">Vehicle Year/Make/Model/Trim</span>
+                                                    <span class="rf-value">{app.vehicleInfo}</span>
+                                                </div>
+                                                <div class="rf-app-detail">
+                                                    <span class="rf-label">VIN #</span>
+                                                    <span class="rf-value">{app.vin}</span>
+                                                </div>
                                             </div>
-                                            <div class="rf-invoice-line rf-invoice-total">
-                                                <span class="rf-inv-label"><strong>Total:</strong></span>
-                                                <span class="rf-inv-value"><strong>{app.formattedTotal}</strong></span>
+                                            <div class="rf-col-invoice rf-invoice-cell">
+                                                <template for:each={app.packages} for:item="pkg">
+                                                    <div key={pkg.id} class="rf-invoice-line">
+                                                        <span class="rf-inv-label">{pkg.name}:</span>
+                                                        <span class="rf-inv-value">{pkg.formattedPrice}</span>
+                                                    </div>
+                                                </template>
+                                                <div class="rf-invoice-divider"></div>
+                                                <div class="rf-invoice-line">
+                                                    <span class="rf-inv-label">Sub Total:</span>
+                                                    <span class="rf-inv-value">{app.formattedSubTotal}</span>
+                                                </div>
+                                                <div class="rf-invoice-line rf-invoice-total">
+                                                    <span class="rf-inv-label"><strong>Total:</strong></span>
+                                                    <span class="rf-inv-value"><strong>{app.formattedTotal}</strong></span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </template>
-                            </div>
-
-                            <!-- Remittance Form Total -->
-                            <div class="rf-grand-total">
-                                <strong>Remittance Form Total: {remittanceFormTotalFormatted}</strong>
+                                    </template>
+                                </div>
                             </div>
                         </template>
                         <template if:false={hasUnpaidApplications}>
@@ -188,6 +190,20 @@
                         </template>
                     </template>
                 </div>
+
+                <!-- Sticky Selection Summary (outside scrollable content) -->
+                <template if:true={hasUnpaidApplications}>
+                    <div class="rf-selection-summary">
+                        <div class="rf-summary-left">
+                            <span class="rf-summary-count">{selectedCount}</span>
+                            <span class="rf-summary-count-label"> of {totalAppCount} applications selected</span>
+                        </div>
+                        <div class="rf-summary-right">
+                            <span class="rf-summary-total-label">Total Payment Amount:</span>
+                            <span class="rf-summary-total-value">{remittanceFormTotalFormatted}</span>
+                        </div>
+                    </div>
+                </template>
 
                 <!-- Footer -->
                 <div class="make-payment-modal-footer">

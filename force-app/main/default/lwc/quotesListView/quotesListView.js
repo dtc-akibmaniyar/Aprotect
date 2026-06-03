@@ -4,6 +4,9 @@ import { updateRecord } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getApplicationsList from '@salesforce/apex/QuotesListViewController.getQuotesList';
 import createNewQuote from '@salesforce/apex/QuotesListViewController.createNewQuote';
+import convertQuoteToApplication from '@salesforce/apex/DealerPortalController.convertQuoteToApplication';
+import generateQuotePDF from '@salesforce/apex/QuotePDFGeneratorService.generateQuotePDF';
+import communityBasePath from '@salesforce/community/basePath';
 
 export default class QuotesListView extends NavigationMixin(LightningElement) {
     @track isLoading = true;
@@ -19,6 +22,12 @@ export default class QuotesListView extends NavigationMixin(LightningElement) {
     @track cancellationVIN = '';
     @track showNewQuoteModal = false;
     @track isCreating = false;
+    @track showConvertModal = false;
+    @track convertApplicationId = null;
+    @track convertVehicleName = '';
+    @track convertVIN = '';
+    @track isConverting = false;
+    @track generatingPDFId = null;
 
     // Cache management
     pageCache = new Map(); // Map<pageNumber, array of records>
@@ -364,6 +373,64 @@ export default class QuotesListView extends NavigationMixin(LightningElement) {
         this.showCancellationModal = true;
     }
 
+    clickConvert(event) {
+        event.stopPropagation();
+        const applicationId = event.currentTarget.closest('.dp-row')?.querySelector('.record-link')?.dataset?.id;
+        if (!applicationId) return;
+        
+        const app = this.applications.find(a => a.id === applicationId);
+        if (!app) return;
+        
+        this.convertApplicationId = applicationId;
+        this.convertVehicleName = app.vehicle.name;
+        this.convertVIN = app.vehicle.vin;
+        this.showConvertModal = true;
+    }
+
+    handleCloseConvertModal() {
+        this.showConvertModal = false;
+        this.convertApplicationId = null;
+        this.convertVehicleName = '';
+        this.convertVIN = '';
+    }
+
+    async handleContinueToConvert() {
+        if (!this.convertApplicationId) return;
+        this.isConverting = true;
+        try {
+            const result = await convertQuoteToApplication({ applicationId: this.convertApplicationId });
+            if (result.success) {
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Success',
+                    message: 'Quote converted to application successfully',
+                    variant: 'success'
+                }));
+                this.handleCloseConvertModal();
+                // Navigate to the application detail page
+                this[NavigationMixin.Navigate]({
+                    type: 'standard__recordPage',
+                    attributes: {
+                        recordId: result.recordId,
+                        objectApiName: 'Application__c',
+                        actionName: 'view'
+                    }
+                });
+            } else {
+                throw new Error(result.message || 'Failed to convert quote');
+            }
+        } catch (err) {
+            const msg = (err && err.body && err.body.message) || err.message || JSON.stringify(err);
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Error converting quote',
+                message: msg,
+                variant: 'error'
+            }));
+            console.error('Error converting quote', err);
+        } finally {
+            this.isConverting = false;
+        }
+    }
+
     handleCreateNewQuote() {
         // Show the new quote confirmation modal
         this.showNewQuoteModal = true;
@@ -453,6 +520,38 @@ export default class QuotesListView extends NavigationMixin(LightningElement) {
 				});
 		}
 	}
+
+    async clickGeneratePDF(event) {
+        event.stopPropagation();
+        const applicationId = event.currentTarget.closest('.dp-row')?.querySelector('.record-link')?.dataset?.id;
+        if (!applicationId || this.generatingPDFId) return;
+        this.generatingPDFId = applicationId;
+        try {
+            const contentVersionId = await generateQuotePDF({ applicationId });
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Success',
+                message: 'Quote PDF generated successfully',
+                variant: 'success'
+            }));
+            // Open the generated PDF in a new browser tab (community-safe URL)
+            if (contentVersionId) {
+                let basePath = communityBasePath || '';
+                // Remove trailing /s from community base path — servlet URLs don't use it
+                basePath = basePath.replace(/\/s$/, '');
+                const downloadUrl = basePath + '/sfc/servlet.shepherd/version/download/' + contentVersionId;
+                window.open(downloadUrl, '_blank');
+            }
+        } catch (err) {
+            const msg = (err && err.body && err.body.message) || err.message || JSON.stringify(err);
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Error generating PDF',
+                message: msg,
+                variant: 'error'
+            }));
+        } finally {
+            this.generatingPDFId = null;
+        }
+    }
 
     handleOpenRecord(event) {
         event.preventDefault();
