@@ -6,6 +6,7 @@ public class RemittanceFormPDFController {
     public Decimal  grandTotal             { get; set; }
     public Boolean  isAllocationRemittance { get; set; }
     public String   selectedServiceLabels  { get; set; }
+    public String   remittanceDate         { get; set; }
 
     private static final Map<String, String> SERVICE_LABEL_MAP = new Map<String, String>{
         'Extended_Limited_Warranty' => 'Extended Limited Warranty',
@@ -15,28 +16,62 @@ public class RemittanceFormPDFController {
     };
 
     /**
-     * Computes the customer-facing display price for an Application Package.
-     * If Dealer_Price_Override__c is set -> use it as total (tax-inclusive).
-     * Otherwise -> use Contract_Premium_Price__c (retail with tax).
+     * Returns the dealer/cost price (tax-inclusive) for an Application Package.
      */
     private static Decimal getDisplayPrice(Application_Package__c pkg) {
-        if (pkg.Dealer_Price_Override__c != null) {
-            return pkg.Dealer_Price_Override__c;
-        }
-        return pkg.Contract_Premium_Price__c != null ? pkg.Contract_Premium_Price__c : 0;
+        return pkg.Contract_Cost_Price__c != null ? pkg.Contract_Cost_Price__c : 0;
     }
 
     /**
-     * Returns the pre-tax display price for an Application Package.
+     * Returns the dealer/cost price (pre-tax) for an Application Package.
      */
     private static Decimal getDisplayPriceWithoutTax(Application_Package__c pkg) {
-        if (pkg.Dealer_Price_Override__c != null) {
-            Decimal taxPct = pkg.Tax_Percentage__c != null ? pkg.Tax_Percentage__c : 0;
-            return taxPct > 0
-                ? (pkg.Dealer_Price_Override__c / (1 + taxPct / 100)).setScale(2, System.RoundingMode.HALF_UP)
-                : pkg.Dealer_Price_Override__c;
+        return pkg.Contract_Cost_Price_Without_Tax__c != null ? pkg.Contract_Cost_Price_Without_Tax__c : 0;
+    }
+
+    /**
+     * Computes a duration string like "12 Months / 20,000 KM" from package fields.
+     */
+    public static String getDurationString(Application_Package__c pkg) {
+        String monthsStr = null;
+        String kmStr = null;
+
+        if (pkg.Month__c != null) {
+            monthsStr = String.valueOf(pkg.Month__c);
+        } else if (pkg.Dealer_Package_Term__r != null && pkg.Dealer_Package_Term__r.Month__c != null) {
+            monthsStr = String.valueOf(pkg.Dealer_Package_Term__r.Month__c);
         }
-        return pkg.Contract_Premium_Price_Without_Tax__c != null ? pkg.Contract_Premium_Price_Without_Tax__c : 0;
+
+        if (pkg.Dealer_Package_Term__r != null && pkg.Dealer_Package_Term__r.Odometer_KM__c != null) {
+            kmStr = String.valueOf(pkg.Dealer_Package_Term__r.Odometer_KM__c);
+            // Format with commas if numeric
+            if (kmStr != null && kmStr.isNumeric()) {
+                kmStr = Decimal.valueOf(kmStr).format();
+            }
+        }
+
+        String result = '';
+        if (String.isNotBlank(monthsStr)) {
+            result = monthsStr + ' Months';
+        }
+        if (String.isNotBlank(kmStr)) {
+            if (String.isNotBlank(result)) result += ' / ';
+            result += kmStr + ' KM';
+        }
+        return result;
+    }
+
+    /**
+     * Returns the package display name from Package_Record_Type__c.
+     */
+    public static String getPackageDisplayName(Application_Package__c pkg) {
+        if (String.isNotBlank(pkg.Package_Record_Type__c)) {
+            return pkg.Package_Record_Type__c;
+        }
+        if (pkg.RecordType != null && String.isNotBlank(pkg.RecordType.Name)) {
+            return pkg.RecordType.Name;
+        }
+        return '';
     }
 
     public RemittanceFormPDFController() {
@@ -46,6 +81,7 @@ public class RemittanceFormPDFController {
         grandTotal             = 0;
         isAllocationRemittance = false;
         selectedServiceLabels  = '';
+        remittanceDate         = '';
 
         String remittanceFormId = ApexPages.currentPage().getParameters().get('id');
 
@@ -55,10 +91,10 @@ public class RemittanceFormPDFController {
         }
 
         try {
-            // -- 1. Query Remittance Form --
+            // -- 1. Query Remittance Form (added Date__c) --
             List<Remittance_Form__c> forms = [
                 SELECT Id, Name, Payer_Name__c, Receiver_Name__c,
-                       Dealer_Name__c, Dealer_Name__r.Name, CreatedDate,
+                       Dealer_Name__c, Dealer_Name__r.Name, CreatedDate, Date__c,
                        Status__c, Cancelation_Reason__c, Bill_To__c, Credit_Note__c,
                        Credit_Issued_By__r.Name, Discount_Amount__c,
                        Remittance_Form_Total_After_Discount__c, Balance__c, Paid_Amount__c,
@@ -76,6 +112,12 @@ public class RemittanceFormPDFController {
             remittanceForm         = forms[0];
             isAllocationRemittance = remittanceForm.RecordType != null &&
                                      remittanceForm.RecordType.DeveloperName == 'Allocation_Remittance';
+
+            // Format remittance date
+            if (remittanceForm.Date__c != null) {
+                Datetime dt = Datetime.newInstance(remittanceForm.Date__c.year(), remittanceForm.Date__c.month(), remittanceForm.Date__c.day());
+                remittanceDate = dt.format('MMM dd, yyyy');
+            }
 
             // Build friendly service labels for allocation remittance
             if (isAllocationRemittance && String.isNotBlank(remittanceForm.Services_To_Pay__c)) {
@@ -156,7 +198,7 @@ public class RemittanceFormPDFController {
                 if (inv.Application__c != null) applicationIds.add(inv.Application__c);
             }
 
-            // -- 4. Query Application Packages with retail/custom pricing fields --
+            // -- 4. Query Application Packages with cost pricing + new fields --
             Map<Id, List<Application_Package__c>> appToPackages = new Map<Id, List<Application_Package__c>>();
             Map<Id, Application_Package__c> packageById = new Map<Id, Application_Package__c>();
             Set<Id> packageIds = new Set<Id>();
@@ -171,7 +213,10 @@ public class RemittanceFormPDFController {
                     '       Odometer_Start__c, Odometer_End__c, Contract_Start_Date__c, Contract_End_Date__c, ' +
                     '       RecordType.Name, Dealer_Package_Price__c, ' +
                     '       Contract_Premium_Price__c, Contract_Premium_Price_Without_Tax__c, ' +
-                    '       Dealer_Price_Override__c, Tax_Amount__c, Tax_Percentage__c ' +
+                    '       Dealer_Price_Override__c, Tax_Amount__c, Tax_Percentage__c, ' +
+                    '       Package_Record_Type__c, Month__c, ' +
+                    '       Dealer_Package_Term__r.Month__c, Dealer_Package_Term__r.Odometer_KM__c, ' +
+                    '       Contract_Cost_Price__c, Contract_Cost_Price_Without_Tax__c ' +
                     'FROM Application_Package__c ' +
                     pkgWhere +
                     ' LIMIT 10000'
@@ -218,7 +263,7 @@ public class RemittanceFormPDFController {
                 ' ORDER BY Application_Package_Name__c ASC LIMIT 10000'
             );
 
-            // -- 7. Build InvoiceWithItems using retail/custom prices --
+            // -- 7. Build InvoiceWithItems using cost prices --
             Map<Id, List<Invoice_Line_Item__c>> invoiceToLineItems = new Map<Id, List<Invoice_Line_Item__c>>();
             for (Invoice_Line_Item__c item : lineItems) {
                 if (!invoiceToLineItems.containsKey(item.Invoice__c)) {
@@ -231,6 +276,7 @@ public class RemittanceFormPDFController {
                 InvoiceWithItems invWithItems = new InvoiceWithItems();
                 invWithItems.invoice     = invoice;
                 invWithItems.application = invoice.Application__r;
+                invWithItems.invoiceName = invoice.Name;
 
                 // Map package ID -> line items for this invoice
                 Map<Id, List<Invoice_Line_Item__c>> pkgToLineItems = new Map<Id, List<Invoice_Line_Item__c>>();
@@ -255,7 +301,16 @@ public class RemittanceFormPDFController {
                             ? packageToOptions.get(pkg.Id)
                             : new List<Application_Package_Option__c>();
 
-                        // Build display line items with retail/custom prices
+                        // Duration and display name
+                        pkgWithOpts.duration    = getDurationString(pkg);
+                        pkgWithOpts.displayName = getPackageDisplayName(pkg);
+
+                        // Cost pricing
+                        pkgWithOpts.dealerPrice = getDisplayPriceWithoutTax(pkg);
+                        pkgWithOpts.taxAmount   = getDisplayPrice(pkg) - getDisplayPriceWithoutTax(pkg);
+                        pkgWithOpts.subtotal    = getDisplayPrice(pkg);
+
+                        // Build display line items with cost prices
                         List<Invoice_Line_Item__c> rawLineItems = pkgToLineItems.containsKey(pkg.Id)
                             ? pkgToLineItems.get(pkg.Id)
                             : new List<Invoice_Line_Item__c>();
@@ -266,7 +321,6 @@ public class RemittanceFormPDFController {
                             LineItemDisplay d = new LineItemDisplay();
                             d.lineItemId = li.Id;
                             d.status = li.Status__c;
-                            // Use retail/custom price from parent package instead of cost price
                             d.displayPrice = getDisplayPrice(pkg);
                             displayItems.add(d);
                         }
@@ -281,7 +335,7 @@ public class RemittanceFormPDFController {
                     ? invoiceToLineItems.get(invoice.Id)
                     : new List<Invoice_Line_Item__c>();
 
-                // Totals using retail/custom prices from Application_Package__c
+                // Totals using cost prices from Application_Package__c
                 invWithItems.invoiceSubTotal = 0;
                 invWithItems.invoiceTaxTotal = 0;
                 for (Invoice_Line_Item__c item : invWithItems.lineItems) {
@@ -315,7 +369,7 @@ public class RemittanceFormPDFController {
         }
     }
 
-    // Wrapper: display-ready line item with retail/custom price
+    // Wrapper: display-ready line item with cost price
     public class LineItemDisplay {
         public String  lineItemId   { get; set; }
         public String  status       { get; set; }
@@ -330,6 +384,7 @@ public class RemittanceFormPDFController {
         public Decimal invoiceSubTotal              { get; set; }
         public Decimal invoiceTaxTotal              { get; set; }
         public Decimal invoiceGrandTotal            { get; set; }
+        public String  invoiceName                  { get; set; }
     }
 
     public class PackageWithOptions {
@@ -337,5 +392,10 @@ public class RemittanceFormPDFController {
         public List<Application_Package_Option__c> additionalOptions { get; set; }
         public List<Invoice_Line_Item__c> packageLineItems        { get; set; }
         public List<LineItemDisplay> displayLineItems             { get; set; }
+        public String  duration    { get; set; }
+        public String  displayName { get; set; }
+        public Decimal dealerPrice { get; set; }
+        public Decimal taxAmount   { get; set; }
+        public Decimal subtotal    { get; set; }
     }
 }
