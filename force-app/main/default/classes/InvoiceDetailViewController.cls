@@ -8,6 +8,19 @@ public without sharing class InvoiceDetailViewController {
         return pkg.Contract_Cost_Price__c != null ? pkg.Contract_Cost_Price__c : 0;
     }
 
+    /**
+     * Checks whether any Payment__c record exists on the invoice's Remittance Form.
+     * Any payment record (regardless of status) means payment has been initiated.
+     */
+    private static Boolean checkPaymentInitiated(Id remittanceFormId) {
+        if (remittanceFormId == null) return false;
+        return [
+            SELECT COUNT()
+            FROM Payment__c
+            WHERE Remittance_Form__c = :remittanceFormId
+        ] > 0;
+    }
+
     @AuraEnabled(cacheable=true)
     public static InvoiceDetailData getInvoiceDetail(String invoiceId) {
         try {
@@ -42,6 +55,9 @@ public without sharing class InvoiceDetailViewController {
         }
 
         Invoice__c inv = invoices[0];
+
+        // ── 1b. Check if payment has been initiated ──────────────────────────
+        Boolean paymentInitiated = checkPaymentInitiated(inv.Remittance_Form__c);
 
         // ── 2. Query Invoice Line Items first to determine which packages to load ─
         List<Invoice_Line_Item__c> lineItems = [
@@ -134,6 +150,7 @@ public without sharing class InvoiceDetailViewController {
             ? inv.CreatedDate.format('MMM dd, yyyy')
             : null;
         result.hasRemittanceForm = inv.Remittance_Form__c != null;
+        result.hasPaymentInitiated = paymentInitiated;
         result.dealerName = inv.Remittance_Form__r?.Dealer_Name__r?.Name;
         result.billTo     = inv.Remittance_Form__r?.Bill_To__c;
         result.applicationId       = inv.Application__r?.Name;
@@ -242,7 +259,7 @@ public without sharing class InvoiceDetailViewController {
             }
 
             List<Invoice__c> invoices = [
-                SELECT Id, Name, Status__c
+                SELECT Id, Name, Status__c, Remittance_Form__c
                 FROM Invoice__c
                 WHERE Id = :invoiceId
                 LIMIT 1
@@ -251,6 +268,11 @@ public without sharing class InvoiceDetailViewController {
                 return new OperationResult(false, 'Invoice not found.');
             }
             Invoice__c inv = invoices[0];
+
+            // ── Payment initiation guard ─────────────────────────────────────
+            if (checkPaymentInitiated(inv.Remittance_Form__c)) {
+                throw new AuraHandledException('Packages cannot be removed after a payment has been initiated on this invoice.');
+            }
 
             Cancellation__c cancellation = new Cancellation__c();
             cancellation.Invoice__c                    = inv.Id;
@@ -495,6 +517,7 @@ public without sharing class InvoiceDetailViewController {
         @AuraEnabled public String  invoiceStatus;
         @AuraEnabled public String  invoiceDate;
         @AuraEnabled public Boolean hasRemittanceForm;
+        @AuraEnabled public Boolean hasPaymentInitiated;
         @AuraEnabled public String  dealerName;
         @AuraEnabled public String  billTo;
         @AuraEnabled public String  applicationId;

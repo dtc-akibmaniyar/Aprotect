@@ -10,21 +10,75 @@
 .header-section {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 20px;
+}
+
+.header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .remittance-form-title {
     font-size: 26px;
     font-weight: 600;
     color: #4a90e2;
-    margin: 0 0 4px 0;
+    margin: 0;
 }
 
 .services-label {
     font-size: 13px;
     color: #555;
     margin: 0;
+}
+
+/* Remittance Date Pill */
+.remittance-date-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #e8f0fe;
+    border: 1px solid #5184b8;
+    border-radius: 16px;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #5184b8;
+}
+
+.pill-icon {
+    --sds-c-icon-color-foreground-default: #5184b8;
+}
+
+/* Header Right Block */
+.header-right-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+/* Date Generated */
+.date-generated-block {
+    text-align: right;
+}
+
+.date-generated-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.date-generated-value {
+    display: block;
+    font-size: 22px;
+    font-weight: 700;
+    color: #333;
+    margin-top: 2px;
 }
 
 /* ── Details / Credit grid ─────────────────────────────────────────── */
@@ -68,143 +122,124 @@
     margin-bottom: 12px;
 }
 
-/* ── Table wrapper ─────────────────────────────────────────────────── */
-.table-wrapper {
-    overflow-x: auto;
-    margin-bottom: 0;
-}
-
-/* ── Invoice Table ─────────────────────────────────────────────────── */
-.inv-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-    table-layout: auto;
-}
-
-/* Header */
-.inv-table thead tr {
-    background-color: #5184b8;
+/* ── DETAILS Banner ────────────────────────────────────────────────── */
+.details-banner {
+    background: linear-gradient(135deg, #1a6e6e, #2a8a8a);
     color: #ffffff;
-}
-
-.inv-table thead th {
-    padding: 12px 14px;
-    font-size: 12px;
-    font-weight: 700;
     text-align: center;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
-    border-right: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.inv-table thead th:last-child {
-    border-right: none;
-}
-
-/* Body rows — alternating background */
-.inv-table tbody tr:nth-child(odd) {
-    background-color: #ffffff;
-}
-
-.inv-table tbody tr:nth-child(even) {
-    background-color: #f4f6f9;
-}
-
-.inv-table tbody tr:hover {
-    background-color: #e8eef5;
-}
-
-.inv-table tbody td {
-    padding: 10px 14px;
-    color: #333;
-    text-align: center;
-    border-bottom: 1px solid #e8e8e8;
-    vertical-align: middle;
-}
-
-/* Footer row */
-.inv-table tfoot .footer-row {
-    background-color: #eef2f7;
-    border-top: 2px solid #5184b8;
-}
-
-.inv-table tfoot td {
-    padding: 10px 14px;
-    text-align: center;
-    font-size: 11px;
-}
-
-.footer-qty {
-    text-align: left !important;
-    font-size: 11px;
-    color: #333;
-}
-
-.footer-total {
+    padding: 12px 20px;
+    font-size: 14px;
     font-weight: 700;
-    color: #5184b8;
-    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 0;
+    border-radius: 4px 4px 0 0;
 }
 
-.footer-count-row {
-    background-color: #f8fafc;
-}
-
-.footer-count {
-    padding: 8px 14px;
-    font-size: 12px;
-    font-weight: 500;
-    color: #333;
-    text-align: center;
-}
-
-.footer-count strong {
-    font-weight: 700;
-    margin-right: 2px;
-}
-
-/* ── Footer breakdown (Net / Tax lines) ──────────────────────────── */
-.footer-total-amount {
-    display: block;
-    font-weight: 700;
-    font-size: 13px;
-    color: #5184b8;
-}
-
-.footer-breakdown {
-    display: block;
-    font-size: 10px;
-    font-weight: 400;
-    color: #666;
-    line-height: 1.5;
-    margin-top: 1px;
-}
-
-/* ── Column widths ─────────────────────────────────────────────────── */
-.col-index    { width: 42px;  text-align: center; }
-.col-inv      { width: 100px; text-align: center; }
-.col-customer { width: 200px; text-align: left; }
-.col-vehicle  { width: 200px; text-align: left; }
-.col-service  { width: 130px; text-align: center; }
-.col-subtotal { width: 100px; text-align: center; font-weight: 600; }
-
-/* left-align text body cells */
-.inv-table tbody td.col-customer,
-.inv-table tbody td.col-vehicle {
-    text-align: left;
-}
-
-/* ── INV # cell ──────────────────────────────────────────────────── */
-.col-inv {
-    display: table-cell; /* keep as table cell */
-}
-
-.inv-cell-inner {
+/* ── Invoice Cards Container ───────────────────────────────────────── */
+.invoice-cards-container {
     display: flex;
     flex-direction: column;
+    gap: 0;
+    margin-bottom: 20px;
+}
+
+/* ── Invoice Card ──────────────────────────────────────────────────── */
+.invoice-card {
+    border: 1px solid #e0e5ec;
+    border-top: none;
+    background: #ffffff;
+}
+
+.invoice-card:first-child {
+    border-top: 1px solid #e0e5ec;
+}
+
+/* ── Collapsed Strip (CSS Grid layout) ─────────────────────────────── */
+.invoice-card-strip {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 13fr) minmax(0, 15fr) minmax(0, 17fr) minmax(0, 20fr) minmax(0, 15fr) minmax(0, 12fr) 30px;
     align-items: center;
-    gap: 3px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background-color 0.15s, box-shadow 0.15s;
+    min-height: 54px;
+    gap: 12px;
+}
+
+.invoice-card-strip:hover {
+    background-color: #f0f4f9;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+/* Each data column: label stacked above value */
+.strip-col {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Remove icon column */
+.strip-col-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+}
+
+/* Chevron column */
+.strip-col-chevron {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+}
+
+.strip-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #5184b8;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.strip-value {
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.strip-balance {
+    font-size: 14px;
+    font-weight: 700;
+    color: #5184b8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.strip-chevron {
+    font-size: 14px;
+    color: #999;
+    user-select: none;
+}
+
+.remove-icon {
+    font-size: 18px;
+    color: #c23934;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.remove-icon:hover {
+    color: #a11d18;
 }
 
 /* ── INV # link ──────────────────────────────────────────────────── */
@@ -213,6 +248,10 @@
     text-decoration: none;
     font-weight: 600;
     cursor: pointer;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .inv-link:hover {
@@ -220,92 +259,138 @@
     color: #005ba1;
 }
 
-/* ── Service cell content ───────────────────────────────────────── */
-.svc-amount {
-    display: block;
-    font-weight: 500;
+/* ── Expanded Detail ───────────────────────────────────────────────── */
+.invoice-card-detail {
+    padding: 16px 20px 20px;
+    background: #fafbfc;
+    border-top: 1px solid #e8ecf0;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 24px;
+}
+
+.detail-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #5184b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 8px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e0e5ec;
+}
+
+.detail-section-gap {
+    margin-top: 16px;
+}
+
+.detail-field {
+    display: flex;
+    gap: 8px;
+    font-size: 13px;
+    color: #333;
+    margin-bottom: 4px;
+    line-height: 1.5;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: #666;
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+/* ── Package Breakdown ─────────────────────────────────────────────── */
+.packages-header {
+    display: flex;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 2px solid #5184b8;
+    margin-bottom: 8px;
+}
+
+.pkg-header-name {
+    flex: 2;
+    font-size: 11px;
+    font-weight: 700;
+    color: #5184b8;
+    text-transform: uppercase;
+}
+
+.pkg-header-price,
+.pkg-header-subtotal {
+    flex: 0.6;
+    font-size: 11px;
+    font-weight: 700;
+    color: #5184b8;
+    text-transform: uppercase;
+    text-align: right;
+}
+
+.package-row {
+    display: flex;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.package-row:last-child {
+    border-bottom: none;
+}
+
+.pkg-info {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pkg-name {
+    font-size: 13px;
+    font-weight: 700;
     color: #333;
 }
 
-.svc-dash {
-    color: #aaa;
-    font-size: 14px;
+.pkg-type {
+    font-size: 11px;
     font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
-/* ── Service cell price breakdown ────────────────────────────────── */
-.svc-breakdown {
+.pkg-duration {
+    font-size: 12px;
+    color: #555;
+}
+
+.pkg-addons {
     margin-top: 4px;
-    padding: 4px 6px;
-    background: #f0f4f8;
-    border-radius: 4px;
-    font-size: 9px;
+    font-size: 11px;
     color: #666;
-    text-align: left;
 }
 
-.svc-breakdown-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 4px;
-    line-height: 1.6;
-}
-
-/* ── Line-item status badges ─────────────────────────────────────── */
-.li-badge {
-    display: inline-block;
-    margin-top: 4px;
-    padding: 1px 7px;
-    border-radius: 10px;
-    font-size: 10px;
+.pkg-addons-label {
     font-weight: 600;
-    letter-spacing: 0.2px;
-    white-space: nowrap;
-    border: 1px solid transparent;
+    margin-right: 4px;
 }
 
-/* Paid → green */
-.li-badge--paid {
-    background-color: #d4edda;
-    color: #155724;
-    border-color: #b8dfc6;
+.pkg-addon-item {
+    display: inline;
+    margin-right: 8px;
 }
 
-/* Partial Paid → amber */
-.li-badge--partial {
-    background-color: #fff3cd;
-    color: #856404;
-    border-color: #fce49a;
+.pkg-dealer-price,
+.pkg-subtotal {
+    flex: 0.6;
+    text-align: right;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
 }
-
-/* Planned → blue */
-.li-badge--planned {
-    background-color: #cce5ff;
-    color: #004085;
-    border-color: #9ecfff;
-}
-
-/* Due → red */
-.li-badge--due {
-    background-color: #f8d7da;
-    color: #721c24;
-    border-color: #f1b5bb;
-}
-
-/* Cancelled → red */
-.li-badge--cancelled {
-    background-color: #f8d7da;
-    color: #721c24;
-    border-color: #f1b5bb;
-}
-
-/* Fallback → grey */
-.li-badge--default {
-    background-color: #e9ecef;
-    color: #495057;
-    border-color: #ced4da;
-}
-
 
 /* ── Remittance Form Status badges ───────────────────────────────── */
 .rf-badge {
@@ -433,48 +518,12 @@
     margin: 4px 0 0 0;
     font-style: italic;
 }
-/* ── Info Banner ─────────────────────────────────────────────────── */
-.info-banner {
-    display: flex;
-    align-items: flex-start;
-    background: #f0f7ff;
-    border: 1px solid #b0d4f1;
-    border-radius: 6px;
-    padding: 12px 16px;
-    margin-bottom: 20px;
-    gap: 8px;
-}
-
-.info-banner-text {
-    font-size: 13px;
-    color: #16325c;
-    line-height: 1.5;
-}
-
-.info-banner-text p {
-    margin: 0 0 4px 0;
-}
-
-.info-banner-text p:last-child {
-    margin-bottom: 0;
-}
 
 /* ── Header Actions ──────────────────────────────────────────────── */
 .header-actions {
     display: flex;
     align-items: center;
     gap: 8px;
-}
-
-/* ── Actions Column ──────────────────────────────────────────────── */
-.col-actions {
-    width: 60px;
-    text-align: center;
-    padding: 4px;
-}
-
-.remove-btn {
-    color: #c23934;
 }
 
 /* ── Modal styles ────────────────────────────────────────────────── */
@@ -538,4 +587,29 @@
     bottom: 0;
     background: rgba(0,0,0,0.5);
     z-index: 9000;
+}
+
+/* ── Check Pending Verification Warning Banner ─────────────────────── */
+.check-pending-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    border-left: 4px solid #ff9800;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    color: #664d03;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.check-pending-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.check-pending-text {
+    font-weight: 500;
 }

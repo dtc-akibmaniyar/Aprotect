@@ -21,6 +21,14 @@
     <template if:true={invoiceData}>
         <div class="invoice-wrapper">
 
+            <!-- PAYMENT INITIATED WARNING BANNER -->
+            <template if:true={hasPaymentInitiated}>
+                <div class="payment-initiated-banner" role="alert">
+                    <lightning-icon icon-name="utility:warning" variant="warning" size="x-small"></lightning-icon>
+                    <span class="payment-initiated-text">A payment has been initiated on this invoice. Package removal and cancellation are locked.</span>
+                </div>
+            </template>
+
             <!-- INVOICE HEADER -->
             <div class="invoice-header">
                 <div>

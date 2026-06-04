@@ -478,7 +478,7 @@ public without sharing class DealerPortalMonerisIntegrationServices {
             chequeRecord.Cheque_Date__c             = Date.valueOf(chequeDate);
             chequeRecord.Cheque_Delivery_Mthod__c   = chequeDeliveryMethod;
             chequeRecord.Amount__c                  = chequeAmount;
-            chequeRecord.Payment_Confirmation_Status__c = 'Deposit Pending'; // awaiting physical deposit
+            chequeRecord.Payment_Confirmation_Status__c = 'Check Pending Verification'; // awaiting admin verification
             chequeRecord.Notes__c                   = String.isBlank(notes) ? '' : notes;
 
             // Set RecordType to Cheque_Payment

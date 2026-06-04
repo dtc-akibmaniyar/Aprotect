@@ -9,45 +9,53 @@
         <template if:true={invoiceData}>
             <div class="remittance-modal-content">
 
+                <!-- Check Pending Verification Warning Banner -->
+                <template if:true={invoiceData.hasCheckPendingVerification}>
+                    <div class="check-pending-banner">
+                        <span class="check-pending-icon">⚠️</span>
+                        <span class="check-pending-text">A check payment is pending verification. Invoices cannot be added or removed until the check is verified by the admin team.</span>
+                    </div>
+                </template>
+
                 <!-- Title and Actions Header -->
                 <div class="header-section">
-                    <div>
+                    <div class="header-left">
                         <h1 class="remittance-form-title">
                             REMITTANCE ID#: {invoiceData.remittanceFormName}
                         </h1>
+                        <template if:true={invoiceData.hasRemittanceDate}>
+                            <div class="remittance-date-pill">
+                                <lightning-icon icon-name="utility:event" size="xx-small" class="pill-icon"></lightning-icon>
+                                <span>Remittance Date: {invoiceData.formattedRemittanceDate}</span>
+                            </div>
+                        </template>
                         <template if:true={invoiceData.isAllocationRemittance}>
                             <p class="services-label">Services: {invoiceData.selectedServiceLabels}</p>
                         </template>
                     </div>
-                    <div class="header-actions">
-                        <template if:true={invoiceData.canModifyInvoices}>
+                    <div class="header-right-block">
+                        <div class="header-actions">
+                            <template if:true={invoiceData.canModifyInvoices}>
+                                <lightning-button
+                                    variant="neutral"
+                                    label="Add Invoice"
+                                    icon-name="utility:add"
+                                    onclick={handleOpenAddInvoice}
+                                    class="slds-m-right_small">
+                                </lightning-button>
+                            </template>
                             <lightning-button
-                                variant="neutral"
-                                label="Add Invoice"
-                                icon-name="utility:add"
-                                onclick={handleOpenAddInvoice}
-                                class="slds-m-right_small">
+                                variant="brand"
+                                label="Download PDF"
+                                icon-name="utility:download"
+                                onclick={handleDownloadPDF}>
                             </lightning-button>
-                        </template>
-                        <lightning-button
-                            variant="brand"
-                            label="Download PDF"
-                            icon-name="utility:download"
-                            onclick={handleDownloadPDF}>
-                        </lightning-button>
-                    </div>
-                </div>
-
-                <!-- Info Banner -->
-                <div class="info-banner">
-                    <lightning-icon icon-name="utility:info" size="x-small" class="slds-m-right_x-small"></lightning-icon>
-                    <div class="info-banner-text">
-                        <p>Invoices are sorted by amount (lowest first). Payments are allocated starting from the lowest amount invoice.</p>
-                        <template if:true={invoiceData.canModifyInvoices}>
-                            <p>You can add or remove invoices before initiating a payment. Once a payment has been initiated, invoices cannot be added or removed.</p>
-                        </template>
-                        <template if:true={invoiceData.hasPayments}>
-                            <p>A payment has been initiated. Invoices can no longer be added or removed.</p>
+                        </div>
+                        <template if:true={invoiceData.hasDateGenerated}>
+                            <div class="date-generated-block">
+                                <span class="date-generated-label">Date Generated:</span>
+                                <span class="date-generated-value">{invoiceData.formattedDateGenerated}</span>
+                            </div>
                         </template>
                     </div>
                 </div>
@@ -112,198 +120,144 @@
                     </div>
                 </div>
 
-                <!-- ── Invoice Table ───────────────────────────────── -->
-                <div class="table-wrapper">
-                    <table class="inv-table">
-                        <thead>
-                            <tr>
-                                <th class="col-index">#</th>
-                                <th class="col-inv">INV #</th>
-                                <th class="col-customer">CUSTOMER</th>
-                                <th class="col-vehicle">VEHICLE</th>
-                                <th class="col-service">WARRANTY</th>
-                                <th class="col-service">TIRE AND RIM</th>
-                                <th class="col-service">LOAN PROTECTION</th>
-                                <th class="col-subtotal">SUB-TOTAL</th>
-                                <template if:true={invoiceData.canModifyInvoices}>
-                                    <th class="col-actions">ACTIONS</th>
-                                </template>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <template for:each={invoiceData.tableRows} for:item="row">
-                                <tr key={row.id} class="inv-row">
-                                    <td class="col-index">{row.rowIndex}</td>
-                                    <td class="col-inv">
-                                        <a class="inv-link"
-                                           data-id={row.id}
-                                           onclick={handleInvoiceClick}
-                                           href="#">{row.invoiceName}</a>
-                                        <template if:true={row.invoiceStatus}>
-                                            <span class={row.invoiceStatusClass}>{row.invoiceStatus}</span>
-                                        </template>
-                                    </td>
-                                    <td class="col-customer">{row.customerName}</td>
-                                    <td class="col-vehicle">{row.vehicleInfo}</td>
+                <!-- ── DETAILS Section Banner ───────────────────────── -->
+                <div class="details-banner">
+                    <span>DETAILS</span>
+                </div>
 
-                                    <!-- WARRANTY -->
-                                    <td class="col-service">
-                                        <template if:true={row.warranty}>
-                                            <span class="svc-amount">{row.warranty.formattedAmount}</span>
-                                            <template if:true={row.warranty.hasStatus}>
-                                                <span class={row.warranty.statusClass}>{row.warranty.status}</span>
-                                            </template>
-                                            <template if:true={row.warranty.hasBreakdown}>
-                                                <div class="svc-breakdown">
-                                                    <div class="svc-breakdown-row">
-                                                        <span>Base:</span>
-                                                        <span>{row.warranty.formattedBaseCostPrice}</span>
-                                                    </div>
-                                                    <template for:each={row.warranty.additionalOptions} for:item="opt">
-                                                        <div key={opt.key} class="svc-breakdown-row">
-                                                            <span>{opt.optionName}:</span>
-                                                            <span>{opt.formattedCostPrice}</span>
-                                                        </div>
-                                                    </template>
-                                                </div>
-                                            </template>
-                                        </template>
-                                        <template if:false={row.warranty}>
-                                            <span class="svc-dash">-</span>
-                                        </template>
-                                    </td>
-
-                                    <!-- TIRE AND RIM -->
-                                    <td class="col-service">
-                                        <template if:true={row.tireRim}>
-                                            <span class="svc-amount">{row.tireRim.formattedAmount}</span>
-                                            <template if:true={row.tireRim.hasStatus}>
-                                                <span class={row.tireRim.statusClass}>{row.tireRim.status}</span>
-                                            </template>
-                                            <template if:true={row.tireRim.hasBreakdown}>
-                                                <div class="svc-breakdown">
-                                                    <div class="svc-breakdown-row">
-                                                        <span>Base:</span>
-                                                        <span>{row.tireRim.formattedBaseCostPrice}</span>
-                                                    </div>
-                                                    <template for:each={row.tireRim.additionalOptions} for:item="opt">
-                                                        <div key={opt.key} class="svc-breakdown-row">
-                                                            <span>{opt.optionName}:</span>
-                                                            <span>{opt.formattedCostPrice}</span>
-                                                        </div>
-                                                    </template>
-                                                </div>
-                                            </template>
-                                        </template>
-                                        <template if:false={row.tireRim}>
-                                            <span class="svc-dash">-</span>
-                                        </template>
-                                    </td>
-
-                                    <!-- LOAN PROTECTION -->
-                                    <td class="col-service">
-                                        <template if:true={row.loanProtection}>
-                                            <span class="svc-amount">{row.loanProtection.formattedAmount}</span>
-                                            <template if:true={row.loanProtection.hasStatus}>
-                                                <span class={row.loanProtection.statusClass}>{row.loanProtection.status}</span>
-                                            </template>
-                                            <template if:true={row.loanProtection.hasBreakdown}>
-                                                <div class="svc-breakdown">
-                                                    <div class="svc-breakdown-row">
-                                                        <span>Base:</span>
-                                                        <span>{row.loanProtection.formattedBaseCostPrice}</span>
-                                                    </div>
-                                                    <template for:each={row.loanProtection.additionalOptions} for:item="opt">
-                                                        <div key={opt.key} class="svc-breakdown-row">
-                                                            <span>{opt.optionName}:</span>
-                                                            <span>{opt.formattedCostPrice}</span>
-                                                        </div>
-                                                    </template>
-                                                </div>
-                                            </template>
-                                        </template>
-                                        <template if:false={row.loanProtection}>
-                                            <span class="svc-dash">-</span>
-                                        </template>
-                                    </td>
-
-                                    <td class="col-subtotal">{row.formattedSubTotal}</td>
-
-                                    <template if:true={invoiceData.canModifyInvoices}>
-                                        <td class="col-actions">
-                                            <template if:true={row.canRemove}>
-                                                <lightning-button-icon
-                                                    icon-name="utility:delete"
-                                                    alternative-text="Remove invoice"
-                                                    variant="bare"
-                                                    size="small"
-                                                    data-id={row.id}
-                                                    onclick={handleRemoveInvoice}
-                                                    class="remove-btn">
-                                                </lightning-button-icon>
-                                            </template>
-                                        </td>
+                <!-- ── Invoice Cards (Collapsed/Expanded) ───────────── -->
+                <div class="invoice-cards-container">
+                    <template for:each={invoiceData.tableRows} for:item="row">
+                        <div key={row.id} class="invoice-card">
+                            <!-- Collapsed Strip -->
+                            <div class="invoice-card-strip" data-id={row.id} onclick={handleToggleRow}>
+                                <div class="strip-col-remove">
+                                    <template if:true={row.canRemove}>
+                                        <span class="remove-icon" data-id={row.id} onclick={handleRemoveInvoice}>⊖</span>
                                     </template>
-                                </tr>
+                                </div>
+                                <div class="strip-col">
+                                    <span class="strip-label">APP ID</span>
+                                    <a class="inv-link" data-id={row.applicationId} onclick={handleApplicationClick} href="#">{row.applicationNumber}</a>
+                                </div>
+                                <div class="strip-col">
+                                    <span class="strip-label">CUSTOMER</span>
+                                    <span class="strip-value">{row.customerName}</span>
+                                </div>
+                                <div class="strip-col">
+                                    <span class="strip-label">VEHICLE</span>
+                                    <span class="strip-value">{row.vehicleFullName}</span>
+                                </div>
+                                <div class="strip-col">
+                                    <span class="strip-label">VIN #</span>
+                                    <span class="strip-value">{row.vinDisplay}</span>
+                                </div>
+                                <div class="strip-col">
+                                    <span class="strip-label">INVOICE #</span>
+                                    <a class="inv-link" data-id={row.id} onclick={handleInvoiceClick} href="#">{row.invoiceName}</a>
+                                </div>
+                                <div class="strip-col">
+                                    <span class="strip-label">BALANCE</span>
+                                    <span class="strip-balance">{row.formattedSubTotal}</span>
+                                </div>
+                                <div class="strip-col-chevron">
+                                    <span class="strip-chevron">{row.chevronIcon}</span>
+                                </div>
+                            </div>
+
+                            <!-- Expanded Detail -->
+                            <template if:true={row.isExpanded}>
+                                <div class="invoice-card-detail">
+                                    <div class="detail-grid">
+                                        <!-- Left: Customer & Vehicle Info -->
+                                        <div class="detail-left">
+                                            <h4 class="detail-section-title">Customer Information</h4>
+                                            <div class="detail-field">
+                                                <span class="detail-label">Name:</span>
+                                                <span>{row.customerName}</span>
+                                            </div>
+                                            <template if:true={row.customerAddress}>
+                                                <div class="detail-field">
+                                                    <span class="detail-label">Address:</span>
+                                                    <span>{row.customerAddress}</span>
+                                                </div>
+                                            </template>
+                                            <template if:true={row.customerPhone}>
+                                                <div class="detail-field">
+                                                    <span class="detail-label">Phone:</span>
+                                                    <span>{row.customerPhone}</span>
+                                                </div>
+                                            </template>
+
+                                            <h4 class="detail-section-title detail-section-gap">Vehicle Information</h4>
+                                            <template if:true={row.vehicleFullName}>
+                                                <div class="detail-field">
+                                                    <span class="detail-label">Vehicle:</span>
+                                                    <span>{row.vehicleFullName}</span>
+                                                </div>
+                                            </template>
+                                            <template if:true={row.vinDisplay}>
+                                                <div class="detail-field">
+                                                    <span class="detail-label">VIN:</span>
+                                                    <span>{row.vinDisplay}</span>
+                                                </div>
+                                            </template>
+                                            <template if:true={row.hasOdometer}>
+                                                <div class="detail-field">
+                                                    <span class="detail-label">Odometer:</span>
+                                                    <span>{row.odometerDisplay}</span>
+                                                </div>
+                                            </template>
+                                            <template if:true={row.hasDeliveryDate}>
+                                                <div class="detail-field">
+                                                    <span class="detail-label">Vehicle Delivery Date:</span>
+                                                    <span>{row.deliveryDate}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+
+                                        <!-- Right: Package Breakdown -->
+                                        <div class="detail-right">
+                                            <h4 class="detail-section-title">Package Breakdown</h4>
+                                            <div class="packages-header">
+                                                <span class="pkg-header-name">Package</span>
+                                                <span class="pkg-header-price">Dealer Price</span>
+                                                <span class="pkg-header-subtotal">Subtotal (w/tax)</span>
+                                            </div>
+                                            <template for:each={row.packages} for:item="pkg">
+                                                <div key={pkg.key} class="package-row">
+                                                    <div class="pkg-info">
+                                                        <span class="pkg-name">{pkg.packageName}</span>
+                                                        <template if:true={pkg.packageTierName}>
+                                                            <span class="pkg-type">{pkg.packageTierName}</span>
+                                                        </template>
+                                                        <template if:false={pkg.packageTierName}>
+                                                            <template if:true={pkg.packageRecordType}>
+                                                                <span class="pkg-type">{pkg.packageRecordType}</span>
+                                                            </template>
+                                                        </template>
+                                                        <template if:true={pkg.hasDuration}>
+                                                            <span class="pkg-duration">{pkg.duration}</span>
+                                                        </template>
+                                                        <template if:true={pkg.hasAddOns}>
+                                                            <div class="pkg-addons">
+                                                                <span class="pkg-addons-label">Add-Ons:</span>
+                                                                <template for:each={pkg.addOns} for:item="addon">
+                                                                    <span key={addon.key} class="pkg-addon-item">{addon.optionName} ({addon.formattedCostPrice})</span>
+                                                                </template>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                    <span class="pkg-dealer-price">{pkg.formattedDealerPrice}</span>
+                                                    <span class="pkg-subtotal">{pkg.formattedSubtotalWithTax}</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
                             </template>
-                        </tbody>
-                        <tfoot>
-                            <!-- Row 1: QTY + column totals with breakdown -->
-                            <tr class="footer-row">
-                                <td colspan="4" class="footer-qty">
-                                    <strong>QTY: {invoiceData.invoiceCount}</strong>
-                                </td>
-                                <td class="col-service footer-total">
-                                    <span class="footer-total-amount">{invoiceData.warrantyColTotal}</span>
-                                    <template if:true={invoiceData.hasWarrantyCol}>
-                                        <span class="footer-breakdown">Net: {invoiceData.warrantyColNet}</span>
-                                        <span class="footer-breakdown">Tax ({invoiceData.warrantyTaxPct}): {invoiceData.warrantyColTax}</span>
-                                    </template>
-                                </td>
-                                <td class="col-service footer-total">
-                                    <span class="footer-total-amount">{invoiceData.tireRimColTotal}</span>
-                                    <template if:true={invoiceData.hasTireRimCol}>
-                                        <span class="footer-breakdown">Net: {invoiceData.tireRimColNet}</span>
-                                        <span class="footer-breakdown">Tax ({invoiceData.tireRimTaxPct}): {invoiceData.tireRimColTax}</span>
-                                    </template>
-                                </td>
-                                <td class="col-service footer-total">
-                                    <span class="footer-total-amount">{invoiceData.loanProtectionColTotal}</span>
-                                    <template if:true={invoiceData.hasLoanProtectionCol}>
-                                        <span class="footer-breakdown">Net: {invoiceData.loanProtectionColNet}</span>
-                                        <span class="footer-breakdown">Tax ({invoiceData.loanProtectionTaxPct}): {invoiceData.loanProtectionColTax}</span>
-                                    </template>
-                                </td>
-                                <td class="col-subtotal"></td>
-                                <template if:true={invoiceData.canModifyInvoices}>
-                                    <td class="col-actions"></td>
-                                </template>
-                            </tr>
-                            <!-- Row 2: service counts aligned under their columns -->
-                            <tr class="footer-count-row">
-                                <td colspan="4"></td>
-                                <td class="col-service footer-count">
-                                    <template if:true={invoiceData.hasWarrantyCol}>
-                                        <strong>WARRANTY:</strong> {invoiceData.warrantyCount}
-                                    </template>
-                                </td>
-                                <td class="col-service footer-count">
-                                    <template if:true={invoiceData.hasTireRimCol}>
-                                        <strong>TIRE AND RIM:</strong> {invoiceData.tireRimCount}
-                                    </template>
-                                </td>
-                                <td class="col-service footer-count">
-                                    <template if:true={invoiceData.hasLoanProtectionCol}>
-                                        <strong>LOAN PROTECTION:</strong> {invoiceData.loanProtectionCount}
-                                    </template>
-                                </td>
-                                <td class="col-subtotal"></td>
-                                <template if:true={invoiceData.canModifyInvoices}>
-                                    <td class="col-actions"></td>
-                                </template>
-                            </tr>
-                        </tfoot>
-                    </table>
+                        </div>
+                    </template>
                 </div>
 
                 <!-- Summary Section -->

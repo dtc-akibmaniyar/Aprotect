@@ -32,7 +32,6 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
 
     @AuraEnabled(cacheable=false)
     public static InvoiceBreakdownData getInvoiceBreakdown(String remittanceFormId) {
-        // try {
             if (String.isBlank(remittanceFormId)) {
                 throw new AuraHandledException('Remittance Form ID is required');
             }
@@ -50,7 +49,8 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                        Credit_Note__c, Credit_Issued_By__r.Name,
                        Discount_Amount__c, Remittance_Form_Total_After_Discount__c,
                        Balance__c, Paid_Amount__c,
-                       RecordType.DeveloperName, Services_To_Pay__c
+                       RecordType.DeveloperName, Services_To_Pay__c,
+                       Date__c, CreatedDate
                 FROM Remittance_Form__c
                 WHERE Id = :remittanceFormId
                 LIMIT 1
@@ -76,6 +76,8 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
             result.paidAmount                       = form.Paid_Amount__c;
             result.isAllocationRemittance           = form.RecordType != null &&
                                                       form.RecordType.DeveloperName == 'Allocation_Remittance';
+            result.remittanceDate                   = form.Date__c;
+            result.dateGenerated                    = form.CreatedDate;
             result.totalCredit     = form.Dealer_Name__r?.Total_Credit_Amount__c   != null ? form.Dealer_Name__r.Total_Credit_Amount__c   : 0;
             result.appliedCredit   = form.Dealer_Name__r?.Applied_Credit__c         != null ? form.Dealer_Name__r.Applied_Credit__c         : 0;
             // Base available credit from Account formula
@@ -109,7 +111,6 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
             List<Invoice__c> invoices;
 
             if (result.isAllocationRemittance == true) {
-                // Resolve invoice IDs via junction records
                 Set<Id> invoiceFilterIds = new Set<Id>();
                 for (Remittance_Line_Item_Junction__c j : [
                     SELECT Invoice__c
@@ -126,7 +127,19 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                         SELECT Id, Name, Application__c, Status__c, Application__r.Name,
                                Application_Id__c, Customer_Name__c,
                                Vehicle_Year__c, Vehicle_Make__c, Vehicle_Model__c, Vehicle_Trim__c, Vin__c,
-                               Amount__c
+                               Amount__c,
+                               Application__r.Customer_First_Name__c,
+                               Application__r.Customer_Last_Name__c,
+                               Application__r.Customer_Address__c,
+                               Application__r.Customer_Phone__c,
+                               Application__r.Customer_Home_Phone__c,
+                               Application__r.Vehicle_Year__c,
+                               Application__r.Vehicle_Make__c,
+                               Application__r.Vehicle_Model__c,
+                               Application__r.Vehicle_VIN__c,
+                               Application__r.Odometer__c,
+                               Application__r.Odometer_Unit__c,
+                               Application__r.Date_of_Purchase__c
                         FROM Invoice__c
                         WHERE Id IN :invoiceFilterIds
                         ORDER BY CreatedDate DESC
@@ -137,13 +150,24 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                     SELECT Id, Name, Application__c, Status__c, Application__r.Name,
                            Application_Id__c, Customer_Name__c,
                            Vehicle_Year__c, Vehicle_Make__c, Vehicle_Model__c, Vehicle_Trim__c, Vin__c,
-                           Amount__c
+                           Amount__c,
+                           Application__r.Customer_First_Name__c,
+                           Application__r.Customer_Last_Name__c,
+                           Application__r.Customer_Address__c,
+                           Application__r.Customer_Phone__c,
+                           Application__r.Customer_Home_Phone__c,
+                           Application__r.Vehicle_Year__c,
+                           Application__r.Vehicle_Make__c,
+                           Application__r.Vehicle_Model__c,
+                           Application__r.Vehicle_VIN__c,
+                           Application__r.Odometer__c,
+                           Application__r.Odometer_Unit__c,
+                           Application__r.Date_of_Purchase__c
                     FROM Invoice__c
                     WHERE Remittance_Form__c = :remittanceFormId
                     ORDER BY CreatedDate DESC
                     LIMIT 1000
                 ];
-                // Deduplicate by Application + Name
                 Map<String, Invoice__c> seenInvoices = new Map<String, Invoice__c>();
                 for (Invoice__c inv : allInvoices) {
                     String key = inv.Application__c + '|' + inv.Name;
@@ -155,13 +179,16 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
             }
 
             Set<Id> invoiceIds = new Set<Id>();
-            for (Invoice__c inv : invoices) invoiceIds.add(inv.Id);
+            Set<Id> applicationIds = new Set<Id>();
+            for (Invoice__c inv : invoices) {
+                invoiceIds.add(inv.Id);
+                if (inv.Application__c != null) applicationIds.add(inv.Application__c);
+            }
 
             // ── 3. Query Invoice Line Items ───────────────────────────────────
             List<Invoice_Line_Item__c> lineItems;
 
             if (result.isAllocationRemittance == true) {
-                // Only the line items junctioned to this remittance form
                 Set<Id> allowedLineItemIds = new Set<Id>();
                 for (Remittance_Line_Item_Junction__c j : [
                     SELECT Invoice_Line_Item__c
@@ -205,11 +232,17 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                 }
             }
 
-            // Query Application Packages for base price info
+            // Query Application Packages with extended fields
             Map<Id, Application_Package__c> appPkgMap = new Map<Id, Application_Package__c>();
             if (!allPackageIds.isEmpty()) {
                 for (Application_Package__c pkg : [
-                    SELECT Id, Dealer_Package_Price__c, Add_Ons_Price__c
+                    SELECT Id, Name, Dealer_Package_Price__c, Add_Ons_Price__c,
+                           Package_Record_Type__c, Month__c,
+                           Contract_Cost_Price__c, Contract_Cost_Price_Without_Tax__c,
+                           Tax_Amount__c, Tax_Percentage__c,
+                           Package_Tier__c, Package_Tier__r.Name,
+                           Dealer_Package_Term__c, Dealer_Package_Term__r.Odometer_KM__c,
+                           Dealer_Package_Term__r.Month__c
                     FROM Application_Package__c
                     WHERE Id IN :allPackageIds
                 ]) {
@@ -258,6 +291,24 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                     : invoice.Application__c;
                 invRecord.customerName    = invoice.Customer_Name__c;
 
+                // Extended customer info from Application
+                if (invoice.Application__r != null) {
+                    invRecord.customerFirstName = invoice.Application__r.Customer_First_Name__c;
+                    invRecord.customerLastName  = invoice.Application__r.Customer_Last_Name__c;
+                    invRecord.customerAddress   = invoice.Application__r.Customer_Address__c;
+                    invRecord.customerPhone     = invoice.Application__r.Customer_Phone__c;
+                    if (String.isBlank(invRecord.customerPhone)) {
+                        invRecord.customerPhone = invoice.Application__r.Customer_Home_Phone__c;
+                    }
+                    invRecord.vehicleYearApp    = invoice.Application__r.Vehicle_Year__c;
+                    invRecord.vehicleMakeApp    = invoice.Application__r.Vehicle_Make__c;
+                    invRecord.vehicleModelApp   = invoice.Application__r.Vehicle_Model__c;
+                    invRecord.vehicleVINApp     = invoice.Application__r.Vehicle_VIN__c;
+                    invRecord.odometer          = invoice.Application__r.Odometer__c;
+                    invRecord.odometerUnit      = invoice.Application__r.Odometer_Unit__c;
+                    invRecord.vehicleDeliveryDate = invoice.Application__r.Date_of_Purchase__c;
+                }
+
                 List<String> vehicleParts = new List<String>();
                 if (invoice.Vehicle_Year__c  != null)            vehicleParts.add(String.valueOf(invoice.Vehicle_Year__c));
                 if (String.isNotBlank(invoice.Vehicle_Make__c))  vehicleParts.add(invoice.Vehicle_Make__c);
@@ -279,7 +330,7 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                         li.taxPercentage       = item.Tax_Percentage__c;
                         li.status              = item.Status__c;
 
-                        // Price breakdown
+                        // Price breakdown + extended package info
                         if (item.Application_Package__c != null && appPkgMap.containsKey(item.Application_Package__c)) {
                             Application_Package__c pkg = appPkgMap.get(item.Application_Package__c);
                             li.baseCostPrice = pkg.Dealer_Package_Price__c != null ? pkg.Dealer_Package_Price__c : 0;
@@ -288,6 +339,25 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                             li.additionalOptions = pkgToOptions.containsKey(item.Application_Package__c)
                                 ? pkgToOptions.get(item.Application_Package__c)
                                 : new List<OptionRecord>();
+                            li.packageName       = pkg.Name;
+                            li.packageRecordType = pkg.Package_Record_Type__c;
+                            li.packageTierName   = pkg.Package_Tier__r?.Name;
+                            li.month             = pkg.Month__c;
+                            li.dealerPrice       = pkg.Dealer_Package_Price__c;
+                            li.subtotalWithTax   = pkg.Contract_Cost_Price__c;
+                            // Duration: months + km
+                            String dptMonth = pkg.Dealer_Package_Term__r?.Month__c;
+                            Decimal dptKm   = pkg.Dealer_Package_Term__r?.Odometer_KM__c;
+                            List<String> durParts = new List<String>();
+                            if (String.isNotBlank(pkg.Month__c)) {
+                                durParts.add(pkg.Month__c + ' Months');
+                            } else if (String.isNotBlank(dptMonth)) {
+                                durParts.add(dptMonth + ' Months');
+                            }
+                            if (dptKm != null && dptKm > 0) {
+                                durParts.add(String.valueOf(dptKm.intValue()) + ' KM');
+                            }
+                            li.duration = durParts.isEmpty() ? null : String.join(durParts, '/');
                         } else {
                             li.baseCostPrice = 0;
                             li.addOnsTotal   = 0;
@@ -314,15 +384,18 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
             ];
             result.hasPayments = paymentCount > 0;
 
+            // Check if any payment has Check Pending Verification status
+            Integer checkPendingPayments = [
+                SELECT COUNT() FROM Payment__c
+                WHERE Remittance_Form__c = :remittanceFormId
+                AND Payment_Confirmation_Status__c = 'Check Pending Verification'
+                LIMIT 1
+            ];
+            result.hasCheckPendingVerification = checkPendingPayments > 0;
+
             result.invoices = invoiceRecords;
             result.success  = true;
             return result;
-
-        // } catch (Exception e) {
-        //     AuraHandledException ahe = new AuraHandledException(e.getMessage());
-        //     ahe.setMessage(e.getMessage());
-        //     throw ahe;
-        // }
     }
 
     @AuraEnabled(cacheable=false)
@@ -343,21 +416,21 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         }
     }
 
-    // ── Wrapper classes ───────────────────────────────────────────────────────
     // ── Remove Invoice from Remittance ────────────────────────────────
     @AuraEnabled
     public static void removeInvoiceFromRemittance(String remittanceFormId, String invoiceId) {
         if (String.isBlank(remittanceFormId) || String.isBlank(invoiceId)) {
             throw new AuraHandledException('Remittance Form ID and Invoice ID are required');
         }
-        // Check no payments exist
         Integer paymentCount = [SELECT COUNT() FROM Payment__c WHERE Remittance_Form__c = :remittanceFormId LIMIT 1];
         if (paymentCount > 0) {
             throw new AuraHandledException('Cannot remove invoices after a payment has been initiated');
         }
-        // Must keep at least 1 invoice
+        Integer checkPendingCount = [SELECT COUNT() FROM Payment__c WHERE Remittance_Form__c = :remittanceFormId AND Payment_Confirmation_Status__c = 'Check Pending Verification' LIMIT 1];
+        if (checkPendingCount > 0) {
+            throw new AuraHandledException('Invoices cannot be added or removed while a check payment is pending verification.');
+        }
         Integer invoiceCount = [SELECT COUNT() FROM Invoice__c WHERE Remittance_Form__c = :remittanceFormId];
-        // Also count via junctions for allocation remittances
         Set<Id> junctionInvoiceIds = new Set<Id>();
         for (Remittance_Line_Item_Junction__c j : [
             SELECT Invoice__c FROM Remittance_Line_Item_Junction__c
@@ -369,7 +442,6 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         if (totalInvoices <= 1) {
             throw new AuraHandledException('Cannot remove the last invoice from a remittance');
         }
-        // Delete junction records for this invoice on this remittance
         List<Remittance_Line_Item_Junction__c> junctions = [
             SELECT Id FROM Remittance_Line_Item_Junction__c
             WHERE Remittance_Form__c = :remittanceFormId AND Invoice__c = :invoiceId
@@ -377,7 +449,6 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         if (!junctions.isEmpty()) {
             delete junctions;
         }
-        // Clear the Remittance_Form__c lookup on the invoice
         update new Invoice__c(Id = invoiceId, Remittance_Form__c = null);
     }
 
@@ -387,17 +458,18 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         if (String.isBlank(remittanceFormId)) {
             throw new AuraHandledException('Remittance Form ID is required');
         }
-        // Check no payments exist
         Integer paymentCount = [SELECT COUNT() FROM Payment__c WHERE Remittance_Form__c = :remittanceFormId LIMIT 1];
         if (paymentCount > 0) {
             throw new AuraHandledException('Cannot add invoices after a payment has been initiated');
         }
-        // Get the dealer from the remittance form
+        Integer checkPendingCount2 = [SELECT COUNT() FROM Payment__c WHERE Remittance_Form__c = :remittanceFormId AND Payment_Confirmation_Status__c = 'Check Pending Verification' LIMIT 1];
+        if (checkPendingCount2 > 0) {
+            throw new AuraHandledException('Invoices cannot be added or removed while a check payment is pending verification.');
+        }
         Remittance_Form__c form = [SELECT Dealer_Name__c FROM Remittance_Form__c WHERE Id = :remittanceFormId LIMIT 1];
         if (form.Dealer_Name__c == null) {
             throw new AuraHandledException('Remittance Form has no dealer');
         }
-        // Get invoice IDs already on this remittance
         Set<Id> existingInvoiceIds = new Set<Id>();
         for (Invoice__c inv : [SELECT Id FROM Invoice__c WHERE Remittance_Form__c = :remittanceFormId]) {
             existingInvoiceIds.add(inv.Id);
@@ -408,7 +480,6 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         ]) {
             existingInvoiceIds.add(j.Invoice__c);
         }
-        // Query available invoices: same dealer, submitted applications, Due status, not on this remittance
         List<Invoice__c> available = [
             SELECT Id, Name, Application_Id__c, Customer_Name__c, Amount__c, Status__c,
                    Vehicle_Year__c, Vehicle_Make__c, Vehicle_Model__c
@@ -421,8 +492,27 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
             ORDER BY Amount__c ASC
             LIMIT 200
         ];
+        // CHANGE 1: Exclude invoices that have any line item with Status = 'Paid'
+        Set<Id> availableIds = new Set<Id>();
+        for (Invoice__c inv : available) {
+            availableIds.add(inv.Id);
+        }
+        Set<Id> invoicesWithPaidLineItems = new Set<Id>();
+        if (!availableIds.isEmpty()) {
+            for (Invoice_Line_Item__c ili : [
+                SELECT Invoice__c FROM Invoice_Line_Item__c
+                WHERE Invoice__c IN :availableIds AND Status__c = 'Paid'
+            ]) {
+                invoicesWithPaidLineItems.add(ili.Invoice__c);
+            }
+        }
+
         List<AvailableInvoice> results = new List<AvailableInvoice>();
         for (Invoice__c inv : available) {
+            // Skip invoices that have any paid line items
+            if (invoicesWithPaidLineItems.contains(inv.Id)) {
+                continue;
+            }
             AvailableInvoice ai = new AvailableInvoice();
             ai.id = inv.Id;
             ai.invoiceName = inv.Name;
@@ -445,14 +535,24 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         if (String.isBlank(remittanceFormId) || String.isBlank(invoiceId)) {
             throw new AuraHandledException('Remittance Form ID and Invoice ID are required');
         }
-        // Check no payments exist
         Integer paymentCount = [SELECT COUNT() FROM Payment__c WHERE Remittance_Form__c = :remittanceFormId LIMIT 1];
         if (paymentCount > 0) {
             throw new AuraHandledException('Cannot add invoices after a payment has been initiated');
         }
-        // Link the invoice to the remittance form
+        Integer checkPendingCount3 = [SELECT COUNT() FROM Payment__c WHERE Remittance_Form__c = :remittanceFormId AND Payment_Confirmation_Status__c = 'Check Pending Verification' LIMIT 1];
+        if (checkPendingCount3 > 0) {
+            throw new AuraHandledException('Invoices cannot be added or removed while a check payment is pending verification.');
+        }
+        // Guard: reject invoice if it is Paid/Completed or has any paid line items
+        Invoice__c invToAdd = [SELECT Id, Status__c FROM Invoice__c WHERE Id = :invoiceId LIMIT 1];
+        if (invToAdd.Status__c == 'Paid' || invToAdd.Status__c == 'Completed') {
+            throw new AuraHandledException('Cannot add a paid or completed invoice to a remittance');
+        }
+        Integer paidLineCount = [SELECT COUNT() FROM Invoice_Line_Item__c WHERE Invoice__c = :invoiceId AND Status__c = 'Paid'];
+        if (paidLineCount > 0) {
+            throw new AuraHandledException('Cannot add an invoice that has paid line items to a remittance');
+        }
         update new Invoice__c(Id = invoiceId, Remittance_Form__c = remittanceFormId);
-        // Create junction records for each line item
         List<Invoice_Line_Item__c> lineItems = [
             SELECT Id, Contract_Cost_Price__c FROM Invoice_Line_Item__c WHERE Invoice__c = :invoiceId AND Status__c != 'Paid'
         ];
@@ -516,6 +616,9 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         @AuraEnabled public Decimal appliedCredit;
         @AuraEnabled public Decimal availableCredit;
         @AuraEnabled public Boolean hasPayments;
+        @AuraEnabled public Boolean hasCheckPendingVerification;
+        @AuraEnabled public Date    remittanceDate;
+        @AuraEnabled public Datetime dateGenerated;
     }
 
     public class InvoiceRecord {
@@ -528,6 +631,19 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         @AuraEnabled public String status;
         @AuraEnabled public Integer rowIndex;
         @AuraEnabled public List<LineItemRecord> lineItems;
+        // Extended customer info
+        @AuraEnabled public String customerFirstName;
+        @AuraEnabled public String customerLastName;
+        @AuraEnabled public String customerAddress;
+        @AuraEnabled public String customerPhone;
+        // Extended vehicle info from Application
+        @AuraEnabled public String vehicleYearApp;
+        @AuraEnabled public String vehicleMakeApp;
+        @AuraEnabled public String vehicleModelApp;
+        @AuraEnabled public String vehicleVINApp;
+        @AuraEnabled public Decimal odometer;
+        @AuraEnabled public String odometerUnit;
+        @AuraEnabled public Date   vehicleDeliveryDate;
     }
 
     public class AvailableInvoice {
@@ -551,6 +667,14 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         @AuraEnabled public Decimal addOnsTotal;
         @AuraEnabled public Boolean hasBreakdown;
         @AuraEnabled public List<OptionRecord> additionalOptions;
+        // Extended package info
+        @AuraEnabled public String  packageName;
+        @AuraEnabled public String  packageRecordType;
+        @AuraEnabled public String  packageTierName;
+        @AuraEnabled public String  month;
+        @AuraEnabled public String  duration;
+        @AuraEnabled public Decimal dealerPrice;
+        @AuraEnabled public Decimal subtotalWithTax;
     }
 
     public class OptionRecord {

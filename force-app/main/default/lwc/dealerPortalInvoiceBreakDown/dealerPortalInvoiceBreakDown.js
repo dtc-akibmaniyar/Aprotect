@@ -10,12 +10,7 @@ import removeInvoiceFromRemittance from '@salesforce/apex/DealerPortalInvoiceBre
 import getAvailableInvoicesForRemittance from '@salesforce/apex/DealerPortalInvoiceBreakdownHandler.getAvailableInvoicesForRemittance';
 import addInvoiceToRemittance from '@salesforce/apex/DealerPortalInvoiceBreakdownHandler.addInvoiceToRemittance';
 
-// Maps a line-item name to one of three service column keys
-const SERVICE_COLS = [
-    { key: 'warranty',       keywords: ['warranty', 'extended limited'] },
-    { key: 'tireRim',        keywords: ['tire', 'rim'] },
-    { key: 'loanProtection', keywords: ['loan protection', 'gap', 'total loss', 'loan'] }
-];
+const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
 export default class DealerPortalInvoiceBreakDown extends NavigationMixin(LightningElement) {
     @api recordId;
@@ -28,9 +23,10 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
     @track availableInvoices = [];
     @track isLoadingAvailable = false;
 
-    _dataLoaded = false;
+    // Expand/collapse state
+    @track expandedRows = {};
 
-    // LMS subscription
+    _dataLoaded = false;
     _subscription = null;
     _pollTimers = [];
 
@@ -54,7 +50,6 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
             this._dataLoaded = true;
             this.loadInvoiceData();
         }
-        // Subscribe to payment status changes
         this._subscription = subscribe(
             this.messageContext,
             PAYMENT_STATUS_CHANNEL,
@@ -72,13 +67,8 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
     }
 
     handlePaymentMessage(message) {
-        // Only react to messages for our remittance form
         if (message.remittanceFormId !== this.recordId) return;
-
-        // Immediate refresh
         this.loadInvoiceData();
-
-        // Delayed polls to catch flow-driven updates (invoice status, balance, junction statuses)
         this._pollTimers.forEach(t => clearTimeout(t));
         this._pollTimers = [
             setTimeout(() => this.loadInvoiceData(), 3000),
@@ -115,183 +105,160 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
         }, 0);
     }
 
+    // ─── Date Formatting ──────────────────────────────────────────────
+
+    _formatRemittanceDate(dateVal) {
+        if (!dateVal) return '';
+        const d = new Date(dateVal);
+        const month = MONTH_NAMES[d.getMonth()];
+        const day = d.getDate();
+        const year = d.getFullYear();
+        return `${month} ${day < 10 ? '0' + day : day}, ${year}`;
+    }
+
+    _formatDateGenerated(datetimeVal) {
+        if (!datetimeVal) return '';
+        const d = new Date(datetimeVal);
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return `${dd}-${mm}-${yyyy}`;
+    }
+
     // ─── Transform ────────────────────────────────────────────────────
 
     transformInvoiceData(result) {
-        const colTotals    = { warranty: 0, tireRim: 0, loanProtection: 0 };
-        const colTotalsNet = { warranty: 0, tireRim: 0, loanProtection: 0 };
-        const colTotalsTax = { warranty: 0, tireRim: 0, loanProtection: 0 };
-        const colCounts    = { warranty: 0, tireRim: 0, loanProtection: 0 };
-        // Track tax percentages to compute weighted average
-        const colTaxPctWeighted = { warranty: 0, tireRim: 0, loanProtection: 0 };
-
         const hasPayments = result.hasPayments === true;
+        const hasCheckPendingVerification = result.hasCheckPendingVerification === true;
         const invoiceCount = (result.invoices || []).length;
 
         const tableRows = (result.invoices || []).map((invoice, idx) => {
-            const cols = this._mapServiceCols(invoice.lineItems || []);
+            // Compute subtotal for this invoice
+            const subtotal = (invoice.lineItems || []).reduce((sum, li) => {
+                return sum + (li.costPriceWithTax || 0);
+            }, 0);
 
-            ['warranty', 'tireRim', 'loanProtection'].forEach(k => {
-                if (cols[k]) {
-                    colTotals[k]    += cols[k].costPriceWithTax    || 0;
-                    colTotalsNet[k] += cols[k].costPriceWithoutTax || 0;
-                    colTotalsTax[k] += cols[k].taxAmount           || 0;
-                    colCounts[k]++;
-                    colTaxPctWeighted[k] += (cols[k].taxPercentage || 0) * (cols[k].costPriceWithoutTax || 0);
-                }
+            // Build package list for expanded view
+            const packages = (invoice.lineItems || []).map((li, liIdx) => {
+                const addOns = (li.additionalOptions || []).map((opt, oi) => ({
+                    key: 'opt-' + oi,
+                    optionName: opt.optionName || 'Add-On',
+                    formattedCostPrice: this._fmt(opt.costPrice || 0)
+                }));
+
+                return {
+                    key: 'pkg-' + liIdx,
+                    packageName: li.packageRecordType || li.packageTierName || li.name || 'Package',
+                    packageRecordType: li.packageRecordType || '',
+                    packageTierName: li.packageTierName || '',
+                    duration: li.duration || '',
+                    hasDuration: !!li.duration,
+                    hasAddOns: addOns.length > 0,
+                    addOns,
+                    formattedDealerPrice: this._fmt(li.dealerPrice || li.baseCostPrice || 0),
+                    formattedSubtotalWithTax: this._fmt(li.subtotalWithTax || li.costPriceWithTax || 0)
+                };
             });
 
-            const subtotal = (cols.warranty?.costPriceWithTax || 0)
-                           + (cols.tireRim?.costPriceWithTax || 0)
-                           + (cols.loanProtection?.costPriceWithTax || 0);
+            // Vehicle info for expanded view
+            const vYear = invoice.vehicleYearApp || '';
+            const vMake = invoice.vehicleMakeApp || '';
+            const vModel = invoice.vehicleModelApp || '';
+            const vehicleFullName = [vYear, vMake, vModel].filter(Boolean).join(' ');
+            const vinDisplay = invoice.vehicleVINApp || invoice.vin || '';
+            const odometerDisplay = invoice.odometer
+                ? `${Number(invoice.odometer).toLocaleString()} ${invoice.odometerUnit || 'KM'}`
+                : '';
+            const deliveryDate = invoice.vehicleDeliveryDate
+                ? this._formatDateGenerated(invoice.vehicleDeliveryDate)
+                : '';
 
             return {
-                id:              invoice.id,
-                invoiceName:     invoice.invoiceName || invoice.applicationNumber,
-                rowIndex:        invoice.rowIndex || (idx + 1),
-                customerName:    invoice.customerName || '',
-                vehicleInfo:     invoice.vehicleInfo  || '',
-                vin:             invoice.vin           || '',
-                invoiceStatus:   invoice.status        || '',
-                invoiceStatusClass: this._statusClass(invoice.status || ''),
-                warranty:        cols.warranty       ? this._colCell(cols.warranty)       : null,
-                tireRim:         cols.tireRim        ? this._colCell(cols.tireRim)        : null,
-                loanProtection:  cols.loanProtection ? this._colCell(cols.loanProtection) : null,
+                id: invoice.id,
+                applicationId: invoice.applicationId || '',
+                invoiceName: invoice.invoiceName || invoice.applicationNumber,
+                applicationNumber: invoice.applicationNumber || '',
+                rowIndex: invoice.rowIndex || (idx + 1),
+                customerName: invoice.customerName || '',
+                customerFirstName: invoice.customerFirstName || '',
+                customerLastName: invoice.customerLastName || '',
+                customerAddress: invoice.customerAddress || '',
+                customerPhone: invoice.customerPhone || '',
+                vehicleInfo: invoice.vehicleInfo || '',
+                vehicleFullName,
+                vinDisplay,
+                odometerDisplay,
+                hasOdometer: !!odometerDisplay,
+                deliveryDate,
+                hasDeliveryDate: !!deliveryDate,
+                vin: invoice.vin || '',
                 formattedSubTotal: this._fmt(subtotal),
-                canRemove: !hasPayments && invoiceCount > 1
+                canRemove: !hasPayments && !hasCheckPendingVerification && invoiceCount > 1,
+                isExpanded: !!this.expandedRows[invoice.id],
+                chevronIcon: this.expandedRows[invoice.id] ? '▽' : '▷',
+                packages
             };
         });
 
-        // Compute average tax percentage per column (weighted by net amount)
-        const colAvgTaxPct = {};
-        ['warranty', 'tireRim', 'loanProtection'].forEach(k => {
-            if (colTotalsNet[k] > 0) {
-                colAvgTaxPct[k] = colTaxPctWeighted[k] / colTotalsNet[k];
-            } else {
-                colAvgTaxPct[k] = 0;
-            }
-        });
-
         return {
-            remittanceFormName:                   result.remittanceFormName,
-            payerName:                            result.payerName,
-            receiverName:                         result.receiverName,
-            dealerName:                           result.dealerName,
-            status:                               result.status,
-            cancellationReason:                   result.cancellationReason,
-            billTo:                               result.billTo,
-            creditNote:                           result.creditNote,
-            creditIssuedBy:                       result.creditIssuedBy,
-            discountAmount:                       result.discountAmount,
-            formattedDiscountAmount:              this._fmt(result.discountAmount || 0),
-            remittanceFormTotalAfterDiscount:     result.remittanceFormTotalAfterDiscount,
+            remittanceFormName: result.remittanceFormName,
+            payerName: result.payerName,
+            receiverName: result.receiverName,
+            dealerName: result.dealerName,
+            status: result.status,
+            cancellationReason: result.cancellationReason,
+            billTo: result.billTo,
+            creditNote: result.creditNote,
+            creditIssuedBy: result.creditIssuedBy,
+            discountAmount: result.discountAmount,
+            formattedDiscountAmount: this._fmt(result.discountAmount || 0),
+            remittanceFormTotalAfterDiscount: result.remittanceFormTotalAfterDiscount,
             formattedRemittanceFormTotalAfterDiscount: this._fmt(result.remittanceFormTotalAfterDiscount || 0),
-            balance:                              result.balance,
-            formattedBalance:                     this._fmt(result.balance || 0),
-            paidAmount:                           result.paidAmount,
-            formattedPaidAmount:                  this._fmt(result.paidAmount || 0),
-            isCancelled:                          result.status === 'Canceled' || result.status === 'canceled' || result.status === 'Cancelled',
-            statusBadgeClass:                     this._remittanceStatusClass(result.status),
-            isAllocationRemittance:               result.isAllocationRemittance === true,
-            selectedServiceLabels:                result.selectedServiceLabels || '',
+            balance: result.balance,
+            formattedBalance: this._fmt(result.balance || 0),
+            paidAmount: result.paidAmount,
+            formattedPaidAmount: this._fmt(result.paidAmount || 0),
+            isCancelled: result.status === 'Canceled' || result.status === 'canceled' || result.status === 'Cancelled',
+            statusBadgeClass: this._remittanceStatusClass(result.status),
+            isAllocationRemittance: result.isAllocationRemittance === true,
+            selectedServiceLabels: result.selectedServiceLabels || '',
             hasPayments,
-            canModifyInvoices: !hasPayments,
+            canModifyInvoices: !hasPayments && !hasCheckPendingVerification,
+            hasCheckPendingVerification,
             tableRows,
-            invoiceCount:           tableRows.length,
-            warrantyColTotal:       this._fmt(colTotals.warranty),
-            tireRimColTotal:        this._fmt(colTotals.tireRim),
-            loanProtectionColTotal: this._fmt(colTotals.loanProtection),
-            // Net (excl. tax) totals
-            warrantyColNet:         this._fmt(colTotalsNet.warranty),
-            tireRimColNet:          this._fmt(colTotalsNet.tireRim),
-            loanProtectionColNet:   this._fmt(colTotalsNet.loanProtection),
-            // Tax amount totals
-            warrantyColTax:         this._fmt(colTotalsTax.warranty),
-            tireRimColTax:          this._fmt(colTotalsTax.tireRim),
-            loanProtectionColTax:   this._fmt(colTotalsTax.loanProtection),
-            // Average tax percentage per column
-            warrantyTaxPct:         this._fmtPct(colAvgTaxPct.warranty),
-            tireRimTaxPct:          this._fmtPct(colAvgTaxPct.tireRim),
-            loanProtectionTaxPct:   this._fmtPct(colAvgTaxPct.loanProtection),
-            warrantyCount:          colCounts.warranty,
-            tireRimCount:           colCounts.tireRim,
-            loanProtectionCount:    colCounts.loanProtection,
-            hasWarrantyCol:       colCounts.warranty       > 0,
-            hasTireRimCol:        colCounts.tireRim        > 0,
-            hasLoanProtectionCol: colCounts.loanProtection > 0,
-            grandTotal:           this._fmt(
+            invoiceCount: tableRows.length,
+            grandTotal: this._fmt(
                 (result.invoices || []).reduce((sum, inv) => {
-                    const cols = this._mapServiceCols(inv.lineItems || []);
-                    return sum + (cols.warranty?.costPriceWithTax || 0)
-                               + (cols.tireRim?.costPriceWithTax  || 0)
-                               + (cols.loanProtection?.costPriceWithTax || 0);
+                    return sum + (inv.lineItems || []).reduce((s, li) => s + (li.costPriceWithTax || 0), 0);
                 }, 0)
             ),
-            totalCredit:               result.totalCredit     || 0,
-            appliedCredit:             result.appliedCredit   || 0,
-            availableCredit:           result.availableCredit || 0,
-            formattedTotalCredit:      this._fmt(result.totalCredit     || 0),
-            formattedAppliedCredit:    this._fmt(result.appliedCredit   || 0),
-            formattedAvailableCredit:  this._fmt(result.availableCredit || 0),
-            hasAvailableCredit:        (result.totalCredit || 0) > 0
+            // Remittance date & date generated
+            formattedRemittanceDate: this._formatRemittanceDate(result.remittanceDate),
+            hasRemittanceDate: !!result.remittanceDate,
+            formattedDateGenerated: this._formatDateGenerated(result.dateGenerated),
+            hasDateGenerated: !!result.dateGenerated,
+            // Credit
+            totalCredit: result.totalCredit || 0,
+            appliedCredit: result.appliedCredit || 0,
+            availableCredit: result.availableCredit || 0,
+            formattedTotalCredit: this._fmt(result.totalCredit || 0),
+            formattedAppliedCredit: this._fmt(result.appliedCredit || 0),
+            formattedAvailableCredit: this._fmt(result.availableCredit || 0),
+            hasAvailableCredit: (result.totalCredit || 0) > 0
         };
-    }
-
-    _mapServiceCols(lineItems) {
-        const cols = { warranty: null, tireRim: null, loanProtection: null };
-        lineItems.forEach(item => {
-            const n = (item.name || '').toLowerCase();
-            const col = SERVICE_COLS.find(c => c.keywords.some(k => n.includes(k)));
-            if (col && !cols[col.key]) {
-                cols[col.key] = item;
-            }
-        });
-        return cols;
-    }
-
-    _colCell(item) {
-        const status = item.status || '';
-        const hasBreakdown = item.hasBreakdown === true;
-        return {
-            amount:          item.costPriceWithTax || 0,
-            formattedAmount: this._fmt(item.costPriceWithTax || 0),
-            status,
-            statusClass:     this._statusClass(status),
-            hasStatus:       !!status,
-            // Breakdown fields
-            hasBreakdown,
-            formattedBaseCostPrice: this._fmt(item.baseCostPrice || 0),
-            formattedAddOnsTotal:   this._fmt(item.addOnsTotal || 0),
-            additionalOptions: (item.additionalOptions || []).map((opt, i) => ({
-                key: 'opt-' + i,
-                optionName: opt.optionName || 'Additional Option',
-                formattedCostPrice: this._fmt(opt.costPrice || 0)
-            }))
-        };
-    }
-
-    _statusClass(status) {
-        const map = {
-            'Paid':         'li-badge li-badge--paid',
-            'Partial Paid': 'li-badge li-badge--partial',
-            'Planned':      'li-badge li-badge--planned',
-            'Due':          'li-badge li-badge--due',
-            'Cancelled':    'li-badge li-badge--cancelled'
-        };
-        return map[status] || 'li-badge li-badge--default';
     }
 
     _remittanceStatusClass(status) {
         const map = {
-            'Open':                 'rf-badge rf-badge--open',
-            'Completed':            'rf-badge rf-badge--completed',
-            'Partially Completed':  'rf-badge rf-badge--partial',
-            'Cancelled':            'rf-badge rf-badge--cancelled',
-            'Canceled':             'rf-badge rf-badge--cancelled',
-            'Expired':              'rf-badge rf-badge--expired',
-            'Paid':                 'rf-badge rf-badge--completed',
-            'Partial Paid':         'rf-badge rf-badge--partial',
-            'Due':                  'rf-badge rf-badge--due'
+            'Open': 'rf-badge rf-badge--open',
+            'Completed': 'rf-badge rf-badge--completed',
+            'Partially Completed': 'rf-badge rf-badge--partial',
+            'Cancelled': 'rf-badge rf-badge--cancelled',
+            'Canceled': 'rf-badge rf-badge--cancelled',
+            'Expired': 'rf-badge rf-badge--expired',
+            'Paid': 'rf-badge rf-badge--completed',
+            'Partial Paid': 'rf-badge rf-badge--partial',
+            'Due': 'rf-badge rf-badge--due'
         };
         return map[status] || 'rf-badge rf-badge--default';
     }
@@ -300,22 +267,56 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
         return '$' + (parseFloat(value) || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     }
 
-    _fmtPct(value) {
-        return (parseFloat(value) || 0).toFixed(2) + '%';
+    // ─── Expand/Collapse ──────────────────────────────────────────────
+
+    handleToggleRow(event) {
+        const invoiceId = event.currentTarget.dataset.id;
+        if (!invoiceId) return;
+        this.expandedRows = {
+            ...this.expandedRows,
+            [invoiceId]: !this.expandedRows[invoiceId]
+        };
+        // Re-transform to update isExpanded/chevron
+        if (this.invoiceData && this.invoiceData.tableRows) {
+            this.invoiceData = {
+                ...this.invoiceData,
+                tableRows: this.invoiceData.tableRows.map(row => ({
+                    ...row,
+                    isExpanded: !!this.expandedRows[row.id],
+                    chevronIcon: this.expandedRows[row.id] ? '▽' : '▷'
+                }))
+            };
+        }
     }
 
     // ─── Navigation ───────────────────────────────────────────────────
 
+    handleApplicationClick(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const applicationId = event.currentTarget.dataset.id;
+        if (!applicationId) return;
+        this[NavigationMixin.Navigate]({
+            type: 'standard__recordPage',
+            attributes: {
+                recordId: applicationId,
+                objectApiName: 'Application__c',
+                actionName: 'view'
+            }
+        });
+    }
+
     handleInvoiceClick(event) {
         event.preventDefault();
+        event.stopPropagation();
         const invoiceId = event.currentTarget.dataset.id;
         if (!invoiceId) return;
         this[NavigationMixin.Navigate]({
             type: 'standard__recordPage',
             attributes: {
-                recordId:      invoiceId,
+                recordId: invoiceId,
                 objectApiName: 'Invoice__c',
-                actionName:    'view'
+                actionName: 'view'
             }
         });
     }
@@ -323,6 +324,7 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
     // ─── Remove Invoice ───────────────────────────────────────────────
 
     async handleRemoveInvoice(event) {
+        event.stopPropagation();
         const invoiceId = event.currentTarget.dataset.id;
         if (!invoiceId) return;
         try {
@@ -333,7 +335,6 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
             });
             this.showToast('Success', 'Invoice removed from remittance', 'success');
             await this.loadInvoiceData();
-            // Notify LDS cache so sibling components (e.g. payment) refresh Balance__c
             notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
         } catch (error) {
             this.showToast('Error', error.body?.message || 'Error removing invoice', 'error');
@@ -380,7 +381,6 @@ export default class DealerPortalInvoiceBreakDown extends NavigationMixin(Lightn
             this.showAddInvoiceModal = false;
             this.availableInvoices = [];
             await this.loadInvoiceData();
-            // Notify LDS cache so sibling components (e.g. payment) refresh Balance__c
             notifyRecordUpdateAvailable([{ recordId: this.recordId }]);
         } catch (error) {
             this.showToast('Error', error.body?.message || 'Error adding invoice', 'error');

@@ -49,6 +49,11 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
         return this.invoiceData && this.invoiceData.applicationRecordId;
     }
 
+    /** True when a Payment__c exists on the invoice's Remittance Form */
+    get hasPaymentInitiated() {
+        return this.invoiceData && this.invoiceData.hasPaymentInitiated === true;
+    }
+
     handleBackToApplication() {
         if (!this.invoiceData?.applicationRecordId) return;
         this[NavigationMixin.Navigate]({
@@ -106,6 +111,7 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
 
     get canCancelInvoice() {
         if (!this.invoiceData) return false;
+        if (this.hasPaymentInitiated) return false;
         return this.invoiceData.invoiceStatus !== 'Cancelled';
     }
 
@@ -266,6 +272,7 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
             invoiceStatus:       raw.invoiceStatus,
             statusClass:         'invoice-status ' + this.statusClass(raw.invoiceStatus),
             hasRemittanceForm:   raw.hasRemittanceForm === true,
+            hasPaymentInitiated: raw.hasPaymentInitiated === true,
             dealerName:          raw.dealerName,
             billTo:              raw.billTo,
             applicationId:       raw.applicationId,
@@ -277,14 +284,14 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
             formattedOdometer: raw.odometer != null
                 ? parseFloat(raw.odometer).toFixed(2) + ' ' + (raw.odometerUnit || 'KM')
                 : null,
-            packages:     this.transformPackages(raw.packages || []),
+            packages:     this.transformPackages(raw.packages || [], raw.hasPaymentInitiated === true),
             hasPackages:  (raw.packages || []).length > 0,
             packageCount: raw.packageCount || 0,
             formattedTotal: this.formatCurrency(raw.totalAmount)
         };
     }
 
-    transformPackages(packages) {
+    transformPackages(packages, paymentInitiated) {
         return packages.map(pkg => ({
             packageId:    pkg.packageId,
             recordTypeName: pkg.recordTypeName,
@@ -320,7 +327,7 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
                 status:          li.status,
                 statusClass:     'line-item-status ' + this.statusClass(li.status),
                 formattedAmount: this.formatCurrency(li.amount),
-                canCancel:       li.status !== 'Cancelled'
+                canCancel:       li.status !== 'Cancelled' && !paymentInitiated
             }))
         }));
     }
