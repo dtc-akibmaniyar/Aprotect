@@ -125,6 +125,7 @@ export default class DealerPortalVehicle extends LightningElement {
         deferralOption: false,
         // Delivery Date
         deliveryDate: '',
+        lienHolder: '',
         // Usage Type
         usageType: 'Personal Use',
         // Powersports fields
@@ -226,6 +227,7 @@ export default class DealerPortalVehicle extends LightningElement {
             warrantyInServiceDate: '',
             deferralOption: false,
             deliveryDate: '',
+        lienHolder: '',
             usageType: 'Personal Use',
             vehicleCategory: '',
             vehicleSubType: '',
@@ -413,6 +415,7 @@ export default class DealerPortalVehicle extends LightningElement {
                 warrantyInServiceDate: vehicleData.warrantyInServiceDate || '',
                 deferralOption: vehicleData.deferralOption || false,
                 deliveryDate: vehicleData.deliveryDate || '',
+                lienHolder: vehicleData.lienHolder || '',
                 // Powersports fields
                 vehicleCategory: loadedCategory,
                 vehicleSubType: this.vehicleSubType,
@@ -1273,7 +1276,8 @@ getCurrentData() {
             'warrantyInServiceDate': 'In_Service_Date__c', // Only field mapping for In_Service_Date__c
             'deferralOption': 'Deferral_Option__c',
             'deliveryDate': 'Delivery_Date__c',
-            'usageType': 'Usage_Type__c'
+            'usageType': 'Usage_Type__c',
+            'lienHolder': 'Financial_Institution_Lender__c'
         };
         
         const salesforceFields = {};
@@ -1450,6 +1454,7 @@ getCurrentData() {
                     inServiceDate: this.vehicleData.inServiceDate || '',
                     commercialUse: this.vehicleData.commercialUse || 'NON-COMMERCIAL',
                     deliveryDate: this.vehicleData.deliveryDate || '',
+                    lienHolder: this.vehicleData.lienHolder || '',
                     usageType: this.vehicleData.usageType || 'Personal Use',
                     // Powersports storable fields
                     vehicleCategory: this.vehicleCategory,
@@ -2129,6 +2134,7 @@ async handleContinue() {
                 warrantyInServiceDate: formatDateForSalesforce(this.vehicleData.warrantyInServiceDate),
                 deferralOption: this.vehicleData.deferralOption || false,
                 deliveryDate: formatDateForSalesforce(this.vehicleData.deliveryDate),
+                lienHolder: this.vehicleData.lienHolder || '',
                 usageType: this.vehicleData.usageType || '',
                 // Application fields
                 dealerCommentsNotes: this.applicationData.dealerCommentsNotes || '',

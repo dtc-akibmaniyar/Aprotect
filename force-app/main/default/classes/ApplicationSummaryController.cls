@@ -712,13 +712,11 @@ public without sharing class ApplicationSummaryController {
 
             for (String rtName : recordTypes) {
                 String rtLabel = resolvePackageRecordTypeLabel(rtName);
-                PageReference pdfPage = Page.DealerPortalVehicleApplicationPDFs;
+                PageReference pdfPage = new PageReference('/apex/DealerPortalVehicleApplicationPDFs');
                 pdfPage.getParameters().put('id', applicationId);
                 if (String.isNotBlank(rtName)) {
                     pdfPage.getParameters().put('rt', rtName);
                 }
-                pdfPage.getParameters().put('sfdc.override', '1');
-                pdfPage.getParameters().put('core.apexpages.request.devconsole', '1');
 
                 Blob pdfBlob;
                 if (Test.isRunningTest()) {
@@ -815,13 +813,11 @@ public without sharing class ApplicationSummaryController {
                 }
             }
 
-            PageReference pdfPage = Page.DealerPortalVehicleApplicationPDFs;
+            PageReference pdfPage = new PageReference('/apex/DealerPortalVehicleApplicationPDFs');
             pdfPage.getParameters().put('id', applicationId);
             if (String.isNotBlank(recordTypeName)) {
                 pdfPage.getParameters().put('rt', recordTypeName);
             }
-            pdfPage.getParameters().put('sfdc.override', '1');
-            pdfPage.getParameters().put('core.apexpages.request.devconsole', '1');
 
             Blob pdfBlob;
             if (Test.isRunningTest()) {
@@ -1309,7 +1305,7 @@ public without sharing class ApplicationSummaryController {
                     try { Integer v = Integer.valueOf(vStr); if (v > maxVersion) maxVersion = v; } catch (Exception ex) { }
                 }
             }
-            PageReference pdfPage = Page.QuotePDF;
+            PageReference pdfPage = new PageReference('/apex/QuotePDF');
             pdfPage.getParameters().put('id', applicationId);
             Blob pdfBlob;
             if (Test.isRunningTest()) {

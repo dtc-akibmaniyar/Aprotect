@@ -525,6 +525,18 @@
                             variant="label-hidden">
                         </lightning-input>
                     </div>
+                    <div class="form-field">
+                        <label class="field-label">LIEN HOLDER / FINANCIAL INSTITUTION</label>
+                        <lightning-input
+                            type="text"
+                            name="lienHolder"
+                            value={vehicleData.lienHolder}
+                            onchange={handleInputChange}
+                            disabled={fieldDisabled}
+                            class="input-field"
+                            variant="label-hidden">
+                        </lightning-input>
+                    </div>
                                          <div class="form-field usage-type-field">
                          <label class="field-label">USAGE TYPE
                              <lightning-icon icon-name="utility:info" size="xx-small" class="info-icon"></lightning-icon>

@@ -67,6 +67,7 @@ public class VehicleDataDTO {
     @AuraEnabled public String salesRepId;
     @AuraEnabled public String salesRepName;
     @AuraEnabled public String dealerSalesId;
+    @AuraEnabled public String lienHolder;
     @AuraEnabled public String dealershipName;
     @AuraEnabled public String dealershipAddress;
     @AuraEnabled public String cityProvincePostal;
@@ -854,6 +855,9 @@ public static VehicleResponse loadVehicleData(String applicationId) {
                 }
                 if (app.Dealer_Sales_ID_License__c != null) {
                     vehicleData.dealerSalesId = app.Dealer_Sales_ID_License__c;
+                }
+                if (app.Financial_Institution_Lender__c != null) {
+                    vehicleData.lienHolder = app.Financial_Institution_Lender__c;
                 }
 
                 if (app.Dealer_Name__r != null) {
@@ -3251,6 +3255,7 @@ throw new CalloutException('Failed to create Application: ' + e.getMessage());
             appToUpdate.Dealer_Comments_Notes__c = (String) vehicleDataMap.get('dealerCommentsNotes');
             appToUpdate.Show_Comments_On_Print__c = (Boolean) vehicleDataMap.get('showCommentsOnPrint');
             appToUpdate.Dealer_Sales_ID_License__c = (String) vehicleDataMap.get('dealerSalesId');
+            appToUpdate.Financial_Institution_Lender__c = (String) vehicleDataMap.get('lienHolder');
             appToUpdate.Vehicle_Sub_Type__c = (String) vehicleDataMap.get('vehicleSubType');
             appToUpdate.Vehicle_Class__c = (String) vehicleDataMap.get('vehicleClass');
             
@@ -4209,7 +4214,7 @@ private static List<Application__c> queryApplications(String applicationId, Bool
             'Vehicle__r.Deferral_Option__c, Vehicle__r.Delivery_Date__c, Vehicle__r.Usage_Type__c, Vehicle__r.Vehicle_Sub_Type__c, Vehicle__r.Vehicle_Class__c, Vehicle__r.Vehicle_Category__c, ' +
             'Dealer_Name__c, Dealer_Name__r.Id, Dealer_Name__r.Name, Dealer_Name__r.BillingStreet, Dealer_Name__r.BillingCity, ' +
             'Dealer_Name__r.BillingState, Dealer_Name__r.BillingPostalCode, Dealer_Comments_Notes__c, Show_Comments_On_Print__c, ' +
-            'Sales_Rep__c, Sales_Rep__r.Id, Sales_Rep__r.Name, Dealer_Sales_ID_License__c' :
+            'Sales_Rep__c, Sales_Rep__r.Id, Sales_Rep__r.Name, Dealer_Sales_ID_License__c, Financial_Institution_Lender__c' :
             'Vehicle__r.Id, Vehicle__r.Name, Vehicle__r.Year__c, Vehicle__r.Make__c, Vehicle__r.Model__c, Vehicle__r.Trim__c';
         
         String query = 'SELECT Id, Name, CreatedDate, Application_Status__c, Is_Vehicle_Financed__c, ' + vehicleFields + ' ' +

@@ -15,7 +15,6 @@ import createInvoiceOnApplicationSubmit from '@salesforce/apex/ApplicationSummar
 // Update application status
 import updateApplicationStatus from '@salesforce/apex/DealerPortalController.updateApplicationStatus';
 import getInvoiceForApplication from '@salesforce/apex/ApplicationSummaryController.getInvoiceForApplication';
-
 export default class DealerPortalSummary extends NavigationMixin(LightningElement) {
     @api recordId;
     @api applicationId = '';
@@ -24,6 +23,7 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     
     @track loading = false;
     @track isBusy = false;
+
     @track generatingPdfRecordType = null;
 
     // Initialize summaryData with all nested objects to prevent undefined errors
@@ -44,7 +44,7 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
         applicationPackages: []
     };
     @track packageData = { recordTypeWrappers: [] };
-    @track loading = true;
+    
     @track error;
     
     @track vehicleData = {};
@@ -454,8 +454,8 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
         this.packageHasFiles = fileDetails.hasFiles;
         this.packageFileCount = fileDetails.fileCount;
         console.log('📁 Files loaded:', fileDetails);
-        console.log('📁 Files hasFiles:', packageHasFiles);
-        console.log('📁 Files fileCount:', packageFileCount);
+        console.log('📁 Files hasFiles:', this.packageHasFiles);
+        console.log('📁 Files fileCount:', this.packageFileCount);
     }
 
     async handleSaveAsQuote() {
@@ -608,11 +608,8 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     }
 
     handleGenerateQuotePDF() {
-        console.log('📄 Generate Quote PDF requested from summary');
-        this.dispatchEvent(new CustomEvent('generatequotepdf', {
-            bubbles: true,
-            composed: true
-        }));
+        console.log('📄 Generate Quote PDF - dispatching to container');
+        this.dispatchEvent(new CustomEvent('generatequotepdf'));
     }
 
     handlePreviewQuotePDF() {

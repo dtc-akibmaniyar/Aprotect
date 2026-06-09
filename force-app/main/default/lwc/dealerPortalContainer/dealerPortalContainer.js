@@ -50,7 +50,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         moreProducts: ['vehicle', 'warranty'],
         gap: ['vehicle', 'warranty', 'moreProducts'],
         customer: ['vehicle'],
-        summary: ['vehicle', 'warranty', 'moreProducts', 'gap', 'customer']
+        summary: ['vehicle', 'warranty', 'moreProducts', 'customer']
     };
     
     connectedCallback() {
@@ -266,8 +266,8 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         
         // Only auto-navigate if this is NOT an auto-selection
         if (!event.detail.autoSelected) {
-            console.log('🔄 Auto-navigating to Car Loan Protection tab');
-            this.switchToTab('gap');
+            console.log('🔄 Auto-navigating to Customer tab (GAP tab hidden)');
+            this.switchToTab('customer');
         } else {
             console.log('⏸️ Auto-selection detected, staying on more products tab');
         }
@@ -363,11 +363,12 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
 
     get gapTabClass() {
-        if (this.isApplicationLocked) return 'tab-button hidden';
-        const isCompleted = this.tabCompletionStatus.gap;
-        const isActive = this.activeTab === 'gap';
-        const isAccessible = this.canAccessTab('gap');
-        return `tab-button ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''} ${!isAccessible ? 'locked' : ''}`;
+        // GAP tab hidden — to re-enable, restore original logic below
+        // Original: if (this.isApplicationLocked) return 'tab-button hidden';
+        // const isCompleted = this.tabCompletionStatus.gap; const isActive = this.activeTab === 'gap';
+        // const isAccessible = this.canAccessTab('gap');
+        // return `tab-button ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''} ${!isAccessible ? 'locked' : ''}`;
+        return 'tab-button hidden';
     }
 
     get customerTabClass() {
@@ -403,7 +404,8 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
 
     get gapTabDisabled() {
-        return this.isApplicationLocked || !this.canAccessTab('gap');
+        // GAP tab hidden — always disabled. To re-enable, restore: return this.isApplicationLocked || !this.canAccessTab('gap');
+        return true;
     }
 
     get customerTabDisabled() {
@@ -432,7 +434,8 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
 
     get gapTabContentClass() {
-        return `tab-content-section ${this.activeTab === 'gap' ? 'active' : 'hidden'}`;
+        // GAP tab hidden — always hide content. To re-enable: return `tab-content-section ${this.activeTab === 'gap' ? 'active' : 'hidden'}`;
+        return 'tab-content-section hidden';
     }
 
     get customerTabContentClass() {
@@ -948,8 +951,8 @@ handlePreviewPDF() {
     }
     
     handleCustomerBack(event) {
-        console.log('👤 Customer component going back to Car Loan Protection tab');
-        this.switchToTab('gap');
+        console.log('👤 Customer component going back to Tire & Rim tab (GAP tab hidden)');
+        this.switchToTab('moreProducts');
     }
     
     handleSummaryBack(event) {
