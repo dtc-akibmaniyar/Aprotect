@@ -35,12 +35,12 @@
 
             <!-- </div> -->
             <div class="header-wrapper">
-              <h1 class="header-title">APPLICATION SUMMARY</h1>
-              <p class="header-subtitle">Please review the details of the application below. Please note once the application is submitted and payment has been remitted, all cancellations must be requested through A-Protect.</p>
+              <h1 class="header-title">{summaryHeaderTitle}</h1>
+              <p class="header-subtitle">{summaryHeaderSubtitle}</p>
               <template if:true={summaryData.application}>
                 <div class="header-metadata-wrapper">
                   <div class="app-id">
-                    <div class="app-id-label">APPLICATION ID # (AP#)</div>
+                    <div class="app-id-label">{applicationIdLabel}</div>
                     <div class="app-id-value">{summaryData.application.Name}</div>
                   </div>
                   <div class="entry-date-info">
@@ -52,7 +52,7 @@
             </div>
           </div>
         </div>        <!-- APPLICATION INFORMATION Header -->
-        <div class="App-Info-header">APPLICATION INFORMATION</div>
+        <div class="App-Info-header">{applicationInfoHeader}</div>
 
         <!-- CUSTOMER INFORMATION Section -->
         <div class="section-header">
@@ -285,10 +285,12 @@
                 <div class="package-header">
                     {packageWrapper.packageHeaderName}
                     <div class="package-header-actions">
-                        <button class="package-pdf-btn" data-recordtype={recordTypeWrapper.recordTypeName} onclick={handlePackagePdf} title="Generate PDF for this package">
-                            <lightning-icon icon-name="utility:pdf_ext" size="x-small"></lightning-icon>
-                            <span>PDF</span>
-                        </button>
+                        <template if:false={isQuote}>
+                            <button class="package-pdf-btn" data-recordtype={recordTypeWrapper.recordTypeName} onclick={handlePackagePdf} title="Generate PDF for this package">
+                                <lightning-icon icon-name="utility:pdf_ext" size="x-small"></lightning-icon>
+                                <span>PDF</span>
+                            </button>
+                        </template>
                         <template if:false={isLocked}>
                             <button class="edit-section-btn edit-section-btn--dark" data-recordtype={recordTypeWrapper.recordTypeName} onclick={handleEditSection} title="Edit this package">
                                 <lightning-icon icon-name="utility:edit" size="x-small"></lightning-icon>
@@ -381,17 +383,35 @@
                 disabled={saveAsQuoteButtonDisabled}
             >SAVE AS QUOTE</button>
             </template>
-            
-            <button
-              class="preview-pdf-button"
-              onclick={handlePreviewPdf}
-              disabled={isBusy}
-            >PREVIEW PDF</button>
+
+            <!-- Quote-specific: Generate PDF and Preview PDF -->
+            <template if:true={isQuote}>
+              <button
+                class="preview-pdf-button"
+                onclick={handleGenerateQuotePDF}
+                disabled={isBusy}
+              >GENERATE PDF</button>
+              <button
+                class="preview-pdf-button"
+                onclick={handlePreviewQuotePDF}
+                disabled={isBusy}
+              >PREVIEW PDF</button>
+            </template>
+
+            <!-- Application-specific: Preview PDF -->
+            <template if:false={isQuote}>
+              <button
+                class="preview-pdf-button"
+                onclick={handlePreviewPdf}
+                disabled={isBusy}
+              >PREVIEW PDF</button>
+            </template>
+
             <button
               class="submit-button"
               onclick={handleSubmitApplication}
               disabled={isSubmitButtonDisabled}
-            >SUBMIT</button>
+            >{submitButtonLabel}</button>
             <template if:true={hasInvoice}>
               <button
                 class="view-invoice-button"

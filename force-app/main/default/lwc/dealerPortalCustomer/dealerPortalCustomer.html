@@ -71,7 +71,7 @@
                             />
                         </div>
                         <div class="field-block">
-                            <label class="field-label">FIRST NAME <span class="required-asterisk">*</span></label>
+                            <label class="field-label">FIRST NAME <template if:false={isQuote}><span class="required-asterisk">*</span></template></label>
                             <input 
                                 class="slds-input" 
                                 type="text" 
@@ -81,7 +81,7 @@
                                 disabled={fieldDisabled} />
                         </div>
                         <div class="field-block">
-                            <label class="field-label">LAST NAME <span class="required-asterisk">*</span></label>
+                            <label class="field-label">LAST NAME <template if:false={isQuote}><span class="required-asterisk">*</span></template></label>
                             <input 
                                 class="slds-input" 
                                 type="text" 
@@ -95,7 +95,7 @@
                     <!-- Row: Address / City / Province / Postal / Country -->
                     <div class="row row-five">
                         <div class="field-block address-field">
-                            <label class="field-label">ADDRESS <span class="required-asterisk">*</span></label>
+                            <label class="field-label">ADDRESS <template if:false={isQuote}><span class="required-asterisk">*</span></template></label>
                             <input 
                                 class="slds-input" 
                                 type="text" 
@@ -105,7 +105,7 @@
                                 disabled={fieldDisabled} />
                         </div>
                         <div class="field-block">
-                            <label class="field-label">CITY <span class="required-asterisk">*</span></label>
+                            <label class="field-label">CITY <template if:false={isQuote}><span class="required-asterisk">*</span></template></label>
                             <input 
                                 class="slds-input" 
                                 type="text" 
@@ -115,7 +115,7 @@
                                 disabled={fieldDisabled} />
                         </div>
                         <div class="field-block">
-                            <label class="field-label">PROVINCE <span class="required-asterisk">*</span></label>
+                            <label class="field-label">PROVINCE <template if:false={isQuote}><span class="required-asterisk">*</span></template></label>
                             <lightning-combobox
                                 name="province"
                                 value={province}
@@ -127,7 +127,7 @@
                             </lightning-combobox>
                         </div>
                         <div class="field-block">
-                            <label class="field-label">POSTAL CODE <span class="required-asterisk">*</span></label>
+                            <label class="field-label">POSTAL CODE <template if:false={isQuote}><span class="required-asterisk">*</span></template></label>
                             <input 
                                 class="slds-input" 
                                 type="text" 
@@ -151,7 +151,7 @@
                     <!-- Row: Phone / Alt / Email -->
                     <div class="row row-three">
                         <div class="field-block">
-                            <label class="field-label">PHONE # <span class="required-asterisk">*</span></label>
+                            <label class="field-label">PHONE # <template if:false={isQuote}><span class="required-asterisk">*</span></template></label>
                             <input 
                                 class="slds-input" 
                                 type="tel" 
@@ -165,7 +165,7 @@
                             <input disabled={fieldDisabled} class="slds-input" type="tel" />
                         </div>
                         <div class="field-block">
-                            <label class="field-label">E-MAIL ADDRESS <span class="required-asterisk">*</span></label>
+                            <label class="field-label">E-MAIL ADDRESS <template if:false={isQuote}><span class="required-asterisk">*</span></template></label>
                             <input 
                                 class="slds-input" 
                                 type="email" 
@@ -500,6 +500,15 @@
                 aria-label="Back">
                 <span class="back-label">Back</span>
             </button> -->
+            <template if:true={isQuote}>
+                <button
+                    type="button"
+                    class="nav-button save-quote-button"
+                    onclick={handleSaveAsQuote}
+                    aria-label="Save As Quote">
+                    <span class="button-label">Save As Quote</span>
+                </button>
+            </template>
             <template if:false={fieldDisabled}>
                 <button
                     type="button"

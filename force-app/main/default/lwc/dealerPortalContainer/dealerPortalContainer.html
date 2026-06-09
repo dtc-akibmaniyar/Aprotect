@@ -140,8 +140,10 @@
             </div>
 
             <div class={customerTabContentClass}>
-                <c-dealer-portal-customer 
+                <c-dealer-portal-customer
+                    onsaveasquote={handleCustomerSaveAsQuote}
                     application-id={applicationId}
+                    application-status={applicationStatus}
                     is-locked={isApplicationLocked}
                     oncustomercomplete={handleCustomerComplete}
                     onnavigate={handleCustomerNavigate}
@@ -152,10 +154,15 @@
             <div class={summaryTabContentClass}>
                 <c-dealer-portal-summary 
                     application-id={applicationId}
+                    application-status={applicationStatus}
                     is-locked={isApplicationLocked}
                     onback={handleSummaryBack}
                     onapplicationstatuschanged={handleApplicationStatusChanged}
                     onnavigate={handleSummaryNavigate}
+                    onconvertapplication={handleConvertToApplication}
+                    onsaveasquote={handleSummarySaveAsQuote}
+                    ongeneratequotepdf={handleGenerateQuotePDF}
+                    onpreviewpdf={handlePreviewPDF}
                 ></c-dealer-portal-summary>
             </div>
         </div>

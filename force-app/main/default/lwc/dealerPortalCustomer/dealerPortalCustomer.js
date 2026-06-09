@@ -5,6 +5,7 @@ import saveCustomerData from '@salesforce/apex/DealerPortalCustomerController.sa
 export default class DealerPortalCustomer extends LightningElement {
     _applicationId;
     @api isLocked = false;
+    @api applicationStatus = '';
     
     @track firstName = '';
     @track lastName = '';
@@ -528,6 +529,9 @@ export default class DealerPortalCustomer extends LightningElement {
     
     // Validation (keeping your existing validation)
     validateForm() {
+        if (this.applicationStatus === 'Quote') {
+            return true;
+        }
         // ... (keep all your existing validation logic)
         if (!this.firstName.trim()) {
             this.errorMessage = 'First Name is required.';
@@ -608,6 +612,10 @@ export default class DealerPortalCustomer extends LightningElement {
         return true;
     }
     
+    get isQuote() {
+        return this.applicationStatus === 'Quote';
+    }
+    
     handleBack() {
         this.saveDataToSession();
         
@@ -623,6 +631,20 @@ export default class DealerPortalCustomer extends LightningElement {
         }
         
         console.log('🔍 handleContinue called with applicationId:', this.applicationId);
+        
+        // For quotes, if no customer data has been entered, skip save and just navigate
+        if (this.isQuote && !this.hasCustomerData()) {
+            console.log('📋 Quote with no customer data - skipping save, navigating to summary');
+            this.saveDataToSession();
+            const navigateEvent = new CustomEvent('navigate', {
+                detail: { 
+                    tab: 'summary',
+                    data: this.getCurrentData()
+                }
+            });
+            this.dispatchEvent(navigateEvent);
+            return;
+        }
         
         try {
             const saveSuccess = await this.saveCustomerDataToSalesforce();
@@ -643,6 +665,24 @@ export default class DealerPortalCustomer extends LightningElement {
         } catch (error) {
             console.error('❌ Error in handleContinue:', error);
         }
+    }
+    
+    // Check if any customer data fields have been filled in
+    hasCustomerData() {
+        return !!(this.firstName || this.lastName || this.email || this.phone || 
+            this.streetAddress || this.city || this.province || this.postalCode || 
+            this.country || this.coBuyerFirstName || this.coBuyerLastName || 
+            this.coBuyerEmail || this.coBuyerPhone || this.licenseNumber || 
+            this.companyBusiness || this.businessNumber || this.insuranceProvider || 
+            this.insurancePolicy || this.companyEmail || this.companyContactName ||
+            this.companyBusinessPhone);
+    }
+    
+    handleSaveAsQuote() {
+        console.log('📋 Save As Quote clicked from customer component');
+        this.dispatchEvent(new CustomEvent('saveasquote', {
+            detail: { applicationId: this._applicationId }
+        }));
     }
     
     // Handle next button click - navigate to next tab when application is locked

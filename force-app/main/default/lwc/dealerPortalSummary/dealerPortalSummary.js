@@ -19,6 +19,7 @@ import getInvoiceForApplication from '@salesforce/apex/ApplicationSummaryControl
 export default class DealerPortalSummary extends NavigationMixin(LightningElement) {
     @api recordId;
     @api applicationId = '';
+    @api applicationStatus;
     @api isLocked = false;
     
     @track loading = false;
@@ -89,6 +90,32 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     
     get effectiveApplicationId() {
         return this.applicationId || this.recordId || null;
+    }
+
+    get isQuote() {
+        return this.applicationStatus === 'Quote';
+    }
+
+    get summaryHeaderTitle() {
+        return this.isQuote ? 'QUOTE SUMMARY' : 'APPLICATION SUMMARY';
+    }
+
+    get summaryHeaderSubtitle() {
+        return this.isQuote
+            ? 'Please review the details of the quote below.'
+            : 'Please review the details of the application below. Please note once the application is submitted and payment has been remitted, all cancellations must be requested through A-Protect.';
+    }
+
+    get applicationIdLabel() {
+        return this.isQuote ? 'QUOTE ID' : 'APPLICATION ID # (AP#)';
+    }
+
+    get applicationInfoHeader() {
+        return this.isQuote ? 'QUOTE INFORMATION' : 'APPLICATION INFORMATION';
+    }
+
+    get submitButtonLabel() {
+        return this.isQuote ? 'CONVERT TO APPLICATION' : 'SUBMIT';
     }
     
     get applicationIdList() {
@@ -432,72 +459,22 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     }
 
     async handleSaveAsQuote() {
-        console.log('💾 Save as Quote requested');
-        this.isBusy = true;
-        const appId = this.effectiveApplicationId;
-        
-        try {
-            if (!appId) {
-                throw new Error('No Application ID available');
-            }
-            
-            console.log('💾 Updating Application Status to Quote for:', appId);
-            const fields = {
-                Id: appId,
-                Application_Status__c: 'Quote'
-            };
-            
-            await updateRecord({ fields });
-            
-            // Success! Application status updated to Quote
-            console.log('✅ Application status updated to Quote successfully');
-            
-            // Update local application data to reflect the new status
-            this.applicationData = {
-                ...this.applicationData,
-                status: 'Quote'
-            };
-            
-            // Show success toast
-            this.showToast('Success', 
-                'Application status updated to Quote successfully!', 
-                'success'
-            );
-            
-            // Dispatch event to parent container to update application status imperatively
-            // This bypasses wire adapter caching and ensures immediate UI update
-            console.log('📡 Dispatching applicationstatuschanged event to parent');
-            this.dispatchEvent(new CustomEvent('applicationstatuschanged', {
-                detail: {
-                    newStatus: 'Quote'
-                },
-                bubbles: true,
-                composed: true
-            }));
-            
-            // Navigate back to vehicle tab
-            console.log('🔄 Navigating back to vehicle tab');
-            this.dispatchEvent(new CustomEvent('navigate', {
-                detail: {
-                    tab: 'vehicle'
-                },
-                bubbles: true,
-                composed: true
-            }));
-            
-            // Reload data to reflect the changes
-            await this.loadData();
-            
-        } catch (error) {
-            console.error('❌ Save as Quote error:', error);
-            const errorMessage = error?.body?.message || error?.message || 'Failed to save as quote';
-            this.showToast('Error', errorMessage, 'error');
-        } finally {
-            this.isBusy = false;
-        }
+        console.log('💾 Save as Quote requested from summary');
+        this.dispatchEvent(new CustomEvent('saveasquote', {
+            detail: {
+                applicationId: this.effectiveApplicationId
+            },
+            bubbles: true,
+            composed: true
+        }));
     }
 
     async handleSubmitApplication() {
+        // If Quote, trigger convert to application instead of submit
+        if (this.isQuote) {
+            this.handleConvertToApplication();
+            return;
+        }
         console.log('📨 Submit Application requested');
         this.isBusy = true;
         const appId = this.effectiveApplicationId;
@@ -620,6 +597,30 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
                 actionName: 'view'
             }
         });
+    }
+
+    handleConvertToApplication() {
+        console.log('🔄 Convert to Application requested from summary');
+        this.dispatchEvent(new CustomEvent('convertapplication', {
+            bubbles: true,
+            composed: true
+        }));
+    }
+
+    handleGenerateQuotePDF() {
+        console.log('📄 Generate Quote PDF requested from summary');
+        this.dispatchEvent(new CustomEvent('generatequotepdf', {
+            bubbles: true,
+            composed: true
+        }));
+    }
+
+    handlePreviewQuotePDF() {
+        console.log('👁️ Preview Quote PDF requested from summary');
+        this.dispatchEvent(new CustomEvent('previewpdf', {
+            bubbles: true,
+            composed: true
+        }));
     }
 
     handleBack() {

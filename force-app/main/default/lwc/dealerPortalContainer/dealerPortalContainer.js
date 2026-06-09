@@ -277,13 +277,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         console.log('✅ Car Loan Protection tab completed');
         this.markTabAsCompleted('gap');
         
-        // If status is Quote, skip customer and go to summary
-        if (this.applicationStatus === 'Quote') {
-            console.log('📋 Application is a Quote - skipping Customer tab, going to Summary');
-            this.switchToTab('summary');
-        } else {
-            this.switchToTab('customer');
-        }
+        this.switchToTab('customer');
     }
     
     handleCustomerComplete() {
@@ -378,8 +372,6 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
 
     get customerTabClass() {
         if (this.isApplicationLocked) return 'tab-button hidden';
-        // Don't show customer tab if application status is Quote
-        if (this.applicationStatus === 'Quote') return 'tab-button hidden';
         const isCompleted = this.tabCompletionStatus.customer;
         const isActive = this.activeTab === 'customer';
         const isAccessible = this.canAccessTab('customer');
@@ -391,8 +383,6 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         if (this.isApplicationLocked) {
             return 'tab-button active';
         }
-        // Don't show summary tab if application status is Quote
-        if (this.applicationStatus === 'Quote') return 'tab-button hidden';
         const isCompleted = this.tabCompletionStatus.summary;
         const isActive = this.activeTab === 'summary';
         const isAccessible = this.canAccessTab('summary');
@@ -417,13 +407,13 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
 
     get customerTabDisabled() {
-        return this.isApplicationLocked || this.applicationStatus === 'Quote' || !this.canAccessTab('customer');
+        return this.isApplicationLocked || !this.canAccessTab('customer');
     }
 
     get summaryTabDisabled() {
         // Always enabled when locked — it's the only tab available
         if (this.isApplicationLocked) return false;
-        return this.applicationStatus === 'Quote' || !this.canAccessTab('summary');
+        return !this.canAccessTab('summary');
     }
     
 
@@ -471,12 +461,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
             return;
         }
 
-        // Check if tab should be hidden (Quote status hides Customer and Summary)
-        if (this.applicationStatus === 'Quote' && (tabName === 'customer' || tabName === 'summary')) {
-            console.log(`❌ Cannot access tab ${tabName} - hidden for Quote applications`);
-            return;
-        }
-        
+
         console.log(`🔒 Tab access check:`, {
             tabName,
             canAccess: this.canAccessTab(tabName),
@@ -778,6 +763,39 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
      * Handle Save As Quote from Loan Protection (GAP) tab
      * Converts application to quote and navigates to quotes list
      */
+    async handleCustomerSaveAsQuote(event) {
+        try {
+            console.log('📋 Customer component - Save As Quote clicked');
+            const { applicationId } = event.detail;
+            
+            const result = await convertApplicationToQuote({ applicationId });
+            
+            if (result.success) {
+                console.log('✅ Application converted to Quote');
+                this.applicationStatus = 'Quote';
+                this.navigateToQuotesList();
+            } else {
+                console.error('❌ Error converting application to quote:', result.message);
+                const evt = new CustomEvent('shownotification', {
+                    detail: {
+                        type: 'error',
+                        message: result.message || 'Failed to convert application to quote'
+                    }
+                });
+                this.dispatchEvent(evt);
+            }
+        } catch (error) {
+            console.error('❌ Error handling Save As Quote:', error);
+            const evt = new CustomEvent('shownotification', {
+                detail: {
+                    type: 'error',
+                    message: 'An error occurred while converting to quote: ' + error.message
+                }
+            });
+            this.dispatchEvent(evt);
+        }
+    }
+
     async handleGapSaveAsQuote(event) {
         try {
             console.log('📋 GAP component - Save As Quote clicked');
@@ -936,13 +954,42 @@ handlePreviewPDF() {
     
     handleSummaryBack(event) {
         console.log('📋 Summary component going back');
-        // If status is Quote, go back to Gap tab (skip Customer)
+        // If status is Quote, go back to Customer tab
         if (this.applicationStatus === 'Quote') {
-            console.log('📋 Application is a Quote - going back to Car Loan Protection tab');
-            this.switchToTab('gap');
+            console.log('📋 Application is a Quote - going back to Customer tab');
+            this.switchToTab('customer');
         } else {
             console.log('📋 Going back to customer tab');
             this.switchToTab('customer');
+        }
+    }
+
+    async handleSummarySaveAsQuote(event) {
+        try {
+            console.log('📋 Summary component - Save As Quote clicked');
+            const applicationId = this._applicationId;
+            
+            const result = await convertApplicationToQuote({ applicationId });
+            
+            if (result.success) {
+                console.log('✅ Application converted to Quote');
+                this.applicationStatus = 'Quote';
+                this.navigateToQuotesList();
+            } else {
+                console.error('❌ Error converting application to quote:', result.message);
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Error',
+                    message: result.message || 'Failed to convert application to quote',
+                    variant: 'error'
+                }));
+            }
+        } catch (error) {
+            console.error('❌ Error handling Save As Quote:', error);
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Error',
+                message: 'An error occurred while converting to quote: ' + error.message,
+                variant: 'error'
+            }));
         }
     }
 

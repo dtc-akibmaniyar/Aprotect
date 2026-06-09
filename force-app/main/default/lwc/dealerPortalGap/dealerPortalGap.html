@@ -73,6 +73,7 @@
                                 oninput={handleLenderLienholderChange}>
                         </label>
 
+                        <template if:false={isNotFinanced}>
                         <label class="loan-field">
                             <span>Financed Loan Term (Months)</span>
                             <select disabled={fieldDisabled} onchange={handleFinanceLoanTermChange}>
@@ -137,6 +138,7 @@
                                 disabled={fieldDisabled}
                                 oninput={handleVehicleTradeInEquityChange}>
                         </label>
+                    </template>
                     </div>
 
                     <!-- Search button hidden - no packages available currently -->
@@ -614,42 +616,31 @@
             </div>
         </template>
         
-        <!-- Only Save As Quote showing (on the right) -->
+        <!-- Quote status: Save As Quote (left), Save & Continue (right) -->
         <template if:true={isQuoteStatus}>
             <div class="navigation-buttons">
-                <template if:true={isQuoteStatus}>
-                    <button
-                        type="button"
-                        class="continue-button"
-                        onclick={handleConvertToApplication}
-                        aria-label="Convert to Application">
-                        <span class="continue-label">Convert to Application</span>
-                    </button>
-                </template>
-                    <button
-                        type="button"
-                        class="continue-button"
-                        onclick={handlePreviewPDF}
-                        aria-label="Preview PDF">
-                        <span class="continue-label">Preview PDF</span>
-                    </button>
-                    <button
-                        type="button"
-                        class="continue-button"
-                        onclick={handleGenerateQuotePDF}
-                        aria-label="Generate PDF">
-                        <span class="continue-label">Generate PDF</span>
-                    </button>
                 <!-- <template if:true={sowSaveAsQuoteButton}> -->
                     <button
                         type="button"
                         class="nav-button save-quote-button"
                         onclick={handleSaveAsQuote}
-                        style="margin-left: auto;"
                         aria-label="Save As Quote">
                         <span class="button-label">Save As Quote</span>
                     </button>
                 <!-- </template> -->
+                <div class="continue-button-wrapper">
+                    <template if:true={loading}>
+                        <lightning-spinner alternative-text="Loading..." size="small"></lightning-spinner>
+                    </template>
+                    <button
+                        type="button"
+                        class="continue-button"
+                        onclick={handleContinue}
+                        disabled={isContinueDisabled}
+                        aria-label="Save &amp; Continue">
+                        <span class="continue-label">Save &amp; Continue</span>
+                    </button>
+                </div>
             </div>
         </template>
         

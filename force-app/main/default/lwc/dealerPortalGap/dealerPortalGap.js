@@ -3776,6 +3776,11 @@ export default class DealerPortalGap extends LightningElement {
         }, 500); // 500ms delay to show spinner
     }
 
+    // Check if vehicle is not financed - used to hide fields in HTML
+    get isNotFinanced() {
+        return !this.isVehicleFinanced;
+    }
+
     // Finance Loan Term dropdown options
     get financeLoanTermOptions() {
         return [
