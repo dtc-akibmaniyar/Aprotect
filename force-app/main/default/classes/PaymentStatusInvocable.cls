@@ -19,6 +19,12 @@
  * - Invoice_Line_Item__c has Payment_Status__c picklist with value 'Paid'
  * - Invoice__c has Payment_Status__c with values 'Paid', 'Partial Paid'
  * - Invoice_Line_Item__c has a 1:1 relationship to Application_Package__c that should be marked Paid
+ *
+ * v2 FIX: Payment allocation now pools ALL completed payment amounts at the
+ *   remittance-form level so that surplus from one payment can cover junctions
+ *   linked to another payment on the same remittance. Previously each payment
+ *   was processed independently, causing under-allocation when a single payment
+ *   didn't fully cover its assigned junction amount.
  */
 public with sharing class PaymentStatusInvocable {
 
@@ -46,7 +52,7 @@ public with sharing class PaymentStatusInvocable {
         public Id paymentId;
 
         /**
-         * Optional: explicitly pass the status you&#39;re transitioning to.
+         * Optional: explicitly pass the status you're transitioning to.
          * If omitted, the class will read Payment__c.Payment_Confirmation_Status__c.
          */
         @InvocableVariable(required=false)
@@ -149,17 +155,42 @@ public with sharing class PaymentStatusInvocable {
             return results;
         }
 
-        // 1) Load all RLJ records for these payments
-        // Line_Item_Amount__c is used to populate Invoice_Line_Item__c.Paid_Amount__c
+        // ---- v2 FIX: Collect remittance form IDs and load ALL payments & junctions ----
+        // Instead of only looking at junctions for the triggering payments,
+        // we load ALL junctions and ALL completed payments for the entire remittance form.
+        // This allows surplus from one payment to cover junctions linked to another payment.
+
+        Set<Id> remittanceFormIdsForAllocation = new Set<Id>();
+        for (Id pid : completedPaymentIds) {
+            Payment__c p = paymentsByIdById.get(pid);
+            if (p != null && p.Remittance_Form__c != null) {
+                remittanceFormIdsForAllocation.add(p.Remittance_Form__c);
+            }
+        }
+
+        // Load ALL payments for these remittance forms (not just the triggering ones)
+        Map<Id, Payment__c> allPaymentsByIdForRemittance = new Map<Id, Payment__c>([
+            SELECT Id, Name, Payment_Confirmation_Status__c, Amount__c,
+                   Remittance_Form__c,
+                   Remittance_Form__r.Total_Planned_Amount__c,
+                   Remittance_Form__r.Balance__c,
+                   Remittance_Form__r.Dealer_Name__c
+            FROM Payment__c
+            WHERE Remittance_Form__c IN :remittanceFormIdsForAllocation
+        ]);
+
+        // Also add these to the main map for downstream use
+        paymentsByIdById.putAll(allPaymentsByIdForRemittance);
+
+        // 1) Load ALL RLJ records for the remittance forms (not just triggering payments)
         List<Remittance_Line_Item_Junction__c> remittanceLineItemJunctionList = [
-            SELECT Id, Payment__c, Invoice__c, Invoice_Line_Item__c, Payment_Status__c, Paid_Date__c, Line_Item_Amount__c
+            SELECT Id, Payment__c, Invoice__c, Invoice_Line_Item__c, Payment_Status__c,
+                   Paid_Date__c, Line_Item_Amount__c, Remittance_Form__c
             FROM Remittance_Line_Item_Junction__c
-            WHERE Payment__c IN :completedPaymentIds
+            WHERE Remittance_Form__c IN :remittanceFormIdsForAllocation
         ];
 
         if (remittanceLineItemJunctionList.isEmpty()) {
-            // Defensive warning: 0 junctions for a completed payment may indicate a
-            // race condition where the Flow has not yet linked junctions to the Payment.
             for (Result r : results) {
                 if (r.paymentId != null && completedPaymentIds.contains(r.paymentId)) {
                     r.success = true;
@@ -173,7 +204,7 @@ public with sharing class PaymentStatusInvocable {
             return results;
         }
 
-        // Build maps
+        // Build maps — group by payment for result tallying, and by remittance for allocation
         Map<Id, List<Remittance_Line_Item_Junction__c>> remittanceLineItemJunctionsByPaymentId = new Map<Id, List<Remittance_Line_Item_Junction__c>>();
         Set<Id> invoiceLineItemIds = new Set<Id>();
         Set<Id> invoiceIds = new Set<Id>();
@@ -191,24 +222,47 @@ public with sharing class PaymentStatusInvocable {
             if (remittanceLineItemJunction.Invoice__c != null) invoiceIds.add(remittanceLineItemJunction.Invoice__c);
         }
 
-        // 2) Payment Allocation: sort junctions by amount ascending per payment,
-        //    mark as Paid only until payment amount is exhausted (lowest-first allocation).
-        //    Track which line items were actually paid for downstream updates.
+        // 2) Payment Allocation — v2: pool ALL completed payment amounts per remittance form
+        //    and allocate across ALL junctions on that remittance (lowest-amount-first).
+        //    This fixes the bug where surplus from one payment couldn't help cover junctions
+        //    linked to a different payment on the same remittance.
         Date today = Date.today();
-        Set<Id> paidLineItemIds = new Set<Id>(); // line items covered by payment
+        Set<Id> paidLineItemIds = new Set<Id>();
         Map<Id, Decimal> paidAmountByLineItemId = new Map<Id, Decimal>();
         List<Remittance_Line_Item_Junction__c> remittanceLineItemJunctionsToUpdate = new List<Remittance_Line_Item_Junction__c>();
 
-        for (Id paymentId : remittanceLineItemJunctionsByPaymentId.keySet()) {
-            Payment__c pmt = paymentsByIdById.get(paymentId);
-            Decimal paymentAmount = (pmt != null && pmt.Amount__c != null) ? pmt.Amount__c : 0;
-            Decimal remaining = paymentAmount;
+        // Group junctions by remittance form and compute total completed payment amount per form
+        Map<Id, List<Remittance_Line_Item_Junction__c>> junctionsByRemittanceForm = new Map<Id, List<Remittance_Line_Item_Junction__c>>();
+        Map<Id, Decimal> totalCompletedPaymentByRemittance = new Map<Id, Decimal>();
 
-            // Invoice-level-first allocation: group junctions by invoice,
-            // sort invoices by total amount ascending, then try to pay whole
-            // invoices first. If remaining can't cover a whole invoice, try
-            // individual line items within it sorted by amount ascending.
-            List<Remittance_Line_Item_Junction__c> junctions = remittanceLineItemJunctionsByPaymentId.get(paymentId);
+        for (Remittance_Line_Item_Junction__c rlj : remittanceLineItemJunctionList) {
+            Id rfId = rlj.Remittance_Form__c;
+            if (rfId == null) continue;
+            if (!junctionsByRemittanceForm.containsKey(rfId)) {
+                junctionsByRemittanceForm.put(rfId, new List<Remittance_Line_Item_Junction__c>());
+            }
+            junctionsByRemittanceForm.get(rfId).add(rlj);
+        }
+
+        // Sum completed payment amounts per remittance form
+        for (Payment__c pmt : allPaymentsByIdForRemittance.values()) {
+            if (pmt.Remittance_Form__c == null) continue;
+            if (!isCompletedStatus(pmt.Payment_Confirmation_Status__c)) continue;
+            Id rfId = pmt.Remittance_Form__c;
+            if (!totalCompletedPaymentByRemittance.containsKey(rfId)) {
+                totalCompletedPaymentByRemittance.put(rfId, 0);
+            }
+            Decimal amt = pmt.Amount__c != null ? pmt.Amount__c : 0;
+            totalCompletedPaymentByRemittance.put(rfId, totalCompletedPaymentByRemittance.get(rfId) + amt);
+        }
+
+        // Allocate per remittance form using pooled payment total
+        for (Id rfId : junctionsByRemittanceForm.keySet()) {
+            Decimal remaining = totalCompletedPaymentByRemittance.containsKey(rfId)
+                ? totalCompletedPaymentByRemittance.get(rfId) : 0;
+            if (remaining <= 0) continue;
+
+            List<Remittance_Line_Item_Junction__c> junctions = junctionsByRemittanceForm.get(rfId);
 
             // Group by Invoice
             Map<Id, List<Remittance_Line_Item_Junction__c>> jxByInv = new Map<Id, List<Remittance_Line_Item_Junction__c>>();
@@ -347,8 +401,7 @@ public with sharing class PaymentStatusInvocable {
 
         // Determine invoice updates
         List<Invoice__c> invoicesToUpdate = new List<Invoice__c>();
-        Set<Id> fullyPaidInvoiceIds = new Set<Id>(); // invoices where every line item is now Paid
-        // Build a map of invoice → remittance form balance to determine if fully paid
+        Set<Id> fullyPaidInvoiceIds = new Set<Id>();
             Map<Id, Decimal> remittanceBalanceByInvoice = new Map<Id, Decimal>();
             for (Remittance_Line_Item_Junction__c rlj : remittanceLineItemJunctionList) {
                 if (rlj.Invoice__c != null && rlj.Payment__c != null) {
@@ -363,12 +416,8 @@ public with sharing class PaymentStatusInvocable {
             for (Id invId : invoiceIds) {
                 AggregateCounts c = countsByInvoice.get(invId);
                 if (c == null || c.total == 0) {
-                    // No line items found - skip
                     continue;
                 }
-                // Mark invoice as Paid if all its line items are paid
-                // (Balance check removed — DLRS rollup timing means Balance__c may not
-                //  be updated yet when this invocable runs in the same transaction.)
                 String newInvStatus;
                 if (c.paid == c.total) {
                     newInvStatus = 'Paid';
@@ -388,7 +437,6 @@ public with sharing class PaymentStatusInvocable {
         }
 
         // 5) Mark parent Application__c as Paid when its invoice is fully paid
-        // Only fully-paid invoices (all line items Paid) trigger this — partial invoices do not.
         if (!fullyPaidInvoiceIds.isEmpty()) {
             Set<Id> appIds = new Set<Id>();
             for (Invoice__c inv : [
@@ -444,8 +492,6 @@ public with sharing class PaymentStatusInvocable {
         }
 
         // 8) Update Remittance Form status to Completed when all line items are paid
-        // This handles the case where the record-triggered flow doesn't re-fire due to
-        // transaction recursion limits when DLRS rollups update the form.
         Set<Id> remittanceFormIds = new Set<Id>();
         for (Remittance_Line_Item_Junction__c rlj : remittanceLineItemJunctionList) {
             if (rlj.Payment__c != null) {
@@ -465,7 +511,6 @@ public with sharing class PaymentStatusInvocable {
                 WHERE Id IN :remittanceFormIds
                   AND Status__c != 'Completed'
             ]) {
-                // Re-check conditions: all items paid and balance zero
                 if (rf.Paid_Amount__c != null && rf.Paid_Amount__c > 0
                     && rf.Balance__c != null && rf.Balance__c <= 0
                     && rf.Paid_Line_Items_Count__c != null
@@ -483,10 +528,6 @@ public with sharing class PaymentStatusInvocable {
         }
 
         // 9) Credit stored — overpayment handling
-        // If a completed payment's Amount__c exceeds the remittance form's planned total,
-        // the excess is stored as Credit_Stored__c on the Payment and a Credit__c record
-        // of type 'Overpayment Credit' is created against the dealer account.
-        // The Account rollup fields (Overpayment_Credit__c, Total_Credit_Amount__c) update automatically.
         List<Payment__c> paymentsWithCredit = new List<Payment__c>();
         List<Credit__c>  creditsToInsert    = new List<Credit__c>();
 
@@ -519,7 +560,6 @@ public with sharing class PaymentStatusInvocable {
         // Tally per-payment results
         Map<Id, Integer> remittanceLineItemJunctionUpdatedCountByPaymentId = countSuccessByPayment(remittanceLineItemJunctionSaveResults, remittanceLineItemJunctionsToUpdate, remittanceLineItemJunctionsByPaymentId);
         Integer totalInvoiceLineItemsUpdated = countSuccess(invoiceLineItemSaveResults);
-        // Count invoices paid vs partial
         Set<Id> paidInvoiceIds = new Set<Id>();
         Set<Id> partialInvoiceIds = new Set<Id>();
         for (Invoice__c updatedInvoice : invoicesToUpdate) {
@@ -539,10 +579,10 @@ public with sharing class PaymentStatusInvocable {
             Result singleResult = resultByPayment.get(completedPaymentId);
             if (singleResult == null) continue;
             singleResult.rljUpdated = (remittanceLineItemJunctionUpdatedCountByPaymentId.containsKey(completedPaymentId) ? remittanceLineItemJunctionUpdatedCountByPaymentId.get(completedPaymentId) : 0);
-            singleResult.lineItemsUpdated = totalInvoiceLineItemsUpdated; // total across payments; for per-payment, extend aggregation
+            singleResult.lineItemsUpdated = totalInvoiceLineItemsUpdated;
             singleResult.invoicesPaid = invPaidCount;
             singleResult.invoicesPartial = invPartialCount;
-            singleResult.appPackagesUpdated = applicationPackagesUpdated; // total
+            singleResult.appPackagesUpdated = applicationPackagesUpdated;
             singleResult.success = true;
             singleResult.message = 'Processed Payment successfully.';
         }
@@ -640,7 +680,6 @@ public with sharing class PaymentStatusInvocable {
         Map<Id, Integer> result = new Map<Id, Integer>();
         if (srs == null || updates == null) return result;
 
-        // Build a map of successful IDs for quick lookup
         Map<Id, Boolean> successfulMap = new Map<Id, Boolean>();
         for (Database.SaveResult sr : srs) {
             if (sr != null && sr.isSuccess()) {
@@ -648,11 +687,9 @@ public with sharing class PaymentStatusInvocable {
             }
         }
 
-        // For each payment, count how many of its RLJs were successfully updated
         for (Id pid : rljByPayment.keySet()) {
             Integer cnt = 0;
             for (Remittance_Line_Item_Junction__c rlj : rljByPayment.get(pid)) {
-                // Check if this RLJ was part of updates and if it succeeded
                 if (successfulMap.containsKey(rlj.Id)) {
                     cnt++;
                 }
