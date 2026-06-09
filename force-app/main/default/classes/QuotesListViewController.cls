@@ -30,6 +30,7 @@ public with sharing class QuotesListViewController {
         @AuraEnabled public String vehicleVin;
         @AuraEnabled public Decimal purchasePrice;
         @AuraEnabled public String paymentStatus;
+        @AuraEnabled public Boolean hasFiles;
         public ApplicationRow() {}
     }
 
@@ -86,7 +87,23 @@ public with sharing class QuotesListViewController {
             }
             
             Map<Id, Set<String>> appIdToServiceLabels = buildServiceLabelsByApplication(apps);
-            List<ApplicationRow> rows = buildRows(apps, appIdToServiceLabels);
+
+            // Bulk check for related files (ContentDocumentLink)
+            Set<Id> appIds = new Set<Id>();
+            for (Application__c a : apps) {
+                appIds.add(a.Id);
+            }
+            Map<Id, Boolean> hasFilesMap = new Map<Id, Boolean>();
+            for (AggregateResult ar : [
+                SELECT LinkedEntityId, COUNT(Id) cnt
+                FROM ContentDocumentLink
+                WHERE LinkedEntityId IN :appIds
+                GROUP BY LinkedEntityId
+            ]) {
+                hasFilesMap.put((Id)ar.get('LinkedEntityId'), true);
+            }
+
+            List<ApplicationRow> rows = buildRows(apps, appIdToServiceLabels, hasFilesMap);
             
             resp.success = true;
             resp.data = rows;
@@ -109,6 +126,7 @@ public with sharing class QuotesListViewController {
         return [SELECT COUNT() FROM Application__c 
                 WHERE Application_Status__c = 'Quote' AND Application_Status__c != 'Deleted'
                 AND (Customer_Name__r.Name LIKE :likePattern
+                   OR Customer_Name__r.Phone LIKE :likePattern
                    OR Name LIKE :likePattern
                    OR QuoteName__c LIKE :likePattern
                    OR Vehicle_VIN__c LIKE :likePattern)];
@@ -139,6 +157,7 @@ public with sharing class QuotesListViewController {
                 FROM Application__c
                 WHERE Application_Status__c = 'Quote' AND Application_Status__c != 'Deleted'
                 AND (Customer_Name__r.Name LIKE :likePattern
+                   OR Customer_Name__r.Phone LIKE :likePattern
                    OR Name LIKE :likePattern
                    OR QuoteName__c LIKE :likePattern
                    OR Vehicle_VIN__c LIKE :likePattern)
@@ -232,8 +251,8 @@ public with sharing class QuotesListViewController {
         public CreateQuoteResponse() {}
     }
 
-    // Build DTO rows from apps and labels
-    private static List<ApplicationRow> buildRows(List<Application__c> apps, Map<Id, Set<String>> appIdToServiceLabels) {
+    // Build DTO rows from apps, labels, and file existence map
+    private static List<ApplicationRow> buildRows(List<Application__c> apps, Map<Id, Set<String>> appIdToServiceLabels, Map<Id, Boolean> hasFilesMap) {
         List<ApplicationRow> rows = new List<ApplicationRow>();
         for (Application__c a : apps) {
             ApplicationRow row = new ApplicationRow();
@@ -247,6 +266,7 @@ public with sharing class QuotesListViewController {
             row.vehicleVin = a.Vehicle_VIN__c;
             row.purchasePrice = a.Vehicle_Purchase_Price__c;
             row.paymentStatus = a.Payment_Status__c;
+            row.hasFiles = hasFilesMap.containsKey(a.Id);
             row.services = new List<String>();
             if (appIdToServiceLabels != null && appIdToServiceLabels.containsKey(a.Id)) {
                 row.services.addAll(appIdToServiceLabels.get(a.Id));

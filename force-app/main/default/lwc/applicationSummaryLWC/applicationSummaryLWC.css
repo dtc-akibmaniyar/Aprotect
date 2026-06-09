@@ -37,3 +37,10 @@ h3 {
     font-style: italic;
     font-size: 14px;
 }
+
+.pdf-actions {
+    margin: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}

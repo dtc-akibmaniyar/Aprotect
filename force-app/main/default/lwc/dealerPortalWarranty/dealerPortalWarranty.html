@@ -25,11 +25,6 @@
             <div class="warranty-hero__content">
                 <div class="warranty-hero__header-row">
                     <h1>ADD EXTENDED WARRANTY PLAN</h1>
-                    <div class="warranty-hero__header-actions">
-                        <template if:true={isQuoteStatus}>
-                            <button class="convert-to-app-btn" onclick={handleConvertToApplication} title="Convert this quote to a pending application">Convert to Application</button>
-                        </template>
-                    </div>
                 </div>
                 <p>Enter the full and accurate vehicle details to ensure all eligible protection plans appear. The system uses this information to determine which plans are available. Incomplete or incorrect entries may prevent plans from showing. Double-check the VIN and mileage before continuing.</p>
             </div>
@@ -785,6 +780,15 @@
                 </button>
             </template>
             
+            <template if:true={isQuoteStatus}>
+                <button
+                    type="button"
+                    class="continue-button"
+                    onclick={handleConvertToApplication}
+                    aria-label="Convert to Application">
+                    <span class="continue-label">Convert to Application</span>
+                </button>
+            </template>
             <template if:true={loading}>
                 <lightning-spinner alternative-text="Loading..." size="small"></lightning-spinner>
             </template>
@@ -798,6 +802,7 @@
                     <span class="continue-label">Save & Continue</span>
                 </button>
             </template>
+
         </div>
     </div>
 </template>

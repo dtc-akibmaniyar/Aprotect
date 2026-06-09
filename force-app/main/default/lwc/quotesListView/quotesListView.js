@@ -128,7 +128,8 @@ export default class QuotesListView extends NavigationMixin(LightningElement) {
                 },
                 services,
                 statusBadge: statusBadge,
-                disabledCancel: statusBadge && statusBadge.toLowerCase() === 'paid' ? true : false
+                disabledCancel: statusBadge && statusBadge.toLowerCase() === 'paid' ? true : false,
+                hasFiles: !!row.hasFiles
             };
         });
     }
@@ -527,19 +528,33 @@ export default class QuotesListView extends NavigationMixin(LightningElement) {
         if (!applicationId || this.generatingPDFId) return;
         this.generatingPDFId = applicationId;
         try {
-            const contentVersionId = await generateQuotePDF({ applicationId });
+            const result = await generateQuotePDF({ applicationId });
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Success',
                 message: 'Quote PDF generated successfully',
                 variant: 'success'
             }));
             // Open the generated PDF in a new browser tab (community-safe URL)
-            if (contentVersionId) {
+            const cvId = result && result.contentVersionId;
+            if (cvId) {
                 let basePath = communityBasePath || '';
                 // Remove trailing /s from community base path — servlet URLs don't use it
                 basePath = basePath.replace(/\/s$/, '');
-                const downloadUrl = basePath + '/sfc/servlet.shepherd/version/download/' + contentVersionId;
+                const downloadUrl = basePath + '/sfc/servlet.shepherd/version/download/' + cvId;
                 window.open(downloadUrl, '_blank');
+            }
+            // Update hasFiles flag for this row so View PDF button appears
+            if (this.allFetchedRecords && this.allFetchedRecords.length > 0) {
+                this.allFetchedRecords = this.allFetchedRecords.map(row => {
+                    if (row && row.id === applicationId) {
+                        return Object.assign({}, row, { hasFiles: true });
+                    }
+                    return row;
+                });
+                // Rebuild page cache and refresh current page
+                this.pageCache.clear();
+                this.cachePagesFromFetchedData(this.allFetchedRecords.filter(r => r != null));
+                this.updateCurrentPage();
             }
         } catch (err) {
             const msg = (err && err.body && err.body.message) || err.message || JSON.stringify(err);
@@ -551,6 +566,15 @@ export default class QuotesListView extends NavigationMixin(LightningElement) {
         } finally {
             this.generatingPDFId = null;
         }
+    }
+
+    clickViewPDF(event) {
+        event.stopPropagation();
+        const applicationId = event.currentTarget.closest('.dp-row')?.querySelector('.record-link')?.dataset?.id;
+        if (!applicationId) return;
+        const basePath = communityBasePath || '';
+        const filesUrl = basePath + '/contentdocument/related/' + applicationId + '/AttachedContentDocuments';
+        window.open(filesUrl, '_blank');
     }
 
     handleOpenRecord(event) {

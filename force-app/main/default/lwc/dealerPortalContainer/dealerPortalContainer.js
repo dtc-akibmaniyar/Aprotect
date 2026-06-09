@@ -299,7 +299,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
 
     // Computed property: show convert button when status is Quote
     get showConvertToApplicationButton() {
-        return this.applicationStatus === 'Quote' && !this.isApplicationLocked;
+        return false;
     }
 
     // Computed properties for tab classes with completion status and locking
@@ -831,7 +831,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     
     // Computed property: show generate quote PDF button when status is Quote
     get showGenerateQuotePDFButton() {
-        return this.applicationStatus === 'Quote';
+        return false;
     }
 
     // Handle Generate Quote PDF button click
@@ -839,18 +839,16 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         if (!this._applicationId || this.isGeneratingQuotePDF) return;
         this.isGeneratingQuotePDF = true;
         try {
-            const contentVersionId = await generateQuotePDF({ applicationId: this._applicationId });
+            const result = await generateQuotePDF({ applicationId: this._applicationId });
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Success',
                 message: 'Quote PDF generated successfully',
                 variant: 'success'
             }));
             // Open the generated PDF in a new browser tab (community-safe URL)
-            if (contentVersionId) {
-                let basePath = communityBasePath || '';
-                // Remove trailing /s from community base path — servlet URLs don't use it
-                basePath = basePath.replace(/\/s$/, '');
-                const downloadUrl = basePath + '/sfc/servlet.shepherd/version/download/' + contentVersionId;
+            if (result && result.contentVersionId) {
+                const sfcBase = (communityBasePath || '').replace(/\/s$/, '');
+                const downloadUrl = sfcBase + '/sfc/servlet.shepherd/version/download/' + result.contentVersionId;
                 window.open(downloadUrl, '_blank');
             }
         } catch (err) {
@@ -863,6 +861,11 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         } finally {
             this.isGeneratingQuotePDF = false;
         }
+    }
+
+handlePreviewPDF() {
+        const basePath = communityBasePath || '';
+        window.open(basePath + '/contentdocument/related/' + this._applicationId + '/AttachedContentDocuments', '_blank');
     }
 
 // Convert to Application handlers

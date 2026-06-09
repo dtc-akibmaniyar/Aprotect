@@ -53,7 +53,7 @@
 </svg>
 
                     </span>
-                    <input class="dp-search-input" placeholder="Search Quotes" value={search} oninput={handleSearchChange} />
+                    <input class="dp-search-input" placeholder="Search by Customer Name, Quote ID, or VIN" value={search} oninput={handleSearchChange} />
                     <span class="dp-filter-icon" aria-hidden="true" title="Filters">
                         <svg width="48" height="32" viewBox="0 0 48 32" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g clip-path="url(#clip0_263_123)">
@@ -111,12 +111,23 @@
                             <!-- Generate PDF Button -->
                             <button class="icon-btn pdf-btn" title="Generate PDF" onclick={clickGeneratePDF} aria-label="Generate PDF">
                                 <svg width="25" height="25" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="#5184B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <path d="M14 2V8H20" stroke="#5184B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <path d="M12 18V12" stroke="#5184B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <path d="M9 15L12 18L15 15" stroke="#5184B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="#E74C3C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#FFF5F5"/>
+                                    <path d="M14 2V8H20" stroke="#E74C3C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <text x="12" y="17" text-anchor="middle" font-size="6" font-weight="bold" fill="#E74C3C" font-family="Arial">PDF</text>
                                 </svg>
                             </button>
+
+                            <!-- Preview PDF Button (only when files exist) -->
+                            <template if:true={app.hasFiles}>
+                                <button class="icon-btn pdf-btn" title="Preview PDF" onclick={clickViewPDF} aria-label="Preview PDF">
+                                    <svg width="25" height="25" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="#3498DB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#F0F8FF"/>
+                                        <path d="M14 2V8H20" stroke="#3498DB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M8 13C8 13 9.5 11 12 11C14.5 11 16 13 16 13C16 13 14.5 15 12 15C9.5 15 8 13 8 13Z" stroke="#3498DB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <circle cx="12" cy="13" r="1" fill="#3498DB"/>
+                                    </svg>
+                                </button>
+                            </template>
 
                             <!-- Convert to Application Button -->
                             <button class="icon-btn convert" title="Convert to Application" onclick={clickConvert} aria-label="Convert to Application">
@@ -128,37 +139,9 @@
                                 </svg>
                             </button>
 
-							<!-- Active Delete Button -->
-							<template if:false={app.disabledCancel}>
-								<button class="icon-btn danger" title="Delete" onclick={clickDelete} aria-label="Delete">
-									<svg width="25" height="25" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-										<g clip-path="url(#clip0_34_2206)">
-											<path d="M8.00736 0C3.57682 0 0 3.35327 0 7.5069C0 11.6605 3.57682 15.0138 8.00736 15.0138C12.4379 15.0138 16.0147 11.6605 16.0147 7.5069C16.0147 3.35327 12.4232 0 8.00736 0ZM10.3919 10.943L8.00736 8.70745L5.65225 10.9154L4.34223 9.68721L6.69733 7.4793L4.31279 5.24379L5.59338 4.04324L7.97792 6.27875L10.333 4.07084L11.6431 5.29899L9.28795 7.5069L11.6725 9.74241L10.3919 10.943Z" fill="#E61E25" />
-										</g>
-										<defs>
-											<clipPath id="clip0_34_2206">
-												<rect width="16" height="15" fill="white" />
-											</clipPath>
-										</defs>
-									</svg>
-								</button>
-							</template>
 
-							<!-- Disabled Delete Button -->
-							<template if:true={app.disabledCancel}>
-								<button class="icon-btn danger" disabled title="Delete" aria-label="Delete">
-									<svg width="25" height="25" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-										<g clip-path="url(#clip0_34_2147)">
-											<path d="M8.00736 0C3.57682 0 0 3.35327 0 7.5069C0 11.6605 3.57682 15.0138 8.00736 15.0138C12.4379 15.0138 16.0147 11.6605 16.0147 7.5069C16.0147 3.35327 12.4232 0 8.00736 0ZM10.3919 10.943L8.00736 8.70745L5.65225 10.9154L4.34223 9.68721L6.69733 7.4793L4.31279 5.24379L5.59338 4.04324L7.97792 6.27875L10.333 4.07084L11.6431 5.29899L9.28795 7.5069L11.6725 9.74241L10.3919 10.943Z" fill="#E4E4E4"/>
-										</g>
-										<defs>
-											<clipPath id="clip0_34_2147">
-												<rect width="16" height="15" fill="white"/>
-											</clipPath>
-										</defs>
-									</svg>
-								</button>
-							</template>
+
+
                         </div>
                     </div>
                 </div>
@@ -208,31 +191,7 @@
             <div class="slds-backdrop slds-backdrop_open" onclick={handleCloseNewQuoteModal}></div>
         </template>
 
-        <!-- Cancellation Request Modal -->
-        <template if:true={showCancellationModal}>
-            <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="modal-heading-01" class="slds-modal slds-fade-in-open">
-                <div class="slds-modal__container cancellation-modal">
-                    <button class="modal-close-btn" onclick={handleCloseCancellationModal} aria-label="Close">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M18 6L6 18M6 6L18 18" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </button>
-                    <div class="slds-p-left_medium slds-p-right_medium slds-p-top_medium">
-                        <h2 id="modal-heading-01" class="modal-title">Request Cancellation</h2>
-                    </div>
-                    <div class="slds-p-left_medium slds-p-right_medium">
-                        <p class="cancellation-message">
-                            Would you like to cancel the quote for <span class="vehicle-name">{cancellationVehicleName}</span><br/>
-                            VIN#<span class="vin-number"> {cancellationVIN}</span>?
-                        </p>
-                    </div>
-                    <div class="slds-p-left_medium slds-p-right_medium slds-p-top_medium">
-                        <button class="modal-btn-continue slds-p-around_x-small" onclick={handleContinueToCancellation}>Continue to Cancellation</button>
-                    </div>
-                </div>
-            </section>
-            <div class="slds-backdrop slds-backdrop_open" onclick={handleCloseCancellationModal}></div>
-        </template>
+
 
         <!-- Convert to Application Modal -->
         <template if:true={showConvertModal}>

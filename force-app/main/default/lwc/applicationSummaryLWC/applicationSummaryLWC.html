@@ -39,6 +39,27 @@
             <template if:false={hasOptionalOptions}>
                 <p class="no-options">No optional options</p>
             </template>
+
+            <!-- PDF Actions -->
+            <div class="pdf-actions">
+                <lightning-button 
+                    label="Generate PDF" 
+                    variant="brand" 
+                    onclick={handleGeneratePDF}
+                    disabled={isLoading}
+                    icon-name="utility:download"
+                    class="slds-m-right_small">
+                </lightning-button>
+                <template if:true={hasFiles}>
+                    <lightning-button 
+                        label="View PDF" 
+                        variant="neutral" 
+                        onclick={handleViewPDF}
+                        icon-name="utility:preview"
+                        class="slds-m-right_small">
+                    </lightning-button>
+                </template>
+            </div>
         </div>
     </div>
 </template>

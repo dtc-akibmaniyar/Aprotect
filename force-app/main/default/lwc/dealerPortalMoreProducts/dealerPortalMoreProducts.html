@@ -26,11 +26,6 @@
                 <div class="tire-hero__content">
                     <div class="tire-hero__header-row">
                         <h1>TIRE & RIM WARRANTY</h1>
-                        <div class="tire-hero__header-actions">
-                            <template if:true={isQuoteStatus}>
-                                <button class="convert-to-app-btn" onclick={handleConvertToApplication} title="Convert this quote to a pending application">Convert to Application</button>
-                            </template>
-                        </div>
                     </div>
                     <p>
                         Covers tire and rim repair or replacement from damage caused by potholes, nails, debris, and other road hazards to stay protected from costly repairs.
@@ -324,11 +319,6 @@
                     <div class="tire-hero__header">
                         <div class="tire-hero__header-row">
                             <h1>TIRE &amp; RIM WARRANTY</h1>
-                            <div class="tire-hero__header-actions">
-                                <template if:true={isQuoteStatus}>
-                                    <button class="convert-to-app-btn" onclick={handleConvertToApplication} title="Convert this quote to a pending application">Convert to Application</button>
-                                </template>
-                            </div>
                         </div>
                     </div>
                     <p>
@@ -831,6 +821,16 @@
                 </button>
             </template>
             
+
+            <template if:true={isQuoteStatus}>
+                <button
+                    type="button"
+                    class="continue-button"
+                    onclick={handleConvertToApplication}
+                    aria-label="Convert to Application">
+                    <span class="continue-label">Convert to Application</span>
+                </button>
+            </template>
             
             <div class="continue-button-wrapper">
                 <template if:true={loading}>

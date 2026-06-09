@@ -3858,6 +3858,14 @@ export default class DealerPortalGap extends LightningElement {
         console.log('🔍 Down Payment options:', this.downPaymentOptions.length);
     }
 
+    handleGenerateQuotePDF() {
+        this.dispatchEvent(new CustomEvent('generatequotepdf'));
+    }
+
+    handlePreviewPDF() {
+        this.dispatchEvent(new CustomEvent('previewpdf'));
+    }
+
     async handleConvertToApplication() {
         if (!this.applicationId) {
             this.dispatchEvent(

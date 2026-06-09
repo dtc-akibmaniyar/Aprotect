@@ -20,6 +20,12 @@ public without sharing class QuotePDFExtension {
     // Logo whitelisting flag
     public Boolean showLogoOnPdf   { get; set; }
 
+    // Computed quote total across all active packages
+    public Decimal quoteTotal { get; private set; }
+
+    // Aprotect fallback branding
+    public Boolean useAprotectBranding { get; set; }
+
     public List<Application_Package__c> applicationPackages { get; private set; }
     private Map<Id, List<Application_Package_Option__c>>     packageOptions;
     private Map<Id, String>  packageLogoUrls;
@@ -39,6 +45,7 @@ public without sharing class QuotePDFExtension {
         public Boolean                             hasTermsAndConditions { get; set; }
         public String                              recordTypeName   { get; set; }
         public Boolean                             isTireRim        { get; set; }
+        public Decimal                             retailPriceTotal { get; set; }
     }
 
     // Single flat list (no record-type grouping needed for quote)
@@ -55,6 +62,9 @@ public without sharing class QuotePDFExtension {
             hasDealerLogo = false;
             dealerLogoUrl = '';
         }
+
+        // Set Aprotect fallback branding flag
+        useAprotectBranding = !hasDealerLogo || !showLogoOnPdf;
 
         packageOptions         = new Map<Id, List<Application_Package_Option__c>>();
         packageLogoUrls        = new Map<Id, String>();
@@ -93,6 +103,10 @@ public without sharing class QuotePDFExtension {
             wrapper.recordTypeName = rt;
             wrapper.isTireRim = rt.containsIgnoreCase('Tire') && rt.containsIgnoreCase('Rim');
 
+            Decimal retailBase = pkg.Dealer_Package_Retail_Price__c != null ? pkg.Dealer_Package_Retail_Price__c : 0;
+            Decimal retailAddons = pkg.Add_Ons_Retail_Price__c != null ? pkg.Add_Ons_Retail_Price__c : 0;
+            wrapper.retailPriceTotal = retailBase + retailAddons;
+
             String inclusionsStr = getPackageInclusionsImpl(pkg.Id);
             String exclusionsStr = getPackageExclusionsImpl(pkg.Id);
 
@@ -101,6 +115,15 @@ public without sharing class QuotePDFExtension {
 
             packageWrappersList.add(wrapper);
         }
+
+        // Calculate quote total from all active packages
+        Decimal total = 0;
+        for (PackageWrapper pw : packageWrappersList) {
+            if (pw.pkg.Contract_Premium_Price__c != null) {
+                total += pw.pkg.Contract_Premium_Price__c;
+            }
+        }
+        quoteTotal = total;
     }
 
     private void loadDealerBranding() {
@@ -287,6 +310,8 @@ public without sharing class QuotePDFExtension {
                        Contract_Premium_Price_Without_Tax__c,
                        Tax_Amount__c,
                        Total_Package_Price__c,
+                       Dealer_Package_Retail_Price__c,
+                       Add_Ons_Retail_Price__c,
                        Dealer_Package__c,
                        Dealer_Package__r.Package__c,
                        Tire_Brand__c,

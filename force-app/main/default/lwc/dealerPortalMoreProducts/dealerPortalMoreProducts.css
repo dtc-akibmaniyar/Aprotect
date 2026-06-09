@@ -52,14 +52,14 @@
 }
 
 .nav-button.save-quote-button {
-    order: 1; /* Save button on the left at bottom */
+    /* No order needed - follows HTML source order */
 }
 
 .continue-button-wrapper {
     display: flex;
     align-items: center;
     gap: 1rem;
-    order: 2; /* Continue button group on the right at bottom */
+    /* No order needed - follows HTML source order */
 }
 
 .button-label {

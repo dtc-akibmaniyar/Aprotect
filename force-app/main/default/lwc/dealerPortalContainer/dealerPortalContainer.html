@@ -81,12 +81,6 @@
                     </template>
                 </button>
             </template>
-            <!-- Convert to Application button -->
-            <template if:true={showConvertToApplicationButton}>
-                <button class="convert-to-app-btn" onclick={handleConvertToApplication}>
-                    Convert to Application
-                </button>
-            </template>
         </div>
 
         <!-- Tab Content -->
@@ -102,7 +96,8 @@
             </div>
 
             <div class={warrantyTabContentClass}>
-                <c-dealer-portal-warranty 
+                <c-dealer-portal-warranty
+                            onconvertapplication={handleConvertToApplication} 
                     application-id={applicationId}
                     application-status={applicationStatus}
                     is-locked={isApplicationLocked}
@@ -115,7 +110,8 @@
             </div>
 
             <div class={moreProductsTabContentClass}>
-                <c-dealer-portal-more-products 
+                <c-dealer-portal-more-products
+                            onconvertapplication={handleConvertToApplication} 
                     application-id={applicationId}
                     is-locked={isApplicationLocked}
                     application-status={applicationStatus}
@@ -128,7 +124,8 @@
             </div>
 
             <div class={gapTabContentClass}>
-                <c-dealer-portal-gap 
+                <c-dealer-portal-gap
+                            onconvertapplication={handleConvertToApplication} 
                     application-id={applicationId}
                     application-status={applicationStatus}
                     is-locked={isApplicationLocked}
@@ -137,6 +134,8 @@
                     onback={handleGapBack}
                     onapplicationstatuschanged={handleApplicationStatusChanged}
                     onsaveasquote={handleGapSaveAsQuote}
+                    ongeneratequotepdf={handleGenerateQuotePDF}
+                    onpreviewpdf={handlePreviewPDF}
                 ></c-dealer-portal-gap>
             </div>
 

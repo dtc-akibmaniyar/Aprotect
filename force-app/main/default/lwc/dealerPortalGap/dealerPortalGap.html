@@ -28,11 +28,6 @@
             <div class="loan-hero__content">
                 <div class="loan-hero__header-row">
                     <h1>GAP</h1>
-                    <div class="loan-hero__header-actions">
-                        <template if:true={isQuoteStatus}>
-                            <button class="convert-to-app-btn" onclick={handleConvertToApplication} title="Convert this quote to a pending application">Convert to Application</button>
-                        </template>
-                    </div>
                 </div>
                 <p>
                     Provides financial protection if your customer must return the vehicle due to total loss events.
@@ -622,6 +617,29 @@
         <!-- Only Save As Quote showing (on the right) -->
         <template if:true={isQuoteStatus}>
             <div class="navigation-buttons">
+                <template if:true={isQuoteStatus}>
+                    <button
+                        type="button"
+                        class="continue-button"
+                        onclick={handleConvertToApplication}
+                        aria-label="Convert to Application">
+                        <span class="continue-label">Convert to Application</span>
+                    </button>
+                </template>
+                    <button
+                        type="button"
+                        class="continue-button"
+                        onclick={handlePreviewPDF}
+                        aria-label="Preview PDF">
+                        <span class="continue-label">Preview PDF</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="continue-button"
+                        onclick={handleGenerateQuotePDF}
+                        aria-label="Generate PDF">
+                        <span class="continue-label">Generate PDF</span>
+                    </button>
                 <!-- <template if:true={sowSaveAsQuoteButton}> -->
                     <button
                         type="button"

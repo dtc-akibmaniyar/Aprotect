@@ -1,8 +1,11 @@
 import { LightningElement, api, wire, track } from 'lwc';
 import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import { NavigationMixin } from 'lightning/navigation';
 import getApplicationSummaryData from '@salesforce/apex/ApplicationSummaryController.getApplicationSummaryData';
 import generateAndAttachPDF from '@salesforce/apex/ApplicationSummaryController.generateAndAttachPDF';
+import hasRelatedFiles from '@salesforce/apex/QuotePDFGeneratorService.hasRelatedFiles';
+import communityBasePath from '@salesforce/community/basePath';
 
 // Define fields to retrieve
 const FIELDS = [
@@ -12,13 +15,14 @@ const FIELDS = [
     'Application__c.Package_Term__r.Name'
 ];
 
-export default class ApplicationSummaryLWC extends LightningElement {
+export default class ApplicationSummaryLWC extends NavigationMixin(LightningElement) {
     @api recordId;
     @track applicationData;
     @track includedOptions = [];
     @track optionalOptions = [];
     @track isLoading = false;
     @track error;
+    @track hasFiles = false;
 
     @wire(getRecord, { recordId: '$recordId', fields: FIELDS })
     application;
@@ -26,6 +30,7 @@ export default class ApplicationSummaryLWC extends LightningElement {
     // Get complete application data when component loads
     connectedCallback() {
         this.loadApplicationData();
+        this.checkForFiles();
     }
 
     async loadApplicationData() {
@@ -45,31 +50,41 @@ export default class ApplicationSummaryLWC extends LightningElement {
         }
     }
 
+    async checkForFiles() {
+        try {
+            this.hasFiles = await hasRelatedFiles({ applicationId: this.recordId });
+        } catch (err) {
+            console.error('Error checking for files:', err);
+            this.hasFiles = false;
+        }
+    }
+
     // Generate PDF and attach to application record
     async handleGeneratePDF() {
         this.isLoading = true;
         try {
-            const contentVersionId = await generateAndAttachPDF({ applicationId: this.recordId });
-            
-            this.showToast(
-                'Success',
-                'PDF generated and attached successfully!',
-                'success'
-            );
-            
-            // Refresh the page to show the new file
-            window.location.reload();
-            
+            const result = await generateAndAttachPDF({ applicationId: this.recordId });
+
+            if (result && result.success) {
+                this.showToast('Success', 'PDF generated and attached successfully!', 'success');
+                this.hasFiles = true;
+            } else {
+                this.showToast('Error', (result && result.message) || 'PDF generation failed', 'error');
+            }
         } catch (error) {
-            this.showToast(
-                'Error',
-                'Failed to generate PDF: ' + error.body.message,
-                'error'
-            );
+            const msg = (error && error.body && error.body.message) || (error && error.message) || 'Unknown error';
+            this.showToast('Error', 'Failed to generate PDF: ' + msg, 'error');
             console.error('PDF generation error:', error);
         } finally {
             this.isLoading = false;
         }
+    }
+
+    // Navigate to attached files page
+    handleViewPDF() {
+        const basePath = communityBasePath || '';
+        const filesUrl = basePath + '/s/contentdocument/related/' + this.recordId + '/AttachedContentDocuments';
+        window.open(filesUrl, '_blank');
     }
 
     // Show toast notification
@@ -115,7 +130,7 @@ export default class ApplicationSummaryLWC extends LightningElement {
     get customerName() {
         const firstName = this.applicationData?.Customer_First_Name__c || '';
         const lastName = this.applicationData?.Customer_Last_Name__c || '';
-        return `${firstName} ${lastName}`.trim() || 'N/A';
+        return (firstName + ' ' + lastName).trim() || 'N/A';
     }
 
     get customerEmail() {
@@ -131,7 +146,7 @@ export default class ApplicationSummaryLWC extends LightningElement {
         const year = this.applicationData.Vehicle_Year__c || '';
         const make = this.applicationData.Vehicle_Make__c || '';
         const model = this.applicationData.Vehicle_Model__c || '';
-        return `${year} ${make} ${model}`.trim() || 'N/A';
+        return (year + ' ' + make + ' ' + model).trim() || 'N/A';
     }
 
     get vehicleVIN() {
@@ -140,7 +155,7 @@ export default class ApplicationSummaryLWC extends LightningElement {
 
     get vehiclePrice() {
         const price = this.applicationData?.Vehicle_Purchase_Price__c;
-        return price ? `$${price.toLocaleString()}` : 'N/A';
+        return price ? '$' + price.toLocaleString() : 'N/A';
     }
 
     get hasIncludedOptions() {
