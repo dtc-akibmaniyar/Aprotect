@@ -32,6 +32,7 @@ public with sharing class ApplicationsListViewController {
         @AuraEnabled public String applicationStatus;
         @AuraEnabled public String cancellationStatus;
         @AuraEnabled public String invoiceId;
+        @AuraEnabled public Date paymentDueDate;
         public ApplicationRow() {}
     }
 
@@ -77,7 +78,8 @@ public with sharing class ApplicationsListViewController {
             
             Map<Id, List<ServiceInfo>> appIdToServiceInfo = buildServiceLabelsByApplication(apps, statusFilter);
             Map<Id, String> appIdToLatestInvoiceId = getLatestInvoiceForApplications(apps);
-            List<ApplicationRow> rows = buildRows(apps, appIdToServiceInfo, appIdToLatestInvoiceId);
+            Map<Id, Date> appIdToPaymentDueDate = getPaymentDueDateForApplications(apps);
+            List<ApplicationRow> rows = buildRows(apps, appIdToServiceInfo, appIdToLatestInvoiceId, appIdToPaymentDueDate);
             
             resp.success = true;
             resp.data = rows;
@@ -211,6 +213,34 @@ public with sharing class ApplicationsListViewController {
         return appIdToLatestInvoiceId;
     }
 
+    /**
+     * Get the payment due date from the latest invoice for each application.
+     */
+    private static Map<Id, Date> getPaymentDueDateForApplications(List<Application__c> apps) {
+        Set<Id> appIds = new Set<Id>();
+        for (Application__c a : apps) {
+            appIds.add(a.Id);
+        }
+        if (appIds.isEmpty()) {
+            return new Map<Id, Date>();
+        }
+        
+        List<Invoice__c> invoices = [
+            SELECT Id, Application__c, Invoice_Due_Date__c
+            FROM Invoice__c
+            WHERE Application__c IN :appIds AND Invoice_Due_Date__c != null
+            ORDER BY CreatedDate DESC
+        ];
+        
+        Map<Id, Date> appIdToPaymentDueDate = new Map<Id, Date>();
+        for (Invoice__c inv : invoices) {
+            if (!appIdToPaymentDueDate.containsKey(inv.Application__c)) {
+                appIdToPaymentDueDate.put(inv.Application__c, inv.Invoice_Due_Date__c);
+            }
+        }
+        return appIdToPaymentDueDate;
+    }
+
     private static Map<Id, List<ServiceInfo>> buildServiceLabelsByApplication(List<Application__c> apps, String statusFilter) {
         Set<Id> appIds = new Set<Id>();
         for (Application__c a : apps) {
@@ -304,7 +334,7 @@ public with sharing class ApplicationsListViewController {
     }
 
     // Build DTO rows from apps and labels
-    private static List<ApplicationRow> buildRows(List<Application__c> apps, Map<Id, List<ServiceInfo>> appIdToServiceInfo, Map<Id, String> appIdToLatestInvoiceId) {
+    private static List<ApplicationRow> buildRows(List<Application__c> apps, Map<Id, List<ServiceInfo>> appIdToServiceInfo, Map<Id, String> appIdToLatestInvoiceId, Map<Id, Date> appIdToPaymentDueDate) {
         List<ApplicationRow> rows = new List<ApplicationRow>();
         for (Application__c a : apps) {
             ApplicationRow row = new ApplicationRow();
@@ -320,6 +350,7 @@ public with sharing class ApplicationsListViewController {
             row.applicationStatus = a.Application_Status__c;
             row.cancellationStatus = a.Cancellation_Status__c;
             row.invoiceId = appIdToLatestInvoiceId != null && appIdToLatestInvoiceId.containsKey(a.Id) ? appIdToLatestInvoiceId.get(a.Id) : null;
+            row.paymentDueDate = appIdToPaymentDueDate != null && appIdToPaymentDueDate.containsKey(a.Id) ? appIdToPaymentDueDate.get(a.Id) : null;
             row.services = new List<ServiceInfo>();
             if (appIdToServiceInfo != null && appIdToServiceInfo.containsKey(a.Id)) {
                 row.services.addAll(appIdToServiceInfo.get(a.Id));

@@ -8,6 +8,7 @@ public class ApplicationDataDTO {
     @AuraEnabled public DateTime CreatedDate;
     @AuraEnabled public String Status;
     @AuraEnabled public String VehicleName;
+    @AuraEnabled public Date PaymentDueDate;
     
     public ApplicationDataDTO() {}
 }
@@ -585,6 +586,38 @@ public static ApplicationsResponse getAllApplications() {
             appData.VehicleName = vehicleName;
             
             applicationData.add(appData);
+        }
+        
+        // Query nearest future Invoice_Due_Date__c for each application
+        if (!applicationData.isEmpty()) {
+            Set<String> appIds = new Set<String>();
+            for (ApplicationDataDTO appDto : applicationData) {
+                appIds.add(appDto.Id);
+            }
+            
+            // Get the earliest Invoice_Due_Date__c per application
+            Map<String, Date> appToInvoiceDueDate = new Map<String, Date>();
+            List<Invoice__c> invoices = [
+                SELECT Application__c, Invoice_Due_Date__c
+                FROM Invoice__c
+                WHERE Application__c IN :appIds
+                AND Invoice_Due_Date__c != null
+                ORDER BY Invoice_Due_Date__c ASC
+            ];
+            
+            for (Invoice__c inv : invoices) {
+                // Only keep the earliest due date per application
+                if (!appToInvoiceDueDate.containsKey(inv.Application__c)) {
+                    appToInvoiceDueDate.put(inv.Application__c, inv.Invoice_Due_Date__c);
+                }
+            }
+            
+            // Populate PaymentDueDate on each DTO
+            for (ApplicationDataDTO appDto : applicationData) {
+                if (appToInvoiceDueDate.containsKey(appDto.Id)) {
+                    appDto.PaymentDueDate = appToInvoiceDueDate.get(appDto.Id);
+                }
+            }
         }
         
         response.success = true;

@@ -966,3 +966,8 @@
 	box-decoration-break: clone;
 	-webkit-box-decoration-break: clone;
 }
+
+/* Payment Due Date Filter */
+.dp-due-date-filters {
+	margin-left: 12px;
+}

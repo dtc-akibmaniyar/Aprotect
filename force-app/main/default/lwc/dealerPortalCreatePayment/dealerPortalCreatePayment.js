@@ -1,4 +1,5 @@
 import { LightningElement, api, wire, track } from 'lwc';
+import { NavigationMixin } from 'lightning/navigation';
 import processPayment from '@salesforce/apex/DealerPortalMonerisIntegrationServices.processPayment';
 import processChequePayment from '@salesforce/apex/DealerPortalMonerisIntegrationServices.processChequePayment';
 import processETransferPayment from '@salesforce/apex/DealerPortalMonerisIntegrationServices.processETransferPayment';
@@ -20,7 +21,7 @@ import { getObjectInfo, getPicklistValues } from "lightning/uiObjectInfoApi";
 import PAYMENT_OBJECT from "@salesforce/schema/Payment__c";
 import CHEQUE_DELIVERY_FIELD from "@salesforce/schema/Payment__c.Cheque_Delivery_Mthod__c";
 
-export default class DealerPortalCreatePayment extends LightningElement {
+export default class DealerPortalCreatePayment extends NavigationMixin(LightningElement) {
     @api recordId;
     @api amount;
 
@@ -516,6 +517,8 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 this.remittanceFormAmount = Math.max(0, (this.remittanceFormAmount || 0) - (this.chequeAmount || 0));
                 this.paymentAmount = this.remittanceFormAmount;
                 this.showToast('Success', 'Cheque details submitted successfully', 'success');
+                // Navigate to success page if fully paid
+                this.navigateToSuccessPageIfFullyPaid();
                 this.dispatchEvent(new CustomEvent('chequesubmitted', {
                     detail: {
                         method: 'cheque',
@@ -636,6 +639,8 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 this.remittanceFormAmount = Math.max(0, (this.remittanceFormAmount || 0) - (this.eTransferAmount || 0));
                 this.paymentAmount = this.remittanceFormAmount;
                 this.showToast('Success', 'E-Transfer details submitted successfully', 'success');
+                // Navigate to success page if fully paid
+                this.navigateToSuccessPageIfFullyPaid();
                 this.dispatchEvent(new CustomEvent('etransfersubmitted', {
                     detail: {
                         method: 'eTransfer',
@@ -738,6 +743,8 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 this.remittanceFormAmount = Math.max(0, (this.remittanceFormAmount || 0) - (this.dealerCreditAmount || 0));
                 this.paymentAmount = this.remittanceFormAmount;
                 this.showToast('Success', 'Dealer credit applied successfully', 'success');
+                // Navigate to success page if fully paid
+                this.navigateToSuccessPageIfFullyPaid();
                 this.dispatchEvent(new CustomEvent('dealercreditapplied', {
                     detail: {
                         method: 'dealerCredit',
@@ -839,6 +846,8 @@ export default class DealerPortalCreatePayment extends LightningElement {
                 // Single delayed refresh for DLRS rollup + flow updates
                 // eslint-disable-next-line @lwc/lwc/no-async-operation
                 setTimeout(() => { notifyRecordUpdateAvailable([{ recordId: this.recordId }]); }, 4000);
+                // Navigate to success page if fully paid
+                this.navigateToSuccessPageIfFullyPaid();
             } else {
                 this.showToast('Error', result?.errorMessage || 'Payment processing failed', 'error');
             }
@@ -927,5 +936,26 @@ export default class DealerPortalCreatePayment extends LightningElement {
             variant: variant
         });
         this.dispatchEvent(toastEvent);
+    }
+
+    /**
+     * Navigate to the Payment Success page when the entire remittance balance is paid off.
+     * Uses a small delay to allow the toast to display before navigation.
+     */
+    navigateToSuccessPageIfFullyPaid() {
+        // Balance is 0 or effectively 0 (handle floating point)
+        if (this.remittanceFormAmount != null && this.remittanceFormAmount <= 0.005) {
+            // eslint-disable-next-line @lwc/lwc/no-async-operation
+            setTimeout(() => {
+                // Navigate to the custom Experience Cloud page
+                // The page must be created in Experience Builder at /payment-success
+                this[NavigationMixin.Navigate]({
+                    type: 'standard__webPage',
+                    attributes: {
+                        url: '/dealerportal/s/payment-success?remittanceFormId=' + this.recordId
+                    }
+                });
+            }, 1500);
+        }
     }
 }

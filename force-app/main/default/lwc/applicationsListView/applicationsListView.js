@@ -26,6 +26,22 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 	@track statusFilter = 'Pending';
 	@track selectedApplicationIds = new Set();
 	@track isSelectAllChecked = false;
+	@track paymentDueDateFilter = 'All';
+
+	// Payment due date filter options
+	get paymentDueDateOptions() {
+		return [
+			{ label: 'All', value: 'All' },
+			{ label: '30 Days', value: '30' },
+			{ label: '60 Days', value: '60' },
+			{ label: '90 Days', value: '90' }
+		];
+	}
+
+	get isPaymentDueAll() { return this.paymentDueDateFilter === 'All'; }
+	get isPaymentDue30() { return this.paymentDueDateFilter === '30'; }
+	get isPaymentDue60() { return this.paymentDueDateFilter === '60'; }
+	get isPaymentDue90() { return this.paymentDueDateFilter === '90'; }
 
 	// Wire CurrentPageReference to handle navigation state
 	@wire(CurrentPageReference)
@@ -52,6 +68,10 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 		if (select && select.value !== this.statusFilter) {
 			select.value = this.statusFilter;
 		}
+		const dueDateSelect = this.template.querySelector('.dp-due-date-select');
+		if (dueDateSelect && dueDateSelect.value !== this.paymentDueDateFilter) {
+			dueDateSelect.value = this.paymentDueDateFilter;
+		}
 	}
 
 	/**
@@ -76,20 +96,23 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 			console.log('Initial load resp:: ' + JSON.stringify(resp));
 			
 			if (resp && resp.success && Array.isArray(resp.data)) {
-				this.totalCount = resp.totalCount || 0;
-				// Compute client-side totalPages based on current pageSize
-				this.totalPages = Math.max(1, Math.ceil((this.totalCount || 0) / this.pageSize));
-				this.page = 1;
-				
 				// Transform and cache all fetched records
 				const transformedData = this.transformData(resp.data);
 				this.countFetched = resp.data.length;
 				
 				// Store fetched records in a temporary storage for pagination
 				this.allFetchedRecords = transformedData;
+
+				// Apply payment due date filter client-side
+				const filteredData = this.applyPaymentDueDateFilter(transformedData);
 				
-				// Cache pages based on pageSize from initial fetch
-				this.cachePagesFromFetchedData(transformedData);
+				this.totalCount = filteredData.length;
+				// Compute client-side totalPages based on current pageSize
+				this.totalPages = Math.max(1, Math.ceil((this.totalCount || 0) / this.pageSize));
+				this.page = 1;
+				
+				// Cache pages based on pageSize from filtered data
+				this.cachePagesFromFetchedData(filteredData);
 				
 				this.updateCurrentPage();
 				this.initialLoadDone = true;
@@ -106,6 +129,45 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 		} finally {
 			this.isLoading = false;
 		}
+	}
+
+	/**
+	 * Apply payment due date filter on client-side
+	 */
+	applyPaymentDueDateFilter(data) {
+		if (this.paymentDueDateFilter === 'All') {
+			return data;
+		}
+		const days = parseInt(this.paymentDueDateFilter, 10);
+		if (isNaN(days)) return data;
+
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const cutoffDate = new Date(today);
+		cutoffDate.setDate(cutoffDate.getDate() + days);
+
+		return data.filter(app => {
+			if (!app.paymentDueDate) return false;
+			const dueDate = new Date(app.paymentDueDate);
+			dueDate.setHours(0, 0, 0, 0);
+			return dueDate >= today && dueDate <= cutoffDate;
+		});
+	}
+
+	/**
+	 * Handle payment due date filter change
+	 */
+	handlePaymentDueDateFilterChange(event) {
+		this.paymentDueDateFilter = event.target.value;
+		// Re-apply filter from cached data
+		this.pageCache.clear();
+		this.page = 1;
+
+		const filteredData = this.applyPaymentDueDateFilter(this.allFetchedRecords);
+		this.totalCount = filteredData.length;
+		this.totalPages = Math.max(1, Math.ceil(this.totalCount / this.pageSize));
+		this.cachePagesFromFetchedData(filteredData);
+		this.updateCurrentPage();
 	}
 
 	/**
@@ -132,6 +194,7 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 				id: row.id,
 				appNumber: row.appNumber,
 				date: dateFmt,
+				paymentDueDate: row.paymentDueDate || null,
 				customer: {
 					name: row.customerName || '',
 					address1: row.billingStreet || '',
@@ -250,10 +313,6 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 			});
 			console.log('Fetch chunk ' + chunkIndex + ' resp:: ' + JSON.stringify(resp));
 			if (resp && resp.success && Array.isArray(resp.data)) {
-				// Update totalCount and totalPages
-				this.totalCount = resp.totalCount || this.totalCount || 0;
-				this.totalPages = Math.max(1, Math.ceil((this.totalCount || 0) / this.pageSize));
-
 				const transformed = this.transformData(resp.data);
 				// Calculate where to place this chunk in allFetchedRecords
 				const expectedStart = (chunkIndex - 1) * this.INITIAL_FETCH_LIMIT;
@@ -271,8 +330,11 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 				// Update countFetched to actual known records (trim nulls)
 				this.countFetched = this.allFetchedRecords.filter(r => r != null).length;
 
-				// Rebuild page cache from allFetchedRecords
-				this.cachePagesFromFetchedData(this.allFetchedRecords.filter(r => r != null));
+				// Apply payment due date filter and rebuild pages
+				const filteredData = this.applyPaymentDueDateFilter(this.allFetchedRecords.filter(r => r != null));
+				this.totalCount = filteredData.length;
+				this.totalPages = Math.max(1, Math.ceil(this.totalCount / this.pageSize));
+				this.cachePagesFromFetchedData(filteredData);
 
 				// If the requested page falls within this new chunk, set applications
 				if (this.pageCache.has(this.page)) {

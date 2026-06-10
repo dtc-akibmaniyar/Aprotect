@@ -41,6 +41,22 @@
                             <option value="Cancelled" selected={isCancelledSelected}>Cancelled</option>
                         </select>
                     </div>
+                    <div class="dp-status-filters dp-due-date-filters">
+                        <span class="dp-status-icon" aria-hidden="true">
+                            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="#5184B8" stroke-width="2" fill="none"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6" stroke="#5184B8" stroke-width="2"></line>
+                                <line x1="8" y1="2" x2="8" y2="6" stroke="#5184B8" stroke-width="2"></line>
+                                <line x1="3" y1="10" x2="21" y2="10" stroke="#5184B8" stroke-width="2"></line>
+                            </svg>
+                        </span>
+                        <select class="dp-status-select dp-due-date-select" onchange={handlePaymentDueDateFilterChange}>
+                            <option value="All" selected={isPaymentDueAll}>Payment Due: All</option>
+                            <option value="30" selected={isPaymentDue30}>Due in 30 Days</option>
+                            <option value="60" selected={isPaymentDue60}>Due in 60 Days</option>
+                            <option value="90" selected={isPaymentDue90}>Due in 90 Days</option>
+                        </select>
+                    </div>
                     <template if:true={shouldShowRemittanceForm}>
                         <c-dealer-postal-remitance-form 
                             record-ids={selectedApplicationIdsList}

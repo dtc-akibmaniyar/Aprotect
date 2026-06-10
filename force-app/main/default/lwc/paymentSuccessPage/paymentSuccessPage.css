@@ -1,0 +1,159 @@
+.success-page-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh;
+    padding: 2rem;
+    font-family: 'Salesforce Sans', Arial, sans-serif;
+}
+
+.loading-container,
+.error-container {
+    text-align: center;
+    padding: 3rem;
+}
+
+.error-title {
+    font-size: 1.5rem;
+    color: #c23934;
+    margin-top: 1rem;
+}
+
+.error-message {
+    color: #706e6b;
+    margin-top: 0.5rem;
+}
+
+.success-card {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    padding: 3rem 2.5rem;
+    max-width: 540px;
+    width: 100%;
+    text-align: center;
+}
+
+/* Success Icon */
+.success-icon-wrapper {
+    margin-bottom: 1.5rem;
+}
+
+.success-icon-circle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #04844b, #2e844a);
+    box-shadow: 0 4px 12px rgba(4, 132, 75, 0.3);
+}
+
+/* Typography */
+.success-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #181818;
+    margin: 0 0 0.5rem 0;
+}
+
+.success-subtitle {
+    font-size: 1rem;
+    color: #706e6b;
+    margin: 0 0 2rem 0;
+}
+
+/* Details Card */
+.details-card {
+    background: #f7f9fb;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    text-align: left;
+    margin-bottom: 2rem;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+}
+
+.detail-label {
+    font-size: 0.875rem;
+    color: #706e6b;
+    font-weight: 500;
+}
+
+.detail-value {
+    font-size: 0.875rem;
+    color: #181818;
+    font-weight: 600;
+}
+
+.detail-amount {
+    font-size: 1rem;
+}
+
+.detail-paid {
+    color: #04844b;
+}
+
+.detail-divider {
+    height: 1px;
+    background: #e5e5e5;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.btn-primary,
+.btn-secondary {
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.btn-primary {
+    background: #0070d2;
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    background: #005fb2;
+}
+
+.btn-secondary {
+    background: #ffffff;
+    color: #0070d2;
+    border: 1px solid #0070d2;
+}
+
+.btn-secondary:hover {
+    background: #f3f3f3;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .success-card {
+        padding: 2rem 1.5rem;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .success-title {
+        font-size: 1.5rem;
+    }
+}

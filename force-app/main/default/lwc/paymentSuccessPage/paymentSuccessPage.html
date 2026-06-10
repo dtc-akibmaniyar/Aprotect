@@ -1,0 +1,82 @@
+<template>
+    <div class="success-page-container">
+        <template if:true={isLoading}>
+            <div class="loading-container">
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:true={error}>
+            <div class="error-container">
+                <lightning-icon icon-name="utility:error" size="large" variant="error"></lightning-icon>
+                <h2 class="error-title">Something went wrong</h2>
+                <p class="error-message">{error}</p>
+                <lightning-button 
+                    label="Back to Dashboard" 
+                    variant="brand" 
+                    onclick={handleBackToDashboard}
+                    class="slds-m-top_medium">
+                </lightning-button>
+            </div>
+        </template>
+
+        <template if:false={isLoading}>
+            <template if:true={hasDetails}>
+                <div class="success-card">
+                    <!-- Success Icon -->
+                    <div class="success-icon-wrapper">
+                        <div class="success-icon-circle">
+                            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M14 24L21 31L34 18" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- Success Message -->
+                    <h1 class="success-title">Payment Successful!</h1>
+                    <p class="success-subtitle">Your remittance payment has been processed successfully.</p>
+
+                    <!-- Payment Details Card -->
+                    <div class="details-card">
+                        <div class="detail-row">
+                            <span class="detail-label">Remittance #</span>
+                            <span class="detail-value">{remittanceNumber}</span>
+                        </div>
+                        <div class="detail-divider"></div>
+                        <div class="detail-row">
+                            <span class="detail-label">Dealer</span>
+                            <span class="detail-value">{dealerName}</span>
+                        </div>
+                        <div class="detail-divider"></div>
+                        <div class="detail-row">
+                            <span class="detail-label">Total Amount</span>
+                            <span class="detail-value detail-amount">{formattedTotalAmount}</span>
+                        </div>
+                        <div class="detail-divider"></div>
+                        <div class="detail-row">
+                            <span class="detail-label">Amount Paid</span>
+                            <span class="detail-value detail-amount detail-paid">{formattedPaidAmount}</span>
+                        </div>
+                        <div class="detail-divider"></div>
+                        <div class="detail-row">
+                            <span class="detail-label">Payment Date</span>
+                            <span class="detail-value">{paymentDate}</span>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="action-buttons">
+                        <!-- HIDDEN: View Remittance button (commented out to hide, re-enable by uncommenting)
+                        <button class="btn-secondary" onclick={handleViewRemittance}>
+                            View Remittance
+                        </button>
+                        -->
+                        <button class="btn-primary" onclick={handleBackToDashboard}>
+                            Back to Dashboard
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </template>
+    </div>
+</template>

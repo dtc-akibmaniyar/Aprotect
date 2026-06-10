@@ -66,6 +66,21 @@
             </div>
         </div>
 
+        <!-- Payment Due Date Filter -->
+        <div class="slds-grid slds-gutters_small slds-m-around_small filter-bar">
+            <div class="slds-col slds-size_1-of-1 slds-medium-size_4-of-12 slds-large-size_3-of-12">
+                <lightning-combobox
+                    name="paymentDueDateFilter"
+                    label="Payment Due Date"
+                    value={paymentDueDateFilter}
+                    placeholder="Filter by payment due date"
+                    options={paymentDueDateOptions}
+                    onchange={handlePaymentDueDateFilterChange}
+                    class="payment-due-filter">
+                </lightning-combobox>
+            </div>
+        </div>
+
         <!-- Loading State -->
         <div if:true={loading} class="loading-container">
             <lightning-spinner alternative-text="Loading applications..." size="medium"></lightning-spinner>
@@ -108,6 +123,9 @@
                                     <div class="slds-truncate" title="Created Date">Created Date</div>
                                 </th>
                                 <th scope="col">
+                                    <div class="slds-truncate" title="Payment Due Date">Payment Due Date</div>
+                                </th>
+                                <th scope="col">
                                     <div class="slds-truncate" title="Status">Status</div>
                                 </th>
                             </tr>
@@ -131,6 +149,11 @@
                                     <td>
                                         <div class="slds-truncate" title={app.CreatedDate}>
                                             {app.CreatedDate}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="slds-truncate" title={app.PaymentDueDateFormatted}>
+                                            {app.PaymentDueDateFormatted}
                                         </div>
                                     </td>
                                     <td>

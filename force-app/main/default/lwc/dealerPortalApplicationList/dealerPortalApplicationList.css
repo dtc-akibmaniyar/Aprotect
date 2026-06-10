@@ -57,6 +57,19 @@
     border: 1px solid #ececec;
 }
 
+/* Filter bar */
+.filter-bar {
+    padding: 0.5rem 1rem;
+    background: #fafafa;
+    border-bottom: 1px solid #ededed;
+}
+
+.payment-due-filter {
+    --sds-c-input-color-border: #e1e8ed;
+    --sds-c-input-color-border-focus: #1f1f1f;
+    --sds-c-input-shadow-focus: 0 0 0 3px rgba(244,208,63,0.35);
+}
+
 /* Table styling improvements */
 .slds-table {
     border: none;

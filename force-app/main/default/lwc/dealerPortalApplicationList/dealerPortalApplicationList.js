@@ -12,9 +12,20 @@ export default class DealerPortalApplicationList extends LightningElement {
     @track errorMessage = '';
     @track lastRefreshTime = null;
     @track refreshLoading = false;
+    @track paymentDueDateFilter = '';
 
     get totalApplications() {
         return this.filteredApplications.length;
+    }
+
+    // Payment Due Date filter options
+    get paymentDueDateOptions() {
+        return [
+            { label: 'All', value: '' },
+            { label: '30 Days', value: '30' },
+            { label: '60 Days', value: '60' },
+            { label: '90 Days', value: '90' }
+        ];
     }
     
     // Computed property to show applications table when not loading and no errors
@@ -44,7 +55,9 @@ export default class DealerPortalApplicationList extends LightningElement {
                     CreatedDate: this.formatDate(app.CreatedDate),
                     VehicleName: app.VehicleName || 'No Vehicle',
                     Status: app.Status || 'Active',
-                    statusClass: this.getStatusClass(app.Status || 'Active')
+                    statusClass: this.getStatusClass(app.Status || 'Active'),
+                    PaymentDueDateRaw: app.PaymentDueDate || null,
+                    PaymentDueDateFormatted: app.PaymentDueDate ? this.formatDate(app.PaymentDueDate) : 'N/A'
                 }));
                 this.applications = normalized;
                 this.applyFilter();
@@ -119,7 +132,9 @@ export default class DealerPortalApplicationList extends LightningElement {
                     CreatedDate: this.formatDate(app.CreatedDate),
                     VehicleName: app.VehicleName || 'No Vehicle',
                     Status: app.Status || 'Active',
-                    statusClass: this.getStatusClass(app.Status || 'Active')
+                    statusClass: this.getStatusClass(app.Status || 'Active'),
+                    PaymentDueDateRaw: app.PaymentDueDate || null,
+                    PaymentDueDateFormatted: app.PaymentDueDate ? this.formatDate(app.PaymentDueDate) : 'N/A'
                 }));
                 this.applications = normalized;
                 this.applyFilter();
@@ -150,21 +165,45 @@ export default class DealerPortalApplicationList extends LightningElement {
         Promise.resolve().then(() => this.applyFilter());
     }
 
+    handlePaymentDueDateFilterChange(event) {
+        this.paymentDueDateFilter = event.detail.value;
+        this.applyFilter();
+    }
+
     applyFilter() {
         const term = (this.searchTerm || '').trim().toLowerCase();
         const source = Array.isArray(this.applications) ? this.applications : [];
-        if (!term) {
-            this.filteredApplications = [...source];
-            return;
+        let result = [...source];
+
+        // Apply search filter
+        if (term) {
+            result = result.filter(app => {
+                const name = (app.Name || '').toLowerCase();
+                const vehicle = (app.VehicleName || '').toLowerCase();
+                const status = (app.Status || '').toLowerCase();
+                return name.includes(term) || vehicle.includes(term) || status.includes(term);
+            });
         }
-        this.filteredApplications = source.filter(app => {
-            const name = (app.Name || '').toLowerCase();
-            const vehicle = (app.VehicleName || '').toLowerCase();
-            const status = (app.Status || '').toLowerCase();
-            return name.includes(term) || vehicle.includes(term) || status.includes(term);
-        });
-        // Ensure reactivity by cloning
-        this.filteredApplications = [...this.filteredApplications];
+
+        // Apply payment due date filter
+        if (this.paymentDueDateFilter) {
+            const days = parseInt(this.paymentDueDateFilter, 10);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const futureDate = new Date(today);
+            futureDate.setDate(futureDate.getDate() + days);
+
+            result = result.filter(app => {
+                if (!app.PaymentDueDateRaw) {
+                    return false;
+                }
+                const dueDate = new Date(app.PaymentDueDateRaw);
+                dueDate.setHours(0, 0, 0, 0);
+                return dueDate >= today && dueDate <= futureDate;
+            });
+        }
+
+        this.filteredApplications = result;
     }
     
     // Method to refresh applications (can be called from parent)
@@ -273,9 +312,11 @@ export default class DealerPortalApplicationList extends LightningElement {
 
     // Empty state messages adapt to search/no data
     get emptyTitle() {
-        return this.searchTerm ? 'No matches' : 'No Applications Found';
+        if (this.searchTerm || this.paymentDueDateFilter) return 'No matches';
+        return 'No Applications Found';
     }
     get emptyMessage() {
-        return this.searchTerm ? 'Try a different search or clear the search box.' : 'There are no applications to display. Create a new application to get started.';
+        if (this.searchTerm || this.paymentDueDateFilter) return 'Try a different search or adjust your filters.';
+        return 'There are no applications to display. Create a new application to get started.';
     }
 }
