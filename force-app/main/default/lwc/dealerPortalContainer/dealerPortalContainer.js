@@ -266,8 +266,8 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         
         // Only auto-navigate if this is NOT an auto-selection
         if (!event.detail.autoSelected) {
-            console.log('🔄 Auto-navigating to Customer tab (GAP tab hidden)');
-            this.switchToTab('customer');
+            console.log('🔄 Auto-navigating to GAP tab');
+            this.switchToTab('gap');
         } else {
             console.log('⏸️ Auto-selection detected, staying on more products tab');
         }
@@ -363,12 +363,11 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
 
     get gapTabClass() {
-        // GAP tab hidden — to re-enable, restore original logic below
-        // Original: if (this.isApplicationLocked) return 'tab-button hidden';
-        // const isCompleted = this.tabCompletionStatus.gap; const isActive = this.activeTab === 'gap';
-        // const isAccessible = this.canAccessTab('gap');
-        // return `tab-button ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''} ${!isAccessible ? 'locked' : ''}`;
-        return 'tab-button hidden';
+        if (this.isApplicationLocked) return 'tab-button hidden';
+        const isCompleted = this.tabCompletionStatus.gap;
+        const isActive = this.activeTab === 'gap';
+        const isAccessible = this.canAccessTab('gap');
+        return `tab-button ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''} ${!isAccessible ? 'locked' : ''}`;
     }
 
     get customerTabClass() {
@@ -404,8 +403,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
 
     get gapTabDisabled() {
-        // GAP tab hidden — always disabled. To re-enable, restore: return this.isApplicationLocked || !this.canAccessTab('gap');
-        return true;
+        return this.isApplicationLocked || !this.canAccessTab('gap');
     }
 
     get customerTabDisabled() {
@@ -434,8 +432,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
 
     get gapTabContentClass() {
-        // GAP tab hidden — always hide content. To re-enable: return `tab-content-section ${this.activeTab === 'gap' ? 'active' : 'hidden'}`;
-        return 'tab-content-section hidden';
+        return `tab-content-section ${this.activeTab === 'gap' ? 'active' : 'hidden'}`;
     }
 
     get customerTabContentClass() {
@@ -951,8 +948,8 @@ handlePreviewPDF() {
     }
     
     handleCustomerBack(event) {
-        console.log('👤 Customer component going back to Tire & Rim tab (GAP tab hidden)');
-        this.switchToTab('moreProducts');
+        console.log('👤 Customer component going back to GAP tab');
+        this.switchToTab('gap');
     }
     
     handleSummaryBack(event) {
