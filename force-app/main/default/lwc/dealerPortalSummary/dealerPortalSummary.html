@@ -317,19 +317,13 @@
                         <span class="package-detail-label">Retail Cost:</span>
                         <span class="package-detail-value">{packageWrapper.formattedRetailCost}</span>
                       </div>
-                      <template if:true={packageWrapper.hasPremiumModelFee}>
-                        <div class="package-detail-row">
-                          <span class="package-detail-label">Premium Vehicle Fee:</span>
-                          <span class="package-detail-value">{packageWrapper.formattedPremiumModelFee}</span>
-                        </div>
-                      </template>
                       <div class="package-detail-row">
                         <span class="package-detail-label">Tax ({packageWrapper.formattedTaxRate}):</span>
-                        <span class="package-detail-value">{packageWrapper.formattedTax}</span>
+                        <span class="package-detail-value">{packageWrapper.customerFormattedTax}</span>
                       </div>
                       <div class="package-detail-row">
                         <span class="package-detail-label">Total:</span>
-                        <span class="package-detail-value">{packageWrapper.formattedTotal}</span>
+                        <span class="package-detail-value">{packageWrapper.customerFormattedTotal}</span>
                       </div>
                     </div>
                   </div>

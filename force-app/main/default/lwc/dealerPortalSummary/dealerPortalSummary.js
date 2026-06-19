@@ -158,6 +158,9 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
             };
             
             this.packageData = packageResult;
+            
+            // Post-process applicationPackages to remove Premium Vehicle Fee from customer-facing totals
+            this._recalculateCustomerTotals();
             console.log('🔄 loadData - packageResult received', packageResult);
             const clonedPackageData = { ...this.packageData }; // Shallow copy of packageData
             clonedPackageData.recordTypeWrappers = clonedPackageData.recordTypeWrappers.map(rtWrapper => {
@@ -293,6 +296,40 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     
     get hasInvoice() {
         return !!this.invoiceId;
+    }
+
+    /**
+     * Recalculate customer-facing totals on each applicationPackage,
+     * excluding the Premium Vehicle Fee (dealer-only cost).
+     * Tax is recalculated on base retail cost only.
+     */
+    _recalculateCustomerTotals() {
+        if (!this.summaryData.applicationPackages) return;
+        this.summaryData.applicationPackages.forEach(rtWrapper => {
+            if (rtWrapper.packages) {
+                rtWrapper.packages.forEach(pkgWrapper => {
+                    const retailCost = this._parseCurrency(pkgWrapper.formattedRetailCost);
+                    const taxRate = parseFloat((pkgWrapper.formattedTaxRate || '0').replace('%', '')) / 100;
+                    // Tax on base retail cost only (no premium fee)
+                    const customerTax = retailCost * taxRate;
+                    const customerTotal = retailCost + customerTax;
+                    pkgWrapper.customerFormattedTax = this._formatCurrency(customerTax);
+                    pkgWrapper.customerFormattedTotal = this._formatCurrency(customerTotal);
+                });
+            }
+        });
+    }
+
+    _parseCurrency(str) {
+        if (!str) return 0;
+        return parseFloat(str.replace(/[^0-9.\-]/g, '')) || 0;
+    }
+
+    _formatCurrency(value) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(value);
     }
 
     calculateTotal() {
