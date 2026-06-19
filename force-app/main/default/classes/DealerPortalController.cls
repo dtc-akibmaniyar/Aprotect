@@ -387,7 +387,6 @@ public class DealerPackageTermDTO {
     @AuraEnabled public String packageTermName;
     /** When true, the Deferral Option checkbox is eligible for this term on the warranty tab. */
     @AuraEnabled public Boolean allowDeferral;
-    @AuraEnabled public Decimal premiumModelFee;
 
     @AuraEnabled public Decimal originalPackageTermCost;
     @AuraEnabled public Decimal includedOptionsPrice;
@@ -516,8 +515,6 @@ public class DealerPackagesResponse {
     @AuraEnabled public String message;
     @AuraEnabled public List<DealerPackageDTO> data;
     @AuraEnabled public Map<String, Object> debugInfo; // Debug information for troubleshooting
-    @AuraEnabled public Boolean isPremiumVehicle;
-    @AuraEnabled public Decimal premiumModelFee;
     
     public DealerPackagesResponse() {}
 }
@@ -1073,11 +1070,7 @@ List<Application__c> applications = [
             SELECT Id, Dealer_Name__c, Dealer_Name__r.Id, Dealer_Name__r.Name,
                     Vehicle__r.Year__c, Vehicle__r.Odometer__c, Vehicle__r.Odometer_Unit__c,
                     Vehicle__r.Model_Lookup__c, Vehicle__r.Model_Lookup__r.Class__c,
-                    Vehicle__r.Make__c, Vehicle__r.Model__c,
-                    Vehicle__r.Model_Lookup__r.Premium_Model_Fee__c,
-                    Vehicle__r.Model_Lookup__r.Make__c,
-                    Vehicle__r.Model_Lookup__r.Make__r.Premium_Model_Fee__c,
-                    Dealer_Name__r.Charge_Premium_Vehicle_Fee__c
+                    Vehicle__r.Business_Commercial_Use__c, Vehicle__r.Type_of_Commercial_Use__c
             FROM Application__c 
             WHERE Id = :applicationId
             LIMIT 1
@@ -1143,32 +1136,16 @@ dealerPackages = allPackages;
 } else {
 }
         
-        // Premium Vehicle Detection
-        Boolean isPremiumVehicle = false;
-        if (application.Vehicle__r != null && application.Vehicle__r.Model_Lookup__r != null) {
-            // Check model-level first (e.g., Corvette), then make-level (e.g., Mercedes)
-            if (application.Vehicle__r.Model_Lookup__r.Premium_Model_Fee__c == true) {
-                isPremiumVehicle = true;
-            } else if (application.Vehicle__r.Model_Lookup__r.Make__r != null && 
-                       application.Vehicle__r.Model_Lookup__r.Make__r.Premium_Model_Fee__c == true) {
-                isPremiumVehicle = true;
-            }
-        }
-        // Check dealer-level toggle - if dealer has premium fees disabled, override
-        Boolean dealerChargesPremiumFee = true;
-        if (application.Dealer_Name__r != null && application.Dealer_Name__r.Charge_Premium_Vehicle_Fee__c != null) {
-            dealerChargesPremiumFee = application.Dealer_Name__r.Charge_Premium_Vehicle_Fee__c;
-        }
-        if (!dealerChargesPremiumFee) {
-            isPremiumVehicle = false;
-        }
+        Boolean isCommercialUse = application.Vehicle__r != null && application.Vehicle__r.Business_Commercial_Use__c == true;
+        String typeOfCommercialUse = (application.Vehicle__r != null) ? application.Vehicle__r.Type_of_Commercial_Use__c : null;
+        
 
         Boolean isTireRimRequest = String.isNotBlank(recordType) && recordType.containsIgnoreCase('Tire_Rim');
 
 
 
 
-        {
+        if (!isTireRimRequest) {
             List<Dealer_Package__c> filteredPackages = new List<Dealer_Package__c>();
             
             for (Dealer_Package__c dp : dealerPackages) {
@@ -1191,8 +1168,27 @@ continue;
 dealerPackages = filteredPackages;
         }
         
-
-
+        // Commercial use filtering
+        {
+            List<Dealer_Package__c> commercialFiltered = new List<Dealer_Package__c>();
+            for (Dealer_Package__c dp : dealerPackages) {
+                String eligibility = dp.Commercial_Eligible__c;
+                if (String.isBlank(eligibility) || eligibility == 'All') {
+                    commercialFiltered.add(dp);
+                } else if (eligibility == 'Personal Only' && !isCommercialUse) {
+                    commercialFiltered.add(dp);
+                } else if (eligibility == 'Commercial Only' && isCommercialUse) {
+                    commercialFiltered.add(dp);
+                } else if (eligibility == 'Light Duty Commercial Only') {
+                    if (isCommercialUse && typeOfCommercialUse != null && typeOfCommercialUse.containsIgnoreCase('Light Duty')) {
+                        commercialFiltered.add(dp);
+                    } else if (!isCommercialUse) {
+                        // Personal use vehicles are not eligible for commercial-only packages
+                    }
+                }
+            }
+            dealerPackages = commercialFiltered;
+        }
 
 
         Set<Id> packageIds = new Set<Id>();
@@ -1210,7 +1206,6 @@ dealerPackages = filteredPackages;
                     Additional_Options_Price__c, Discount_Type__c, Discount_Value__c,
                     Expiry_Term__c, Odometer_KM__c,
                     Package_Term__r.Allow_Deferral__c,
-                    Premium_Model_Fee__c,
                     Dealer_Package_Tier__c, Dealer_Package__c,
                     Dealer_Package_Tier__r.Id,
                     Dealer_Package_Tier__r.Name,
@@ -1447,14 +1442,13 @@ DealerPackageTermDTO termDto = new DealerPackageTermDTO();
                         termDto.totalPrice = priceWithMarkup;
                         
 
-                        termDto.durationRestrictionInMonths = term.Expiry_Term__c;
+                        termDto.durationRestrictionInMonths = null;
                         termDto.mileageRestriction = term.Mileage_Restriction__c;
                         termDto.mileageUnit = term.Mileage_Unit__c;
-                        termDto.packageTermName = term.Expiry_Term__c != null ? String.valueOf(term.Expiry_Term__c.intValue()) + ' Months/' + (term.Mileage_Restriction__c != null ? String.valueOf(term.Mileage_Restriction__c.intValue()) + ' km' : '0 km') : term.Name;
+                        termDto.packageTermName = term.Name;
                         termDto.expiryTerm = term.Expiry_Term__c;
                         termDto.odometerKM = term.Odometer_KM__c;
                         termDto.allowDeferral = term.Package_Term__r != null && term.Package_Term__r.Allow_Deferral__c == true;
-                        termDto.premiumModelFee = isPremiumVehicle ? term.Premium_Model_Fee__c : null;
 
                         tierTermList.add(termDto);
                         termList.add(termDto); // Also add to flat list for backward compatibility
@@ -1530,7 +1524,6 @@ for (Integer i = 0; i < packageList.size(); i++) {
         response.success = true;
         response.message = responseMessage;
         response.data = packageList;
-        response.isPremiumVehicle = isPremiumVehicle;
         
 
         Map<String, Object> debugInfo = new Map<String, Object>();
@@ -2608,75 +2601,6 @@ throw new CalloutException('Package data map is empty');
         
         
 
-        // Premium Vehicle Fee Logic
-        try {
-            // Get the selected term's premium fee
-            List<Dealer_Package_Term__c> premiumTerms = [
-                SELECT Premium_Model_Fee__c, 
-                       Dealer_Package__r.Dealer__r.Charge_Premium_Vehicle_Fee__c
-                FROM Dealer_Package_Term__c 
-                WHERE Id = :selectedTermId 
-                LIMIT 1
-            ];
-            
-            if (!premiumTerms.isEmpty()) {
-                Dealer_Package_Term__c premiumTerm = premiumTerms[0];
-                Boolean dealerChargesPremium = premiumTerm.Dealer_Package__r.Dealer__r.Charge_Premium_Vehicle_Fee__c != false;
-                
-                if (dealerChargesPremium && premiumTerm.Premium_Model_Fee__c != null && premiumTerm.Premium_Model_Fee__c > 0) {
-                    // Check if vehicle is premium
-                    List<Application__c> apps = [
-                        SELECT Vehicle__r.Model_Lookup__r.Premium_Model_Fee__c,
-                               Vehicle__r.Model_Lookup__r.Make__r.Premium_Model_Fee__c,
-                               Vehicle__c
-                        FROM Application__c 
-                        WHERE Id = :applicationId 
-                        LIMIT 1
-                    ];
-                    
-                    if (!apps.isEmpty() && apps[0].Vehicle__r != null) {
-                        Boolean isVehiclePremium = false;
-                        if (apps[0].Vehicle__r.Model_Lookup__r != null) {
-                            isVehiclePremium = apps[0].Vehicle__r.Model_Lookup__r.Premium_Model_Fee__c == true;
-                            if (!isVehiclePremium && apps[0].Vehicle__r.Model_Lookup__r.Make__r != null) {
-                                isVehiclePremium = apps[0].Vehicle__r.Model_Lookup__r.Make__r.Premium_Model_Fee__c == true;
-                            }
-                        }
-                        
-                        if (isVehiclePremium) {
-                            // Check for dealer override amount
-                            Decimal premiumFeeAmount = premiumTerm.Premium_Model_Fee__c;
-                            List<Account> dealerAccounts = [
-                                SELECT Premium_Fee_Override_Amount__c 
-                                FROM Account 
-                                WHERE Id = :dealerId 
-                                LIMIT 1
-                            ];
-                            if (!dealerAccounts.isEmpty() && dealerAccounts[0].Premium_Fee_Override_Amount__c != null) {
-                                premiumFeeAmount = dealerAccounts[0].Premium_Fee_Override_Amount__c;
-                            }
-                            
-                            appPackage.Premium_Model_Fee__c = premiumFeeAmount;
-                            
-                            // Also update Vehicle record
-                            try {
-                                Vehicle__c vehicleToUpdate = new Vehicle__c(
-                                    Id = apps[0].Vehicle__c,
-                                    Premium_Vehicle_Fee__c = premiumFeeAmount
-                                );
-                                update vehicleToUpdate;
-                            } catch (Exception ve) {
-                                // Log but don't fail the package creation
-                                System.debug('Failed to update vehicle premium fee: ' + ve.getMessage());
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception premiumEx) {
-            System.debug('Premium fee calculation error (non-blocking): ' + premiumEx.getMessage());
-        }
-        
         String recordId = null;
         try {
         insert appPackage;
@@ -2685,7 +2609,7 @@ throw new CalloutException('Package data map is empty');
             
 
             try {
-                recordId = createApplicationPackageWithoutSharing(applicationId, dealerId, dealerPackageId, packageName, selectedTermId, includeDeductible ? deductible : 0, recordTypeName, appPackage.Premium_Model_Fee__c);
+                recordId = createApplicationPackageWithoutSharing(applicationId, dealerId, dealerPackageId, packageName, selectedTermId, includeDeductible ? deductible : 0, recordTypeName);
                 if (recordId != null) {
 
                 } else {
@@ -3308,17 +3232,7 @@ vehicle.Delivery_Date__c = null;
         if (String.isNotBlank(vehicle.Make__c)) {
             List<Make__c> makeRecords = [SELECT Id, Class__c FROM Make__c WHERE Name = :vehicle.Make__c LIMIT 1];
             if (makeRecords.isEmpty()) {
-                // Auto-create make if not found — don't block the application
-                Make__c newMake = new Make__c();
-                newMake.Name = vehicle.Make__c;
-                newMake.Class__c = 'Class 1'; // Default class
-                newMake.Premium_Model_Fee__c = false;
-                try {
-                    insert newMake;
-                    makeRecords = new List<Make__c>{ newMake };
-                } catch (Exception makeEx) {
-                    throw new CalloutException('Failed to register manufacturer: ' + makeEx.getMessage());
-                }
+                throw new CalloutException('We don\'t work with this type of manufacturer. Please contact support for assistance.');
             }
             vehicle.Make_Lookup__c = makeRecords[0].Id;
             
@@ -4075,7 +3989,7 @@ return new List<Dealer_Package__c>();
 try {
 
                 packages = [
-                    SELECT Id, Name, Package__c, Deductable__c, Per_Claim_Limit__c, Package_Description__c, Class__c,
+                    SELECT Id, Name, Package__c, Deductable__c, Per_Claim_Limit__c, Package_Description__c, Class__c, Commercial_Eligible__c,
                             Plan_Type__c, Plan_Type__r.Name, Plan_Type__r.Package_Description__c,
                             Dealer__c, Dealer__r.Name, Dealer__r.Tax_Region__c, Dealer__r.Tax_Region__r.Total_Tax_Rate__c,
                             RecordType.DeveloperName, RecordType.Name
@@ -4092,7 +4006,7 @@ packages = new List<Dealer_Package__c>();
         } else {
 
             packages = [
-                SELECT Id, Name, Package__c, Deductable__c, Per_Claim_Limit__c, Package_Description__c, Class__c,
+                SELECT Id, Name, Package__c, Deductable__c, Per_Claim_Limit__c, Package_Description__c, Class__c, Commercial_Eligible__c,
                         Plan_Type__c, Plan_Type__r.Name, Plan_Type__r.Package_Description__c,
                         Dealer__c, Dealer__r.Name, Dealer__r.Tax_Region__c, Dealer__r.Tax_Region__r.Total_Tax_Rate__c,
                         RecordType.DeveloperName, RecordType.Name
@@ -4389,7 +4303,7 @@ return new List<Application__c>();
  * @param deductible The deductible amount to set
  * @return Application_Package__c record ID if successful, null if failed
  */
-public static String createApplicationPackageWithoutSharing(String applicationId, String dealerId, String dealerPackageId, String packageName, String selectedTermId, Decimal deductible, String recordType, Decimal premiumModelFee) {
+public static String createApplicationPackageWithoutSharing(String applicationId, String dealerId, String dealerPackageId, String packageName, String selectedTermId, Decimal deductible, String recordType) {
     try {
 
 
@@ -4469,10 +4383,6 @@ return null;
 }
         }
         
-        // Premium Vehicle Fee — passed from the caller which already resolved it
-        if (premiumModelFee != null && premiumModelFee > 0) {
-            appPackage.Premium_Model_Fee__c = premiumModelFee;
-        }
 
         // Populate tax from dealer's region
         TaxRegionHelper.applyDealerTax(appPackage, dealerId);
@@ -5184,7 +5094,7 @@ DealerPackageDTO dto = new DealerPackageDTO();
 for (Dealer_Package_Term__c term : packageTerms) {
 DealerPackageTermDTO termDto = new DealerPackageTermDTO();
                     termDto.Id = term.Id;
-                    termDto.packageTermName = term.Expiry_Term__c != null ? String.valueOf(term.Expiry_Term__c.intValue()) + ' Months/' + (term.Mileage_Restriction__c != null ? String.valueOf(term.Mileage_Restriction__c.intValue()) + ' km' : '0 km') : term.Name;
+                    termDto.packageTermName = term.Name;
                     termDto.durationRestrictionInMonths = term.Expiry_Term__c;
                     termDto.mileageRestriction = term.Mileage_Restriction__c;
                     termDto.mileageUnit = term.Mileage_Unit__c;
@@ -6619,31 +6529,34 @@ public class MileageComparator implements Comparator<Dealer_Package_Term__c> {
 
             String trimmedVin = vin.trim();
 
-            // Build queries dynamically — only exclude currentApplicationId when it is a valid, non-blank Id
-            String baseFields = 'SELECT Id, Name, Application_Status__c, RecordType.Name, '
-                + 'Customer_First_Name__c, Customer_Last_Name__c, Customer_Name__c, '
-                + 'Vehicle__r.VIN__c, Vehicle__r.Vehicle_Identification_Number_VIN__c, '
-                + 'CreatedDate FROM Application__c ';
+            // Query Application__c records that have a Vehicle with the same VIN
+            // Exclude the current application and look across all record types (Application + Quote)
+            List<Application__c> matchingApps = [
+                SELECT Id, Name, Application_Status__c, RecordType.Name,
+                       Customer_First_Name__c, Customer_Last_Name__c, Customer_Name__c,
+                       Vehicle__r.VIN__c, Vehicle__r.Vehicle_Identification_Number_VIN__c,
+                       CreatedDate
+                FROM Application__c
+                WHERE Vehicle__r.VIN__c = :trimmedVin
+                AND Id != :currentApplicationId
+                AND Application_Status__c != 'Cancelled'
+                ORDER BY CreatedDate DESC
+                LIMIT 20
+            ];
 
-            String excludeClause = '';
-            if (String.isNotBlank(currentApplicationId)) {
-                excludeClause = ' AND Id != :currentApplicationId';
-            }
-
-            String query1 = baseFields
-                + 'WHERE Vehicle__r.VIN__c = :trimmedVin'
-                + excludeClause
-                + ' AND Application_Status__c != \'Cancelled\''
-                + ' ORDER BY CreatedDate DESC LIMIT 20';
-
-            String query2 = baseFields
-                + 'WHERE Vehicle__r.Vehicle_Identification_Number_VIN__c = :trimmedVin'
-                + excludeClause
-                + ' AND Application_Status__c != \'Cancelled\''
-                + ' ORDER BY CreatedDate DESC LIMIT 20';
-
-            List<Application__c> matchingApps = Database.query(query1);
-            List<Application__c> matchingApps2 = Database.query(query2);
+            // Also check by Vehicle_Identification_Number_VIN__c if different from VIN__c
+            List<Application__c> matchingApps2 = [
+                SELECT Id, Name, Application_Status__c, RecordType.Name,
+                       Customer_First_Name__c, Customer_Last_Name__c, Customer_Name__c,
+                       Vehicle__r.VIN__c, Vehicle__r.Vehicle_Identification_Number_VIN__c,
+                       CreatedDate
+                FROM Application__c
+                WHERE Vehicle__r.Vehicle_Identification_Number_VIN__c = :trimmedVin
+                AND Id != :currentApplicationId
+                AND Application_Status__c != 'Cancelled'
+                ORDER BY CreatedDate DESC
+                LIMIT 20
+            ];
 
             // Merge results, avoiding duplicates by Id
             Map<Id, Application__c> allMatches = new Map<Id, Application__c>();
@@ -6673,9 +6586,10 @@ public class MileageComparator implements Comparator<Dealer_Package_Term__c> {
             }
 
         } catch (Exception e) {
-            // Rethrow so the LWC can show the error and NOT silently skip the duplicate check
-            System.debug(LoggingLevel.ERROR, 'Error checking duplicate VIN: ' + e.getMessage() + ' | ' + e.getStackTraceString());
-            throw new AuraHandledException('Duplicate VIN check failed: ' + e.getMessage());
+            // On error, allow the flow to continue (don't block VIN decode)
+            System.debug('Error checking duplicate VIN: ' + e.getMessage());
+            result.put('hasDuplicates', false);
+            result.put('error', e.getMessage());
         }
 
         return result;
