@@ -216,7 +216,7 @@ public class RemittanceFormPDFController {
                     '       Dealer_Price_Override__c, Tax_Amount__c, Tax_Percentage__c, ' +
                     '       Package_Record_Type__c, Month__c, ' +
                     '       Dealer_Package_Term__r.Month__c, Dealer_Package_Term__r.Odometer_KM__c, ' +
-                    '       Contract_Cost_Price__c, Contract_Cost_Price_Without_Tax__c ' +
+                    '       Contract_Cost_Price__c, Contract_Cost_Price_Without_Tax__c, Premium_Model_Fee__c ' +
                     'FROM Application_Package__c ' +
                     pkgWhere +
                     ' LIMIT 10000'
@@ -306,7 +306,8 @@ public class RemittanceFormPDFController {
                         pkgWithOpts.displayName = getPackageDisplayName(pkg);
 
                         // Cost pricing
-                        pkgWithOpts.dealerPrice = getDisplayPriceWithoutTax(pkg);
+                        pkgWithOpts.dealerPrice = pkg.Dealer_Package_Price__c != null ? pkg.Dealer_Package_Price__c : 0;
+                        pkgWithOpts.premiumFee  = pkg.Premium_Model_Fee__c != null ? pkg.Premium_Model_Fee__c : 0;
                         pkgWithOpts.taxAmount   = getDisplayPrice(pkg) - getDisplayPriceWithoutTax(pkg);
                         pkgWithOpts.subtotal    = getDisplayPrice(pkg);
 
@@ -394,7 +395,8 @@ public class RemittanceFormPDFController {
         public List<LineItemDisplay> displayLineItems             { get; set; }
         public String  duration    { get; set; }
         public String  displayName { get; set; }
-        public Decimal dealerPrice { get; set; }
+        public Decimal dealerPrice  { get; set; }
+        public Decimal premiumFee   { get; set; }
         public Decimal taxAmount   { get; set; }
         public Decimal subtotal    { get; set; }
     }

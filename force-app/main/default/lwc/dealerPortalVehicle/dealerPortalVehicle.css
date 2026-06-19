@@ -1161,3 +1161,129 @@ textarea {
 .converted-odometer-field .converted-odometer {
     --slds-c-input-color-background: #f3f3f3;
 }
+/* ── Duplicate VIN Modal ── */
+.duplicate-modal-header {
+    background: #fff3cd;
+    border-bottom: 2px solid #ffc107;
+}
+
+.duplicate-modal-header h2 {
+    color: #856404;
+    font-weight: 700;
+}
+
+.duplicate-vin-warning {
+    background: #fff8e1;
+    border-left: 4px solid #ffc107;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.duplicate-warning-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #5d4e37;
+    margin: 0;
+}
+
+.duplicate-table-container {
+    overflow-x: auto;
+}
+
+.duplicate-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+}
+
+.duplicate-table thead th {
+    background: #f0f4f8;
+    color: #4a4a4a;
+    font-weight: 700;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.625rem 0.75rem;
+    border-bottom: 2px solid #d0d0d0;
+    text-align: left;
+}
+
+.duplicate-table tbody td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid #e8e8e8;
+    color: #1a1a1a;
+}
+
+.duplicate-row {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.duplicate-row:hover {
+    background: #e8f0fe;
+}
+
+.duplicate-row.selected {
+    background: #d0e4fd;
+    outline: 2px solid #1e88ff;
+    outline-offset: -2px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    background: #e8e8e8;
+    color: #4a4a4a;
+}
+
+.duplicate-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.duplicate-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border-radius: 0;
+}
+
+.duplicate-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.duplicate-btn-open {
+    background: #ffffff;
+    border: 1px solid #d0d0d0;
+    color: #4a4a4a;
+}
+
+.duplicate-btn-open:hover:not(:disabled) {
+    background: #f0f0f0;
+    border-color: #b0b0b0;
+}
+
+.duplicate-btn-continue {
+    background: #1e88ff;
+    color: #ffffff;
+    border: 1px solid #1a78e0;
+}
+
+.duplicate-btn-continue:hover {
+    background: #1b7de6;
+}

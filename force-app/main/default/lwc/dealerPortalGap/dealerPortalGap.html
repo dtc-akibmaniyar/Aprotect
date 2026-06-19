@@ -15,10 +15,10 @@
         <div class="trisura-logo-card">
             <img src={trisuraLogoUrl} alt="Trisura" class="trisura-logo" />
             <p class="portal-redirect-text">Click below to be redirected to the Trisura Portal</p>
-            <a href={portalUrl} target="_blank" rel="noopener noreferrer" class="portal-button">
+            <button type="button" class="portal-button" onclick={handleVisitPortal}>
                 <span>Visit Trisura Portal</span>
                 <span class="portal-button-arrow">→</span>
-            </a>
+            </button>
         </div>
 
         <!-- Program Information Card -->

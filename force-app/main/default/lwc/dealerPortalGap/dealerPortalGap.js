@@ -26,7 +26,7 @@ export default class DealerPortalGap extends LightningElement {
     // Preserve all @api methods the container may call
     @api
     onTabActivated() {
-        console.log('🎯 GAP TAB ACTIVATED (Trisura info page)');
+        console.log('\ud83c\udfaf GAP TAB ACTIVATED (Trisura info page)');
         this.loadProgramInfo();
     }
 
@@ -70,14 +70,14 @@ export default class DealerPortalGap extends LightningElement {
             console.error('Error loading GAP program info:', error);
             // Fallback content if Apex call fails (e.g. permission issue)
             this.programContent = [
-                'Trisura Guarantee Insurance Company – GAP Program:',
+                'Trisura Guarantee Insurance Company \u2013 GAP Program:',
                 '',
                 'Trisura provides Guaranteed Asset Protection (GAP) coverage that bridges the gap between what you owe on your vehicle and what your primary insurance pays in the event of a total loss.',
                 '',
                 'Key Features:',
-                '• Covers the difference between the vehicle\'s actual cash value and the outstanding loan/lease balance',
-                '• Available for new and used vehicles',
-                '• Seamless claims process',
+                '\u2022 Covers the difference between the vehicle\'s actual cash value and the outstanding loan/lease balance',
+                '\u2022 Available for new and used vehicles',
+                '\u2022 Seamless claims process',
                 '',
                 'For full program details and to submit claims, please visit the Trisura portal using the link above.'
             ].join('\n');
@@ -88,7 +88,7 @@ export default class DealerPortalGap extends LightningElement {
     get formattedContentLines() {
         if (!this.programContent) return [];
         return this.programContent.split('\n').map((line, index) => {
-            const isBullet = line.trim().startsWith('•');
+            const isBullet = line.trim().startsWith('\u2022');
             return {
                 key: 'line-' + index,
                 text: line,
@@ -104,6 +104,19 @@ export default class DealerPortalGap extends LightningElement {
         this.dispatchEvent(new CustomEvent('back', {
             detail: { data: {} },
             bubbles: true
+        }));
+    }
+
+    handleVisitPortal() {
+        // Open the Trisura portal in a new tab
+        window.open(this.portalUrl, '_blank', 'noopener,noreferrer');
+        // Also navigate to the next tab
+        this.dispatchEvent(new CustomEvent('gapcomplete', {
+            detail: {
+                success: true,
+                skipped: true,
+                applicationId: this._applicationId
+            }
         }));
     }
 

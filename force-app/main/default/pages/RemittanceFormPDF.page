@@ -206,6 +206,7 @@
                                         <td style="padding:6px 6px; font-size:7px; font-weight:bold; color:#fff; border:1px solid #3a6a9a;">Type/Tier</td>
                                         <td style="padding:6px 6px; font-size:7px; font-weight:bold; color:#fff; border:1px solid #3a6a9a;">Duration</td>
                                         <td style="padding:6px 6px; font-size:7px; font-weight:bold; color:#fff; border:1px solid #3a6a9a; text-align:right;">Dealer Price</td>
+                                        <td style="padding:6px 6px; font-size:7px; font-weight:bold; color:#fff; border:1px solid #3a6a9a; text-align:right;">Premium Fee</td>
                                         <td style="padding:6px 6px; font-size:7px; font-weight:bold; color:#fff; border:1px solid #3a6a9a; text-align:right;">Tax</td>
                                         <td style="padding:6px 6px; font-size:7px; font-weight:bold; color:#fff; border:1px solid #3a6a9a; text-align:right;">Subtotal</td>
                                     </tr>
@@ -216,6 +217,10 @@
                                             <td style="padding:5px 6px; font-size:8px; color:#333; border:1px solid #ddd;">{!pkgWithOpts.duration}</td>
                                             <td style="padding:5px 6px; font-size:8px; color:#333; border:1px solid #ddd; text-align:right;">
                                                 <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!pkgWithOpts.dealerPrice}"/></apex:outputText>
+                                            </td>
+                                            <td style="padding:5px 6px; font-size:8px; color:#333; border:1px solid #ddd; text-align:right;">
+                                                <apex:outputText value="${0,number,###,##0.00}" rendered="{!pkgWithOpts.premiumFee > 0}"><apex:param value="{!pkgWithOpts.premiumFee}"/></apex:outputText>
+                                                <apex:outputText value="—" rendered="{!pkgWithOpts.premiumFee == 0 || pkgWithOpts.premiumFee == null}"/>
                                             </td>
                                             <td style="padding:5px 6px; font-size:8px; color:#333; border:1px solid #ddd; text-align:right;">
                                                 <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!pkgWithOpts.taxAmount}"/></apex:outputText>

@@ -292,44 +292,59 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
     }
 
     transformPackages(packages, paymentInitiated) {
-        return packages.map(pkg => ({
-            packageId:    pkg.packageId,
-            recordTypeName: pkg.recordTypeName,
-            packageName:  pkg.packageName,
-            packageTerm:  pkg.packageTerm,
-            startDate:    pkg.startDate,
-            expiryDate:   pkg.expiryDate,
-            formattedStartOdometer: pkg.startOdometer != null
-                ? this.formatNumber(pkg.startOdometer) + ' KM'
-                : null,
-            formattedExpiryOdometer: pkg.expiryOdometer != null
-                ? this.formatNumber(pkg.expiryOdometer) + ' KM'
-                : null,
-            // Price breakdown
-            hasBreakdown: pkg.hasBreakdown === true,
-            formattedBaseCostPrice: this.formatCurrency(pkg.baseCostPrice),
-            formattedAddOnsTotal: this.formatCurrency(pkg.addOnsTotal),
-            additionalOptions: (pkg.additionalOptions || []).map(opt => ({
-                optionId:          opt.optionId,
-                optionName:        opt.optionName || 'Additional Option',
-                formattedCostPrice: this.formatCurrency(opt.costPrice),
-                selectionType:     opt.selectionType
-            })),
-            // Tax breakdown
-            hasTax: pkg.hasTax === true,
-            formattedBasePriceWithoutTax: this.formatCurrency(pkg.basePriceWithoutTax),
-            taxPercentageDisplay: pkg.taxPercentage != null ? parseFloat(pkg.taxPercentage).toFixed(2) : '0.00',
-            formattedTaxAmount: this.formatCurrency(pkg.taxAmount),
-            formattedTotalWithTax: this.formatCurrency((pkg.basePriceWithoutTax || 0) + (pkg.taxAmount || 0)),
-            lineItems: (pkg.lineItems || []).map(li => ({
-                lineItemId:      li.lineItemId,
-                packageName:     pkg.packageName,
-                status:          li.status,
-                statusClass:     'line-item-status ' + this.statusClass(li.status),
-                formattedAmount: this.formatCurrency(li.amount),
-                canCancel:       li.status !== 'Cancelled' && !paymentInitiated
-            }))
-        }));
+        return packages.map(pkg => {
+            // Premium Model Fee from Apex
+            const premiumModelFee = pkg.premiumModelFee || 0;
+            const hasPremiumModelFee = pkg.hasPremiumModelFee === true;
+
+            // Base price without tax from Apex (Contract_Cost_Price_Without_Tax__c)
+            // This formula field now INCLUDES the premium model fee,
+            // so we subtract it for the display "Base Price" line
+            const basePriceWithoutTax = pkg.basePriceWithoutTax || 0;
+            const displayBasePrice = basePriceWithoutTax - premiumModelFee;
+
+            return {
+                packageId:    pkg.packageId,
+                recordTypeName: pkg.recordTypeName,
+                packageName:  pkg.packageName,
+                packageTerm:  pkg.packageTerm,
+                startDate:    pkg.startDate,
+                expiryDate:   pkg.expiryDate,
+                formattedStartOdometer: pkg.startOdometer != null
+                    ? this.formatNumber(pkg.startOdometer) + ' KM'
+                    : null,
+                formattedExpiryOdometer: pkg.expiryOdometer != null
+                    ? this.formatNumber(pkg.expiryOdometer) + ' KM'
+                    : null,
+                // Price breakdown
+                hasBreakdown: pkg.hasBreakdown === true,
+                formattedBaseCostPrice: this.formatCurrency(pkg.baseCostPrice),
+                formattedAddOnsTotal: this.formatCurrency(pkg.addOnsTotal),
+                additionalOptions: (pkg.additionalOptions || []).map(opt => ({
+                    optionId:          opt.optionId,
+                    optionName:        opt.optionName || 'Additional Option',
+                    formattedCostPrice: this.formatCurrency(opt.costPrice),
+                    selectionType:     opt.selectionType
+                })),
+                // Premium Model Fee
+                hasPremiumModelFee: hasPremiumModelFee,
+                formattedPremiumModelFee: this.formatCurrency(premiumModelFee),
+                // Tax breakdown — tax is computed on (base + premium fee)
+                hasTax: pkg.hasTax === true,
+                formattedBasePriceWithoutTax: this.formatCurrency(displayBasePrice),
+                taxPercentageDisplay: pkg.taxPercentage != null ? parseFloat(pkg.taxPercentage).toFixed(2) : '0.00',
+                formattedTaxAmount: this.formatCurrency(basePriceWithoutTax * (pkg.taxPercentage ? parseFloat(pkg.taxPercentage) / 100 : 0)),
+                formattedTotalWithTax: this.formatCurrency(basePriceWithoutTax + (basePriceWithoutTax * (pkg.taxPercentage ? parseFloat(pkg.taxPercentage) / 100 : 0))),
+                lineItems: (pkg.lineItems || []).map(li => ({
+                    lineItemId:      li.lineItemId,
+                    packageName:     pkg.packageName,
+                    status:          li.status,
+                    statusClass:     'line-item-status ' + this.statusClass(li.status),
+                    formattedAmount: this.formatCurrency(li.amount),
+                    canCancel:       li.status !== 'Cancelled' && !paymentInitiated
+                }))
+            };
+        });
     }
 
     statusClass(status) {

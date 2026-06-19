@@ -92,7 +92,8 @@ public without sharing class InvoiceDetailViewController {
                        Dealer_Price_Override__c,
                        Tax_Percentage__c,
                        Dealer_Package_Price__c,
-                       Add_Ons_Price__c
+                       Add_Ons_Price__c,
+                       Premium_Model_Fee__c
                 FROM Application_Package__c
                 WHERE Id IN :packageIds
               ];
@@ -193,6 +194,10 @@ public without sharing class InvoiceDetailViewController {
             pd.baseCostPrice = pkg.Dealer_Package_Price__c != null ? pkg.Dealer_Package_Price__c : 0;
             pd.addOnsTotal   = pkg.Add_Ons_Price__c != null ? pkg.Add_Ons_Price__c : 0;
             pd.hasBreakdown  = pd.addOnsTotal > 0;
+
+            // Premium Model Fee
+            pd.premiumModelFee = pkg.Premium_Model_Fee__c != null ? pkg.Premium_Model_Fee__c : 0;
+            pd.hasPremiumModelFee = pd.premiumModelFee > 0;
 
             // Tax breakdown
             pd.basePriceWithoutTax = pkg.Contract_Cost_Price_Without_Tax__c != null ? pkg.Contract_Cost_Price_Without_Tax__c : 0;
@@ -547,6 +552,9 @@ public without sharing class InvoiceDetailViewController {
         @AuraEnabled public Decimal addOnsTotal;
         @AuraEnabled public Boolean hasBreakdown;
         @AuraEnabled public List<OptionData> additionalOptions;
+        // Premium Model Fee
+        @AuraEnabled public Decimal premiumModelFee;
+        @AuraEnabled public Boolean hasPremiumModelFee;
         // Tax breakdown fields
         @AuraEnabled public Decimal basePriceWithoutTax;
         @AuraEnabled public Decimal taxPercentage;

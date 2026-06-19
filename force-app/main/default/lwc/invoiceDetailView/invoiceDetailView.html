@@ -179,6 +179,12 @@
                                     <span class="tax-breakdown-label">Base Price:</span>
                                     <span class="tax-breakdown-value">{pkg.formattedBasePriceWithoutTax}</span>
                                 </div>
+                                <template if:true={pkg.hasPremiumModelFee}>
+                                    <div class="tax-breakdown-row">
+                                        <span class="tax-breakdown-label">Premium Vehicle Fee:</span>
+                                        <span class="tax-breakdown-value">{pkg.formattedPremiumModelFee}</span>
+                                    </div>
+                                </template>
                                 <div class="tax-breakdown-row">
                                     <span class="tax-breakdown-label">Tax ({pkg.taxPercentageDisplay}%):</span>
                                     <span class="tax-breakdown-value">{pkg.formattedTaxAmount}</span>

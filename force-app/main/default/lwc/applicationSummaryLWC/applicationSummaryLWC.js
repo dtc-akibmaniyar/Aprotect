@@ -5,7 +5,8 @@ import { NavigationMixin } from 'lightning/navigation';
 import getApplicationSummaryData from '@salesforce/apex/ApplicationSummaryController.getApplicationSummaryData';
 import generateAndAttachPDF from '@salesforce/apex/ApplicationSummaryController.generateAndAttachPDF';
 import hasRelatedFiles from '@salesforce/apex/QuotePDFGeneratorService.hasRelatedFiles';
-import communityBasePath from '@salesforce/community/basePath';
+// communityBasePath removed — static import crashes in internal Lightning.
+// Context is detected at runtime instead.
 
 // Define fields to retrieve
 const FIELDS = [
@@ -80,11 +81,41 @@ export default class ApplicationSummaryLWC extends NavigationMixin(LightningElem
         }
     }
 
-    // Navigate to attached files page
+    // Navigate to attached files page — works in both community and internal Lightning
     handleViewPDF() {
-        const basePath = communityBasePath || '';
-        const filesUrl = basePath + '/s/contentdocument/related/' + this.recordId + '/AttachedContentDocuments';
-        window.open(filesUrl, '_blank');
+        const pathname = window.location.pathname;
+        const isCommunity = pathname.includes('/s/');
+        if (isCommunity) {
+            // Community context: build URL from the community base path
+            const basePath = pathname.split('/s/')[0] + '/s';
+            const filesUrl = basePath + '/contentdocument/related/' + this.recordId + '/AttachedContentDocuments';
+            window.open(filesUrl, '_blank');
+        } else {
+            // Internal Lightning context: use NavigationMixin
+            this[NavigationMixin.Navigate]({
+                type: 'standard__recordRelationshipPage',
+                attributes: {
+                    recordId: this.recordId,
+                    objectApiName: 'Application__c',
+                    relationshipApiName: 'AttachedContentDocuments',
+                    actionName: 'view'
+                }
+            });
+        }
+    }
+
+    // Handle option click (placeholder for navigation to option records)
+    handleOptionClick(event) {
+        const optionId = event.currentTarget.dataset.id;
+        if (optionId) {
+            this[NavigationMixin.Navigate]({
+                type: 'standard__recordPage',
+                attributes: {
+                    recordId: optionId,
+                    actionName: 'view'
+                }
+            });
+        }
     }
 
     // Show toast notification

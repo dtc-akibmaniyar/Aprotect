@@ -1,0 +1,241 @@
+/* Container */
+.remittance-list-container {
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 12px 26px rgba(0,0,0,0.08);
+    overflow: hidden;
+    border: 1px solid #ececec;
+}
+
+/* Toolbar */
+.list-toolbar { gap: 0.75rem; }
+.filter-col { min-width: 160px; }
+.status-filter {
+    --sds-c-input-color-border: #e1e8ed;
+    --sds-c-input-color-border-focus: #1f1f1f;
+    --sds-c-input-shadow-focus: 0 0 0 3px rgba(244,208,63,0.35);
+}
+
+/* Refresh */
+.refresh-button { margin-left: 4px; transition: all 0.2s ease; }
+.refresh-button.loading { opacity: 0.7; cursor: not-allowed; }
+
+/* Time */
+.time-col { display: flex; align-items: center; }
+.time-text { padding-left: 0.5rem; white-space: nowrap; }
+
+/* Table */
+.table-wrapper { overflow-x: auto; }
+
+.remittance-table { border: none; }
+
+.remittance-table thead th {
+    background: linear-gradient(180deg, #fafafa 0%, #f3f3f3 100%);
+    border-bottom: 2px solid #ededed;
+    font-weight: 700;
+    color: #1f2937;
+    padding: 0.85rem 1rem;
+}
+
+.remittance-table tbody td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #f3f2f2;
+    vertical-align: middle;
+}
+
+.remittance-table tbody tr {
+    transition: background 150ms ease, transform 150ms ease;
+}
+
+.remittance-table tbody tr:hover {
+    background: #fffdf3;
+    transform: translateY(-1px);
+}
+
+/* Sortable headers */
+.sortable-header {
+    cursor: pointer;
+    user-select: none;
+}
+.sortable-header:hover {
+    background: #eef1f5 !important;
+}
+.th-content {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.sort-icon {
+    font-size: 0.65rem;
+    color: #706e6b;
+}
+
+/* Links */
+.remittance-name-link {
+    color: #1f1f1f;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 150ms ease;
+}
+.remittance-name-link:hover {
+    color: #1f1f1f;
+    text-decoration: none;
+    box-shadow: inset 0 -8px 0 rgba(244,208,63,0.35);
+}
+
+/* Status Badges */
+.status-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.2rem 0.65rem;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.status-open {
+    background: #e8f4fd;
+    color: #0070d2;
+    border: 1px solid #b8d4e8;
+}
+
+.status-completed {
+    background: #e6f7e9;
+    color: #2e844a;
+    border: 1px solid #b7e1c0;
+}
+
+.status-expired {
+    background: #fde8e8;
+    color: #c23934;
+    border: 1px solid #f0b8b8;
+}
+
+.status-cancelled {
+    background: #f3f3f3;
+    color: #706e6b;
+    border: 1px solid #d8d8d8;
+}
+
+.status-default {
+    background: #f3f3f3;
+    color: #444;
+    border: 1px solid #d8d8d8;
+}
+
+/* Expiry warning */
+.expiry-warning {
+    color: #c23934;
+    font-weight: 600;
+}
+
+/* Amount cells */
+.amount-cell {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    font-weight: 500;
+}
+
+/* Line items progress */
+.line-items-cell {
+    text-align: center;
+}
+
+.progress-complete {
+    color: #2e844a;
+    font-weight: 600;
+}
+
+.progress-partial {
+    color: #706e6b;
+    font-weight: 500;
+}
+
+/* Pagination */
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: #fafafa;
+    border-top: 1px solid #ededed;
+}
+
+.pagination-info {
+    font-size: 0.85rem;
+    color: #706e6b;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-indicator {
+    font-size: 0.85rem;
+    color: #444;
+    font-weight: 500;
+}
+
+/* Loading / Error / Empty */
+.loading-container {
+    text-align: center;
+    padding: 3rem;
+    color: #706e6b;
+}
+
+.refresh-loading-container {
+    text-align: center;
+    padding: 1rem;
+    color: #706e6b;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    margin: 1rem;
+    border: 1px solid #dddbda;
+}
+
+.refresh-loading-container p {
+    margin: 0.5rem 0 0 0;
+    font-size: 0.875rem;
+}
+
+.error-container {
+    text-align: center;
+    padding: 2rem;
+    color: #c23934;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #706e6b;
+}
+
+.empty-state lightning-icon {
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    margin-bottom: 0.5rem;
+    color: #1f2937;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .remittance-table thead th,
+    .remittance-table tbody td {
+        padding: 0.6rem 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .list-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .filter-col {
+        min-width: 100%;
+    }
+}

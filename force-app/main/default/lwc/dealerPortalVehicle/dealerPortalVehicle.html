@@ -68,6 +68,66 @@
             <div class="slds-backdrop slds-backdrop_open"></div>
         </template>
 
+        <!-- Duplicate VIN Modal -->
+        <template if:true={showDuplicateVinModal}>
+            <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open slds-modal_medium">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header duplicate-modal-header">
+                        <lightning-button-icon 
+                            icon-name="utility:close" 
+                            onclick={closeDuplicateVinModal} 
+                            alternative-text="close" 
+                            variant="bare-inverse" 
+                            class="slds-modal__close">
+                        </lightning-button-icon>
+                        <h2 class="slds-text-heading_medium slds-hyphenate">
+                            <lightning-icon icon-name="utility:warning" size="small" variant="warning" class="slds-m-right_x-small"></lightning-icon>
+                            Duplicate VIN Detected
+                        </h2>
+                    </header>
+                    <div class="slds-modal__content slds-p-around_medium">
+                        <div class="duplicate-vin-warning">
+                            <p class="duplicate-warning-text">A record with the same VIN already exists. Please review the existing record(s) below before proceeding.</p>
+                        </div>
+                        <div class="duplicate-table-container">
+                            <table class="duplicate-table">
+                                <thead>
+                                    <tr>
+                                        <th>Record Type</th>
+                                        <th>Record #</th>
+                                        <th>VIN</th>
+                                        <th>Status</th>
+                                        <th>Customer Name</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template for:each={duplicateVinRecords} for:item="dup">
+                                        <tr key={dup.recordId} data-id={dup.recordId} class={dup.rowClass} onclick={handleDuplicateRowSelect}>
+                                            <td>{dup.recordType}</td>
+                                            <td>{dup.recordName}</td>
+                                            <td>{dup.vin}</td>
+                                            <td><span class="status-badge">{dup.status}</span></td>
+                                            <td>{dup.customerName}</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <footer class="slds-modal__footer duplicate-modal-footer">
+                        <button type="button" class="duplicate-btn duplicate-btn-open" onclick={handleOpenExistingRecord} disabled={isOpenExistingDisabled}>
+                            <lightning-icon icon-name="utility:open" size="xx-small" class="slds-m-right_xx-small"></lightning-icon>
+                            Open Existing Record
+                        </button>
+                        <button type="button" class="duplicate-btn duplicate-btn-continue" onclick={handleContinueNewRecord}>
+                            Continue with New Record
+                        </button>
+                    </footer>
+                </div>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+
         <!-- More Information Modal -->
         <template if:true={showMoreInfoModal}>
             <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">

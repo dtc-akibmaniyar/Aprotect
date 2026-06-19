@@ -28,6 +28,9 @@ export default class DealerPortalWarranty extends LightningElement {
     @track selectedTerm = '4';
     @track selectedClaim = '5000';
     @track selectedAdditionalOptions = []; // Array of selected additional option IDs
+    @track isPremiumVehicle = false;
+    @track premiumFeeAmount = 0;
+    @track modalPremiumFee = 0;
     @track vehicleConfigChangedMessage = '';
     @track availableAdditionalOptionsData = []; // Raw additional options data
     @track existingAdditionalOptions = []; // Already selected options (from Salesforce)
@@ -292,6 +295,10 @@ export default class DealerPortalWarranty extends LightningElement {
             }
             
             if (result.success) {
+                // Capture premium vehicle status from response
+                this.isPremiumVehicle = result.isPremiumVehicle === true;
+                console.log('🏷️ WARRANTY - Premium Vehicle:', this.isPremiumVehicle);
+
                 // Track whether the dealer has packages configured (before vehicle filtering)
                 if (result.debugInfo) {
                     this.dealerHasPackages = (result.debugInfo.queriedPackagesCount || 0) > 0;
@@ -1297,8 +1304,11 @@ export default class DealerPortalWarranty extends LightningElement {
                 return total + (option ? (option.retailPrice || option.netCost || 0) : 0);
             }, 0);
             
-            // Calculate total taxable amount (term retail price + additional options)
-            const totalTaxableAmount = priceWithMarkup + newOptionsPrice;
+            // Calculate premium vehicle fee
+            const premiumFee = this.isPremiumVehicle && this.selectedWarrantyTerm && this.selectedWarrantyTerm.premiumModelFee ? this.selectedWarrantyTerm.premiumModelFee : 0;
+            
+            // Calculate total taxable amount (term retail price + additional options + premium vehicle fee)
+            const totalTaxableAmount = priceWithMarkup + newOptionsPrice + premiumFee;
             
             // Calculate tax on total taxable amount - use taxRate (term taxAmount is only for term, recalculate for total)
             let taxAmount = 0;
@@ -1309,13 +1319,15 @@ export default class DealerPortalWarranty extends LightningElement {
             
             // Total price = taxable amount + tax
             this.price = totalTaxableAmount + taxAmount;
-            this._retailPriceDisplay = totalTaxableAmount;
+            // Show base price WITHOUT premium fee (premium is displayed separately)
+            this._retailPriceDisplay = priceWithMarkup + newOptionsPrice;
             console.log('💰 New selection price calculation:', {
                 netCost,
                 markup,
                 markupType,
                 priceWithMarkup,
                 newOptionsPrice,
+                premiumFee,
                 totalTaxableAmount,
                 taxAmount,
                 taxRate,
@@ -1336,209 +1348,64 @@ export default class DealerPortalWarranty extends LightningElement {
     
     // Price breakdown modal methods
     showPriceBreakdownModal() {
-        console.log('💰 Showing price breakdown modal');
-        console.log('🔍 Price breakdown conditions:', {
-            isExistingApplication: this.isExistingApplication,
-            hasExistingPackage: !!this.existingApplicationPackage,
-            hasSelectedWarrantyTerm: !!this.selectedWarrantyTerm,
-            selectedWarrantyTermId: this.selectedWarrantyTerm?.Id
-        });
-        
-        // Enhanced null safety check
-        if (!this.selectedWarrantyTerm) {
-            console.log('⚠️ No warranty term selected for price breakdown');
+        if (!this.selectedWarrantyTerm && !this.isExistingApplication) {
             return;
         }
-        
-        if (!this.selectedWarrantyTerm.packageTermName && !this.selectedWarrantyTerm.Name) {
-            console.log('⚠️ Selected warranty term has no name property');
-            return;
-        }
-        
-        let netCost, markup, retailPrice, totalPrice;
-        
+
+        let netCost = 0;
+        let taxRate = 0;
+        let taxAmount = 0;
+
         // Check if user selected a different term than the stored one
         const isSameTerm = this.isExistingApplication && 
                           this.existingApplicationPackage && 
                           this.selectedWarrantyTerm && 
                           this.selectedWarrantyTerm.Id === this.existingApplicationPackage.selectedTermId;
-        
-        // For Draft/Pending, recalculate from current term data so admin pricing changes reflect
+
         const bdAppStatus = this.applicationStatus || '';
         const useStoredForBreakdown = isSameTerm && !['Draft', 'Pending', 'Quote'].includes(bdAppStatus);
-        
+
         if (useStoredForBreakdown) {
-            // For submitted/active applications with same term, use stored values directly from Application_Package__c
             netCost = this.existingApplicationPackage.dealerPackagePrice || 0;
-            markup = this.existingApplicationPackage.dealerMarkup || 0;
-            retailPrice = this.existingApplicationPackage.dealerPackageRetailPrice || 0;
-            
-            // Calculate existing additional options price (minus ones marked for removal)
-            const existingOptionsPrice = this.existingAdditionalOptions
-                .filter(option => !this.optionsToRemove.includes(option.id))
-                .reduce((total, option) => total + (option.retailPrice || 0), 0);
-            
-            // Calculate new additional options price
-            const newOptionsPrice = this.selectedNewOptions.reduce((total, optionId) => {
-                const option = this.availableAdditionalOptionsData.find(opt => opt.id === optionId);
-                return total + (option ? (option.retailPrice || option.netCost || 0) : 0);
-            }, 0);
-            
-            // Calculate total taxable amount (term retail price + all additional options)
-            const totalTaxableAmount = retailPrice + existingOptionsPrice + newOptionsPrice;
-            
-            // Calculate tax on total taxable amount
-            const taxRate = this.existingApplicationPackage.taxPercentage || 0;
-            let taxAmount = 0;
-            if (taxRate > 0) {
-                taxAmount = totalTaxableAmount * (taxRate / 100);
-            } else {
-                // Fallback to stored taxAmount if taxRate not available
-                taxAmount = this.existingApplicationPackage.taxAmount || 0;
-            }
-            
-            console.log('🔍 Existing app price breakdown (using stored values with tax on total):', {
-                netCost: netCost,
-                markup: markup,
-                retailPrice: retailPrice,
-                existingOptionsPrice: existingOptionsPrice,
-                newOptionsPrice: newOptionsPrice,
-                totalTaxableAmount: totalTaxableAmount,
-                taxRate: taxRate,
-                taxAmount: taxAmount,
-                contractPremiumPriceWithoutTax: this.existingApplicationPackage.contractPremiumPriceWithoutTax,
-                contractPremiumPrice: this.existingApplicationPackage.contractPremiumPrice
-            });
-            
-            // Total price = total taxable amount + tax
-            totalPrice = totalTaxableAmount + taxAmount;
+            taxRate = this.existingApplicationPackage.taxPercentage || 0;
         } else if (this.selectedWarrantyTerm) {
-            // For new selections, use the totalPrice from the term (already includes proper markup calculation)
             netCost = this.selectedWarrantyTerm.netCost || 0;
-            const markupValue = this.selectedWarrantyTerm.markup || 0;
-            const markupType = this.selectedWarrantyTerm.markupType || '';
-            
-            // Calculate the actual markup amount for display
-            if (markupType === '%' && markupValue > 0) {
-                markup = netCost * markupValue / 100;
-            } else if (markupType === '$' && markupValue > 0) {
-                markup = markupValue;
-            } else {
-                markup = 0; // No markup
-            }
-            
-            // Retail price is netCost + markup (before tax)
-            retailPrice = netCost + markup;
-            
-            // Add new additional options pricing
-            const newOptionsPrice = this.selectedNewOptions.reduce((total, optionId) => {
-                const option = this.availableAdditionalOptionsData.find(opt => opt.id === optionId);
-                return total + (option ? (option.retailPrice || option.netCost || 0) : 0);
-            }, 0);
-            
-            // Calculate total taxable amount (term retail price + additional options)
-            const totalTaxableAmount = retailPrice + newOptionsPrice;
-            
-            // Calculate tax on total taxable amount
-            const taxRate = this.selectedWarrantyTerm.taxRate || this.selectedDealerPackage?.taxRate || 0;
-            let taxAmount = 0;
-            if (taxRate > 0) {
-                taxAmount = totalTaxableAmount * (taxRate / 100);
-            }
-            
-            // Debug logging for price breakdown
-            console.log('🔍 Price breakdown debug:', {
-                termId: this.selectedWarrantyTerm?.Id,
-                termName: this.selectedWarrantyTerm?.packageTermName || this.selectedWarrantyTerm?.Name,
-                netCost: netCost,
-                markupValue: markupValue,
-                markupType: markupType,
-                markup: markup,
-                taxRate: taxRate,
-                taxAmount: taxAmount,
-                retailPrice: retailPrice,
-                newOptionsPrice: newOptionsPrice,
-                totalTaxableAmount: totalTaxableAmount,
-                totalPrice: totalTaxableAmount + taxAmount
-            });
-            
-            // Total price includes total taxable amount + tax
-            totalPrice = totalTaxableAmount + taxAmount;
-        } else {
-            netCost = markup = retailPrice = totalPrice = 0;
+            taxRate = this.selectedWarrantyTerm.taxRate || this.selectedDealerPackage?.taxRate || 0;
+        } else if (this.isExistingApplication && this.existingApplicationPackage) {
+            netCost = this.existingApplicationPackage.dealerPackagePrice || 0;
+            taxRate = this.existingApplicationPackage.taxPercentage || 0;
         }
-        
-        // Get tax information for display
-        let displayTaxAmount = 0;
-        let displayTaxRate = 0;
-        if (isSameTerm) {
-            // For existing packages, calculate tax on stored values including options if any
-            const storedRetailPrice = this.existingApplicationPackage.dealerPackageRetailPrice || 0;
-            const existingOptionsPrice = this.existingAdditionalOptions
-                .filter(option => !this.optionsToRemove.includes(option.id))
-                .reduce((total, option) => total + (option.retailPrice || 0), 0);
-            const newOptionsPrice = this.selectedNewOptions.reduce((total, optionId) => {
-                const option = this.availableAdditionalOptionsData.find(opt => opt.id === optionId);
-                return total + (option ? (option.retailPrice || option.netCost || 0) : 0);
-            }, 0);
-            const totalTaxable = storedRetailPrice + existingOptionsPrice + newOptionsPrice;
-            displayTaxRate = this.existingApplicationPackage.taxPercentage || 0;
-            if (displayTaxRate > 0) {
-                displayTaxAmount = totalTaxable * (displayTaxRate / 100);
-            } else {
-                displayTaxAmount = this.existingApplicationPackage.taxAmount || 0;
-            }
-        } else if (this.selectedWarrantyTerm) {
-            // Calculate tax on term + options
-            const newOptionsPrice = this.selectedNewOptions.reduce((total, optionId) => {
-                const option = this.availableAdditionalOptionsData.find(opt => opt.id === optionId);
-                return total + (option ? (option.retailPrice || option.netCost || 0) : 0);
-            }, 0);
-            const totalTaxable = retailPrice + newOptionsPrice;
-            displayTaxRate = this.selectedWarrantyTerm.taxRate || this.selectedDealerPackage?.taxRate || 0;
-            if (displayTaxRate > 0) {
-                displayTaxAmount = totalTaxable * (displayTaxRate / 100);
-            }
-        } else if (this.selectedDealerPackage && this.selectedDealerPackage.taxRate) {
-            displayTaxRate = this.selectedDealerPackage.taxRate || 0;
-            if (displayTaxRate > 0) {
-                displayTaxAmount = retailPrice * (displayTaxRate / 100);
-            }
+
+        // Calculate additional options total (dealer cost / netCost)
+        const existingOptionsNetCost = (this.existingAdditionalOptions || [])
+            .filter(opt => !(this.optionsToRemove || []).includes(opt.id))
+            .reduce((total, opt) => total + (opt.netCost || opt.retailPrice || 0), 0);
+
+        const newOptionsNetCost = (this.selectedNewOptions || []).reduce((total, optionId) => {
+            const opt = (this.availableAdditionalOptionsData || []).find(o => o.id === optionId);
+            return total + (opt ? (opt.netCost || opt.retailPrice || 0) : 0);
+        }, 0);
+
+        const totalOptionsNetCost = existingOptionsNetCost + newOptionsNetCost;
+        const totalDealerBeforeTax = netCost + totalOptionsNetCost;
+
+        if (taxRate > 0) {
+            taxAmount = totalDealerBeforeTax * (taxRate / 100);
         }
+
+        // Premium vehicle fee
+        const premiumFee = this.isPremiumVehicle && this.selectedWarrantyTerm && this.selectedWarrantyTerm.premiumModelFee ? this.selectedWarrantyTerm.premiumModelFee : 0;
+        this.modalPremiumFee = premiumFee;
         
-        // When price is overridden, show custom price + tax breakdown
-        if (this.isPriceOverridden) {
-            const overrideTaxRate = this._getCurrentTaxRate();
-            const overridePreTax = this._overridePreTaxPrice || this.price;
-            const overrideTax = this._overrideTaxAmount || 0;
-            this.currentPriceBreakdown = {
-                netCost: '—',
-                markup: '—',
-                retailPrice: this.formatPrice(overridePreTax),
-                taxRate: overrideTaxRate > 0 ? overrideTaxRate.toFixed(2) + '%' : '0%',
-                taxAmount: this.formatPrice(overrideTax),
-                totalPrice: this.formatPrice(this.price)
-            };
-            // Populate dealer reference pricing for toggle
-            this.dealerReferenceBreakdown = {
-                netCost: this.formatPrice(netCost),
-                markup: this.formatPrice(markup),
-                retailPrice: this.formatPrice(retailPrice),
-                taxRate: displayTaxRate > 0 ? displayTaxRate.toFixed(2) + '%' : '0%',
-                taxAmount: this.formatPrice(displayTaxAmount),
-                totalPrice: this.formatPrice(totalPrice)
-            };
-        } else {
-            this.currentPriceBreakdown = {
-                netCost: this.formatPrice(netCost),
-                markup: this.formatPrice(markup),
-                retailPrice: this.formatPrice(retailPrice),
-                taxRate: displayTaxRate > 0 ? displayTaxRate.toFixed(2) + '%' : '0%',
-                taxAmount: this.formatPrice(displayTaxAmount),
-                totalPrice: this.formatPrice(totalPrice)
-            };
-        }
+        this.modalDealerPrice = netCost;
+        this.modalTaxRate = taxRate;
         
+        // Recalculate total with premium fee included
+        const totalBeforeTax = totalDealerBeforeTax + premiumFee;
+        const recalcTaxAmount = taxRate > 0 ? totalBeforeTax * (taxRate / 100) : taxAmount;
+        this.modalTaxAmount = recalcTaxAmount;
+        this.modalTotalWithTax = totalBeforeTax + recalcTaxAmount;
+
         this.showPriceModal = true;
     }
     
@@ -1546,9 +1413,88 @@ export default class DealerPortalWarranty extends LightningElement {
         this.showDealerReferencePrice = event.target.checked;
     }
 
+    // --- Dealer Pricing Modal Getters ---
+
+    get selectedPlanName() {
+        if (this.selectedDealerPackage) {
+            return this.selectedDealerPackage.PackageName || this.selectedDealerPackage.Name || '';
+        }
+        return '';
+    }
+
+    get formattedDealerPrice() {
+        if (this.modalDealerPrice != null) {
+            return '$' + this.modalDealerPrice.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        return '$0.00';
+    }
+
+    get selectedAdditionalOptionsList() {
+        const items = [];
+        // Existing options not marked for removal
+        if (this.existingAdditionalOptions) {
+            this.existingAdditionalOptions
+                .filter(opt => !(this.optionsToRemove || []).includes(opt.id))
+                .forEach(opt => {
+                    const cost = opt.netCost || opt.retailPrice || 0;
+                    items.push({
+                        id: opt.id,
+                        label: opt.optionName || 'Option',
+                        formattedDealerPrice: '$' + cost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+                    });
+                });
+        }
+        // Newly selected options
+        if (this.selectedNewOptions && this.availableAdditionalOptionsData) {
+            this.selectedNewOptions.forEach(optionId => {
+                const opt = this.availableAdditionalOptionsData.find(o => o.id === optionId);
+                if (opt) {
+                    const cost = opt.netCost || opt.retailPrice || 0;
+                    items.push({
+                        id: opt.id,
+                        label: opt.optionName || 'Option',
+                        formattedDealerPrice: '$' + cost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+                    });
+                }
+            });
+        }
+        return items;
+    }
+
+    get formattedTaxRate() {
+        if (this.modalTaxRate != null && this.modalTaxRate > 0) {
+            return this.modalTaxRate.toFixed(2) + '%';
+        }
+        return '0%';
+    }
+
+    get formattedTotalTaxAmount() {
+        if (this.modalTaxAmount != null) {
+            return '$' + this.modalTaxAmount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        return '$0.00';
+    }
+
+    get formattedTotalWithTax() {
+        if (this.modalTotalWithTax != null) {
+            return '$' + this.modalTotalWithTax.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        return '$0.00';
+    }
+
+    get hasPremiumFee() {
+        return this.isPremiumVehicle && this.modalPremiumFee > 0;
+    }
+
+    get formattedPremiumFee() {
+        if (this.modalPremiumFee != null && this.modalPremiumFee > 0) {
+            return '$' + this.modalPremiumFee.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        return '$0.00';
+    }
+
     hidePriceBreakdownModal() {
         this.showPriceModal = false;
-        this.showDealerReferencePrice = false;
     }
     
     stopPropagation(event) {

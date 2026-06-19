@@ -4710,3 +4710,142 @@ lightning-accordion-section[data-package-id].gradient-default .slds-accordion__s
     from { opacity: 0; transform: translateY(-10px); }
     to { opacity: 1; transform: translateY(0); }
 }
+/* Dealer Pricing Modal — 2-Column Layout */
+.pricing-section {
+    padding: 16px 20px;
+}
+
+.pricing-package-header {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.pricing-package-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a202c;
+    margin-bottom: 4px;
+}
+
+.pricing-package-term {
+    font-size: 13px;
+    color: #6b7280;
+    font-weight: 400;
+}
+
+.pricing-line-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.pricing-line-label {
+    font-size: 14px;
+    color: #374151;
+    font-weight: 400;
+}
+
+.pricing-line-value {
+    font-size: 14px;
+    color: #1a202c;
+    font-weight: 600;
+    text-align: right;
+    min-width: 100px;
+}
+
+.pricing-options-header {
+    padding: 12px 0 4px 0;
+}
+
+.pricing-divider {
+    border-top: 1px solid #e5e7eb;
+    margin: 8px 0;
+}
+
+.pricing-divider-bold {
+    border-top: 2px solid #374151;
+    margin: 4px 0;
+}
+
+.pricing-total-row {
+    padding: 12px 0 4px 0;
+}
+
+.pricing-total-row .pricing-line-label {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a202c;
+}
+
+.pricing-total-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #047857;
+}
+
+/* Close Button — Improved Styling */
+.close-modal-btn {
+    background-color: #0d9488;
+    color: #ffffff;
+    border: none;
+    padding: 10px 32px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    letter-spacing: 0.3px;
+}
+
+.close-modal-btn:hover {
+    background-color: #0f766e;
+}
+
+.close-modal-btn:active {
+    background-color: #115e59;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 20px 16px;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* Premium Vehicle Badge */
+.premium-vehicle-panel {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.premium-vehicle-strip {
+    display: flex;
+    align-items: center;
+    background: linear-gradient(135deg, #b8860b, #daa520);
+    color: white;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(184, 134, 11, 0.3);
+}
+
+.premium-vehicle-icon {
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+.premium-vehicle-text {
+    text-transform: uppercase;
+}
+
+/* Premium Fee Row in Modal */
+.premium-fee-row {
+    color: #b8860b;
+    font-weight: 500;
+}

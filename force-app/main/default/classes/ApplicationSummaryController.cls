@@ -196,6 +196,9 @@ public without sharing class ApplicationSummaryController {
         @AuraEnabled public String formattedTaxRate { get; set; }
         @AuraEnabled public Decimal total { get; set; }
         @AuraEnabled public String formattedTotal { get; set; }
+        @AuraEnabled public Decimal premiumModelFee { get; set; }
+        @AuraEnabled public String formattedPremiumModelFee { get; set; }
+        @AuraEnabled public Boolean hasPremiumModelFee { get; set; }
         @AuraEnabled public String contractStartDate { get; set; }
         @AuraEnabled public String contractExpiryDate { get; set; }
         @AuraEnabled public Decimal contractStartOdometer { get; set; }
@@ -291,7 +294,8 @@ public without sharing class ApplicationSummaryController {
                 Finance_Loan_Term_Months__c, Amount_Financed__c, Interest_Rate__c, 
                 Cash_Down_Payment__c, Trade_in_Amount__c,
                 Sales_Person__c,Sales_Person__r.Name,Sales_Rep__r.Name, Sales_Rep__c,
-                Package_Plan_Type__r.Name, Package__r.Name, Package_Tier__r.Name, Package_Term__r.Name
+                Package_Plan_Type__r.Name, Package__r.Name, Package_Tier__r.Name, Package_Term__r.Name,
+                RecordType.DeveloperName
                 FROM Application__c 
                 WHERE Id = :applicationId 
                 LIMIT 1
@@ -492,7 +496,7 @@ public without sharing class ApplicationSummaryController {
                         Package__r.Name, Package_Term__r.Name,
                         Deductible__c, Tax_Amount__c,Tax_Amount_Cost__c, Total_Package_Price__c, Contract_Premium_Price__c,Contract_Premium_Price_Without_Tax__c,
                         Contract_Cost_Price_Without_Tax__c, Contract_Cost_Price__c,
-                        Dealer_Price_Override__c, Tax_Percentage__c,
+                        Dealer_Price_Override__c, Tax_Percentage__c, Premium_Model_Fee__c,
                        Contract_Start_Date__c, Contract_End_Date__c, 
                        Odometer_Start__c, Odometer_End__c, Odometer_Start_Unit__c, Odometer_End_Unit__c
                 FROM Application_Package__c
@@ -557,6 +561,17 @@ public without sharing class ApplicationSummaryController {
                     pkgWrapper.formattedTotal = formatCurrency(pkg.Contract_Premium_Price__c);
                 }
                 
+                // Premium Model Fee
+                if (pkg.Premium_Model_Fee__c != null && pkg.Premium_Model_Fee__c > 0) {
+                    pkgWrapper.premiumModelFee = pkg.Premium_Model_Fee__c;
+                    pkgWrapper.formattedPremiumModelFee = formatCurrency(pkg.Premium_Model_Fee__c);
+                    pkgWrapper.hasPremiumModelFee = true;
+                } else {
+                    pkgWrapper.premiumModelFee = 0;
+                    pkgWrapper.formattedPremiumModelFee = '$0.00';
+                    pkgWrapper.hasPremiumModelFee = false;
+                }
+
                 pkgWrapper.deductible = pkg.Deductible__c;
                 pkgWrapper.formattedDeductible = pkg.Deductible__c != null ? 
                     formatCurrency(pkg.Deductible__c) : '$0.00';

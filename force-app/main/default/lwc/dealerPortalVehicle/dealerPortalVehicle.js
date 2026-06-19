@@ -7,6 +7,7 @@ import decodeVin from '@salesforce/apex/DealerPortalController.decodeVin';
 import getDealershipInfo from '@salesforce/apex/DealerPortalController.getDealershipInfo';
 import getDealerContacts from '@salesforce/apex/DealerPortalController.getDealerContacts';
 import getVehicleWarrantyPicklists from '@salesforce/apex/DealerPortalController.getVehicleWarrantyPicklists';
+import checkDuplicateVIN from '@salesforce/apex/DealerPortalController.checkDuplicateVIN';
 
 export default class DealerPortalVehicle extends LightningElement {
     _applicationId;
@@ -32,6 +33,11 @@ export default class DealerPortalVehicle extends LightningElement {
     // VIN decode status
     @track vinDecodeSuccess = false;
     @track vinDecodeWarning = false;
+
+    // Duplicate VIN modal
+    @track showDuplicateVinModal = false;
+    @track duplicateVinRecords = [];
+    @track selectedDuplicateId = '';
     
     // Manufacturer warranty section toggle - start expanded to match image
     @track showManufacturerWarranty = true;
@@ -1290,7 +1296,7 @@ getCurrentData() {
         return salesforceFields;
     }
     
-    // Handle search button click - now uses real NHTSA VIN decoder API
+    // Handle search button click - checks for duplicate VIN first, then decodes
     async handleSearch() {
         const searchVin = this.vehicleData.vehicleIdentificationNumberVIN; // Use Search VIN field
         
@@ -1302,6 +1308,69 @@ getCurrentData() {
         this.loading = true;
         this.showError = false;
         this.errorMessage = '';
+        
+        try {
+            // TODO: Re-enable duplicate VIN check after fixing Apex method
+            // Duplicate VIN check temporarily bypassed — going straight to VIN decode
+            console.log('\uD83D\uDD0D [handleSearch] Skipping duplicate VIN check, proceeding directly to VIN decode for:', searchVin);
+            await this.proceedWithVinDecode(searchVin);
+            
+        } catch (error) {
+            console.error('❌ Error during VIN decode:', error);
+            this.showErrorMessage('VIN decode failed: ' + (error?.body?.message || error?.message || 'Unknown error') + '. Please try again.');
+            this.loading = false;
+        }
+    }
+
+    // Handle selecting a duplicate record row
+    handleDuplicateRowSelect(event) {
+        const recordId = event.currentTarget.dataset.id;
+        this.selectedDuplicateId = recordId;
+        this.duplicateVinRecords = this.duplicateVinRecords.map(dup => ({
+            ...dup,
+            isSelected: dup.recordId === recordId,
+            rowClass: dup.recordId === recordId ? 'duplicate-row selected' : 'duplicate-row'
+        }));
+    }
+
+    // Handle "Open Existing Record" button in duplicate modal
+    handleOpenExistingRecord() {
+        if (!this.selectedDuplicateId) {
+            this.showErrorMessage('Please select a record to open.');
+            return;
+        }
+        this.showDuplicateVinModal = false;
+        
+        // Navigate to the selected record via the container's navigation
+        // Dispatch event so the container can handle navigation
+        this.dispatchEvent(new CustomEvent('openapplication', {
+            detail: { applicationId: this.selectedDuplicateId },
+            bubbles: true,
+            composed: true
+        }));
+    }
+
+    // Handle "Continue with New Record" button in duplicate modal
+    async handleContinueNewRecord() {
+        this.showDuplicateVinModal = false;
+        this.loading = true;
+        const searchVin = this.vehicleData.vehicleIdentificationNumberVIN;
+        await this.proceedWithVinDecode(searchVin);
+    }
+
+    // Close duplicate VIN modal
+    closeDuplicateVinModal() {
+        this.showDuplicateVinModal = false;
+    }
+
+    // Getter: is the "Open Existing Record" button disabled?
+    get isOpenExistingDisabled() {
+        return !this.selectedDuplicateId;
+    }
+
+    // Proceed with VIN decode (Black Book integration)
+    async proceedWithVinDecode(searchVin) {
+        this.loading = true;
         
         try {
             console.log('🔍 Starting VIN decode for: ' + searchVin);

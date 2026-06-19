@@ -449,10 +449,16 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         if (!junctions.isEmpty()) {
             delete junctions;
         }
-        update new Invoice__c(Id = invoiceId, Remittance_Form__c = null);
+        // Only clear the Remittance_Form__c lookup if it points to this remittance
+        Invoice__c inv = [SELECT Id, Remittance_Form__c FROM Invoice__c WHERE Id = :invoiceId LIMIT 1];
+        if (inv.Remittance_Form__c == remittanceFormId) {
+            update new Invoice__c(Id = invoiceId, Remittance_Form__c = null);
+        }
     }
 
     // ── Get Available Invoices for Remittance ─────────────────────────
+    // MODIFIED: Allow invoices that are on OTHER remittances as long as those
+    // remittances have NO payments initiated (Scenario 1 enhancement).
     @AuraEnabled
     public static List<AvailableInvoice> getAvailableInvoicesForRemittance(String remittanceFormId) {
         if (String.isBlank(remittanceFormId)) {
@@ -470,6 +476,8 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         if (form.Dealer_Name__c == null) {
             throw new AuraHandledException('Remittance Form has no dealer');
         }
+
+        // Collect invoice IDs already on THIS remittance (via lookup or junction)
         Set<Id> existingInvoiceIds = new Set<Id>();
         for (Invoice__c inv : [SELECT Id FROM Invoice__c WHERE Remittance_Form__c = :remittanceFormId]) {
             existingInvoiceIds.add(inv.Id);
@@ -480,6 +488,53 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         ]) {
             existingInvoiceIds.add(j.Invoice__c);
         }
+
+        // ── SCENARIO 1 CHANGE: Find invoices blocked by paid/payment-initiated remittances ──
+        // An invoice is blocked if it's on ANY remittance that has a payment initiated
+        // (i.e., has Payment__c records) or the remittance status is 'Completed'.
+        // Invoices on remittances with NO payments and status != 'Completed' remain available.
+
+        // Step 1: Find remittance IDs that have payments or are completed
+        Set<Id> blockedRemittanceIds = new Set<Id>();
+        // Remittances with payments
+        for (Payment__c pmt : [
+            SELECT Remittance_Form__c FROM Payment__c
+            WHERE Remittance_Form__c != null
+        ]) {
+            blockedRemittanceIds.add(pmt.Remittance_Form__c);
+        }
+        // Remittances with Completed status
+        for (Remittance_Form__c rf : [
+            SELECT Id FROM Remittance_Form__c WHERE Status__c = 'Completed'
+        ]) {
+            blockedRemittanceIds.add(rf.Id);
+        }
+
+        // Step 2: Find invoices that are on blocked remittances (via junction)
+        Set<Id> invoicesOnBlockedRemittances = new Set<Id>();
+        if (!blockedRemittanceIds.isEmpty()) {
+            for (Remittance_Line_Item_Junction__c j : [
+                SELECT Invoice__c FROM Remittance_Line_Item_Junction__c
+                WHERE Remittance_Form__c IN :blockedRemittanceIds
+                AND Invoice__c != null
+            ]) {
+                invoicesOnBlockedRemittances.add(j.Invoice__c);
+            }
+            // Also check direct lookup
+            for (Invoice__c inv : [
+                SELECT Id FROM Invoice__c
+                WHERE Remittance_Form__c IN :blockedRemittanceIds
+            ]) {
+                invoicesOnBlockedRemittances.add(inv.Id);
+            }
+        }
+
+        // Step 3: Query available invoices — removed "Remittance_Form__c = null" filter.
+        // Instead, exclude invoices already on THIS remittance and those on blocked remittances.
+        Set<Id> allExcludedIds = new Set<Id>();
+        allExcludedIds.addAll(existingInvoiceIds);
+        allExcludedIds.addAll(invoicesOnBlockedRemittances);
+
         List<Invoice__c> available = [
             SELECT Id, Name, Application_Id__c, Customer_Name__c, Amount__c, Status__c,
                    Vehicle_Year__c, Vehicle_Make__c, Vehicle_Model__c
@@ -487,12 +542,12 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
             WHERE Application__r.Dealer_Name__c = :form.Dealer_Name__c
               AND Application__r.Application_Status__c = 'Submitted'
               AND Status__c = 'Due'
-              AND Remittance_Form__c = null
-              AND Id NOT IN :existingInvoiceIds
+              AND Id NOT IN :allExcludedIds
             ORDER BY Amount__c ASC
             LIMIT 200
         ];
-        // CHANGE 1: Exclude invoices that have any line item with Status = 'Paid'
+
+        // Exclude invoices that have any line item with Status = 'Paid'
         Set<Id> availableIds = new Set<Id>();
         for (Invoice__c inv : available) {
             availableIds.add(inv.Id);
@@ -530,6 +585,8 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
     }
 
     // ── Add Invoice to Remittance ─────────────────────────────────────
+    // MODIFIED: Allow adding an invoice even if it's already on another unpaid remittance.
+    // Only set the Remittance_Form__c lookup if it's currently null.
     @AuraEnabled
     public static void addInvoiceToRemittance(String remittanceFormId, String invoiceId) {
         if (String.isBlank(remittanceFormId) || String.isBlank(invoiceId)) {
@@ -544,7 +601,7 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
             throw new AuraHandledException('Invoices cannot be added or removed while a check payment is pending verification.');
         }
         // Guard: reject invoice if it is Paid/Completed or has any paid line items
-        Invoice__c invToAdd = [SELECT Id, Status__c FROM Invoice__c WHERE Id = :invoiceId LIMIT 1];
+        Invoice__c invToAdd = [SELECT Id, Status__c, Remittance_Form__c FROM Invoice__c WHERE Id = :invoiceId LIMIT 1];
         if (invToAdd.Status__c == 'Paid' || invToAdd.Status__c == 'Completed') {
             throw new AuraHandledException('Cannot add a paid or completed invoice to a remittance');
         }
@@ -552,7 +609,39 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
         if (paidLineCount > 0) {
             throw new AuraHandledException('Cannot add an invoice that has paid line items to a remittance');
         }
-        update new Invoice__c(Id = invoiceId, Remittance_Form__c = remittanceFormId);
+
+        // SCENARIO 1 CHANGE: Check if this invoice is on any remittance with payment initiated or completed
+        List<Remittance_Line_Item_Junction__c> existingJunctions = [
+            SELECT Id, Remittance_Form__c, Remittance_Form__r.Status__c
+            FROM Remittance_Line_Item_Junction__c
+            WHERE Invoice__c = :invoiceId
+            AND Remittance_Form__c != :remittanceFormId
+        ];
+        for (Remittance_Line_Item_Junction__c ej : existingJunctions) {
+            // Check if that other remittance has payments or is completed
+            if (ej.Remittance_Form__r.Status__c == 'Completed') {
+                throw new AuraHandledException('This invoice is already on a completed remittance and cannot be added to another.');
+            }
+        }
+        // Also check for payments on those other remittances
+        Set<Id> otherRemittanceIds = new Set<Id>();
+        for (Remittance_Line_Item_Junction__c ej : existingJunctions) {
+            otherRemittanceIds.add(ej.Remittance_Form__c);
+        }
+        if (!otherRemittanceIds.isEmpty()) {
+            Integer otherPaymentCount = [SELECT COUNT() FROM Payment__c WHERE Remittance_Form__c IN :otherRemittanceIds LIMIT 1];
+            if (otherPaymentCount > 0) {
+                throw new AuraHandledException('This invoice is already on a remittance with payment initiated and cannot be added to another.');
+            }
+        }
+
+        // Only update the Remittance_Form__c lookup if it's currently null
+        // (invoice may already be linked to another unpaid remittance via lookup)
+        if (invToAdd.Remittance_Form__c == null) {
+            update new Invoice__c(Id = invoiceId, Remittance_Form__c = remittanceFormId);
+        }
+
+        // Create junction records for this remittance
         List<Invoice_Line_Item__c> lineItems = [
             SELECT Id, Contract_Cost_Price__c FROM Invoice_Line_Item__c WHERE Invoice__c = :invoiceId AND Status__c != 'Paid'
         ];

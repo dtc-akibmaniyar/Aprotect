@@ -1,0 +1,216 @@
+<template>
+    <div class="remittance-list-container">
+        <!-- Page Header -->
+        <div class="slds-page-header">
+            <div class="slds-page-header__row">
+                <div class="slds-page-header__col-title">
+                    <div class="slds-media">
+                        <div class="slds-media__figure">
+                            <span class="slds-icon_container slds-icon-standard-record">
+                                <lightning-icon icon-name="standard:record" size="medium"></lightning-icon>
+                            </span>
+                        </div>
+                        <div class="slds-media__body">
+                            <div class="slds-page-header__name">
+                                <div class="slds-page-header__name-title">
+                                    <h1>
+                                        <span class="slds-page-header__title">{title}</span>
+                                    </h1>
+                                </div>
+                            </div>
+                            <p class="slds-page-header__name-meta">{description}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="slds-page-header__col-actions">
+                    <div class="slds-page-header__controls">
+                        <div class="slds-page-header__control">
+                            <div class="slds-grid slds-grid_vertical-align-center slds-gutters_small list-toolbar">
+                                <div class="slds-col filter-col">
+                                    <lightning-combobox
+                                        name="statusFilter"
+                                        value={statusFilter}
+                                        options={statusFilterOptions}
+                                        onchange={handleStatusFilterChange}
+                                        variant="label-hidden"
+                                        class="status-filter">
+                                    </lightning-combobox>
+                                </div>
+                                <div class="slds-col actions-col">
+                                    <lightning-button
+                                        label="Refresh"
+                                        variant="neutral"
+                                        onclick={handleRefresh}
+                                        icon-name="utility:refresh"
+                                        class={refreshButtonClass}
+                                        disabled={refreshLoading}>
+                                    </lightning-button>
+                                </div>
+                                <template if:true={lastRefreshTime}>
+                                    <div class="slds-col time-col">
+                                        <div class="slds-text-body_small slds-text-color_weak time-text">
+                                            Last refreshed: {lastRefreshTime}
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <template if:true={loading}>
+            <div class="loading-container">
+                <lightning-spinner alternative-text="Loading remittance forms..." size="medium"></lightning-spinner>
+                <p>Loading remittance forms...</p>
+            </div>
+        </template>
+
+        <!-- Refresh Loading -->
+        <template if:true={refreshLoading}>
+            <div class="refresh-loading-container">
+                <lightning-spinner alternative-text="Refreshing..." size="small"></lightning-spinner>
+                <p>Refreshing...</p>
+            </div>
+        </template>
+
+        <!-- Error State -->
+        <template if:true={showError}>
+            <div class="error-container">
+                <lightning-icon icon-name="utility:error" size="medium" class="slds-m-bottom_small"></lightning-icon>
+                <h3>Error Loading Remittance Forms</h3>
+                <p>{errorMessage}</p>
+                <lightning-button
+                    label="Try Again"
+                    variant="brand"
+                    onclick={handleRefresh}
+                    class="slds-m-top_medium">
+                </lightning-button>
+            </div>
+        </template>
+
+        <!-- Table -->
+        <template if:true={showTable}>
+            <template if:true={hasRecords}>
+                <div class="table-wrapper">
+                    <table class="slds-table slds-table_cell-buffer slds-table_bordered remittance-table">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="sortable-header" data-field="name" onclick={handleSort}>
+                                    <div class="slds-truncate th-content">
+                                        Remittance # <span class="sort-icon">{sortNameIcon}</span>
+                                    </div>
+                                </th>
+                                <th scope="col" class="sortable-header" data-field="status" onclick={handleSort}>
+                                    <div class="slds-truncate th-content">
+                                        Status <span class="sort-icon">{sortStatusIcon}</span>
+                                    </div>
+                                </th>
+                                <th scope="col" class="sortable-header" data-field="createdDate" onclick={handleSort}>
+                                    <div class="slds-truncate th-content">
+                                        Created Date <span class="sort-icon">{sortCreatedDateIcon}</span>
+                                    </div>
+                                </th>
+                                <th scope="col" class="sortable-header" data-field="expiryDate" onclick={handleSort}>
+                                    <div class="slds-truncate th-content">
+                                        Expiry Date <span class="sort-icon">{sortExpiryDateIcon}</span>
+                                    </div>
+                                </th>
+                                <th scope="col" class="sortable-header" data-field="amount" onclick={handleSort}>
+                                    <div class="slds-truncate th-content">
+                                        Amount <span class="sort-icon">{sortAmountIcon}</span>
+                                    </div>
+                                </th>
+                                <th scope="col" class="sortable-header" data-field="balance" onclick={handleSort}>
+                                    <div class="slds-truncate th-content">
+                                        Balance <span class="sort-icon">{sortBalanceIcon}</span>
+                                    </div>
+                                </th>
+                                <th scope="col">
+                                    <div class="slds-truncate">Line Items</div>
+                                </th>
+                                <th scope="col">
+                                    <div class="slds-truncate">Payer</div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template for:each={remittanceForms} for:item="form">
+                                <tr key={form.id} class="table-row">
+                                    <td>
+                                        <a href="#"
+                                           class="remittance-name-link"
+                                           data-id={form.id}
+                                           data-url={form.recordUrl}
+                                           onclick={handleRemittanceClick}>
+                                            {form.name}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <span class={form.statusClass}>{form.statusLabel}</span>
+                                    </td>
+                                    <td>
+                                        <div class="slds-truncate">{form.createdDateFormatted}</div>
+                                    </td>
+                                    <td>
+                                        <div class={form.expiryDateClass}>{form.expiryDateFormatted}</div>
+                                    </td>
+                                    <td>
+                                        <div class="amount-cell">{form.amountFormatted}</div>
+                                    </td>
+                                    <td>
+                                        <div class="amount-cell">{form.balanceFormatted}</div>
+                                    </td>
+                                    <td>
+                                        <div class="line-items-cell">
+                                            <span class={form.progressClass}>{form.lineItemsSummary}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="slds-truncate">{form.payerName}</div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <template if:true={showPagination}>
+                    <div class="pagination-bar">
+                        <span class="pagination-info">{paginationInfo}</span>
+                        <div class="pagination-controls">
+                            <lightning-button
+                                label="Previous"
+                                variant="neutral"
+                                onclick={handlePrevPage}
+                                disabled={isFirstPage}
+                                icon-name="utility:chevronleft">
+                            </lightning-button>
+                            <span class="page-indicator">Page {pageNumber} of {totalPages}</span>
+                            <lightning-button
+                                label="Next"
+                                variant="neutral"
+                                onclick={handleNextPage}
+                                disabled={isLastPage}
+                                icon-name="utility:chevronright"
+                                icon-position="right">
+                            </lightning-button>
+                        </div>
+                    </div>
+                </template>
+            </template>
+
+            <!-- Empty State -->
+            <template if:false={hasRecords}>
+                <div class="empty-state">
+                    <lightning-icon icon-name="standard:record" size="large"></lightning-icon>
+                    <h3>{emptyTitle}</h3>
+                    <p>{emptyMessage}</p>
+                </div>
+            </template>
+        </template>
+    </div>
+</template>

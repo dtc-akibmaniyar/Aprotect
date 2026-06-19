@@ -1,7 +1,6 @@
 import { LightningElement, track, api, wire } from 'lwc';
 import { NavigationMixin } from 'lightning/navigation';
-// import { getObjectInfo, getPicklistValues } from 'lightning/uiObjectInfoApi';
-// Schema imports removed — fields do not exist on Application_Package__c
+import { getPicklistValues } from 'lightning/uiObjectInfoApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getDealerPackages from '@salesforce/apex/DealerPortalController.getDealerPackages';
 import getExistingApplicationPackageByRecordType from '@salesforce/apex/DealerPortalController.getExistingApplicationPackageByRecordType';
@@ -35,6 +34,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     @track dealerHasSpecificPackages = false;
     @track selectedDealerPackage = null;
     @track selectedWarrantyTerm = null;
+    @track isChangingSelection = false;
     @track showPriceModal = false;
     @track currentPriceBreakdown = {};
     @track dealerReferenceBreakdown = {};
@@ -79,7 +79,18 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     @track rimType       = '';
     @track dealerComments = '';
 
-    // Picklist wire adapters removed — fields do not exist on Application_Package__c
+    // Individual wire for Rim Type (working)
+    @wire(getPicklistValues, { recordTypeId: '012G1000003ycK7IAI', fieldApiName: { objectApiName: 'Application_Package__c', fieldApiName: 'Rim_Type__c' } })
+    rimTypePicklist;
+
+    @wire(getPicklistValues, { recordTypeId: '012G1000003ycK7IAI', fieldApiName: { objectApiName: 'Application_Package__c', fieldApiName: 'Tire_Brand__c' } })
+    tireBrandPicklist;
+
+    @wire(getPicklistValues, { recordTypeId: '012G1000003ycK7IAI', fieldApiName: { objectApiName: 'Application_Package__c', fieldApiName: 'Tread_Depth_Unit__c' } })
+    treadDepthUnitPicklist;
+
+    @wire(getPicklistValues, { recordTypeId: '012G1000003ycK7IAI', fieldApiName: { objectApiName: 'Application_Package__c', fieldApiName: 'Rim_Brand__c' } })
+    rimBrandPicklist;
 
     @track currentView = 'planSelection';
     @track planCards = [];
@@ -123,6 +134,22 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
 
     get isPlanSelectionView() {
         return this.currentView === 'planSelection';
+    }
+
+    get showPlanSelection() {
+        return this.isPlanSelectionView && (!this.hasSelectedTerm || this.isChangingSelection);
+    }
+
+    get showSelectedPlanView() {
+        return this.isPlanSelectionView && this.hasSelectedTerm && !this.isChangingSelection;
+    }
+
+    get formattedSelectedPrice() {
+        if (this.selectedWarrantyTerm) {
+            const price = this.selectedWarrantyTerm.totalPrice || this.selectedWarrantyTerm.netCost || 0;
+            return '$' + Number(price).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        return '$0.00';
     }
 
     get showContinueButton() {
@@ -208,6 +235,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             // Restore selected warranty term if available AND we have a selected package
             if (savedData.selectedWarrantyTerm && savedData.selectedDealerPackage) {
                 this.selectedWarrantyTerm = savedData.selectedWarrantyTerm;
+                this.isChangingSelection = false;
                 console.log('✅ Restored selected warranty term from session:', this.selectedWarrantyTerm);
             } else if (savedData.selectedWarrantyTerm && !savedData.selectedDealerPackage) {
                 // Clear term if no package is selected
@@ -643,6 +671,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                         
                         if (matchingTerm) {
                             this.selectedWarrantyTerm = matchingTerm;
+                            this.isChangingSelection = false;
                             console.log('✅ Auto-selected term:', matchingTerm.packageTermName || matchingTerm.Name);
                         }
                     }
@@ -950,6 +979,53 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         return !!this.selectedWarrantyTerm;
     }
 
+    handleChangePlanSelection() {
+        this.isChangingSelection = true;
+    }
+
+    // --- Dealer Pricing Modal Getters ---
+
+    get selectedPlanName() {
+        if (this.selectedDealerPackage) {
+            return this.selectedDealerPackage.PackageName || this.selectedDealerPackage.Name || 'Selected Package';
+        }
+        return 'Selected Package';
+    }
+
+    get formattedDealerPrice() {
+        return this.formatPrice(this.modalDealerPrice || 0);
+    }
+
+    get hasSelectedAdditionalOptions() {
+        return this.selectedAdditionalOptions && this.selectedAdditionalOptions.length > 0;
+    }
+
+    get selectedAdditionalOptionsList() {
+        if (!this.selectedAdditionalOptions || this.selectedAdditionalOptions.length === 0) {
+            return [];
+        }
+        return this.selectedAdditionalOptions.map(opt => ({
+            id: opt.Id || opt.id,
+            label: opt.optionName || opt.Name || opt.label || 'Option',
+            formattedDealerPrice: this.formatPrice(opt.dealerPrice || opt.netCost || 0)
+        }));
+    }
+
+    get formattedTaxRate() {
+        const rate = this.modalTaxRate || 0;
+        return rate > 0 ? rate.toFixed(2) + '%' : '0%';
+    }
+
+    get formattedTotalTaxAmount() {
+        return this.formatPrice(this.modalTaxAmount || 0);
+    }
+
+    get formattedTotalWithTax() {
+        return this.formatPrice(this.modalTotalWithTax || 0);
+    }
+
+    // --- End Dealer Pricing Modal Getters ---
+
     // Get included options for the selected package (for side panel) - same as warranty
     get selectedPackageOptions() {
         if (!this.selectedDealerPackage || !this.selectedDealerPackage.options) {
@@ -1207,6 +1283,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             const newTermId = selectedTerm.Id;
             
             this.selectedWarrantyTerm = selectedTerm;
+            this.isChangingSelection = false;
             console.log('🎨 Term selection highlighting applied:', selectedTerm.packageTermName || selectedTerm.Name);
             
             
@@ -1460,6 +1537,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
 
         // Select term
         this.selectedWarrantyTerm = term;
+        this.isChangingSelection = false;
         console.log('✅ Accordion term selected:', term.packageTermName || term.Name, 'from package:', pkg.PackageName);
 
         // Collapse all accordion sections except the selected package
@@ -1622,6 +1700,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                 if (term) {
                     this.selectedDealerPackage = pkg;
                     this.selectedWarrantyTerm = term;
+                    this.isChangingSelection = false;
                     this.updatePrice();
                     this.saveDataToSession();
                     // DON'T save to Salesforce until user clicks Continue
@@ -1653,8 +1732,6 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     
     // Validate form before continuing
     validateForm() {
-        // Only require package and term selection to continue
-        // Tire & Rim form is completely optional and has no validation requirements
         if (!this.selectedDealerPackage) {
             this.errorMessage = 'Please select a warranty package before continuing.';
             this.showError = true;
@@ -1667,13 +1744,75 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             return false;
         }
 
-        // Tire & Rim detail fields are OPTIONAL - validation disabled.
-        // Was blocking Save & Continue when users hadn't filled tire detail inputs
-        // (inputs only visible in planDetails view, not planSelection accordion view).
+        // Validate Tire & Rim required fields when the details form is visible
+        if (this.showSelectedPlanView && !this.validateTireRimFields()) {
+            return false;
+        }
 
         // Clear any previous errors
         this.showError = false;
         this.errorMessage = '';
+
+        return true;
+    }
+
+    /**
+     * Validates all required Tire & Rim detail fields.
+     * Returns true if all required fields are filled, false otherwise.
+     * Sets inline error styling on empty fields and shows a summary message.
+     */
+    validateTireRimFields() {
+        const requiredTireFields = [
+            { field: 'tireBrand', label: 'Tire Brand' },
+            { field: 'tireType', label: 'Tire Type' },
+            { field: 'treadDepth', label: 'Tread Depth' },
+            { field: 'treadDepthUnit', label: 'Tread Depth Unit' },
+            { field: 'rimSize', label: 'Rim Size' },
+            { field: 'rimSizeUnit', label: 'Rim Size Unit' },
+            { field: 'rimBrand', label: 'Rim Brand' },
+            { field: 'rimType', label: 'Rim Type' }
+        ];
+
+        const missingFields = [];
+
+        // Clear previous validation errors
+        const allFieldEls = this.template.querySelectorAll('[data-field]');
+        allFieldEls.forEach(el => {
+            el.classList.remove('tire-field-error');
+            const existingErr = el.parentElement.querySelector('.tire-field-error-msg');
+            if (existingErr) {
+                existingErr.remove();
+            }
+        });
+
+        requiredTireFields.forEach(({ field, label }) => {
+            const value = this[field];
+            const isEmpty = value === undefined || value === null || String(value).trim() === '';
+            
+            if (isEmpty) {
+                missingFields.push(label);
+                const el = this.template.querySelector('[data-field="' + field + '"]');
+                if (el) {
+                    el.classList.add('tire-field-error');
+                    const errSpan = document.createElement('span');
+                    errSpan.className = 'tire-field-error-msg';
+                    errSpan.textContent = label + ' is required';
+                    el.parentElement.appendChild(errSpan);
+                }
+            }
+        });
+
+        if (missingFields.length > 0) {
+            this.errorMessage = 'Please complete all required Tire & Rim fields: ' + missingFields.join(', ');
+            this.showError = true;
+
+            const formCard = this.template.querySelector('.tire-details-form-card');
+            if (formCard) {
+                formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+
+            return false;
+        }
 
         return true;
     }
@@ -1859,6 +1998,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             // Restore selected warranty term if available AND we have a selected package
             if (data.selectedWarrantyTerm && data.selectedDealerPackage) {
                 this.selectedWarrantyTerm = data.selectedWarrantyTerm;
+                this.isChangingSelection = false;
                 console.log('✅ Restored selected warranty term:', this.selectedWarrantyTerm);
             } else if (data.selectedWarrantyTerm && !data.selectedDealerPackage) {
                 // Clear term if no package is selected
@@ -2101,24 +2241,13 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     // Price breakdown modal methods
     showPriceBreakdownModal() {
         console.log('💰 Showing price breakdown modal');
-        console.log('💰 Current state - selectedWarrantyTerm:', !!this.selectedWarrantyTerm);
-        console.log('💰 Current state - isExistingApplication:', this.isExistingApplication);
-        console.log('💰 Current state - existingApplicationPackage:', !!this.existingApplicationPackage);
-        console.log('💰 Current state - selectedDealerPackage:', !!this.selectedDealerPackage);
         
-        // Check if we have either a selected term OR an existing application package
         if (!this.selectedWarrantyTerm && !this.isExistingApplication) {
             console.log('⚠️ No warranty term selected and no existing application package for price breakdown');
             return;
         }
         
-        // For existing applications, we don't need a term name check
-        if (!this.isExistingApplication && this.selectedWarrantyTerm && !this.selectedWarrantyTerm.packageTermName && !this.selectedWarrantyTerm.Name) {
-            console.log('⚠️ Selected warranty term has no name property');
-            return;
-        }
-        
-        // Check if user selected a different term than the stored one
+        // Determine dealer price source
         const isSameTerm = this.isExistingApplication && 
                           this.existingApplicationPackage && 
                           this.selectedWarrantyTerm && 
@@ -2127,145 +2256,37 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         const bdAppStatus = this.applicationStatus || '';
         const useStoredForBreakdown = isSameTerm && !['Draft', 'Pending', 'Quote'].includes(bdAppStatus);
         
-        let netCost, markup, retailPrice, totalPrice;
+        let dealerPrice, taxRate, taxAmount, totalWithTax;
         
         if (useStoredForBreakdown) {
-            // For submitted/active applications with same term, use stored values directly from Application_Package__c
-            netCost = this.existingApplicationPackage.dealerPackagePrice || 0;
-            markup = this.existingApplicationPackage.dealerMarkup || 0;
-            retailPrice = this.existingApplicationPackage.dealerPackageRetailPrice || 0;
-            
-            // Use stored tax values
-            const taxRate = this.existingApplicationPackage.taxPercentage || 0;
-            const taxAmount = this.existingApplicationPackage.taxAmount || 0;
-            
-            console.log('🔍 Existing app price breakdown (using stored values):', {
-                netCost: netCost,
-                markup: markup,
-                retailPrice: retailPrice,
-                taxRate: taxRate,
-                taxAmount: taxAmount,
-                contractPremiumPriceWithoutTax: this.existingApplicationPackage.contractPremiumPriceWithoutTax,
-                contractPremiumPrice: this.existingApplicationPackage.contractPremiumPrice
-            });
-            
-            // Use stored total price directly
-            totalPrice = this.existingApplicationPackage.contractPremiumPrice || 0;
+            dealerPrice = this.existingApplicationPackage.dealerPackagePrice || 0;
+            taxRate = this.existingApplicationPackage.taxPercentage || 0;
+            taxAmount = this.existingApplicationPackage.taxAmount || 0;
+            totalWithTax = this.existingApplicationPackage.contractPremiumPrice || 0;
         } else if (this.selectedWarrantyTerm) {
-            // For new selections, use the totalPrice from the term (already includes proper markup calculation)
-            netCost = this.selectedWarrantyTerm.netCost || 0;
-            const markupValue = this.selectedWarrantyTerm.markup || 0;
-            const markupType = this.selectedWarrantyTerm.markupType || '';
-            
-            // Calculate the actual markup amount for display
-            if (markupType === '%' && markupValue > 0) {
-                markup = netCost * markupValue / 100;
-            } else if (markupType === '$' && markupValue > 0) {
-                markup = markupValue;
-            } else {
-                markup = 0; // No markup
-            }
-            
-            // Get tax information from term
-            const taxAmount = this.selectedWarrantyTerm.taxAmount || 0;
-            const taxRate = this.selectedWarrantyTerm.taxRate || 0;
-            
-            // Retail price is netCost + markup (before tax)
-            retailPrice = netCost + markup;
-            
-            // Debug logging for price breakdown
-            console.log('🔍 Price breakdown debug:', {
-                termId: this.selectedWarrantyTerm?.Id,
-                termName: this.selectedWarrantyTerm?.packageTermName || this.selectedWarrantyTerm?.Name,
-                netCost: netCost,
-                markupValue: markupValue,
-                markupType: markupType,
-                markup: markup,
-                taxRate: taxRate,
-                taxAmount: taxAmount,
-                retailPrice: retailPrice,
-                totalPrice: this.selectedWarrantyTerm.totalPrice
-            });
-            
-            // Total price includes base warranty (with tax)
-            totalPrice = retailPrice + taxAmount;
+            dealerPrice = this.selectedWarrantyTerm.netCost || 0;
+            taxRate = this.selectedWarrantyTerm.taxRate || 0;
+            taxAmount = this.selectedWarrantyTerm.taxAmount || 0;
+            totalWithTax = dealerPrice + taxAmount;
         } else if (this.isExistingApplication && this.existingApplicationPackage) {
-            // Existing application but no term explicitly selected yet — use stored values
-            netCost = this.existingApplicationPackage.dealerPackagePrice || 0;
-            markup = this.existingApplicationPackage.dealerMarkup || 0;
-            retailPrice = this.existingApplicationPackage.dealerPackageRetailPrice || 0;
-            totalPrice = this.existingApplicationPackage.contractPremiumPrice || 0;
-            console.log('🔍 Existing app price breakdown (no term selected, using stored):', {
-                netCost, markup, retailPrice, totalPrice
-            });
+            dealerPrice = this.existingApplicationPackage.dealerPackagePrice || 0;
+            taxRate = this.existingApplicationPackage.taxPercentage || 0;
+            taxAmount = this.existingApplicationPackage.taxAmount || 0;
+            totalWithTax = this.existingApplicationPackage.contractPremiumPrice || 0;
         } else {
-            netCost = markup = retailPrice = totalPrice = 0;
+            dealerPrice = taxRate = taxAmount = totalWithTax = 0;
         }
         
-        // Get tax information for display
-        let displayTaxAmount = 0;
-        let displayTaxRate = 0;
-        if (isSameTerm) {
-            // Use stored tax values from Application_Package__c
-            displayTaxAmount = this.existingApplicationPackage.taxAmount || 0;
-            displayTaxRate = this.existingApplicationPackage.taxPercentage || 0;
-        } else if (this.selectedWarrantyTerm && this.selectedWarrantyTerm.taxAmount !== undefined) {
-            displayTaxAmount = this.selectedWarrantyTerm.taxAmount || 0;
-            displayTaxRate = this.selectedWarrantyTerm.taxRate || 0;
-        } else if (this.isExistingApplication && this.existingApplicationPackage) {
-            // Existing application, no term selected — use stored tax values
-            displayTaxAmount = this.existingApplicationPackage.taxAmount || 0;
-            displayTaxRate = this.existingApplicationPackage.taxPercentage || 0;
-        } else if (this.selectedDealerPackage && this.selectedDealerPackage.taxRate) {
-            displayTaxRate = this.selectedDealerPackage.taxRate || 0;
-            if (displayTaxRate > 0) {
-                displayTaxAmount = retailPrice * (displayTaxRate / 100);
-            }
-        }
-        
-        // When price is overridden, show custom price + tax breakdown
-        if (this.isPriceOverridden) {
-            const overrideTaxRate = this._getCurrentTaxRate();
-            const overridePreTax = this._overridePreTaxPrice || this.price;
-            const overrideTax = this._overrideTaxAmount || 0;
-            this.currentPriceBreakdown = {
-                netCost: '—',
-                markup: '—',
-                retailPrice: this.formatPrice(overridePreTax),
-                taxRate: overrideTaxRate > 0 ? overrideTaxRate.toFixed(2) + '%' : '0%',
-                taxAmount: this.formatPrice(overrideTax),
-                totalPrice: this.formatPrice(this.price)
-            };
-            // Populate dealer reference pricing for toggle
-            this.dealerReferenceBreakdown = {
-                netCost: this.formatPrice(netCost),
-                markup: this.formatPrice(markup),
-                retailPrice: this.formatPrice(retailPrice),
-                taxRate: displayTaxRate > 0 ? displayTaxRate.toFixed(2) + '%' : '0%',
-                taxAmount: this.formatPrice(displayTaxAmount),
-                totalPrice: this.formatPrice(totalPrice)
-            };
-        } else {
-            this.currentPriceBreakdown = {
-                netCost: this.formatPrice(netCost),
-                markup: this.formatPrice(markup),
-                retailPrice: this.formatPrice(retailPrice),
-                taxRate: displayTaxRate > 0 ? displayTaxRate.toFixed(2) + '%' : '0%',
-                taxAmount: this.formatPrice(displayTaxAmount),
-                totalPrice: this.formatPrice(totalPrice)
-            };
-        }
+        this.modalDealerPrice = dealerPrice;
+        this.modalTaxRate = taxRate;
+        this.modalTaxAmount = taxAmount;
+        this.modalTotalWithTax = totalWithTax;
         
         this.showPriceModal = true;
-    }
-    
-    handleToggleDealerReference(event) {
-        this.showDealerReferencePrice = event.target.checked;
     }
 
     hidePriceBreakdownModal() {
         this.showPriceModal = false;
-        this.showDealerReferencePrice = false;
     }
     
     stopPropagation(event) {
@@ -2404,6 +2425,11 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             
             // If there's a selected package, save it with full logic
             if (this.selectedDealerPackage && this.selectedWarrantyTerm) {
+                // Validate Tire & Rim required fields before saving
+                if (this.showSelectedPlanView && !this.validateTireRimFields()) {
+                    this.loading = false;
+                    return;
+                }
                 console.log('🔍 [TIRE SAVE AS QUOTE] Saving package');
                 console.log('🔍 selectedDealerPackage:', this.selectedDealerPackage);
                 console.log('🔍 selectedWarrantyTerm:', this.selectedWarrantyTerm);
@@ -3010,22 +3036,9 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         return hasId;
     }
     
-    // Tread Depth Unit dropdown options
-    get treadDepthUnitOptions() {
-        return [
-            { label: 'Select Unit', value: '' },
-            { label: 'mm', value: 'mm' },
-            { label: '32nds', value: '32nds' }
-        ];
-    }
-    
     get treadDepthUnitSelectOptions() {
-        return this.treadDepthUnitOptions
-            .filter(option => option.value !== '')
-            .map(option => ({
-                ...option,
-                selected: option.value === this.treadDepthUnit
-            }));
+        const vals = this.treadDepthUnitPicklist?.data?.values || [];
+        return vals.map(v => ({ label: v.label, value: v.value, selected: v.value === this.treadDepthUnit }));
     }
     
     // Rim Size Unit dropdown options
@@ -3217,6 +3230,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                     if (term) {
                         this.selectedDealerPackage = pkg;
                         this.selectedWarrantyTerm = term;
+                        this.isChangingSelection = false;
                         this.selectedProgram = pkg.PackageName;
                         console.log('✅ Selected from comparison:', term.packageTermName || term.Name, 'from', pkg.PackageName);
                         
