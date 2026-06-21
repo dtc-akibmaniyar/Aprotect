@@ -1310,15 +1310,44 @@ getCurrentData() {
         this.errorMessage = '';
         
         try {
-            // TODO: Re-enable duplicate VIN check after fixing Apex method
-            // Duplicate VIN check temporarily bypassed — going straight to VIN decode
-            console.log('\uD83D\uDD0D [handleSearch] Skipping duplicate VIN check, proceeding directly to VIN decode for:', searchVin);
+            // STEP 1: Check for duplicate VIN before calling Black Book
+            console.log('🔍 Checking for duplicate VIN: ' + searchVin);
+            const dupResult = await checkDuplicateVIN({ 
+                vin: searchVin.trim(), 
+                currentApplicationId: this._applicationId || '' 
+            });
+            
+            if (dupResult && dupResult.hasDuplicates && dupResult.duplicates && dupResult.duplicates.length > 0) {
+                console.log('⚠️ Duplicate VIN found:', dupResult.duplicates);
+                this.duplicateVinRecords = dupResult.duplicates.map((dup, index) => ({
+                    ...dup,
+                    index: index,
+                    isSelected: dupResult.duplicates.length === 1,
+                    rowClass: dupResult.duplicates.length === 1 ? 'duplicate-row selected' : 'duplicate-row'
+                }));
+                if (dupResult.duplicates.length === 1) {
+                    this.selectedDuplicateId = dupResult.duplicates[0].recordId;
+                } else {
+                    this.selectedDuplicateId = '';
+                }
+                this.showDuplicateVinModal = true;
+                this.loading = false;
+                return; // Stop here — user must choose
+            }
+            
+            // No duplicates — proceed with VIN decode
             await this.proceedWithVinDecode(searchVin);
             
         } catch (error) {
-            console.error('❌ Error during VIN decode:', error);
-            this.showErrorMessage('VIN decode failed: ' + (error?.body?.message || error?.message || 'Unknown error') + '. Please try again.');
-            this.loading = false;
+            console.error('❌ Error during VIN search:', error);
+            // If duplicate check fails, proceed with decode anyway
+            try {
+                await this.proceedWithVinDecode(searchVin);
+            } catch (decodeError) {
+                console.error('❌ Error during VIN decode:', decodeError);
+                this.showErrorMessage('Error connecting to VIN decoder service. Please try again or enter vehicle information manually.');
+                this.loading = false;
+            }
         }
     }
 
@@ -1341,13 +1370,15 @@ getCurrentData() {
         }
         this.showDuplicateVinModal = false;
         
-        // Navigate to the selected record via the container's navigation
-        // Dispatch event so the container can handle navigation
-        this.dispatchEvent(new CustomEvent('openapplication', {
-            detail: { applicationId: this.selectedDuplicateId },
-            bubbles: true,
-            composed: true
-        }));
+        // Find the selected record to get its record number (Name)
+        const selectedRecord = this.duplicateVinRecords.find(
+            dup => dup.recordId === this.selectedDuplicateId
+        );
+        const recordName = selectedRecord ? selectedRecord.recordName : '';
+        
+        // Navigate to the application record in the dealer portal
+        const url = `/dealerportal/s/application/${this.selectedDuplicateId}/${recordName}`;
+        window.location.href = url;
     }
 
     // Handle "Continue with New Record" button in duplicate modal

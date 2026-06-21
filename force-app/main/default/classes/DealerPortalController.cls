@@ -1069,8 +1069,7 @@ DealerPackagesResponse response = new DealerPackagesResponse();
 List<Application__c> applications = [
             SELECT Id, Dealer_Name__c, Dealer_Name__r.Id, Dealer_Name__r.Name,
                     Vehicle__r.Year__c, Vehicle__r.Odometer__c, Vehicle__r.Odometer_Unit__c,
-                    Vehicle__r.Model_Lookup__c, Vehicle__r.Model_Lookup__r.Class__c,
-                    Vehicle__r.Business_Commercial_Use__c, Vehicle__r.Type_of_Commercial_Use__c
+                    Vehicle__r.Model_Lookup__c, Vehicle__r.Model_Lookup__r.Class__c
             FROM Application__c 
             WHERE Id = :applicationId
             LIMIT 1
@@ -1136,9 +1135,6 @@ dealerPackages = allPackages;
 } else {
 }
         
-        Boolean isCommercialUse = application.Vehicle__r != null && application.Vehicle__r.Business_Commercial_Use__c == true;
-        String typeOfCommercialUse = (application.Vehicle__r != null) ? application.Vehicle__r.Type_of_Commercial_Use__c : null;
-        
 
         Boolean isTireRimRequest = String.isNotBlank(recordType) && recordType.containsIgnoreCase('Tire_Rim');
 
@@ -1168,27 +1164,8 @@ continue;
 dealerPackages = filteredPackages;
         }
         
-        // Commercial use filtering
-        {
-            List<Dealer_Package__c> commercialFiltered = new List<Dealer_Package__c>();
-            for (Dealer_Package__c dp : dealerPackages) {
-                String eligibility = dp.Commercial_Eligible__c;
-                if (String.isBlank(eligibility) || eligibility == 'All') {
-                    commercialFiltered.add(dp);
-                } else if (eligibility == 'Personal Only' && !isCommercialUse) {
-                    commercialFiltered.add(dp);
-                } else if (eligibility == 'Commercial Only' && isCommercialUse) {
-                    commercialFiltered.add(dp);
-                } else if (eligibility == 'Light Duty Commercial Only') {
-                    if (isCommercialUse && typeOfCommercialUse != null && typeOfCommercialUse.containsIgnoreCase('Light Duty')) {
-                        commercialFiltered.add(dp);
-                    } else if (!isCommercialUse) {
-                        // Personal use vehicles are not eligible for commercial-only packages
-                    }
-                }
-            }
-            dealerPackages = commercialFiltered;
-        }
+
+
 
 
         Set<Id> packageIds = new Set<Id>();
@@ -3989,7 +3966,7 @@ return new List<Dealer_Package__c>();
 try {
 
                 packages = [
-                    SELECT Id, Name, Package__c, Deductable__c, Per_Claim_Limit__c, Package_Description__c, Class__c, Commercial_Eligible__c,
+                    SELECT Id, Name, Package__c, Deductable__c, Per_Claim_Limit__c, Package_Description__c, Class__c,
                             Plan_Type__c, Plan_Type__r.Name, Plan_Type__r.Package_Description__c,
                             Dealer__c, Dealer__r.Name, Dealer__r.Tax_Region__c, Dealer__r.Tax_Region__r.Total_Tax_Rate__c,
                             RecordType.DeveloperName, RecordType.Name
@@ -4006,7 +3983,7 @@ packages = new List<Dealer_Package__c>();
         } else {
 
             packages = [
-                SELECT Id, Name, Package__c, Deductable__c, Per_Claim_Limit__c, Package_Description__c, Class__c, Commercial_Eligible__c,
+                SELECT Id, Name, Package__c, Deductable__c, Per_Claim_Limit__c, Package_Description__c, Class__c,
                         Plan_Type__c, Plan_Type__r.Name, Plan_Type__r.Package_Description__c,
                         Dealer__c, Dealer__r.Name, Dealer__r.Tax_Region__c, Dealer__r.Tax_Region__r.Total_Tax_Rate__c,
                         RecordType.DeveloperName, RecordType.Name
@@ -6534,6 +6511,7 @@ public class MileageComparator implements Comparator<Dealer_Package_Term__c> {
             List<Application__c> matchingApps = [
                 SELECT Id, Name, Application_Status__c, RecordType.Name,
                        Customer_First_Name__c, Customer_Last_Name__c, Customer_Name__c,
+                       Customer_Name__r.Name,
                        Vehicle__r.VIN__c, Vehicle__r.Vehicle_Identification_Number_VIN__c,
                        CreatedDate
                 FROM Application__c
@@ -6548,6 +6526,7 @@ public class MileageComparator implements Comparator<Dealer_Package_Term__c> {
             List<Application__c> matchingApps2 = [
                 SELECT Id, Name, Application_Status__c, RecordType.Name,
                        Customer_First_Name__c, Customer_Last_Name__c, Customer_Name__c,
+                       Customer_Name__r.Name,
                        Vehicle__r.VIN__c, Vehicle__r.Vehicle_Identification_Number_VIN__c,
                        CreatedDate
                 FROM Application__c
@@ -6575,9 +6554,15 @@ public class MileageComparator implements Comparator<Dealer_Package_Term__c> {
                     dup.put('recordName', app.Name);
                     dup.put('recordType', app.RecordType != null ? app.RecordType.Name : 'Application');
                     dup.put('status', app.Application_Status__c);
-                    dup.put('customerName', String.isNotBlank(app.Customer_Name__c) ? app.Customer_Name__c :
-                        ((String.isNotBlank(app.Customer_First_Name__c) ? app.Customer_First_Name__c : '') + ' ' +
-                         (String.isNotBlank(app.Customer_Last_Name__c) ? app.Customer_Last_Name__c : '')).trim());
+                    // Use Account Name (Customer_Name__r.Name) instead of the lookup ID
+                    String custName = '';
+                    if (app.Customer_Name__r != null && String.isNotBlank(app.Customer_Name__r.Name)) {
+                        custName = app.Customer_Name__r.Name;
+                    } else {
+                        custName = ((String.isNotBlank(app.Customer_First_Name__c) ? app.Customer_First_Name__c : '') + ' ' +
+                                    (String.isNotBlank(app.Customer_Last_Name__c) ? app.Customer_Last_Name__c : '')).trim();
+                    }
+                    dup.put('customerName', custName);
                     dup.put('vin', app.Vehicle__r != null ? (String.isNotBlank(app.Vehicle__r.VIN__c) ? app.Vehicle__r.VIN__c : app.Vehicle__r.Vehicle_Identification_Number_VIN__c) : trimmedVin);
                     duplicates.add(dup);
                 }
