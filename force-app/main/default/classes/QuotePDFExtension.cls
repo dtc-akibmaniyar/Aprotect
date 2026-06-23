@@ -57,11 +57,7 @@ public without sharing class QuotePDFExtension {
         loadDealerBranding();
         getDealerLogoUrl();
 
-        // Apply logo whitelisting: if dealer hasn't opted in, hide logo
-        if (!showLogoOnPdf) {
-            hasDealerLogo = false;
-            dealerLogoUrl = '';
-        }
+        // Show dealer logo if DealerLogo__c is populated (no opt-in gate needed)
 
         // Set Aprotect fallback branding flag
         useAprotectBranding = !hasDealerLogo || !showLogoOnPdf;
@@ -116,12 +112,10 @@ public without sharing class QuotePDFExtension {
             packageWrappersList.add(wrapper);
         }
 
-        // Calculate quote total from all active packages
+        // Calculate quote total (sub-total) = sum of retail prices (pre-tax)
         Decimal total = 0;
         for (PackageWrapper pw : packageWrappersList) {
-            if (pw.pkg.Contract_Premium_Price__c != null) {
-                total += pw.pkg.Contract_Premium_Price__c;
-            }
+            total += pw.retailPriceTotal;
         }
         quoteTotal = total;
     }
@@ -553,5 +547,35 @@ public without sharing class QuotePDFExtension {
             result = String.join(exclusions, '\n');
         }
         return result;
+    }
+    
+    public Decimal taxTotal {
+        get {
+            Decimal total = 0;
+            if (packageWrappersList != null) {
+                for (PackageWrapper wrapper : packageWrappersList) {
+                    if (wrapper.pkg.Tax_Amount__c != null) {
+                        total += wrapper.pkg.Tax_Amount__c;
+                    }
+                }
+            }
+            return total;
+        }
+        private set;
+    }
+    public Decimal grandTotal { 
+        get {
+            if (grandTotal == null) {
+            grandTotal = 0;
+                for (PackageWrapper wrapper : packageWrappersList) {
+                    grandTotal += wrapper.retailPriceTotal;
+                    if (wrapper.pkg.Tax_Amount__c != null) {
+                        grandTotal += wrapper.pkg.Tax_Amount__c;
+                    }
+                }
+            }
+            return grandTotal;
+        }
+        private set; 
     }
 }
