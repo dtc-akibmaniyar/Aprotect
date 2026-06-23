@@ -255,31 +255,31 @@
                             <table style="width:100%; border-collapse:collapse;">
                                 <tr>
                                     <td style="font-weight:bold; font-size:9pt; color:#1B2A4A; padding-bottom:4px;">
-                                        {!Application__c.Customer_First_Name__c}&#160;{!Application__c.Customer_Last_Name__c}
+                                        {!customerFirstName}&#160;{!customerLastName}
                                     </td>
                                 </tr>
-                                <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(Application__c.Customer_Name__r.BillingStreet))}">
+                                <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(customerStreet))}">
                                     <tr>
-                                        <td class="field-value">{!Application__c.Customer_Name__r.BillingStreet}</td>
+                                        <td class="field-value">{!customerStreet}</td>
                                     </tr>
                                 </apex:outputPanel>
-                                <apex:outputPanel layout="none" rendered="{!OR(NOT(ISBLANK(Application__c.Customer_Name__r.BillingCity)), NOT(ISBLANK(Application__c.Customer_Name__r.BillingState)), NOT(ISBLANK(Application__c.Customer_Name__r.BillingPostalCode)))}">
+                                <apex:outputPanel layout="none" rendered="{!OR(NOT(ISBLANK(customerCity)), NOT(ISBLANK(customerState)), NOT(ISBLANK(customerPostalCode)))}">
                                     <tr>
                                         <td class="field-value">
-                                            {!Application__c.Customer_Name__r.BillingCity}
-                                            <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(Application__c.Customer_Name__r.BillingState))}">&#160;{!Application__c.Customer_Name__r.BillingState}</apex:outputPanel>
-                                            <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(Application__c.Customer_Name__r.BillingPostalCode))}">&#160;{!Application__c.Customer_Name__r.BillingPostalCode}</apex:outputPanel>
+                                            {!customerCity}
+                                            <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(customerState))}">&#160;{!customerState}</apex:outputPanel>
+                                            <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(customerPostalCode))}">&#160;{!customerPostalCode}</apex:outputPanel>
                                         </td>
                                     </tr>
                                 </apex:outputPanel>
-                                <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(Application__c.Customer_Name__r.Phone))}">
+                                <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(customerPhone))}">
                                     <tr>
-                                        <td class="field-value">Tel: {!Application__c.Customer_Name__r.Phone}</td>
+                                        <td class="field-value">Tel: {!customerPhone}</td>
                                     </tr>
                                 </apex:outputPanel>
-                                <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(Application__c.Customer_Name__r.PersonEmail))}">
+                                <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(customerEmail))}">
                                     <tr>
-                                        <td class="field-value">E-mail: {!Application__c.Customer_Name__r.PersonEmail}</td>
+                                        <td class="field-value">E-mail: {!customerEmail}</td>
                                     </tr>
                                 </apex:outputPanel>
                             </table>
@@ -297,61 +297,55 @@
                             <table style="width:100%; border-collapse:collapse;">
                                 <tr>
                                     <td colspan="2" style="font-weight:bold; font-size:9pt; color:#1B2A4A; padding-bottom:6px;">
-                                        {!Application__c.Vehicle_Year__c}&#160;{!Application__c.Vehicle_Make__c}&#160;{!Application__c.Vehicle_Model__c}&#160;{!Application__c.Vehicle__r.Trim__c}
+                                        {!vehicleYear}&#160;{!vehicleMake}&#160;{!vehicleModel}&#160;{!vehicleTrim}
                                     </td>
                                 </tr>
                                 <tr>
                                     <td class="field-label">VIN#:</td>
-                                    <td class="field-value">{!Application__c.Vehicle_VIN__c}</td>
+                                    <td class="field-value">{!vehicleVIN}</td>
                                 </tr>
                                 <tr>
                                     <td class="field-label">Odometer:</td>
                                     <td class="field-value">
-                                        <apex:outputText value="{0, number, ###,###}">
-                                            <apex:param value="{!Application__c.Odometer__c}"/>
-                                        </apex:outputText>&#160;{!Application__c.Vehicle__r.Odometer_Unit__c}
+                                        {!vehicleOdometer}&#160;{!vehicleOdometerUnit}
                                     </td>
                                 </tr>
                                 <tr>
                                     <td class="field-label">Purchase Price:</td>
                                     <td class="field-value">
-                                        <apex:outputText value="${0, number, ###,##0.00}">
-                                            <apex:param value="{!Application__c.Vehicle_Purchase_Price__c}"/>
-                                        </apex:outputText>
+                                        {!vehiclePurchasePrice}
                                     </td>
                                 </tr>
                                 <tr>
                                     <td class="field-label">Delivery Date:</td>
                                     <td class="field-value">
-                                        <apex:outputText value="{0, date, MM-dd-yyyy}">
-                                            <apex:param value="{!Application__c.Vehicle__r.Delivery_Date__c}"/>
-                                        </apex:outputText>
+                                        {!vehicleDeliveryDate}
                                     </td>
                                 </tr>
                                 <tr>
                                     <td class="field-label">Transmission:</td>
-                                    <td class="field-value">{!Application__c.Vehicle__r.Transmission__c}</td>
+                                    <td class="field-value">{!vehicleTransmission}</td>
                                 </tr>
                                 <tr>
                                     <td class="field-label">Fuel:</td>
-                                    <td class="field-value">{!Application__c.Vehicle__r.Fuel_Type__c}</td>
+                                    <td class="field-value">{!vehicleFuel}</td>
                                 </tr>
                                 <tr>
                                     <td class="field-label">Engine Size:</td>
-                                    <td class="field-value">{!Application__c.Vehicle__r.Engine__c}</td>
+                                    <td class="field-value">{!vehicleEngine}</td>
                                 </tr>
                                 <tr>
                                     <td class="field-label">Colour:</td>
-                                    <td class="field-value">{!Application__c.Vehicle__r.Color__c}</td>
+                                    <td class="field-value">{!vehicleColor}</td>
                                 </tr>
                                 <tr>
                                     <td class="field-label">Body Type:</td>
-                                    <td class="field-value">{!Application__c.Vehicle__r.Body_Style__c}</td>
+                                    <td class="field-value">{!vehicleBodyStyle}</td>
                                 </tr>
                                 <tr>
                                     <td class="field-label">Business/Commercial Use:</td>
                                     <td class="field-value">
-                                        <apex:outputText value="{!IF(Application__c.Vehicle__r.Business_Commercial_Use__c, 'Yes', 'No')}"/>
+                                        {!vehicleCommercial}
                                     </td>
                                 </tr>
                             </table>
@@ -376,7 +370,7 @@
                                 <table style="width:100%; border-collapse:collapse; border-bottom:1px solid #D0D0D0;">
                                     <tr>
                                         <td class="plan-header-td">
-                                            {!wrapper.pkg.Package__r.Name}
+                                            {!wrapper.packageName}
                                         </td>
                                     </tr>
                                     <tr>
@@ -387,7 +381,7 @@
                                                 </tr>
                                                 <tr>
                                                     <td class="plan-value">
-                                                        <apex:outputText value="{!IF(ISBLANK(wrapper.pkg.Package_Term__r.Name), 'N/A', wrapper.pkg.Package_Term__r.Name)}"/>
+                                                        {!wrapper.termName}
                                                     </td>
                                                 </tr>
                                                 <apex:outputPanel layout="none" rendered="{!wrapper.optionalOptions.size > 0}">

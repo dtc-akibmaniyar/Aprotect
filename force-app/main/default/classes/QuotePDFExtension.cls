@@ -17,6 +17,31 @@ public without sharing class QuotePDFExtension {
     public String  dealerWebsite   { get; set; }
     public String  dealerAddress   { get; set; }
 
+    // Vehicle/Customer display fields (populated via SOQL for PDF compatibility)
+    public String vehicleYear       { get; set; }
+    public String vehicleMake       { get; set; }
+    public String vehicleModel      { get; set; }
+    public String vehicleTrim       { get; set; }
+    public String vehicleVIN        { get; set; }
+    public String vehicleOdometer   { get; set; }
+    public String vehicleOdometerUnit { get; set; }
+    public String vehiclePurchasePrice { get; set; }
+    public String vehicleDeliveryDate { get; set; }
+    public String vehicleTransmission { get; set; }
+    public String vehicleFuel       { get; set; }
+    public String vehicleEngine     { get; set; }
+    public String vehicleColor      { get; set; }
+    public String vehicleBodyStyle  { get; set; }
+    public String vehicleCommercial { get; set; }
+    public String customerFirstName { get; set; }
+    public String customerLastName  { get; set; }
+    public String customerStreet    { get; set; }
+    public String customerCity      { get; set; }
+    public String customerState     { get; set; }
+    public String customerPostalCode { get; set; }
+    public String customerPhone     { get; set; }
+    public String customerEmail     { get; set; }
+
     // Logo whitelisting flag
     public Boolean showLogoOnPdf   { get; set; }
 
@@ -33,6 +58,8 @@ public without sharing class QuotePDFExtension {
 
     public class PackageWrapper {
         public Application_Package__c              pkg              { get; set; }
+        public String                              packageName      { get; set; }
+        public String                              termName         { get; set; }
         public List<Application_Package_Option__c> includedOptions  { get; set; }
         public List<Application_Package_Option__c> optionalOptions  { get; set; }
         public List<String>                        inclusionsList   { get; set; }
@@ -52,6 +79,25 @@ public without sharing class QuotePDFExtension {
     public List<PackageWrapper> packageWrappersList { get; private set; }
 
     public QuotePDFExtension(ApexPages.StandardController stdController) {
+        // Ensure all fields used in VF merge expressions are loaded
+        if (!Test.isRunningTest()) {
+            stdController.addFields(new List<String>{
+                'Customer_First_Name__c', 'Customer_Last_Name__c',
+                'Customer_Name__c',
+                'Customer_Name__r.BillingStreet', 'Customer_Name__r.BillingCity',
+                'Customer_Name__r.BillingState', 'Customer_Name__r.BillingPostalCode',
+                'Customer_Name__r.Phone', 'Customer_Name__r.PersonEmail',
+                'Vehicle_Year__c', 'Vehicle_Make__c', 'Vehicle_Model__c',
+                'Vehicle__r.Trim__c', 'Vehicle_VIN__c', 'Odometer__c',
+                'Vehicle__r.Odometer_Unit__c', 'Vehicle_Purchase_Price__c',
+                'Vehicle__r.Delivery_Date__c', 'Vehicle__r.Transmission__c',
+                'Vehicle__r.Fuel_Type__c', 'Vehicle__r.Engine__c',
+                'Vehicle__r.Color__c', 'Vehicle__r.Body_Style__c',
+                'Vehicle__r.Business_Commercial_Use__c',
+                'Dealer_Name__c', 'Dealer_Name__r.Name',
+                'Dealer_Name__r.DealerLogo__c', 'Dealer_Name__r.Show_Logo_On_PDF__c'
+            });
+        }
         this.application = (Application__c) stdController.getRecord();
 
         loadDealerBranding();
@@ -61,6 +107,8 @@ public without sharing class QuotePDFExtension {
 
         // Set Aprotect fallback branding flag
         useAprotectBranding = !hasDealerLogo || !showLogoOnPdf;
+
+        loadVehicleAndCustomerFields();
 
         packageOptions         = new Map<Id, List<Application_Package_Option__c>>();
         packageLogoUrls        = new Map<Id, String>();
@@ -80,6 +128,8 @@ public without sharing class QuotePDFExtension {
         for (Application_Package__c pkg : applicationPackages) {
             PackageWrapper wrapper  = new PackageWrapper();
             wrapper.pkg             = pkg;
+            wrapper.packageName     = pkg.Package__r != null ? pkg.Package__r.Name : '';
+            wrapper.termName        = pkg.Package_Term__r != null ? pkg.Package_Term__r.Name : 'N/A';
             wrapper.includedOptions = getIncludedOptionsImpl(pkg.Id);
             wrapper.optionalOptions = getOptionalOptionsImpl(pkg.Id);
             wrapper.packageLogoUrl  = packageLogoUrls.get(pkg.Id);
@@ -278,6 +328,60 @@ public without sharing class QuotePDFExtension {
     /**
      * @description Get ALL active packages — no record type filtering, no dedup
      */
+    private void loadVehicleAndCustomerFields() {
+        try {
+            Application__c fullApp = [
+                SELECT Customer_First_Name__c, Customer_Last_Name__c,
+                       Customer_Name__r.BillingStreet, Customer_Name__r.BillingCity,
+                       Customer_Name__r.BillingState, Customer_Name__r.BillingPostalCode,
+                       Customer_Name__r.Phone, Customer_Name__r.PersonEmail,
+                       Vehicle_Year__c, Vehicle_Make__c, Vehicle_Model__c,
+                       Vehicle__r.Trim__c, Vehicle_VIN__c, Odometer__c,
+                       Vehicle__r.Odometer_Unit__c, Vehicle_Purchase_Price__c,
+                       Vehicle__r.Delivery_Date__c, Vehicle__r.Transmission__c,
+                       Vehicle__r.Fuel_Type__c, Vehicle__r.Engine__c,
+                       Vehicle__r.Color__c, Vehicle__r.Body_Style__c,
+                       Vehicle__r.Business_Commercial_Use__c
+                FROM Application__c WHERE Id = :application.Id LIMIT 1
+            ];
+            customerFirstName = fullApp.Customer_First_Name__c != null ? fullApp.Customer_First_Name__c : '';
+            customerLastName = fullApp.Customer_Last_Name__c != null ? fullApp.Customer_Last_Name__c : '';
+            if (fullApp.Customer_Name__r != null) {
+                customerStreet = fullApp.Customer_Name__r.BillingStreet;
+                customerCity = fullApp.Customer_Name__r.BillingCity;
+                customerState = fullApp.Customer_Name__r.BillingState;
+                customerPostalCode = fullApp.Customer_Name__r.BillingPostalCode;
+                customerPhone = fullApp.Customer_Name__r.Phone;
+                customerEmail = fullApp.Customer_Name__r.PersonEmail;
+            }
+            vehicleYear = fullApp.Vehicle_Year__c != null ? fullApp.Vehicle_Year__c : '';
+            vehicleMake = fullApp.Vehicle_Make__c != null ? fullApp.Vehicle_Make__c : '';
+            vehicleModel = fullApp.Vehicle_Model__c != null ? fullApp.Vehicle_Model__c : '';
+            vehicleVIN = fullApp.Vehicle_VIN__c != null ? fullApp.Vehicle_VIN__c : '';
+            if (fullApp.Vehicle__r != null) {
+                vehicleTrim = fullApp.Vehicle__r.Trim__c;
+                vehicleOdometerUnit = fullApp.Vehicle__r.Odometer_Unit__c;
+                vehicleTransmission = fullApp.Vehicle__r.Transmission__c;
+                vehicleFuel = fullApp.Vehicle__r.Fuel_Type__c;
+                vehicleEngine = fullApp.Vehicle__r.Engine__c;
+                vehicleColor = fullApp.Vehicle__r.Color__c;
+                vehicleBodyStyle = fullApp.Vehicle__r.Body_Style__c;
+                vehicleCommercial = fullApp.Vehicle__r.Business_Commercial_Use__c ? 'Yes' : 'No';
+                if (fullApp.Vehicle__r.Delivery_Date__c != null) {
+                    vehicleDeliveryDate = fullApp.Vehicle__r.Delivery_Date__c.format();
+                }
+            }
+            if (fullApp.Odometer__c != null) {
+                vehicleOdometer = String.valueOf(fullApp.Odometer__c.intValue());
+            }
+            if (fullApp.Vehicle_Purchase_Price__c != null) {
+                vehiclePurchasePrice = '$' + fullApp.Vehicle_Purchase_Price__c.setScale(2).format();
+            }
+        } catch (Exception e) {
+            System.debug('Error loading vehicle/customer fields: ' + e.getMessage());
+        }
+    }
+
     private void getAllActivePackages() {
         try {
             applicationPackages = [
