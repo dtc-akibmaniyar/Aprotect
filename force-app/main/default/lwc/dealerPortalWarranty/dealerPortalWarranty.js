@@ -1439,7 +1439,7 @@ export default class DealerPortalWarranty extends LightningElement {
                     const cost = opt.netCost || opt.retailPrice || 0;
                     items.push({
                         id: opt.id,
-                        label: opt.optionName || 'Option',
+                        optionName: opt.optionName || 'Option',
                         formattedDealerPrice: '$' + cost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
                     });
                 });
@@ -1452,7 +1452,7 @@ export default class DealerPortalWarranty extends LightningElement {
                     const cost = opt.netCost || opt.retailPrice || 0;
                     items.push({
                         id: opt.id,
-                        label: opt.optionName || 'Option',
+                        optionName: opt.optionName || 'Option',
                         formattedDealerPrice: '$' + cost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
                     });
                 }

@@ -68,61 +68,115 @@
             <div class="slds-backdrop slds-backdrop_open"></div>
         </template>
 
-        <!-- Duplicate VIN Modal -->
+<!-- Duplicate VIN Modal — Enhanced -->
         <template if:true={showDuplicateVinModal}>
-            <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open slds-modal_medium">
-                <div class="slds-modal__container">
-                    <header class="slds-modal__header duplicate-modal-header">
-                        <lightning-button-icon 
-                            icon-name="utility:close" 
-                            onclick={closeDuplicateVinModal} 
-                            alternative-text="close" 
-                            variant="bare-inverse" 
-                            class="slds-modal__close">
-                        </lightning-button-icon>
-                        <h2 class="slds-text-heading_medium slds-hyphenate">
-                            <lightning-icon icon-name="utility:warning" size="small" variant="warning" class="slds-m-right_x-small"></lightning-icon>
-                            Duplicate VIN Detected
-                        </h2>
-                    </header>
-                    <div class="slds-modal__content slds-p-around_medium">
-                        <div class="duplicate-vin-warning">
-                            <p class="duplicate-warning-text">A record with the same VIN already exists. Please review the existing record(s) below before proceeding.</p>
-                        </div>
-                        <div class="duplicate-table-container">
-                            <table class="duplicate-table">
-                                <thead>
-                                    <tr>
-                                        <th>Type</th>
-                                        <th>Record #</th>
-                                        <th>VIN</th>
-                                        <th>Status</th>
-                                        <th>Customer Name</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <template for:each={duplicateVinRecords} for:item="dup">
-                                        <tr key={dup.recordId} data-id={dup.recordId} class={dup.rowClass} onclick={handleDuplicateRowSelect}>
-                                            <td>{dup.recordType}</td>
-                                            <td>{dup.recordName}</td>
-                                            <td>{dup.vin}</td>
-                                            <td><span class="status-badge">{dup.status}</span></td>
-                                            <td>{dup.customerName}</td>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-                        </div>
+            <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open vin-dup-modal">
+                <div class="slds-modal__container vin-dup-container">
+                    
+                    <!-- Close button -->
+                    <button type="button" class="vin-dup-close-btn" onclick={closeDuplicateVinModal} aria-label="Close">
+                        &#10005;
+                    </button>
+
+                    <div class="slds-modal__content vin-dup-content">
+                        
+                        <!-- ========== MAIN VIEW (3 option cards) ========== -->
+                        <template if:false={showDuplicateSubList}>
+                        
+                            <!-- Warning Icon -->
+                            <div class="vin-dup-icon-wrapper">
+                                <div class="vin-dup-warning-circle">
+                                    <span class="vin-dup-exclamation">!</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Title -->
+                            <h2 class="vin-dup-title">VIN Already Exists</h2>
+                            
+                            <!-- Description -->
+                            <p class="vin-dup-description">
+                                The VIN you entered is already associated with an existing vehicle record in the A-Protect system.
+                            </p>
+                            <p class="vin-dup-description vin-dup-description-bold">
+                                Please select one of the following options:
+                            </p>
+                            
+                            <!-- Option Cards -->
+                            <div class="vin-dup-options">
+                                
+                                <!-- Option 1: Open Existing Application -->
+                                <button type="button" class="vin-dup-option-card" onclick={handleOpenExistingRecord}>
+                                    <div class="vin-dup-option-icon-wrap">
+                                        <lightning-icon icon-name="utility:open" size="small" class="vin-dup-option-icon"></lightning-icon>
+                                    </div>
+                                    <div class="vin-dup-option-text">
+                                        <span class="vin-dup-option-title">Open Existing Application</span>
+                                        <span class="vin-dup-option-desc">View and continue working on the existing application associated with this VIN.</span>
+                                    </div>
+                                </button>
+                                
+                                <!-- Option 2: Start a New Application -->
+                                <button type="button" class="vin-dup-option-card" onclick={handleStartNewApplication}>
+                                    <div class="vin-dup-option-icon-wrap vin-dup-option-icon-green">
+                                        <lightning-icon icon-name="utility:add" size="small" class="vin-dup-option-icon"></lightning-icon>
+                                    </div>
+                                    <div class="vin-dup-option-text">
+                                        <span class="vin-dup-option-title">Start a New Application</span>
+                                        <span class="vin-dup-option-desc">Create a new application record. Vehicle information will be populated from the existing record.</span>
+                                    </div>
+                                </button>
+                                
+                                <!-- Option 3: Contact A-Protect Support -->
+                                <button type="button" class="vin-dup-option-card" onclick={handleContactSupport}>
+                                    <div class="vin-dup-option-icon-wrap vin-dup-option-icon-red">
+                                        <lightning-icon icon-name="utility:call" size="small" class="vin-dup-option-icon"></lightning-icon>
+                                    </div>
+                                    <div class="vin-dup-option-text">
+                                        <span class="vin-dup-option-title">Contact A-Protect Support</span>
+                                        <span class="vin-dup-option-desc">Get assistance when the VIN is associated with another dealership or requires review.</span>
+                                    </div>
+                                </button>
+                                
+                            </div>
+                        
+                        </template>
+
+                        <!-- ========== SUB-LIST VIEW (select which application to open) ========== -->
+                        <template if:true={showDuplicateSubList}>
+                        
+                            <!-- Back arrow + Title -->
+                            <div class="vin-dup-sublist-header">
+                                <button type="button" class="vin-dup-back-btn" onclick={handleBackToOptions} aria-label="Back">
+                                    <lightning-icon icon-name="utility:chevronleft" size="xx-small"></lightning-icon>
+                                </button>
+                                <h2 class="vin-dup-sublist-title">Select an Application</h2>
+                            </div>
+                            
+                            <p class="vin-dup-description" style="margin-bottom: 16px;">
+                                Multiple applications were found for this VIN. Select one to open:
+                            </p>
+                            
+                            <!-- Application list -->
+                            <div class="vin-dup-sublist">
+                                <template for:each={duplicateVinRecords} for:item="dup">
+                                    <button type="button" key={dup.recordId} class="vin-dup-sublist-row" data-id={dup.recordId} onclick={handleSelectAndOpenRecord}>
+                                        <div class="vin-dup-sublist-row-main">
+                                            <span class="vin-dup-sublist-app-number">{dup.recordName}</span>
+                                            <span class="vin-dup-sublist-badge">{dup.status}</span>
+                                        </div>
+                                        <div class="vin-dup-sublist-row-details">
+                                            <span class="vin-dup-sublist-detail">
+                                                <template if:true={dup.customerName}>{dup.customerName}</template>
+                                            </span>
+                                            <span class="vin-dup-sublist-detail vin-dup-sublist-type">{dup.recordType}</span>
+                                        </div>
+                                    </button>
+                                </template>
+                            </div>
+                        
+                        </template>
+                        
                     </div>
-                    <footer class="slds-modal__footer duplicate-modal-footer">
-                        <button type="button" class="duplicate-btn duplicate-btn-open" onclick={handleOpenExistingRecord} disabled={isOpenExistingDisabled}>
-                            <lightning-icon icon-name="utility:open" size="xx-small" class="slds-m-right_xx-small"></lightning-icon>
-                            Open Existing Record
-                        </button>
-                        <button type="button" class="duplicate-btn duplicate-btn-continue" onclick={handleContinueNewRecord}>
-                            Continue with New Record
-                        </button>
-                    </footer>
                 </div>
             </section>
             <div class="slds-backdrop slds-backdrop_open"></div>

@@ -559,71 +559,88 @@
                     <div class="slds-backdrop slds-backdrop_open"></div>
                 </template>
                 
-                <!-- Dealer Pricing Modal -->
+                <!-- Dealer Cost Summary Modal -->
                 <template if:true={showPriceModal}>
-                    <div class="price-breakdown-modal-overlay" onclick={hidePriceBreakdownModal}>
-                        <div class="price-breakdown-modal" onclick={stopPropagation}>
-                            <div class="modal-header">
-                                <h2 class="modal-title">Dealer Pricing</h2>
-                                <button class="modal-close-btn" onclick={hidePriceBreakdownModal}>✕</button>
+                    <div class="dcs-overlay" onclick={hidePriceBreakdownModal}>
+                        <div class="dcs-modal" onclick={stopPropagation}>
+
+                            <!-- Header -->
+                            <div class="dcs-header">
+                                <div class="dcs-header-text">
+                                    <h2 class="dcs-title">Dealer Cost Summary</h2>
+                                    <p class="dcs-subtitle">Review the selected coverage below.</p>
+                                </div>
+                                <button class="dcs-close-btn" onclick={hidePriceBreakdownModal} aria-label="Close">&#10005;</button>
                             </div>
-                            <div class="modal-body">
-                                <div class="pricing-section">
-                                    <!-- Package Header -->
-                                    <div class="pricing-package-header">
-                                        <span class="pricing-package-name">{selectedPlanName}</span>
-                                        <span class="pricing-package-term">{selectedTermName}</span>
+
+                            <!-- Body -->
+                            <div class="dcs-body">
+                                <div class="dcs-table">
+
+                                    <!-- Coverage Section -->
+                                    <div class="dcs-section-label">Coverage</div>
+                                    <div class="dcs-row">
+                                        <div class="dcs-row-left">
+                                            <span class="dcs-item-name">{selectedPlanName}</span>
+                                            <span class="dcs-item-detail">{selectedTermName}</span>
+                                        </div>
+                                        <span class="dcs-item-price">{formattedDealerPrice}</span>
                                     </div>
 
-                                    <!-- Dealer Price Row -->
-                                    <div class="pricing-line-item">
-                                        <span class="pricing-line-label">Dealer Price (Before Tax)</span>
-                                        <span class="pricing-line-value">{formattedDealerPrice}</span>
-                                    </div>
-
-                                    <!-- Premium Vehicle Fee Row -->
+                                    <!-- Fees Section (Premium Vehicle Fee) -->
                                     <template if:true={hasPremiumFee}>
-                                        <div class="pricing-line-item premium-fee-row">
-                                            <span class="pricing-line-label">Premium Vehicle Fee</span>
-                                            <span class="pricing-line-value">+{formattedPremiumFee}</span>
+                                        <div class="dcs-section-label">Fees</div>
+                                        <div class="dcs-row dcs-row-fee">
+                                            <div class="dcs-row-left">
+                                                <span class="dcs-item-name">Premium Vehicle Fee Charge</span>
+                                                <span class="dcs-item-badge">Auto-applied</span>
+                                            </div>
+                                            <div class="dcs-fee-price-wrap">
+                                                <span class="dcs-item-price">+{formattedPremiumFee}</span>
+                                                <span class="dcs-info-icon" tabindex="0">
+                                                    &#9432;
+                                                    <span class="dcs-info-tooltip">Additional charge will apply for the following makes: Acura, Alfa Romeo, Aston Martin, Audi, Bentley, BMW, Bugatti, Cadillac, DMC, Ferrari, Genesis, Infiniti, Jaguar, Lamborghini, Land Rover, Lexus, Lincoln, Lotus, Lucid, Maserati, McLaren, Mercedes, Polestar, Porsche, Rivian, Rolls Royce, Tesla, Volvo.<br/><strong>*List is subject to change without notice.</strong></span>
+                                                </span>
+                                            </div>
                                         </div>
                                     </template>
 
-                                    <!-- Additional Options -->
+                                    <!-- Optional Benefits Section -->
                                     <template if:true={hasSelectedAdditionalOptions}>
-                                        <div class="pricing-options-header">
-                                            <span class="pricing-line-label"><strong>Additional Options</strong></span>
-                                        </div>
+                                        <div class="dcs-section-label">Optional Benefits</div>
                                         <template for:each={selectedAdditionalOptionsList} for:item="option">
-                                            <div class="pricing-line-item" key={option.id}>
-                                                <span class="pricing-line-label">{option.optionName}</span>
-                                                <span class="pricing-line-value">{option.formattedDealerPrice}</span>
+                                            <div class="dcs-row" key={option.id}>
+                                                <div class="dcs-row-left">
+                                                    <span class="dcs-item-name">{option.optionName}</span>
+                                                </div>
+                                                <span class="dcs-item-price">{option.formattedDealerPrice}</span>
                                             </div>
                                         </template>
                                     </template>
 
-                                    <!-- Divider before tax -->
-                                    <div class="pricing-divider"></div>
-
                                     <!-- Tax Row -->
-                                    <div class="pricing-line-item">
-                                        <span class="pricing-line-label">Tax ({formattedTaxRate})</span>
-                                        <span class="pricing-line-value">+{formattedTotalTaxAmount}</span>
+                                    <div class="dcs-section-label">Tax</div>
+                                    <div class="dcs-row">
+                                        <div class="dcs-row-left">
+                                            <span class="dcs-item-name">Tax ({formattedTaxRate})</span>
+                                        </div>
+                                        <span class="dcs-item-price">+{formattedTotalTaxAmount}</span>
                                     </div>
 
-                                    <!-- Divider before total -->
-                                    <div class="pricing-divider pricing-divider-bold"></div>
+                                </div>
 
-                                    <!-- Total Row -->
-                                    <div class="pricing-line-item pricing-total-row">
-                                        <span class="pricing-line-label">Total</span>
-                                        <span class="pricing-line-value pricing-total-value">{formattedTotalWithTax}</span>
-                                    </div>
+                                <!-- Total -->
+                                <div class="dcs-total-bar">
+                                    <span class="dcs-total-label">Total Dealer Cost</span>
+                                    <span class="dcs-total-value">{formattedTotalWithTax}</span>
                                 </div>
                             </div>
-                            <div class="modal-footer">
-                                <button class="close-modal-btn" onclick={hidePriceBreakdownModal}>Close</button>
+
+                            <!-- Footer -->
+                            <div class="dcs-footer">
+                                <button class="dcs-proceed-btn" onclick={hidePriceBreakdownModal}>Proceed</button>
                             </div>
+
                         </div>
                     </div>
                 </template>

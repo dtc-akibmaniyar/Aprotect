@@ -38,6 +38,9 @@ export default class DealerPortalVehicle extends LightningElement {
     @track showDuplicateVinModal = false;
     @track duplicateVinRecords = [];
     @track selectedDuplicateId = '';
+    @track isCrossDealerVin = false;
+    @track existingVehicleData = null;
+    @track showDuplicateSubList = false;
     
     // Manufacturer warranty section toggle - start expanded to match image
     @track showManufacturerWarranty = true;
@@ -1298,7 +1301,7 @@ getCurrentData() {
     
     // Handle search button click - checks for duplicate VIN first, then decodes
     async handleSearch() {
-        const searchVin = this.vehicleData.vehicleIdentificationNumberVIN; // Use Search VIN field
+        const searchVin = this.vehicleData.vehicleIdentificationNumberVIN;
         
         if (!searchVin || searchVin.trim() === '') {
             this.showErrorMessage('Please enter a VIN to search');
@@ -1319,23 +1322,24 @@ getCurrentData() {
             
             if (dupResult && dupResult.hasDuplicates && dupResult.duplicates && dupResult.duplicates.length > 0) {
                 console.log('⚠️ Duplicate VIN found:', dupResult.duplicates);
+                
+                // Store cross-dealer flag and existing vehicle data
+                this.isCrossDealerVin = dupResult.isCrossDealer || false;
+                this.existingVehicleData = dupResult.existingVehicleData || null;
+                
                 this.duplicateVinRecords = dupResult.duplicates.map((dup, index) => ({
                     ...dup,
-                    index: index,
-                    isSelected: dupResult.duplicates.length === 1,
-                    rowClass: dupResult.duplicates.length === 1 ? 'duplicate-row selected' : 'duplicate-row'
+                    index: index
                 }));
-                if (dupResult.duplicates.length === 1) {
-                    this.selectedDuplicateId = dupResult.duplicates[0].recordId;
-                } else {
-                    this.selectedDuplicateId = '';
-                }
+                
+                // Always start on the main options view
+                this.showDuplicateSubList = false;
                 this.showDuplicateVinModal = true;
                 this.loading = false;
-                return; // Stop here — user must choose
+                return; // Stop here — user must choose. NO API call.
             }
             
-            // No duplicates — proceed with VIN decode
+            // No duplicates — proceed with VIN decode (API call)
             await this.proceedWithVinDecode(searchVin);
             
         } catch (error) {
@@ -1352,52 +1356,119 @@ getCurrentData() {
     }
 
     // Handle selecting a duplicate record row
-    handleDuplicateRowSelect(event) {
-        const recordId = event.currentTarget.dataset.id;
-        this.selectedDuplicateId = recordId;
-        this.duplicateVinRecords = this.duplicateVinRecords.map(dup => ({
-            ...dup,
-            isSelected: dup.recordId === recordId,
-            rowClass: dup.recordId === recordId ? 'duplicate-row selected' : 'duplicate-row'
-        }));
-    }
+
 
     // Handle "Open Existing Record" button in duplicate modal
     handleOpenExistingRecord() {
-        if (!this.selectedDuplicateId) {
-            this.showErrorMessage('Please select a record to open.');
-            return;
+        if (this.duplicateVinRecords.length === 1) {
+            // Single match — navigate directly
+            const record = this.duplicateVinRecords[0];
+            this.navigateToApplication(record.recordId, record.recordName);
+        } else {
+            // Multiple matches — show sub-list for user to pick
+            this.showDuplicateSubList = true;
         }
+    }
+
+    handleSelectAndOpenRecord(event) {
+        const recordId = event.currentTarget.dataset.id;
+        const record = this.duplicateVinRecords.find(dup => dup.recordId === recordId);
+        if (record) {
+            this.navigateToApplication(record.recordId, record.recordName);
+        }
+    }
+
+    navigateToApplication(recordId, recordName) {
         this.showDuplicateVinModal = false;
-        
-        // Find the selected record to get its record number (Name)
-        const selectedRecord = this.duplicateVinRecords.find(
-            dup => dup.recordId === this.selectedDuplicateId
-        );
-        const recordName = selectedRecord ? selectedRecord.recordName : '';
-        
-        // Navigate to the application record in the dealer portal
-        const url = `/dealerportal/s/application/${this.selectedDuplicateId}/${recordName}`;
+        this.showDuplicateSubList = false;
+        const url = `/dealerportal/s/application/${recordId}/${recordName || ''}`;
         window.location.href = url;
     }
 
+    handleBackToOptions() {
+        this.showDuplicateSubList = false;
+    }
+
     // Handle "Continue with New Record" button in duplicate modal
-    async handleContinueNewRecord() {
+    handleStartNewApplication() {
         this.showDuplicateVinModal = false;
+        this.showDuplicateSubList = false;
         this.loading = true;
-        const searchVin = this.vehicleData.vehicleIdentificationNumberVIN;
-        await this.proceedWithVinDecode(searchVin);
+
+        try {
+            if (this.existingVehicleData) {
+                console.log('📋 Populating vehicle data from existing record (no API call)');
+                
+                const existingData = this.existingVehicleData;
+                
+                // Populate the vehicle form fields from existing record data
+                this.vehicleData = {
+                    ...this.vehicleData,
+                    vin: existingData.vin || this.vehicleData.vehicleIdentificationNumberVIN,
+                    vehicleIdentificationNumberVIN: existingData.vehicleIdentificationNumberVIN || this.vehicleData.vehicleIdentificationNumberVIN,
+                    year: existingData.year || '',
+                    make: existingData.make || '',
+                    model: existingData.model || '',
+                    trim: existingData.trim || '',
+                    engine: existingData.engine || '',
+                    fuelType: existingData.fuelType || '',
+                    driveType: existingData.driveType || '',
+                    transmission: existingData.transmission || '',
+                    bodyStyle: existingData.bodyStyle || '',
+                    color: existingData.color || '',
+                    vehicleCategory: existingData.vehicleCategory || ''
+                };
+                
+                // Set vehicle category and powersports state
+                this.vehicleCategory = existingData.vehicleCategory || '';
+                this.isPowersports = (this.vehicleCategory === 'Powersports');
+                
+                // Mark that we have vehicle data (enables the form sections)
+                this.hasVehicleData = true;
+                this.vinDecoded = true;
+                
+                // Store for additional vehicle info modal
+                this.additionalVehicleData = existingData;
+                
+                this.loading = false;
+                
+                // Show success message
+                this.showSuccessMessage('Vehicle information populated from existing records. Please review and complete the remaining fields.');
+            } else {
+                // Fallback: if no existing data available, just enable manual entry
+                console.log('⚠️ No existing vehicle data available, enabling manual entry');
+                this.hasVehicleData = true;
+                this.vinDecoded = true;
+                this.loading = false;
+                this.showSuccessMessage('Please enter vehicle information manually.');
+            }
+        } catch (error) {
+            console.error('❌ Error populating vehicle data:', error);
+            this.loading = false;
+            this.showErrorMessage('Error populating vehicle data. Please enter information manually.');
+        }
     }
 
     // Close duplicate VIN modal
     closeDuplicateVinModal() {
         this.showDuplicateVinModal = false;
+        this.showDuplicateSubList = false;
+    }
+
+    handleContactSupport() {
+        this.showDuplicateVinModal = false;
+        this.showDuplicateSubList = false;
+        
+        // Show support contact information
+        this.showErrorMessage(
+            'This VIN is associated with a record from another dealership. ' +
+            'Please contact A-Protect Support to resolve this VIN duplication. ' +
+            'Email: support@a-protect.ca | Phone: 1-866-667-1965'
+        );
     }
 
     // Getter: is the "Open Existing Record" button disabled?
-    get isOpenExistingDisabled() {
-        return !this.selectedDuplicateId;
-    }
+
 
     // Proceed with VIN decode (Black Book integration)
     async proceedWithVinDecode(searchVin) {

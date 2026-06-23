@@ -397,6 +397,8 @@ public class DealerPackageTermDTO {
     @AuraEnabled public Decimal expiryTerm;
     @AuraEnabled public Decimal odometerKM;
     
+    @AuraEnabled public Decimal premiumModelFee; // Premium model fee from Package_Term__c
+
     public DealerPackageTermDTO() {}
 }
 
@@ -515,8 +517,11 @@ public class DealerPackagesResponse {
     @AuraEnabled public String message;
     @AuraEnabled public List<DealerPackageDTO> data;
     @AuraEnabled public Map<String, Object> debugInfo; // Debug information for troubleshooting
+    @AuraEnabled public Boolean isPremiumVehicle; // Whether vehicle qualifies for premium model fee
     
-    public DealerPackagesResponse() {}
+    public DealerPackagesResponse() {
+        this.isPremiumVehicle = false;
+    }
 }
 
 
@@ -1068,8 +1073,11 @@ DealerPackagesResponse response = new DealerPackagesResponse();
 
 List<Application__c> applications = [
             SELECT Id, Dealer_Name__c, Dealer_Name__r.Id, Dealer_Name__r.Name,
+                    Dealer_Name__r.Charge_Premium_Vehicle_Fee__c,
                     Vehicle__r.Year__c, Vehicle__r.Odometer__c, Vehicle__r.Odometer_Unit__c,
-                    Vehicle__r.Model_Lookup__c, Vehicle__r.Model_Lookup__r.Class__c
+                    Vehicle__r.Model_Lookup__c, Vehicle__r.Model_Lookup__r.Class__c,
+                    Vehicle__r.Make_Lookup__c, Vehicle__r.Make_Lookup__r.Premium_Model_Fee__c,
+                    Vehicle__r.Model_Lookup__r.Premium_Model_Fee__c
             FROM Application__c 
             WHERE Id = :applicationId
             LIMIT 1
@@ -1183,6 +1191,7 @@ dealerPackages = filteredPackages;
                     Additional_Options_Price__c, Discount_Type__c, Discount_Value__c,
                     Expiry_Term__c, Odometer_KM__c,
                     Package_Term__r.Allow_Deferral__c,
+                    Package_Term__r.Premium_Model_Fee__c,
                     Dealer_Package_Tier__c, Dealer_Package__c,
                     Dealer_Package_Tier__r.Id,
                     Dealer_Package_Tier__r.Name,
@@ -1368,6 +1377,7 @@ DealerPackageTierDTO tierDto = new DealerPackageTierDTO();
 for (Dealer_Package_Term__c term : tierTerms) {
 DealerPackageTermDTO termDto = new DealerPackageTermDTO();
                         termDto.Id = term.Id;
+                        termDto.premiumModelFee = term.Package_Term__r != null && term.Package_Term__r.Premium_Model_Fee__c != null ? term.Package_Term__r.Premium_Model_Fee__c : 0;
                         
 
                         termDto.originalPackageTermCost = term.Original_Package_Term_Cost__c != null ? term.Original_Package_Term_Cost__c : 0;
@@ -1497,10 +1507,29 @@ for (Integer i = 0; i < packageList.size(); i++) {
             }
         }
         
+        // Determine if vehicle qualifies for premium model fee
+        Boolean isPremiumVehicle = false;
+        if (application.Dealer_Name__r != null 
+            && application.Dealer_Name__r.Charge_Premium_Vehicle_Fee__c == true) {
+            // Check Make-level premium flag
+            if (application.Vehicle__r != null 
+                && application.Vehicle__r.Make_Lookup__r != null 
+                && application.Vehicle__r.Make_Lookup__r.Premium_Model_Fee__c == true) {
+                isPremiumVehicle = true;
+            }
+            // Check Model-level premium flag (can also trigger premium)
+            if (application.Vehicle__r != null 
+                && application.Vehicle__r.Model_Lookup__r != null 
+                && application.Vehicle__r.Model_Lookup__r.Premium_Model_Fee__c == true) {
+                isPremiumVehicle = true;
+            }
+        }
+
         DealerPackagesResponse response = new DealerPackagesResponse();
         response.success = true;
         response.message = responseMessage;
         response.data = packageList;
+        response.isPremiumVehicle = isPremiumVehicle;
         
 
         Map<String, Object> debugInfo = new Map<String, Object>();
@@ -6487,17 +6516,26 @@ public class MileageComparator implements Comparator<Dealer_Package_Term__c> {
 
 
     /**
-     * Check for duplicate VIN across existing Applications and Quotes.
-     * Called BEFORE the Black Book VIN decode to warn the dealer.
+     * Enhanced: Check for duplicate VIN across existing Applications.
+     * Called BEFORE the Black Book VIN decode to prevent unnecessary API calls.
+     * Now returns existing vehicle data for "Start New Application" path,
+     * and detects cross-dealer scenarios for "Contact Support" option.
+     * 
      * @param vin The VIN to check
      * @param currentApplicationId The current application ID to exclude from results
-     * @return Map with 'hasDuplicates' (Boolean) and 'duplicates' (List of Maps)
+     * @return Map with:
+     *   - hasDuplicates (Boolean)
+     *   - duplicates (List<Map>) — matching application records
+     *   - isCrossDealer (Boolean) — true if VIN belongs to a different dealer
+     *   - existingVehicleData (Map) — vehicle fields from existing record for reuse
      */
     @AuraEnabled
     public static Map<String, Object> checkDuplicateVIN(String vin, String currentApplicationId) {
         Map<String, Object> result = new Map<String, Object>();
         result.put('hasDuplicates', false);
         result.put('duplicates', new List<Map<String, Object>>());
+        result.put('isCrossDealer', false);
+        result.put('existingVehicleData', null);
 
         try {
             if (String.isBlank(vin)) {
@@ -6506,72 +6544,123 @@ public class MileageComparator implements Comparator<Dealer_Package_Term__c> {
 
             String trimmedVin = vin.trim();
 
-            // Query Application__c records that have a Vehicle with the same VIN
-            // Exclude the current application and look across all record types (Application + Quote)
-            List<Application__c> matchingApps = [
+            // Validate minimum VIN length to avoid false partial matches
+            if (trimmedVin.length() < 11) {
+                return result;
+            }
+
+            // Get the current portal user's dealer Account ID
+            Id currentDealerAccountId = null;
+            try {
+                User currentUser = [
+                    SELECT Contact.AccountId 
+                    FROM User 
+                    WHERE Id = :UserInfo.getUserId() 
+                    LIMIT 1
+                ];
+                if (currentUser.Contact != null) {
+                    currentDealerAccountId = currentUser.Contact.AccountId;
+                }
+            } catch (Exception e) {
+                System.debug('Could not determine current dealer: ' + e.getMessage());
+            }
+
+            // Single combined query — searches both VIN fields with OR
+            List<Application__c> allMatches = [
                 SELECT Id, Name, Application_Status__c, RecordType.Name,
                        Customer_First_Name__c, Customer_Last_Name__c, Customer_Name__c,
                        Customer_Name__r.Name,
+                       Dealer_Name__c, Dealer_Name__r.Name,
+                       Vehicle__c,
                        Vehicle__r.VIN__c, Vehicle__r.Vehicle_Identification_Number_VIN__c,
+                       Vehicle__r.Year__c, Vehicle__r.Make__c, Vehicle__r.Model__c,
+                       Vehicle__r.Trim__c, Vehicle__r.Engine__c, Vehicle__r.Fuel_Type__c,
+                       Vehicle__r.Drive_Type__c, Vehicle__r.Transmission__c,
+                       Vehicle__r.Body_Style__c, Vehicle__r.Color__c,
+                       Vehicle__r.Vehicle_Category__c, Vehicle__r.Make_Lookup__c,
+                       Vehicle__r.Model_Lookup__c, Vehicle__r.Body_Type__c,
+                       Vehicle__r.GVWR__c,
                        CreatedDate
                 FROM Application__c
-                WHERE Vehicle__r.VIN__c = :trimmedVin
+                WHERE (Vehicle__r.VIN__c = :trimmedVin 
+                       OR Vehicle__r.Vehicle_Identification_Number_VIN__c = :trimmedVin)
                 AND Id != :currentApplicationId
                 AND Application_Status__c != 'Cancelled'
                 ORDER BY CreatedDate DESC
                 LIMIT 20
             ];
-
-            // Also check by Vehicle_Identification_Number_VIN__c if different from VIN__c
-            List<Application__c> matchingApps2 = [
-                SELECT Id, Name, Application_Status__c, RecordType.Name,
-                       Customer_First_Name__c, Customer_Last_Name__c, Customer_Name__c,
-                       Customer_Name__r.Name,
-                       Vehicle__r.VIN__c, Vehicle__r.Vehicle_Identification_Number_VIN__c,
-                       CreatedDate
-                FROM Application__c
-                WHERE Vehicle__r.Vehicle_Identification_Number_VIN__c = :trimmedVin
-                AND Id != :currentApplicationId
-                AND Application_Status__c != 'Cancelled'
-                ORDER BY CreatedDate DESC
-                LIMIT 20
-            ];
-
-            // Merge results, avoiding duplicates by Id
-            Map<Id, Application__c> allMatches = new Map<Id, Application__c>();
-            for (Application__c app : matchingApps) {
-                allMatches.put(app.Id, app);
-            }
-            for (Application__c app : matchingApps2) {
-                allMatches.put(app.Id, app);
-            }
 
             if (!allMatches.isEmpty()) {
                 List<Map<String, Object>> duplicates = new List<Map<String, Object>>();
-                for (Application__c app : allMatches.values()) {
-                    Map<String, Object> dup = new Map<String, Object>();
-                    dup.put('recordId', app.Id);
-                    dup.put('recordName', app.Name);
-                    dup.put('recordType', app.RecordType != null ? app.RecordType.Name : 'Application');
-                    dup.put('status', app.Application_Status__c);
-                    // Use Account Name (Customer_Name__r.Name) instead of the lookup ID
-                    String custName = '';
-                    if (app.Customer_Name__r != null && String.isNotBlank(app.Customer_Name__r.Name)) {
-                        custName = app.Customer_Name__r.Name;
-                    } else {
-                        custName = ((String.isNotBlank(app.Customer_First_Name__c) ? app.Customer_First_Name__c : '') + ' ' +
-                                    (String.isNotBlank(app.Customer_Last_Name__c) ? app.Customer_Last_Name__c : '')).trim();
+                Boolean hasCrossDealer = false;
+                Application__c firstMatch = allMatches[0]; // Most recent match for vehicle data
+
+                for (Application__c app : allMatches) {
+                    try {
+                        Map<String, Object> dup = new Map<String, Object>();
+                        dup.put('recordId', app.Id);
+                        dup.put('recordName', app.Name);
+                        dup.put('recordType', app.RecordTypeId != null && app.RecordType != null ? app.RecordType.Name : 'Application');
+                        dup.put('status', app.Application_Status__c);
+
+                        // Customer name — Account Name → First+Last fallback
+                        String custName = '';
+                        if (app.Customer_Name__r != null && String.isNotBlank(app.Customer_Name__r.Name)) {
+                            custName = app.Customer_Name__r.Name;
+                        } else {
+                            custName = ((String.isNotBlank(app.Customer_First_Name__c) ? app.Customer_First_Name__c : '') + ' ' +
+                                        (String.isNotBlank(app.Customer_Last_Name__c) ? app.Customer_Last_Name__c : '')).trim();
+                        }
+                        dup.put('customerName', custName);
+
+                        // VIN value
+                        dup.put('vin', app.Vehicle__r != null 
+                            ? (String.isNotBlank(app.Vehicle__r.VIN__c) ? app.Vehicle__r.VIN__c : app.Vehicle__r.Vehicle_Identification_Number_VIN__c) 
+                            : trimmedVin);
+
+                        // Dealer name for display
+                        dup.put('dealerName', app.Dealer_Name__r != null ? app.Dealer_Name__r.Name : '');
+
+                        // Cross-dealer detection
+                        if (currentDealerAccountId != null && app.Dealer_Name__c != null 
+                            && app.Dealer_Name__c != currentDealerAccountId) {
+                            hasCrossDealer = true;
+                        }
+
+                        duplicates.add(dup);
+                    } catch (Exception e) {
+                        System.debug('Error processing duplicate record ' + app.Id + ': ' + e.getMessage());
                     }
-                    dup.put('customerName', custName);
-                    dup.put('vin', app.Vehicle__r != null ? (String.isNotBlank(app.Vehicle__r.VIN__c) ? app.Vehicle__r.VIN__c : app.Vehicle__r.Vehicle_Identification_Number_VIN__c) : trimmedVin);
-                    duplicates.add(dup);
                 }
+
                 result.put('hasDuplicates', true);
                 result.put('duplicates', duplicates);
+                result.put('isCrossDealer', hasCrossDealer);
+
+                // Build existing vehicle data from the most recent match
+                // This allows "Start New Application" to populate fields WITHOUT an API call
+                if (firstMatch.Vehicle__r != null) {
+                    Map<String, Object> vehicleData = new Map<String, Object>();
+                    vehicleData.put('vin', trimmedVin);
+                    vehicleData.put('vehicleIdentificationNumberVIN', trimmedVin);
+                    vehicleData.put('year', firstMatch.Vehicle__r.Year__c);
+                    vehicleData.put('make', firstMatch.Vehicle__r.Make__c);
+                    vehicleData.put('model', firstMatch.Vehicle__r.Model__c);
+                    vehicleData.put('trim', firstMatch.Vehicle__r.Trim__c);
+                    vehicleData.put('engine', firstMatch.Vehicle__r.Engine__c);
+                    vehicleData.put('fuelType', firstMatch.Vehicle__r.Fuel_Type__c);
+                    vehicleData.put('driveType', firstMatch.Vehicle__r.Drive_Type__c);
+                    vehicleData.put('transmission', firstMatch.Vehicle__r.Transmission__c);
+                    vehicleData.put('bodyStyle', firstMatch.Vehicle__r.Body_Style__c);
+                    vehicleData.put('color', firstMatch.Vehicle__r.Color__c);
+                    vehicleData.put('vehicleCategory', firstMatch.Vehicle__r.Vehicle_Category__c);
+                    vehicleData.put('bodyType', firstMatch.Vehicle__r.Body_Type__c);
+                    vehicleData.put('gvwr', firstMatch.Vehicle__r.GVWR__c);
+                    result.put('existingVehicleData', vehicleData);
+                }
             }
 
         } catch (Exception e) {
-            // On error, allow the flow to continue (don't block VIN decode)
             System.debug('Error checking duplicate VIN: ' + e.getMessage());
             result.put('hasDuplicates', false);
             result.put('error', e.getMessage());
