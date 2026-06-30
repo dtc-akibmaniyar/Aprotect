@@ -3236,21 +3236,44 @@ vehicle.Delivery_Date__c = null;
 
 
         if (String.isNotBlank(vehicle.Make__c)) {
-            List<Make__c> makeRecords = [SELECT Id, Class__c FROM Make__c WHERE Name = :vehicle.Make__c LIMIT 1];
+            List<Make__c> makeRecords = [SELECT Id, Class__c, Premium_Model_Fee__c FROM Make__c WHERE Name = :vehicle.Make__c LIMIT 1];
             if (makeRecords.isEmpty()) {
-                throw new CalloutException('We don\'t work with this type of manufacturer. Please contact support for assistance.');
+                // Auto-create the Make record when it doesn't exist
+                Make__c newMake = new Make__c();
+                newMake.Name = vehicle.Make__c;
+                
+                // Check if this make is premium using Custom Metadata Type
+                Boolean isPremiumMake = false;
+                List<Premium_Vehicle_Make__mdt> premiumMakes = [
+                    SELECT Make_Name__c FROM Premium_Vehicle_Make__mdt 
+                    WHERE Make_Name__c = :vehicle.Make__c LIMIT 1
+                ];
+                if (!premiumMakes.isEmpty()) {
+                    isPremiumMake = true;
+                    newMake.Premium_Model_Fee__c = true;
+                }
+                
+                try {
+                    insert newMake;
+                    // Re-query to get all fields after insert
+                    makeRecords = [SELECT Id, Class__c, Premium_Model_Fee__c FROM Make__c WHERE Id = :newMake.Id LIMIT 1];
+                } catch (Exception e) {
+                    throw new CalloutException('Failed to create make record: ' + e.getMessage());
+                }
             }
             vehicle.Make_Lookup__c = makeRecords[0].Id;
             
 
             if (String.isNotBlank(vehicle.Model__c)) {
-                List<Model__c> modelRecords = [SELECT Id FROM Model__c WHERE Name = :vehicle.Model__c LIMIT 1];
+                List<Model__c> modelRecords = [SELECT Id FROM Model__c WHERE Name = :vehicle.Model__c AND Make__c = :makeRecords[0].Id LIMIT 1];
                 if (modelRecords.isEmpty()) {
 
                     Model__c newModel = new Model__c();
                     newModel.Make__c = makeRecords[0].Id;
                     newModel.Name = vehicle.Model__c;
                     newModel.Class__c = makeRecords[0].Class__c;
+                    // Inherit premium status from the parent make
+                    newModel.Premium_Model_Fee__c = makeRecords[0].Premium_Model_Fee__c;
                     
                     try {
                         insert newModel;

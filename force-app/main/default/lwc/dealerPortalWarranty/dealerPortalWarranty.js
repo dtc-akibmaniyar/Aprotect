@@ -481,12 +481,10 @@ export default class DealerPortalWarranty extends LightningElement {
                 this.currentView = 'packageList';
                 this.selectedDealerPackageName = '';
 
-                if (this.savedDealerPackageId) {
-                    await this.selectDealerPackageById(this.savedDealerPackageId);
-                    if (this.savedWarrantyTermId) {
-                        await this.selectWarrantyTermById(this.savedWarrantyTermId);
-                    }
-                }
+                // Clear stale sessionStorage data — no active package in Salesforce
+                this.savedDealerPackageId = null;
+                this.savedWarrantyTermId = null;
+                this.selectedProgram = '';
             }
         } catch (error) {
         }
