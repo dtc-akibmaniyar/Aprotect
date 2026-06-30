@@ -31,6 +31,7 @@ public without sharing class InvoiceDetailViewController {
         // ── 1. Query Invoice + Application + Remittance Bill To ──────────────
         List<Invoice__c> invoices = [
             SELECT Id, Name, Status__c, CreatedDate,
+                   Total_Balance_Amount__c,
                    Remittance_Form__c,
                    Application__c,
                    Application__r.Name,
@@ -234,8 +235,9 @@ public without sharing class InvoiceDetailViewController {
             result.packages.add(pd);
         }
 
-        result.totalAmount  = grandTotal;
-        result.packageCount = result.packages.size();
+        result.totalAmount   = grandTotal;
+        result.balanceAmount = inv.Total_Balance_Amount__c != null ? inv.Total_Balance_Amount__c : 0;
+        result.packageCount  = result.packages.size();
         return result;
 
         } catch (AuraHandledException e) {
@@ -535,6 +537,7 @@ public without sharing class InvoiceDetailViewController {
         @AuraEnabled public String  odometerUnit;
         @AuraEnabled public List<PackageData> packages;
         @AuraEnabled public Decimal totalAmount;
+        @AuraEnabled public Decimal balanceAmount;
         @AuraEnabled public Integer packageCount;
     }
 

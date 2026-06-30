@@ -1479,6 +1479,11 @@ export default class DealerPortalWarranty extends LightningElement {
         }
         return '$0.00';
     }
+    get formattedDealerCostExclTax() {
+        const total = (this.modalTotalWithTax || 0) - (this.modalTaxAmount || 0);
+        return '$' + total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
 
     get hasPremiumFee() {
         return this.isPremiumVehicle && this.modalPremiumFee > 0;

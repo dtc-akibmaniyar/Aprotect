@@ -284,10 +284,11 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
             formattedOdometer: raw.odometer != null
                 ? parseFloat(raw.odometer).toFixed(2) + ' ' + (raw.odometerUnit || 'KM')
                 : null,
-            packages:     this.transformPackages(raw.packages || [], raw.hasPaymentInitiated === true),
-            hasPackages:  (raw.packages || []).length > 0,
-            packageCount: raw.packageCount || 0,
-            formattedTotal: this.formatCurrency(raw.totalAmount)
+            packages:        this.transformPackages(raw.packages || [], raw.hasPaymentInitiated === true),
+            hasPackages:     (raw.packages || []).length > 0,
+            packageCount:    raw.packageCount || 0,
+            formattedTotal:   this.formatCurrency(raw.totalAmount),
+            formattedBalance: this.formatCurrency(raw.balanceAmount != null ? raw.balanceAmount : raw.totalAmount)
         };
     }
 

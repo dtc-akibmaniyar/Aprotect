@@ -283,7 +283,11 @@ public without sharing class ApplicationSummaryController {
                 Co_Buyer__c, Co_Buyer__r.Name, Co_Buyer__r.Phone, Co_Buyer__r.PersonEmail,
                 Co_Buyer__r.BillingStreet, Co_Buyer__r.License_Number__c, Co_Buyer__r.BillingCity, Co_Buyer__r.BillingState,
                 Co_Buyer__r.BillingPostalCode, Co_Buyer__r.BillingCountry,
-                Company_Business__c, Dealer_Sales_ID_License__c,
+                Company_Business__c, Company_Business_Name__c, Business_No_License__c, 
+                Company_Province__c, Company_E_Mail_Address__c, Company_Contact_Name__c, 
+                Company_Business_Phone__c, Company_Business_ALT_Phone__c, Company_Business_Address__c, 
+                Company_Business_City__c, Company_Business_Postal_Code__c, Company_Business_Country__c,
+                Dealer_Sales_ID_License__c,
                 Vehicle__c, Vehicle__r.Year__c, Vehicle__r.Make__c, Vehicle__r.Model__c, Vehicle__r.VIN__c,
                 Vehicle__r.Odometer__c, Vehicle__r.Odometer_Unit__c, Vehicle__r.Vehicle_Purchase_Price__c, Vehicle__r.Purchase_Date__c,
                 Vehicle__r.Business_Commercial_Use__c, Vehicle__r.Type_Of_Commercial_Use__c, Vehicle__r.Engine__c, Vehicle__r.Transmission__c, Vehicle__r.Fuel_Type__c,
@@ -361,12 +365,44 @@ public without sharing class ApplicationSummaryController {
             
             // Populate Company/Business Information - with null checks
             data.company = new CompanyBusinessInfo();
-            if (String.isNotBlank(app.Company_Business__c)) {
-                data.company.companyName = app.Company_Business__c;
+            // Use Company_Business_Name__c (written by DealerPortalCustomerController.saveCustomerData)
+            // Fall back to legacy Company_Business__c if present
+            String companyNameVal = String.isNotBlank(app.Company_Business_Name__c) 
+                ? app.Company_Business_Name__c 
+                : app.Company_Business__c;
+            if (String.isNotBlank(companyNameVal)) {
+                data.company.companyName = companyNameVal;
             }
-            if (app.Co_Buyer__c != null && app.Co_Buyer__r != null) {
-                data.company.licenseNumber = app.Customer_Name__r.License_Number__c;
+            if (String.isNotBlank(app.Business_No_License__c)) {
+                data.company.licenseNumber = app.Business_No_License__c;
             }
+            if (String.isNotBlank(app.Company_Business_Phone__c)) {
+                data.company.phone = app.Company_Business_Phone__c;
+            }
+            if (String.isNotBlank(app.Company_E_Mail_Address__c)) {
+                data.company.email = app.Company_E_Mail_Address__c;
+            }
+            if (String.isNotBlank(app.Company_Business_Address__c)) {
+                data.company.street = app.Company_Business_Address__c;
+            }
+            if (String.isNotBlank(app.Company_Business_City__c)) {
+                data.company.city = app.Company_Business_City__c;
+            }
+            if (String.isNotBlank(app.Company_Province__c)) {
+                data.company.state = app.Company_Province__c;
+            }
+            if (String.isNotBlank(app.Company_Business_Postal_Code__c)) {
+                data.company.postalCode = app.Company_Business_Postal_Code__c;
+            }
+            if (String.isNotBlank(app.Company_Business_Country__c)) {
+                data.company.country = app.Company_Business_Country__c;
+            }
+            data.company.formattedAddress = formatAddress(
+                app.Company_Business_City__c,
+                app.Company_Province__c,
+                app.Company_Business_Postal_Code__c,
+                app.Company_Business_Country__c
+            );
             
             // Populate Dealership Information
             data.dealershipInfo = new DealershipInformation();

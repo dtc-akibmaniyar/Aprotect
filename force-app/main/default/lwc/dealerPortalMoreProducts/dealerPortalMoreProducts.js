@@ -145,6 +145,10 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     }
 
     get formattedSelectedPrice() {
+        // Show the custom pre-tax price the user entered (not tax-inclusive)
+        if (this.isPriceOverridden && this._overridePreTaxPrice != null) {
+            return '$' + Number(this._overridePreTaxPrice).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
         if (this.selectedWarrantyTerm) {
             const price = this.selectedWarrantyTerm.totalPrice || this.selectedWarrantyTerm.netCost || 0;
             return '$' + Number(price).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -1023,6 +1027,11 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     get formattedTotalWithTax() {
         return this.formatPrice(this.modalTotalWithTax || 0);
     }
+    get formattedDealerCostExclTax() {
+        const total = (this.modalTotalWithTax || 0) - (this.modalTaxAmount || 0);
+        return '$' + total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
 
     // --- End Dealer Pricing Modal Getters ---
 
@@ -2399,6 +2408,10 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     
     async handleSaveAsQuote() {
         console.log('💾 Save as Quote - More Products tab');
+        // ✅ FIX: Commit any in-progress custom price override before saving.
+        if (this.isPriceEditMode) {
+            this._applyPriceOverride();
+        }
         
         // Check if applicationId is missing
         if (!this.applicationId) {
@@ -2560,6 +2573,14 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         if (this.showNoPackageDisclaimer) {
             this.handleSkip();
             return;
+        }
+        // ✅ FIX: Commit any in-progress custom price override before saving.
+        // If the user typed a custom price and clicked Continue without tabbing away,
+        // onblur fires AFTER onclick in LWC. Calling _applyPriceOverride() here
+        // ensures isPriceOverridden and _overridePreTaxPrice are set before
+        // finalData is constructed below.
+        if (this.isPriceEditMode) {
+            this._applyPriceOverride();
         }
         console.log('🔍 ===== MORE PRODUCTS handleContinue CALLED =====');
         console.log('🔍 Call stack:', new Error().stack);
