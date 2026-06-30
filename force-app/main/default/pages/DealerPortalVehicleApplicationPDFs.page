@@ -1,373 +1,510 @@
-<apex:page standardController="Application__c" extensions="ApplicationPDFExtension" renderAs="pdf" applyBodyTag="false" showHeader="false">
+<apex:page standardController="Application__c" extensions="ApplicationPDFExtension" renderAs="pdf" applyBodyTag="false" applyHtmlTag="false" showHeader="false">
+<html>
+<head>
+<style type="text/css">
 
-    <head>
-        <style type="text/css" media="print">
-            @page {
-                size: letter;
-                margin: 0.35in 0.4in 0.55in 0.4in;
+    @page {
+        size: letter;
+        margin: 0.35in 0.4in 0.55in 0.4in;
 
-                @bottom-center {
-                    content: element(footer);
-                }
-            }
-
-            div.footer {
-                display: block;
-                padding: 3px 0;
-                position: running(footer);
-                font-size: 7.5pt;
-                text-align: center;
-                color: #333;
-                font-family: Arial, Helvetica, sans-serif;
-                border-top: 1px solid #999;
-            }
-
-            .pagenumber:before {
-                content: counter(page);
-            }
-
-            .pagecount:before {
-                content: counter(pages);
-            }
-        </style>
-    </head>
-
-    <style type="text/css">
-        body, table, td, th, div, span, p {
-            font-family: Arial, Helvetica, sans-serif;
+        @bottom-center {
+            content: element(footer);
         }
-        body {
-            margin: 0;
-            padding: 0;
-            color: #000;
-            font-size: 9pt;
-            line-height: 1.35;
-        }
-        .page-break { page-break-after: always; }
+    }
 
-        /* Section header bar - dark navy */
-        .section-header {
-            background: #1a1a2e;
-            color: white;
-            padding: 5px 10px;
-            font-weight: bold;
-            font-size: 8pt;
-            margin-top: 10px;
-            margin-bottom: 0;
-            letter-spacing: 0.5px;
-        }
+    div.footer {
+        display: block;
+        padding: 3px 0;
+        position: running(footer);
+        font-size: 7.5pt;
+        text-align: center;
+        color: #333;
+        font-family: Arial, Helvetica, sans-serif;
+        border-top: 1px solid #999;
+    }
 
-        /* Sub-header blue label */
-        .sub-label {
-            font-weight: bold;
-            color: #4472C4;
-            font-size: 7.5pt;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            margin-bottom: 2px;
-        }
+    .pagenumber:before { content: counter(page); }
+    .pagecount:before  { content: counter(pages); }
 
-        /* Terms and Conditions styles */
-        .tc-body {
-            font-size: 9pt;
-            line-height: 1.5;
-            text-align: justify;
-            color: #222;
-        }
-        .tc-body p { margin: 5px 0; }
-        .tc-body h1, .tc-body h2, .tc-body h3 {
-            font-size: 10pt;
-            margin: 10px 0 5px 0;
-            font-weight: bold;
-            color: #000;
-        }
-        .tc-body ol, .tc-body ul { margin: 5px 0; padding-left: 18px; }
-        .tc-body li { margin: 2px 0; }
-    </style>
+    body, table, td, th, span, p {
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    body {
+        margin: 0;
+        padding: 0;
+        color: #000;
+        font-size: 9pt;
+        line-height: 1.35;
+    }
 
-    <!-- FOOTER -->
-    <div class="footer">
-        <div style="font-weight:bold;">A-Protect Warranty Corporation</div>
-        <div>8800 Dufferin St. Suite 302B Concord, ON L4K 1Z8 | Toll Free: 1-866-660-6444 | Tel: 416-661-6444 | www.a-protectwarranty.com</div>
-    </div>
+    .page-break { page-break-after: always; }
 
-    <div>
-        <apex:repeat value="{!recordTypeWrappersList}" var="recordTypeWrapper">
-            <apex:repeat value="{!recordTypeWrapper.packages}" var="wrapper">
+    /* Section header - background MUST be on td in Flying Saucer */
+    .section-header-td {
+        background-color: #1a1a2e;
+        color: #ffffff;
+        padding: 5px 10px;
+        font-weight: bold;
+        font-size: 8pt;
+    }
 
-                <!-- ======================== PAGE: APPLICATION FORM ======================== -->
+    /* Sub-label blue heading */
+    .sub-label-td {
+        font-weight: bold;
+        color: #4472C4;
+        font-size: 7.5pt;
+        padding: 0 0 3px 0;
+    }
 
-                <!-- HEADER -->
-                <table style="width:100%; border-collapse:collapse; margin-bottom:0;">
-                    <tr>
-                        <!-- Title Left -->
-                        <td style="width:70%; vertical-align:top; padding:0;">
-                            <apex:outputPanel rendered="{!wrapper.isTireRim}">
-                                <div style="font-size:19pt; font-weight:bold; color:#1a1a2e; line-height:1.15;">Tire &amp; Rim Warranty Application</div>
-                            </apex:outputPanel>
-                            <apex:outputPanel rendered="{!NOT(wrapper.isTireRim)}">
-                                <div style="font-size:19pt; font-weight:bold; color:#1a1a2e; line-height:1.15;">Extended Limited Warranty Application</div>
-                            </apex:outputPanel>
-                            <div style="font-size:14pt; color:#555; margin-top:1px;">Vehicle Service Contract</div>
-                        </td>
-                        <!-- Application # Right -->
-                        <td style="width:30%; text-align:right; vertical-align:top; padding:0;">
-                            <div style="font-size:12pt; color:#666;">Application #</div>
-                            <div style="font-size:18pt; font-weight:bold; color:#1a1a2e;">{!Application__c.Name}</div>
-                        </td>
-                    </tr>
-                </table>
+    /* Info cell shared style */
+    .info-cell {
+        padding: 5px 8px;
+        vertical-align: top;
+        font-size: 9pt;
+        border-right: 1px solid #ddd;
+    }
+    .info-cell-last {
+        padding: 5px 8px;
+        vertical-align: top;
+        font-size: 9pt;
+    }
 
-                <!-- ===== SECTION 1: CUSTOMER INFORMATION ===== -->
-                <div class="section-header">SECTION 1: CUSTOMER INFORMATION</div>
-                <table style="width:100%; border-collapse:collapse; border:1px solid #ccc; border-top:none;">
-                    <tr>
-                        <!-- Primary Owner -->
-                        <td style="width:33%; padding:5px 8px; vertical-align:top; font-size:9pt; border-right:1px solid #ddd;">
-                            <div style="font-weight:bold; font-size:9pt;">{!Application__c.Customer_First_Name__c} {!Application__c.Customer_Last_Name__c}</div>
-                            <div>{!Application__c.Customer_Address__c}</div>
-                            <div>Tel: {!Application__c.Customer_Phone__c}</div>
-                            <div>E-mail: {!Application__c.Customer_Email__c}</div>
-                        </td>
-                        <!-- Co-Buyer -->
-                        <td style="width:33%; padding:5px 8px; vertical-align:top; font-size:9pt; border-right:1px solid #ddd;">
-                            <div style="font-weight:bold; font-size:9pt;">{!Application__c.Co_Buyer__r.Name}</div>
-                            <div>{!Application__c.Co_Buyer__r.BillingStreet}</div>
-                            <div>Tel: {!Application__c.Co_Buyer__r.Phone}</div>
-                            <div>E-mail: {!Application__c.Co_Buyer__r.PersonEmail}</div>
-                        </td>
-                        <!-- Company/Business -->
-                        <td style="width:34%; padding:5px 8px; vertical-align:top; font-size:9pt;">
-                            <div style="font-weight:bold; font-size:9pt;">{!Application__c.Customer_Name__r.Name}</div>
-                            <div>{!Application__c.Customer_Name__r.BillingStreet} {!Application__c.Customer_Name__r.BillingCity} {!Application__c.Customer_Name__r.BillingState} {!Application__c.Customer_Name__r.BillingPostalCode}</div>
-                            <div>Contact Name: {!Application__c.Customer_First_Name__c}</div>
-                            <div>Tel: {!Application__c.Customer_Phone__c}</div>
-                            <div>E-mail: {!Application__c.Customer_Email__c}</div>
-                        </td>
-                    </tr>
-                </table>
+    /* Plan info label column */
+    .plan-label-td {
+        font-weight: bold;
+        font-size: 8pt;
+        padding: 1px 8px 1px 0;
+        vertical-align: top;
+        width: 38%;
+    }
+    .plan-value-td {
+        font-size: 8pt;
+        padding: 1px 0;
+        vertical-align: top;
+    }
 
-                <!-- ===== SECTION 2: VEHICLE INFORMATION ===== -->
-                <div class="section-header">SECTION 2: VEHICLE INFORMATION</div>
-                <table style="width:100%; border-collapse:collapse; border:1px solid #ccc; border-top:none;">
-                    <tr>
-                        <!-- Vehicle Details (left column ~33%) -->
-                        <td style="width:33%; padding:5px 8px; vertical-align:top; font-size:9pt; border-right:1px solid #ddd;">
-                            <div style="font-weight:bold; font-size:9pt; margin-bottom:2px;">{!Application__c.Vehicle_Year__c} {!Application__c.Vehicle_Make__c} {!Application__c.Vehicle_Model__c}</div>
-                            <div>VIN#: {!Application__c.Vehicle_VIN__c}</div>
-                            <div>Odometer: <apex:outputText value="{0,number,###,###}">
-                                <apex:param value="{!Application__c.Odometer__c}" />
-                            </apex:outputText> {!Application__c.Odometer_Unit__c}</div>
-                            <div>Purchase Price: $<apex:outputText value="{0,number,###,##0.00}">
-                                <apex:param value="{!Application__c.Vehicle_Purchase_Price__c}" />
-                            </apex:outputText></div>
-                            <div>Delivery Date: <apex:outputText value="{0,date,MM-dd-yyyy}">
-                                <apex:param value="{!Application__c.Vehicle__r.Delivery_Date__c}" />
-                            </apex:outputText></div>
-                            <div style="height:8px;"></div>
-                            <div>Transmission: {!Application__c.Vehicle__r.Transmission__c}</div>
-                            <div>Fuel: {!Application__c.Vehicle__r.Fuel_Type__c}</div>
-                            <div>Engine Size: {!Application__c.Vehicle__r.Engine__c}</div>
-                            <div>Colour: {!Application__c.Vehicle__r.Color__c}</div>
-                            <div>Body Type: {!Application__c.Vehicle__r.Body_Type__c}</div>
-                            <div>Business/Commercial Use: {!Application__c.Vehicle__r.Business_Commercial_Use__c}</div>
-                        </td>
+    /* Terms and Conditions */
+    .tc-body {
+        font-size: 9pt;
+        line-height: 1.5;
+        text-align: justify;
+        color: #222;
+    }
+    .tc-body p  { margin: 5px 0; }
+    .tc-body h1,
+    .tc-body h2,
+    .tc-body h3 { font-size: 10pt; margin: 10px 0 5px 0; font-weight: bold; color: #000; }
+    .tc-body ol,
+    .tc-body ul { margin: 5px 0; padding-left: 18px; }
+    .tc-body li { margin: 2px 0; }
 
-                        <!-- Middle column (~33%): Manufacturer Warranty OR Tire Details -->
-                        <td style="width:33%; padding:5px 8px; vertical-align:top; font-size:9pt; border-right:1px solid #ddd;">
-                            <apex:outputPanel rendered="{!NOT(wrapper.isTireRim)}">
-                                <div class="sub-label">Manufacturer Warranty:</div>
-                                <div style="height:4px;"></div>
-                                <div>Type: {!Application__c.Vehicle__r.Manufacturer_Warranty_Type__c}</div>
-                                <div>Term: {!Application__c.Vehicle__r.Warranty_Term__c}</div>
-                                <div>In-Service Date: <apex:outputText value="{0,date,MM-dd-yyyy}">
-                                    <apex:param value="{!Application__c.Vehicle__r.In_Service_Date__c}" />
-                                </apex:outputText></div>
-                                <div style="height:16px;"></div>
-                                <div class="sub-label">Dealer Notes:</div>
-                            </apex:outputPanel>
-                            <apex:outputPanel rendered="{!wrapper.isTireRim}">
-                                <div class="sub-label">Tire Details</div>
-                                <div style="height:4px;"></div>
-                                <div>Tire Brand: {!wrapper.pkg.Tire_Brand__c}</div>
-                                <div>Tire Type: {!wrapper.pkg.Tire_Type__c}</div>
-                                <div>Tread Depth: {!wrapper.pkg.Tread_Depth__c} {!wrapper.pkg.Tread_Depth_Unit__c}</div>
-                                <div>Rim Brand: {!wrapper.pkg.Rim_Brand__c}</div>
-                                <div>Rim Type: {!wrapper.pkg.Rim_Type__c}</div>
-                                <div>Rim Size: {!wrapper.pkg.Rim_Size__c} {!wrapper.pkg.Rim_Size_Unit__c}</div>
-                                <div style="height:10px;"></div>
-                                <div class="sub-label">Dealer Notes:</div>
-                            </apex:outputPanel>
-                        </td>
+    /* Important notice box - background on td */
+    .notice-td {
+        font-size: 8pt;
+        font-weight: bold;
+        text-align: justify;
+        line-height: 1.4;
+        padding: 6px 8px;
+        background-color: #f5f5f5;
+        border: 1px solid #ddd;
+    }
 
-                        <!-- Right column (~34%): Dealership + Lender -->
-                        <td style="width:34%; padding:5px 8px; vertical-align:top; font-size:9pt;">
-                            <div class="sub-label">Dealership Information</div>
-                            <div style="height:4px;"></div>
-                            <div style="font-weight:bold;">{!Application__c.Dealer_Name__r.Name}</div>
-                            <div>{!Application__c.Dealer_Name__r.BillingStreet} {!Application__c.Dealer_Name__r.BillingCity} {!Application__c.Dealer_Name__r.BillingState} {!Application__c.Dealer_Name__r.BillingPostalCode}</div>
-                            <div>Tel: {!Application__c.Dealer_Phone__c}</div>
+    /* Signature table header cells */
+    .sig-header-td {
+        background-color: #d0d0d0;
+        padding: 5px 6px;
+        font-weight: bold;
+        font-size: 8pt;
+        border: 1px solid #999;
+    }
+    .sig-value-td {
+        border: 1px solid #999;
+        padding: 5px 6px;
+        height: 24px;
+    }
 
-                            <div style="height:12px;"></div>
-                            <div class="sub-label">Lender Information</div>
-                            <div style="height:4px;"></div>
-                            <div style="font-weight:bold;">{!Application__c.Financial_Institution_Lender__c}</div>
-                            <div>{!Application__c.Lender_Address__c}</div>
-                            <div>Tel: </div>
-                        </td>
-                    </tr>
-                </table>
+    .blue-section-header-td{
+        background-color: #244f74;
+        color: #ffffff;
+        padding: 5px 10px;
+        font-weight: bold;
+        font-size: 8pt;
+    }
 
-                <!-- ===== SECTION 3: SERVICE PLAN SELECTIONS ===== -->
-                <div class="section-header">SECTION 3: SERVICE PLAN SELECTIONS</div>
-                <table style="width:100%; border-collapse:collapse; border:1px solid #ccc; border-top:none;">
-                    <tr>
-                        <!-- Package Logo area (left ~25%) -->
-                        <td style="width:25%; padding:8px; vertical-align:middle; text-align:center;">
-                            <apex:outputPanel rendered="{!wrapper.hasPackageLogo}">
-                                <img src="{!wrapper.packageLogoUrl}" width="100" />
-                            </apex:outputPanel>
-                        </td>
+    .black-section-header-td{
+        background-color: #1a1a2e;
+        color: #ffffff;
+        padding: 5px 10px;
+        font-weight: bold;
+        font-size: 8pt;
+    }
 
-                        <!-- Plan Information (center ~75%) -->
-                        <td style="width:75%; padding:6px 8px; vertical-align:top;">
-                            <div style="font-weight:bold; font-size:7pt; color:#1a1a2e; margin-bottom:4px; letter-spacing:0.3px;">PLAN INFORMATION</div>
-                            <table style="border-collapse:collapse; width:100%;">
-                                <tr>
-                                    <td style="font-weight:bold; font-size:8pt; padding:1px 6px 1px 0; white-space:nowrap; vertical-align:top;">Plan Name:</td>
-                                    <td style="font-size:9pt; padding:1px 0; vertical-align:top;">{!wrapper.pkg.Package__r.Name}</td>
-                                </tr>
-                                <tr>
-                                    <td style="font-weight:bold; font-size:8pt; padding:1px 6px 1px 0; white-space:nowrap; vertical-align:top;">Term:</td>
-                                    <td style="font-size:8pt; padding:1px 0; vertical-align:top;">{!wrapper.pkg.Package_Term__r.Name}</td>
-                                </tr>
-                                <tr>
-                                    <td style="font-weight:bold; font-size:8pt; padding:1px 6px 1px 0; white-space:nowrap; vertical-align:top;">Start Date/Odometer:</td>
-                                    <td style="font-size:8pt; padding:1px 0; vertical-align:top;">{!wrapper.contractStartDate}/{!wrapper.pkg.Odometer_Start__c} {!wrapper.pkg.Odometer_Start_Unit__c}</td>
-                                </tr>
-                                <tr>
-                                    <td style="font-weight:bold; font-size:8pt; padding:1px 6px 1px 0; white-space:nowrap; vertical-align:top;">Expiry Date/Odometer:</td>
-                                    <td style="font-size:8pt; padding:1px 0; vertical-align:top;">{!wrapper.contractEndDate}/{!wrapper.pkg.Odometer_End__c} {!wrapper.pkg.Odometer_End_Unit__c}</td>
-                                </tr>
-                                <tr>
-                                    <td style="font-weight:bold; font-size:8pt; padding:1px 6px 1px 0; white-space:nowrap; vertical-align:top;">Additional Options:</td>
-                                    <td style="font-size:8pt; padding:1px 0; vertical-align:top;">
-                                        <apex:repeat value="{!wrapper.includedOptions}" var="option">
-                                            <apex:outputText value="{!option.Option__c}, " />
-                                        </apex:repeat>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="text-align:right; padding:3px 8px 5px 0; border-top:1px solid #eee;">
-                            <span style="font-size:6pt;">Warranty Cost: $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!wrapper.pkg.Contract_Premium_Price_Without_Tax__c}" /></apex:outputText></span>
-                            <span style="font-size:6pt; margin-left:8px;">Tax ({!wrapper.pkg.Tax_Percentage__c}%): $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!wrapper.pkg.Tax_Amount__c}" /></apex:outputText></span>
-                            <span style="font-size:6pt; margin-left:8px;">Total: $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!wrapper.pkg.Contract_Premium_Price__c}" /></apex:outputText></span>
-                        </td>
-                    </tr>
-                </table>
+</style>
+</head>
+<body>
 
-                <!-- ===== SECTION 4: CUSTOMER ACKNOWLEDGEMENT ===== -->
-                <div class="section-header">SECTION 4: CUSTOMER ACKNOWLEDGEMENT</div>
-                <div style="border:1px solid #ccc; border-top:none; padding:8px 10px;">
-                    <!-- Legal text -->
-                    <div style="font-size:8pt; line-height:1.4; text-align:justify; color:#222;">
-                        I acknowledge that I have received, read, reviewed, and understood this A-Protect Vehicle Service Agreement (&quot;Agreement&quot;), including all terms, conditions, coverage provisions, exclusions, limitations, cancellation provisions, transfer provisions, claim procedures, and any applicable aggregate claim limits. I certify that all information provided on this Application and Registration Page is true, complete, and accurate to the best of my knowledge and understand that this Agreement has been issued based upon the information provided during the application and registration process. I understand that prior authorization from A-Protect Warranty Corporation is required before any covered repairs are commenced and that failure to obtain such authorization may result in denial of coverage. I further understand that any mechanical failure, loss, or damage resulting from a pre-existing condition is not covered under this Agreement. I acknowledge that this Application and Registration Page, together with the Terms and Conditions of this Agreement, constitute the entire agreement between myself and A-Protect Warranty Corporation and that no oral statements, promises, representations, or assurances made by any dealer, salesperson, agent, or representative shall modify, expand, or alter the coverage provided under this Agreement. I understand that the purchase of this Agreement is optional and is not required as a condition of purchasing, leasing, financing, or obtaining credit for the covered vehicle, and that neither the extension of credit, the terms of credit, nor the terms of the vehicle sale or lease are conditioned upon the purchase of this Agreement. I further acknowledge that this Agreement is a Vehicle Service Agreement and not an insurance contract, automobile liability insurance policy, or physical damage insurance policy, and that all benefits, authorizations, approvals, reimbursements, and payments are administered solely in accordance with the terms, conditions, limitations, and exclusions contained herein.
-                    </div>
+<!-- ===== RUNNING FOOTER ===== -->
+<div class="footer">
+    <div style="font-weight:bold;">A-Protect Warranty Corporation</div>
+    <div>8800 Dufferin St. Suite 302B Concord, ON L4K 1Z8&#160;|&#160;Toll Free: 1-866-660-6444&#160;|&#160;Tel: 416-661-6444&#160;|&#160;www.a-protectwarranty.com</div>
+</div>
 
-                    <div style="height:10px;"></div>
+<apex:repeat value="{!recordTypeWrappersList}" var="recordTypeWrapper">
+    <apex:repeat value="{!recordTypeWrapper.packages}" var="wrapper">
 
-                    <!-- Signature instruction -->
-                    <div style="font-size:8pt; font-weight:bold; margin-bottom:6px;">By signing below, or by providing electronic consent, the Customer acknowledges acceptance of and agreement to all terms, conditions, limitations, and provisions contained within this Agreement.</div>
+        <!-- ==================== APPLICATION FORM PAGE ==================== -->
 
-                    <!-- Signature + Date boxes -->
-                    <table style="width:55%; border-collapse:collapse; margin-top:12px;">
+        <!-- HEADER: Logo left | App # right -->
+        <table style="width:100%; border-collapse:collapse; margin-bottom:6px;">
+            <tr>
+                <!-- Left: Dealer logo + Title -->
+                <td style="width:65%; vertical-align:bottom; padding:0;">
+                    <apex:outputPanel layout="none" rendered="{!hasDealerLogo}">
+                        <img src="{!dealerLogoUrl}" height="45" style="display:block; margin-bottom:4px;" />
+                    </apex:outputPanel>
+                    <apex:outputPanel layout="none" rendered="{!wrapper.isTireRim}">
+                        <div style="font-size:19pt; font-weight:bold; color:#1a1a2e; line-height:1.15;">Tire &amp; Rim Warranty Application</div>
+                    </apex:outputPanel>
+                    <apex:outputPanel layout="none" rendered="{!NOT(wrapper.isTireRim)}">
+                        <div style="font-size:19pt; font-weight:bold; color:#3775b8; line-height:1.15;">Extended Limited Warranty Application</div>
+                    </apex:outputPanel>
+                    <div style="font-size:14pt; color:black; margin-top:1px; font-weight:;">Vehicle Service Contract</div>
+                </td>
+                <!-- Right: Application # -->
+                <td style="width:35%; text-align:right; vertical-align:top; padding:0;">
+                    <div style="font-size:10pt; color:black;">Application #</div>
+                    <div style="font-size:18pt; font-weight:bold; color:#b8342f;">{!Application__c.Name}</div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- ===== SECTION 1: CUSTOMER INFORMATION ===== -->
+        <table style="width:100%; border-collapse:collapse;">
+            <tr>
+                <td class="{!IF(NOT(wrapper.isTireRim), 'blue-section-header-td', 'black-section-header-td')}">SECTION 1: CUSTOMER INFORMATION</td>
+            </tr>
+        </table>
+        <table style="width:100%; border:1px solid #ccc; margin-top: 5px;">
+            <tr>
+                <!-- Primary Owner -->
+                <td class="info-cell" style="width:33%;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr><td style="font-weight:bold; font-size:9pt; padding-bottom:2px;">{!Application__c.Customer_First_Name__c}&#160;{!Application__c.Customer_Last_Name__c}</td></tr>
+                        <tr><td>{!Application__c.Customer_Address__c}</td></tr>
+                        <tr><td>Tel: {!Application__c.Customer_Phone__c}</td></tr>
+                        <tr><td>E-mail: {!Application__c.Customer_Email__c}</td></tr>
+                    </table>
+                </td>
+                <!-- Co-Buyer -->
+                <td class="info-cell" style="width:33%;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr><td style="font-weight:bold; font-size:9pt; padding-bottom:2px;">{!Application__c.Co_Buyer__r.Name}</td></tr>
+                        <tr><td>{!Application__c.Co_Buyer__r.BillingStreet}</td></tr>
+                        <tr><td>Tel: {!Application__c.Co_Buyer__r.Phone}</td></tr>
+                        <tr><td>E-mail: {!Application__c.Co_Buyer__r.PersonEmail}</td></tr>
+                    </table>
+                </td>
+                <!-- Company/Business -->
+                <td class="info-cell-last" style="width:34%;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr><td style="font-weight:bold; font-size:9pt; padding-bottom:2px;">{!Application__c.Customer_Name__r.Name}</td></tr>
+                        <tr><td>
+                            {!Application__c.Customer_Name__r.BillingStreet}&#160;
+                            {!Application__c.Customer_Name__r.BillingCity}&#160;
+                            {!Application__c.Customer_Name__r.BillingState}&#160;
+                            {!Application__c.Customer_Name__r.BillingPostalCode}
+                        </td></tr>
+                        <tr><td>Contact Name: {!Application__c.Customer_First_Name__c}</td></tr>
+                        <tr><td>Tel: {!Application__c.Customer_Phone__c}</td></tr>
+                        <tr><td>E-mail: {!Application__c.Customer_Email__c}</td></tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        <!-- ===== SECTION 2: VEHICLE INFORMATION ===== -->
+        <table style="width:100%; border-collapse:collapse; margin-top:6px;">
+            <tr>
+                <td class="{!IF(NOT(wrapper.isTireRim), 'blue-section-header-td', 'black-section-header-td')}">SECTION 2: VEHICLE INFORMATION</td>
+            </tr>
+        </table>
+        <table style="width:100%; border:1px solid #ccc; margin-top: 5px;">
+            <tr>
+                <!-- Left: Vehicle Details -->
+                <td class="info-cell" style="width:33%;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr><td style="font-weight:bold; font-size:9pt; padding-bottom:3px;">
+                            {!Application__c.Vehicle_Year__c}&#160;{!Application__c.Vehicle_Make__c}&#160;{!Application__c.Vehicle_Model__c}
+                        </td></tr>
+                        <tr><td>VIN#: {!Application__c.Vehicle_VIN__c}</td></tr>
+                        <tr><td>Odometer:&#160;<apex:outputText value="{0,number,###,###}"><apex:param value="{!Application__c.Odometer__c}"/></apex:outputText>&#160;{!Application__c.Odometer_Unit__c}</td></tr>
+                        <tr><td>Purchase Price: $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!Application__c.Vehicle_Purchase_Price__c}"/></apex:outputText></td></tr>
+                        <tr><td>Delivery Date: <apex:outputText value="{0,date,MM-dd-yyyy}"><apex:param value="{!Application__c.Vehicle__r.Delivery_Date__c}"/></apex:outputText></td></tr>
+                        <tr><td style="padding-top:6px;">Transmission: {!Application__c.Vehicle__r.Transmission__c}</td></tr>
+                        <tr><td>Fuel: {!Application__c.Vehicle__r.Fuel_Type__c}</td></tr>
+                        <tr><td>Engine Size: {!Application__c.Vehicle__r.Engine__c}</td></tr>
+                        <tr><td>Colour: {!Application__c.Vehicle__r.Color__c}</td></tr>
+                        <tr><td>Body Type: {!Application__c.Vehicle__r.Body_Type__c}</td></tr>
+                        <tr><td>Business/Commercial Use: <apex:outputText value="{!IF(Application__c.Vehicle__r.Business_Commercial_Use__c, ' Yes', ' No')}"/></td></tr>
+                    </table>
+                </td>
+
+                <!-- Middle: Manufacturer Warranty OR Tire Details + Dealer Notes -->
+                <td class="info-cell" style="width:33%;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <apex:outputPanel layout="none" rendered="{!NOT(wrapper.isTireRim)}">
+                            <tr><td class="sub-label-td">Manufacturer Warranty:</td></tr>
+                            <tr><td style="padding-top:2px;">Type: {!Application__c.Vehicle__r.Manufacturer_Warranty_Type__c}</td></tr>
+                            <tr><td>Term: {!Application__c.Vehicle__r.Warranty_Term__c}</td></tr>
+                            <tr><td>In-Service Date: <apex:outputText value="{0,date,MM-dd-yyyy}"><apex:param value="{!Application__c.Vehicle__r.In_Service_Date__c}"/></apex:outputText></td></tr>
+                            <tr><td style="padding-top:10px;"><table style="width:100%; border-collapse:collapse;"><tr><td class="sub-label-td">Dealer Notes:</td></tr></table></td></tr>
+                        </apex:outputPanel>
+                        <apex:outputPanel layout="none" rendered="{!wrapper.isTireRim}">
+                            <tr><td class="sub-label-td">Tire Details</td></tr>
+                            <tr><td style="padding-top:2px;">Tire Brand: {!wrapper.pkg.Tire_Brand__c}</td></tr>
+                            <tr><td>Tire Type: {!wrapper.pkg.Tire_Type__c}</td></tr>
+                            <tr><td>Tread Depth: {!wrapper.pkg.Tread_Depth__c}&#160;{!wrapper.pkg.Tread_Depth_Unit__c}</td></tr>
+                            <tr><td>Rim Brand: {!wrapper.pkg.Rim_Brand__c}</td></tr>
+                            <tr><td>Rim Type: {!wrapper.pkg.Rim_Type__c}</td></tr>
+                            <tr><td>Rim Size: {!wrapper.pkg.Rim_Size__c}&#160;{!wrapper.pkg.Rim_Size_Unit__c}</td></tr>
+                            <tr><td style="padding-top:8px;"><table style="width:100%; border-collapse:collapse;"><tr><td class="sub-label-td">Dealer Notes:</td></tr></table></td></tr>
+                        </apex:outputPanel>
+                    </table>
+                </td>
+
+                <!-- Right: Dealership + Lender -->
+                <td class="info-cell-last" style="width:34%;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr><td class="sub-label-td">Dealership Information</td></tr>
+                        <tr><td style="font-weight:bold; padding-top:2px;">{!Application__c.Dealer_Name__r.Name}</td></tr>
+                        <tr><td>
+                            {!Application__c.Dealer_Name__r.BillingStreet}&#160;
+                            {!Application__c.Dealer_Name__r.BillingCity}&#160;
+                            {!Application__c.Dealer_Name__r.BillingState}&#160;
+                            {!Application__c.Dealer_Name__r.BillingPostalCode}
+                        </td></tr>
+                        <tr><td>Tel: {!Application__c.Dealer_Phone__c}</td></tr>
+                        <tr><td style="padding-top:10px;"><table style="width:100%; border-collapse:collapse;"><tr><td class="sub-label-td">Lender Information</td></tr></table></td></tr>
+                        <tr><td style="font-weight:bold; padding-top:2px;">{!Application__c.Financial_Institution_Lender__c}</td></tr>
+                        <tr><td>{!Application__c.Lender_Address__c}</td></tr>
+                        <tr><td>Tel:</td></tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        <!-- ===== SECTION 3: SERVICE PLAN SELECTIONS ===== -->
+        <table style="width:100%; border-collapse:collapse; margin-top:6px;">
+            <tr>
+                <td class="{!IF(NOT(wrapper.isTireRim), 'blue-section-header-td', 'black-section-header-td')}">SECTION 3: SERVICE PLAN SELECTIONS</td>
+            </tr>
+        </table>
+        <table style="width:100%; border:1px solid #ccc; margin-top: 5px;">
+            <tr>
+                <!-- Logo -->
+                <td style="width:22%; padding:8px; vertical-align:middle; text-align:center; border-right:1px solid #eee;">
+                    <apex:outputPanel layout="none" rendered="{!wrapper.hasPackageLogo}">
+                        <img src="{!wrapper.packageLogoUrl}" width="110" />
+                    </apex:outputPanel>
+                </td>
+                <!-- Plan Info -->
+                <td style="width:78%; padding:6px 10px; vertical-align:top;">
+                    <table style="width:100%; border-collapse:collapse;">
                         <tr>
-                            <td style="width:60%; border-bottom:1px solid #000; height:35px; vertical-align:bottom; padding-bottom:2px;"></td>
-                            <td style="width:10%;"></td>
-                            <td style="width:30%; border-bottom:1px solid #000; height:35px; vertical-align:bottom; padding-bottom:2px;"></td>
+                            <td colspan="2" style="font-weight:bold; font-size:7pt; color:#4472C4; padding-bottom:5px;">PLAN INFORMATION</td>
                         </tr>
                         <tr>
-                            <td style="font-size:8pt; color:#333; padding-top:2px;">Customer Signature</td>
-                            <td></td>
-                            <td style="font-size:8pt; color:#333; padding-top:2px;">Date</td>
+                            <td class="plan-label-td">Plan Name:</td>
+                            <td class="plan-value-td" style="font-size:9pt; font-weight:bold;">{!wrapper.planName}</td>
+                        </tr>
+                        <tr>
+                            <td class="plan-label-td">Term:</td>
+                            <td class="plan-value-td">{!wrapper.termName}</td>
+                        </tr>
+                        <tr>
+                            <td class="plan-label-td">Start Date/Odometer:</td>
+                            <td class="plan-value-td">{!wrapper.contractStartDate}/{!wrapper.pkg.Odometer_Start__c}&#160;{!wrapper.pkg.Odometer_Start_Unit__c}</td>
+                        </tr>
+                        <tr>
+                            <td class="plan-label-td">Expiry Date/Odometer:</td>
+                            <td class="plan-value-td">{!wrapper.contractEndDate}/{!wrapper.pkg.Odometer_End__c}&#160;{!wrapper.pkg.Odometer_End_Unit__c}</td>
+                        </tr>
+                        <tr>
+                            <td class="plan-label-td">Additional Options:</td>
+                            <td class="plan-value-td">
+                                <apex:repeat value="{!wrapper.includedOptions}" var="option">
+                                    <apex:outputText value="{!option.Option__c}, "/>
+                                </apex:repeat>
+                            </td>
                         </tr>
                     </table>
-                </div>
+                </td>
+            </tr>
+            
+        </table>
 
-                <!-- ======================== TERMS AND CONDITIONS PAGES ======================== -->
-                <apex:outputPanel rendered="{!wrapper.hasTermsAndConditions}">
-                    <div style="page-break-before:always;"></div>
+        <!-- Pricing row -->
+        <table style="width:100%; border-collapse:collapse; margin-top:2px;">
+            <tr>
+                <td style="text-align:right; padding:4px 10px 5px 0; font-size:6pt;">
+                    Warranty Cost: $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!wrapper.pkg.Contract_Premium_Price_Without_Tax__c}"/></apex:outputText>
+                    &#160;&#160;Tax ({!wrapper.pkg.Tax_Percentage__c}%): $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!wrapper.pkg.Tax_Amount__c}"/></apex:outputText>
+                    &#160;&#160;Total: $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!wrapper.pkg.Contract_Premium_Price__c}"/></apex:outputText>
+                </td>
+            </tr>
+        </table>
 
-                    <!-- TC HEADER -->
-                    <table style="width:100%; border-collapse:collapse; margin-bottom:4px;">
+        <!-- ===== SECTION 4: CUSTOMER ACKNOWLEDGEMENT ===== -->
+        <table style="width:100%; border-collapse:collapse; margin-top:6px;">
+            <tr>
+                <td class="{!IF(NOT(wrapper.isTireRim), 'blue-section-header-td', 'black-section-header-td')}">SECTION 4: CUSTOMER ACKNOWLEDGEMENT</td>
+            </tr>
+        </table>
+        <table style="width:100%; border-collapse:collapse; border:1px solid #ccc; border-top:none; page-break-inside:avoid;">
+            <tr>
+                <td style="padding:8px 10px; vertical-align:top;">
+                    <table style="width:100%; border-collapse:collapse; page-break-inside:avoid;">
+                        <!-- Legal Text -->
                         <tr>
-                            <td style="width:60%; vertical-align:middle;">
-                                <apex:outputPanel rendered="{!hasDealerLogo}" layout="none">
-                                    <div style="display:inline-block; vertical-align:middle; margin-right:8px;">
+                            <td style="font-size:8pt; line-height:1.4; text-align:justify; color:#222; padding-bottom:8px;">
+                                I acknowledge that I have received, read, reviewed, and understood this A-Protect Vehicle Service Agreement (&quot;Agreement&quot;), including all terms, conditions, coverage provisions, exclusions, limitations, cancellation provisions, transfer provisions, claim procedures, and any applicable aggregate claim limits. I certify that all information provided on this Application and Registration Page is true, complete, and accurate to the best of my knowledge and understand that this Agreement has been issued based upon the information provided during the application and registration process. I understand that prior authorization from A-Protect Warranty Corporation is required before any covered repairs are commenced and that failure to obtain such authorization may result in denial of coverage. I further understand that any mechanical failure, loss, or damage resulting from a pre-existing condition is not covered under this Agreement. I acknowledge that this Application and Registration Page, together with the Terms and Conditions of this Agreement, constitute the entire agreement between myself and A-Protect Warranty Corporation and that no oral statements, promises, representations, or assurances made by any dealer, salesperson, agent, or representative shall modify, expand, or alter the coverage provided under this Agreement. I understand that the purchase of this Agreement is optional and is not required as a condition of purchasing, leasing, financing, or obtaining credit for the covered vehicle, and that neither the extension of credit, the terms of credit, nor the terms of the vehicle sale or lease are conditioned upon the purchase of this Agreement. I further acknowledge that this Agreement is a Vehicle Service Agreement and not an insurance contract, automobile liability insurance policy, or physical damage insurance policy, and that all benefits, authorizations, approvals, reimbursements, and payments are administered solely in accordance with the terms, conditions, limitations, and exclusions contained herein.
+                            </td>
+                        </tr>
+                        <!-- Sign instruction + signature lines all in same table to avoid split -->
+                        <tr>
+                            <td style="font-size:8pt; font-weight:bold; padding-bottom:14px;">
+                                By signing below, or by providing electronic consent, the Customer acknowledges acceptance of and agreement to all terms, conditions, limitations, and provisions contained within this Agreement.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <table style="width:58%; border-collapse:collapse;">
+                                    <tr>
+                                        <td style="width:62%; border-bottom:1px solid #000; height:30px; vertical-align:bottom; padding-bottom:2px;">&#160;</td>
+                                        <td style="width:8%;">&#160;</td>
+                                        <td style="width:30%; border-bottom:1px solid #000; height:30px; vertical-align:bottom; padding-bottom:2px;">&#160;</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-size:8pt; color:#333; padding-top:2px;">Customer Signature</td>
+                                        <td>&#160;</td>
+                                        <td style="font-size:8pt; color:#333; padding-top:2px;">Date</td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        <!-- ==================== TERMS AND CONDITIONS PAGES ==================== -->
+        <apex:outputPanel layout="none" rendered="{!wrapper.hasTermsAndConditions}">
+            <div style="page-break-before:always;"></div>
+
+            <!-- TC HEADER -->
+            <table style="width:100%; border-collapse:collapse; margin-bottom:4px;">
+                <tr>
+                    <!-- Left: Logo + Title -->
+                    <td style="width:60%; vertical-align:middle; padding:0;">
+                        <table style="border-collapse:collapse;">
+                            <tr>
+                                <apex:outputPanel layout="none" rendered="{!hasDealerLogo}">
+                                    <td style="padding-right:8px; vertical-align:middle;">
                                         <img src="{!dealerLogoUrl}" width="80" height="35" />
-                                    </div>
+                                    </td>
                                 </apex:outputPanel>
-                                <div style="display:inline-block; vertical-align:middle;">
-                                    <div style="font-size:11pt; font-weight:bold; color:#1a1a2e;">
-                                        <apex:outputPanel rendered="{!wrapper.isTireRim}">Tire &amp; Rim Protection Plan</apex:outputPanel>
-                                        <apex:outputPanel rendered="{!NOT(wrapper.isTireRim)}">A-Protect Extended Limited Warranty</apex:outputPanel>
-                                    </div>
-                                    <div style="font-size:8pt; font-weight:bold; color:#1a1a2e;">Vehicle Service Contract</div>
-                                </div>
-                            </td>
-                            <td style="width:40%; text-align:right; vertical-align:top;">
-                                <apex:outputPanel rendered="{!AND(dealerName != '', dealerName != null)}">
-                                    <div style="font-size:7.5pt; color:#444; line-height:1.4;">
-                                        <span style="font-weight:bold;">{!dealerName}</span><br/>
-                                        <apex:outputPanel rendered="{!AND(dealerAddress != '', dealerAddress != null)}">{!dealerAddress}<br/></apex:outputPanel>
-                                        <apex:outputPanel rendered="{!AND(dealerPhone != '', dealerPhone != null)}">Tel: {!dealerPhone}<br/></apex:outputPanel>
-                                        <apex:outputPanel rendered="{!AND(dealerWebsite != '', dealerWebsite != null)}">{!dealerWebsite}</apex:outputPanel>
-                                        <apex:outputPanel rendered="{!AND(dealerEmail != '', dealerEmail != null)}"> | {!dealerEmail}</apex:outputPanel>
-                                    </div>
+                                <td style="vertical-align:middle;">
+                                    <table style="border-collapse:collapse;">
+                                        <tr>
+                                            <td style="font-size:11pt; font-weight:bold; color:#1a1a2e; padding-bottom:2px;">
+                                                <apex:outputPanel layout="none" rendered="{!wrapper.isTireRim}">Tire &amp; Rim Protection Plan</apex:outputPanel>
+                                                <apex:outputPanel layout="none" rendered="{!NOT(wrapper.isTireRim)}">A-Protect Extended Limited Warranty</apex:outputPanel>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-size:8pt; font-weight:bold; color:#1a1a2e;">Vehicle Service Contract</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                    <!-- Right: Dealer Info -->
+                    <td style="width:40%; text-align:right; vertical-align:top; padding:0;">
+                        <apex:outputPanel layout="none" rendered="{!AND(dealerName != '', dealerName != null)}">
+                            <table style="width:100%; border-collapse:collapse;">
+                                <tr><td style="text-align:right; font-size:7.5pt; font-weight:bold; color:#444; line-height:1.4;">{!dealerName}</td></tr>
+                                <apex:outputPanel layout="none" rendered="{!AND(dealerAddress != '', dealerAddress != null)}">
+                                    <tr><td style="text-align:right; font-size:7.5pt; color:#444; line-height:1.4;">{!dealerAddress}</td></tr>
                                 </apex:outputPanel>
-                            </td>
-                        </tr>
-                    </table>
-                    <div style="height:3px; background:#cc0000;"></div>
+                                <apex:outputPanel layout="none" rendered="{!AND(dealerPhone != '', dealerPhone != null)}">
+                                    <tr><td style="text-align:right; font-size:7.5pt; color:#444; line-height:1.4;">Tel: {!dealerPhone}</td></tr>
+                                </apex:outputPanel>
+                                <apex:outputPanel layout="none" rendered="{!AND(dealerWebsite != '', dealerWebsite != null)}">
+                                    <tr><td style="text-align:right; font-size:7.5pt; color:#444; line-height:1.4;">{!dealerWebsite}</td></tr>
+                                </apex:outputPanel>
+                                <apex:outputPanel layout="none" rendered="{!AND(dealerEmail != '', dealerEmail != null)}">
+                                    <tr><td style="text-align:right; font-size:7.5pt; color:#444; line-height:1.4;">{!dealerEmail}</td></tr>
+                                </apex:outputPanel>
+                            </table>
+                        </apex:outputPanel>
+                    </td>
+                </tr>
+            </table>
 
-                    <!-- IMPORTANT NOTICE -->
-                    <div style="font-size:8pt; font-weight:bold; margin:8px 0; text-align:justify; line-height:1.4; padding:6px 8px; background:#f5f5f5; border:1px solid #ddd;">
+            <!-- Red divider line -->
+            <table style="width:100%; border-collapse:collapse; margin-bottom:6px;">
+                <tr>
+                    <td style="height:3px; background-color:#cc0000; font-size:0; line-height:0;">&#160;</td>
+                </tr>
+            </table>
+
+            <!-- Important Notice -->
+            <table style="width:100%; border-collapse:collapse; margin-bottom:6px;">
+                <tr>
+                    <td class="notice-td">
                         IMPORTANT NOTICE: THIS IS NOT AN INSURANCE POLICY. This is a Vehicle Service Contract.
                         Please read this agreement carefully and keep it in a safe place with your other important documents.
-                    </div>
+                    </td>
+                </tr>
+            </table>
 
-                    <!-- TC TITLE -->
-                    <div style="text-align:center; font-size:13pt; font-weight:bold; margin:8px 0 10px 0; letter-spacing:1px;">TERMS AND CONDITIONS</div>
+            <!-- TC Title -->
+            <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+                <tr>
+                    <td style="text-align:center; font-size:13pt; font-weight:bold;">TERMS AND CONDITIONS</td>
+                </tr>
+            </table>
 
-                    <!-- DYNAMIC TC CONTENT -->
-                    <div class="tc-body">
-                        <apex:outputText value="{!wrapper.termsAndConditions}" escape="false" />
-                    </div>
+            <!-- TC Body -->
+            <div class="tc-body">
+                <apex:outputText value="{!wrapper.termsAndConditions}" escape="false"/>
+            </div>
 
-                    <!-- SIGNATURE TABLE AT END -->
-                    <table style="width:100%; border-collapse:collapse; margin-top:16px;">
-                        <tr>
-                            <td style="width:35%; background:#d0d0d0; padding:5px 6px; font-weight:bold; font-size:8pt; border:1px solid #999;">CUSTOMER SIGNATURE</td>
-                            <td style="width:15%; border:1px solid #999;"></td>
-                            <td style="width:20%; background:#d0d0d0; padding:5px 6px; font-weight:bold; font-size:8pt; border:1px solid #999;">DATE</td>
-                            <td style="width:30%; border:1px solid #999;"></td>
-                        </tr>
-                        <tr>
-                            <td style="width:35%; background:#d0d0d0; padding:5px 6px; font-weight:bold; font-size:8pt; border:1px solid #999;">CUSTOMER SIGNATURE</td>
-                            <td style="width:15%; border:1px solid #999;"></td>
-                            <td style="width:20%; background:#d0d0d0; padding:5px 6px; font-weight:bold; font-size:8pt; border:1px solid #999;">DATE</td>
-                            <td style="width:30%; border:1px solid #999;"></td>
-                        </tr>
-                    </table>
-                </apex:outputPanel>
+            <!-- End Signature Table -->
+            <table style="width:100%; border-collapse:collapse; margin-top:16px;">
+                <tr>
+                    <td class="sig-header-td" style="width:35%;">CUSTOMER SIGNATURE</td>
+                    <td class="sig-value-td" style="width:15%;"></td>
+                    <td class="sig-header-td" style="width:20%;">DATE</td>
+                    <td class="sig-value-td" style="width:30%;"></td>
+                </tr>
+                <tr>
+                    <td class="sig-header-td" style="width:35%;">CUSTOMER SIGNATURE</td>
+                    <td class="sig-value-td" style="width:15%;"></td>
+                    <td class="sig-header-td" style="width:20%;">DATE</td>
+                    <td class="sig-value-td" style="width:30%;"></td>
+                </tr>
+            </table>
+        </apex:outputPanel>
 
-                <!-- PAGE BREAK BETWEEN PACKAGES -->
-                <div class="page-break"></div>
+        <apex:outputPanel layout="none" rendered="{!NOT(wrapper.isLast)}">
+            <div class="page-break"></div>
+        </apex:outputPanel>
 
-            </apex:repeat>
-        </apex:repeat>
-    </div>
+    </apex:repeat>
+</apex:repeat>
+
+</body>
+</html>
 </apex:page>

@@ -30,6 +30,10 @@ public without sharing class ApplicationPDFExtension {
         public Boolean                             hasTermsAndConditions { get; set; }
         public String                              recordTypeName   { get; set; }
         public Boolean                             isTireRim        { get; set; }
+        public Boolean                             isLast           { get; set; }
+        // Flattened relationship fields for PDF renderer compatibility
+        public String                              planName         { get; set; }
+        public String                              termName         { get; set; }
     }
 
     public class RecordTypeWrapper {
@@ -74,6 +78,12 @@ public without sharing class ApplicationPDFExtension {
             wrapper.packageLogoUrl  = packageLogoUrls.get(pkg.Id);
             wrapper.hasPackageLogo  = packageHasLogo.containsKey(pkg.Id) ? packageHasLogo.get(pkg.Id) : false;
 
+            // Flatten relationship fields to avoid PDF renderer traversal issues
+            wrapper.planName = (pkg.Package__r != null && pkg.Package__r.Name != null)
+                ? pkg.Package__r.Name : '';
+            wrapper.termName = (pkg.Package_Term__r != null && pkg.Package_Term__r.Name != null)
+                ? pkg.Package_Term__r.Name : '';
+
             if (pkg.Contract_Start_Date__c != null) {
                 wrapper.contractStartDate = ((DateTime) pkg.Contract_Start_Date__c).format('yyyy-MM-dd');
             }
@@ -102,6 +112,12 @@ public without sharing class ApplicationPDFExtension {
                 recordTypeWrappersList.add(rtw);
             }
             recordTypeWrappers.get(rt).packages.add(wrapper);
+        }
+
+        for (RecordTypeWrapper rtw : recordTypeWrappersList) {
+            if (!rtw.packages.isEmpty()) {
+                rtw.packages[rtw.packages.size() - 1].isLast = true;
+            }
         }
 
         // Filter by rt param if present
@@ -362,6 +378,8 @@ public without sharing class ApplicationPDFExtension {
     }
 
     private String tryGetDistributionUrl(Id packageFileId) {
+        System.debug('Trying to get distribution URL for package file: ' + packageFileId);
+
         List<ContentDistribution> dists = [
             SELECT DistributionPublicUrl, ExpiryDate, PreferencesAllowViewInBrowser
             FROM ContentDistribution
@@ -369,11 +387,15 @@ public without sharing class ApplicationPDFExtension {
             ORDER BY LastModifiedDate DESC
             LIMIT 1
         ];
+
+        System.debug('Found distributions: ' + dists);
+
         return dists.isEmpty() ? null : dists[0].DistributionPublicUrl;
     }
 
     private void getPackageLogos() {
         try {
+            System.debug('Getting package logos for application packages: ' + applicationPackages);
             for (Application_Package__c appPkg : applicationPackages) {
                 if (appPkg.Dealer_Package__c == null) continue;
 
@@ -386,32 +408,27 @@ public without sharing class ApplicationPDFExtension {
                                    ShareType
                             FROM ContentDocumentLinks
                             WHERE ContentDocument.FileExtension IN ('jpg','jpeg','png','gif','bmp')
-                              AND Visibility = 'AllUsers'
-                              AND ShareType  IN ('V','C')
                             ORDER BY Id DESC
                             LIMIT 1)
                     FROM Package_File__c
                     WHERE Dealer_Package__c = :appPkg.Dealer_Package__c
-                      AND File_Type_del__c  = 'Header Logo'
+                      AND File_Type_del__c  = 'Package Logo'
                     LIMIT 1
                 ];
 
+                System.debug('Found package logo files for package ' + appPkg.Id + ': ' + packageLogoFiles);
+
                 Boolean found = false;
 
-                if (!packageLogoFiles.isEmpty()) {
-                    String distUrl = tryGetDistributionUrl(packageLogoFiles[0].Id);
-                    if (String.isNotBlank(distUrl)) {
-                        packageLogoUrls.put(appPkg.Id, distUrl);
-                        packageHasLogo.put(appPkg.Id, true);
-                        found = true;
-                    } else if (packageLogoFiles[0].ContentDocumentLinks != null &&
-                               !packageLogoFiles[0].ContentDocumentLinks.isEmpty()) {
-                        ContentDocumentLink logoLink = packageLogoFiles[0].ContentDocumentLinks[0];
-                        String logoUrl = buildFileUrl(logoLink.ContentDocument.LatestPublishedVersionId);
-                        packageLogoUrls.put(appPkg.Id, logoUrl);
-                        packageHasLogo.put(appPkg.Id, true);
-                        found = true;
-                    }
+                if (!packageLogoFiles.isEmpty() &&
+                    packageLogoFiles[0].ContentDocumentLinks != null &&
+                    !packageLogoFiles[0].ContentDocumentLinks.isEmpty()) {
+                    ContentDocumentLink logoLink = packageLogoFiles[0].ContentDocumentLinks[0];
+                    String logoUrl = buildFileUrl(logoLink.ContentDocument.LatestPublishedVersionId);
+                    packageLogoUrls.put(appPkg.Id, logoUrl);
+                    System.debug('Set package logo URL for package ' + appPkg.Id + ': ' + logoUrl);
+                    packageHasLogo.put(appPkg.Id, true);
+                    found = true;
                 }
 
                 if (!found) {
@@ -463,7 +480,7 @@ public without sharing class ApplicationPDFExtension {
                             LIMIT 1)
                     FROM Package_File__c
                     WHERE Dealer_Package__c = :appPackages[0].Dealer_Package__c
-                      AND File_Type_del__c  = 'Dealer Logo'
+                      AND File_Type_del__c  = 'Package Logo'
                     LIMIT 1
                 ];
 
