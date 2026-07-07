@@ -1525,6 +1525,36 @@ for (Integer i = 0; i < packageList.size(); i++) {
             }
         }
 
+        // Check if admin has waived the premium fee for the active Application_Package__c on this application
+        // If waived, suppress the premium vehicle fee entirely for the dealer portal response
+        if (isPremiumVehicle && String.isNotBlank(recordType)) {
+            try {
+                List<Application_Package__c> activePackages = [
+                    SELECT Id, Waive_Premium_Fee__c
+                    FROM Application_Package__c
+                    WHERE Application__c = :applicationId
+                        AND RecordType.DeveloperName = :recordType
+                        AND Active__c = true
+                        AND Waive_Premium_Fee__c = true
+                    LIMIT 1
+                ];
+                if (!activePackages.isEmpty()) {
+                    isPremiumVehicle = false;
+                    // Also zero out all term premiumModelFee values so the portal shows $0
+                    for (DealerPackageDTO pkgDto : packageList) {
+                        if (pkgDto.terms != null) {
+                            for (DealerPackageTermDTO termDto : pkgDto.terms) {
+                                termDto.premiumModelFee = 0;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception waiverEx) {
+                // Non-fatal: if field doesn't exist yet or query fails, leave isPremiumVehicle as-is
+                System.debug('Warning: Could not check premium fee waiver: ' + waiverEx.getMessage());
+            }
+        }
+
         DealerPackagesResponse response = new DealerPackagesResponse();
         response.success = true;
         response.message = responseMessage;
@@ -1910,7 +1940,7 @@ public static ApplicationPackageResponse savePackageWithActiveManagement(Map<Str
 List<Application_Package__c> existingActive;
         try {
             existingActive = [
-                SELECT Id, Dealer_Package__c, Dealer_Package_Term__c, Active__c
+                SELECT Id, Dealer_Package__c, Dealer_Package_Term__c, Active__c, Waive_Premium_Fee__c
                 FROM Application_Package__c
                 WHERE Application__c = :applicationId
                     AND RecordType.DeveloperName = :recordType
@@ -1920,7 +1950,7 @@ List<Application_Package__c> existingActive;
 } catch (Exception queryError) {
 
             existingActive = [
-                SELECT Id, Dealer_Package__c, Dealer_Package_Term__c
+                SELECT Id, Dealer_Package__c, Dealer_Package_Term__c, Waive_Premium_Fee__c
                 FROM Application_Package__c
                 WHERE Application__c = :applicationId
                     AND RecordType.DeveloperName = :recordType
@@ -2145,6 +2175,30 @@ packageToSave = existingPkg;
             }
         } catch (Exception e) {
             // If name cannot be generated, continue without setting it
+        }
+
+        // Write Premium_Model_Fee__c for audit/reporting purposes.
+        // If admin has waived the premium fee, record $0. Otherwise record the actual fee amount
+        // passed from the LWC (if provided). Do NOT touch Waive_Premium_Fee__c — preserve admin's setting.
+        try {
+            Boolean waiverActive = (packageToSave.Id != null && !isNewPackage)
+                ? (packageToSave.Waive_Premium_Fee__c == true)
+                : false;
+            // For new packages, check the map for waiver override (not yet in the record)
+            if (isNewPackage && packageDataMap.containsKey('waivedPremiumFee')) {
+                waiverActive = Boolean.valueOf(String.valueOf(packageDataMap.get('waivedPremiumFee')));
+            }
+
+            if (waiverActive) {
+                packageToSave.Premium_Model_Fee__c = 0;
+            } else if (packageDataMap.containsKey('premiumFeeAmount')) {
+                Object feeVal = packageDataMap.get('premiumFeeAmount');
+                if (feeVal != null && String.valueOf(feeVal) != 'null') {
+                    packageToSave.Premium_Model_Fee__c = Decimal.valueOf(String.valueOf(feeVal));
+                }
+            }
+        } catch (Exception premiumEx) {
+            System.debug('Warning: Could not set Premium_Model_Fee__c: ' + premiumEx.getMessage());
         }
         
 if (isNewPackage) {

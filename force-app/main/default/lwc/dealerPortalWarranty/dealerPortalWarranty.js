@@ -21,6 +21,7 @@ export default class DealerPortalWarranty extends LightningElement {
     @track renderKey = 0 // Used to force re-renders;
     @track price = 0.00;
     @track isPriceEditMode = false;
+    @track isPriceCalculating = false;
     @track priceOverrideInput = '';
     @track isPriceOverridden = false;
     @track priceValidationMessage = '';
@@ -782,8 +783,17 @@ export default class DealerPortalWarranty extends LightningElement {
         // Update selection highlighting
         this.updateSelectionHighlighting();
         
+        // Clear any stale price override from the previous package
+        this.isPriceOverridden = false;
+        this.isPriceEditMode = false;
+        this.priceOverrideInput = '';
+        this._overridePreTaxPrice = null;
+        this._overrideTaxAmount = null;
+        this.isPriceCalculating = true;
+
         // Update price (will be 0 until term is selected)
         this.updatePrice();
+        this.isPriceCalculating = false;
         
         // Save data
         this.saveDataToSession();
@@ -859,13 +869,17 @@ export default class DealerPortalWarranty extends LightningElement {
         this.isPriceOverridden = false;
         this.isPriceEditMode = false;
         this.priceOverrideInput = '';
+        this._overridePreTaxPrice = null;
+        this._overrideTaxAmount = null;
 
         this.clearAdditionalOptionsForTermSwitch();
         this.trackWarrantyChange('term', oldTermId, newTermId);
+        this.isPriceCalculating = true;
         await this.loadAdditionalOptions(selectedTerm.Id);
         console.log('ℹ️ Additional options loaded for new term - user must re-select');
 
         this.updatePrice();
+        this.isPriceCalculating = false;
         this.saveDataToSession();
         console.log('🔍 handleWarrantyTermSelection - Term selected, will create package on Continue');
         this.renderKey++;
@@ -1585,9 +1599,9 @@ export default class DealerPortalWarranty extends LightningElement {
     handlePriceClick() {
         if (!this.selectedWarrantyTerm) return;
         this.isPriceEditMode = true;
-        // Show pre-tax override price if available, otherwise show current price
-        const editPrice = this._overridePreTaxPrice || this.price;
-        this.priceOverrideInput = editPrice ? editPrice.toFixed(2) : '';
+        // Show pre-tax override price if available, otherwise show pre-tax display value (never tax-inclusive total)
+        const editPrice = this._overridePreTaxPrice != null ? this._overridePreTaxPrice : this._retailPriceDisplay;
+        this.priceOverrideInput = editPrice != null ? editPrice.toFixed(2) : '';
         // Focus the input on next tick
         // eslint-disable-next-line @lwc/lwc/no-async-operation
         setTimeout(() => {

@@ -5269,3 +5269,11 @@ lightning-accordion-section.program-section-selected lightning-button:hover {
 .dcs-proceed-btn:hover {
     background: #059669;
 }
+
+.price-loading-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    width: 100%;
+}

@@ -204,6 +204,12 @@
                                 <div class="price-summary-section">
                                     <h4 class="section-heading">PRICE:</h4>
                                     <div class="price-summary-box">
+                                        <!-- Price loading spinner -->
+                                        <template if:true={isPriceCalculating}>
+                                            <div class="price-loading-spinner">
+                                                <lightning-spinner alternative-text="Calculating price..." size="small" variant="brand"></lightning-spinner>
+                                            </div>
+                                        </template>
                                         <!-- Read mode: click to edit -->
                                         <template if:false={isPriceEditMode}>
                                             <span class="price-summary-value price-clickable" onclick={handlePriceClick} title="Click to override price">
@@ -578,10 +584,7 @@
                         </div>
                     </div>
 
-                    <!-- Footer -->
-                    <div class="dcs-footer">
-                        <button class="dcs-proceed-btn" onclick={hidePriceBreakdownModal}>Proceed</button>
-                    </div>
+
 
                 </div>
             </div>

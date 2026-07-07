@@ -5111,3 +5111,11 @@ lightning-accordion-section[data-package-id].gradient-default .slds-accordion__s
 .dcs-info-icon:focus .dcs-info-tooltip {
     display: block;
 }
+
+.price-loading-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    width: 100%;
+}

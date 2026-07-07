@@ -21,6 +21,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     @track isPriceEditMode = false;
     @track priceOverrideInput = '';
     @track isPriceOverridden = false;
+    @track isPriceCalculating = false;
     @track priceValidationMessage = '';
     @track selectedProgram = '';
     @track selectedTerm = '4';
@@ -1169,12 +1170,18 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             const isPackageChange = this.selectedDealerPackage && this.selectedDealerPackage.Id !== selectedPackage.Id;
             
             if (isPackageChange) {
-                console.log('📦 [TIRE] Package changed - clearing additional options');
+                console.log('📦 [TIRE] Package changed - clearing additional options and price override');
                 // Clear all additional options when package changes
                 this.selectedAdditionalOptions = [];
                 this.existingAdditionalOptions = [];
                 this.selectedNewOptions = [];
                 this.optionsToRemove = [];
+                // Clear stale price override so the new package price loads cleanly
+                this.isPriceOverridden = false;
+                this.isPriceEditMode = false;
+                this.priceOverrideInput = '';
+                this._overridePreTaxPrice = null;
+                this._overrideTaxAmount = null;
             }
             
             // Check if package is selectable based on vehicle model class
@@ -1233,7 +1240,9 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             });
             
             // Update price (will be 0 until term is selected)
+            this.isPriceCalculating = true;
             this.updatePrice();
+            this.isPriceCalculating = false;
             
             // Save data
             this.saveDataToSession();
@@ -1301,8 +1310,17 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             
             
             // Don't reload existing options - they should persist across terms
-            
+
+            // Reset price override when a new term is selected
+            this.isPriceOverridden = false;
+            this.isPriceEditMode = false;
+            this.priceOverrideInput = '';
+            this._overridePreTaxPrice = null;
+            this._overrideTaxAmount = null;
+
+            this.isPriceCalculating = true;
             this.updatePrice();
+            this.isPriceCalculating = false;
             this.saveDataToSession();
             
             // NO AUTO-SAVE - Everything saves only when Continue is clicked
@@ -2863,9 +2881,9 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     handlePriceClick() {
         if (!this.selectedWarrantyTerm) return;
         this.isPriceEditMode = true;
-        // Show pre-tax override price if available, otherwise show current price
-        const editPrice = this._overridePreTaxPrice || this.price;
-        this.priceOverrideInput = editPrice ? editPrice.toFixed(2) : '';
+        // Show pre-tax override price if available, otherwise show pre-tax display value (never tax-inclusive total)
+        const editPrice = this._overridePreTaxPrice != null ? this._overridePreTaxPrice : this._retailPriceDisplay;
+        this.priceOverrideInput = editPrice != null ? editPrice.toFixed(2) : '';
         setTimeout(() => {
             const input = this.template.querySelector('.price-override-input');
             if (input) { input.focus(); input.select(); }
