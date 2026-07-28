@@ -1,0 +1,292 @@
+<template>
+    <div class="modal-backdrop" onclick={handleClose}></div>
+    <div class="modal-container">
+        <!-- Modal Header -->
+        <div class="modal-header">
+            <h2 class="modal-title">Create Remittance</h2>
+            <button class="close-btn" onclick={handleClose} aria-label="Close">
+                <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+            </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="modal-body">
+            <!-- Loading -->
+            <template if:true={isLoading}>
+                <div class="loading-container">
+                    <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+                </div>
+            </template>
+
+            <template if:false={isLoading}>
+                <div class="modal-content-layout">
+
+                    <!-- LEFT PANEL: Application List -->
+                    <div class="left-panel">
+                        <!-- Search -->
+                        <div class="search-bar">
+                            <lightning-icon icon-name="utility:search" size="x-small" class="search-icon"></lightning-icon>
+                            <input
+                                type="text"
+                                placeholder="Q search"
+                                value={searchTerm}
+                                oninput={handleSearchChange}
+                                class="search-input"
+                            />
+                        </div>
+
+                        <!-- Aging Filter Tabs -->
+                        <div class="filter-tabs">
+                            <template for:each={filterTabs} for:item="tab">
+                                <button
+                                    key={tab.id}
+                                    data-filter={tab.id}
+                                    class={tab.tabClass}
+                                    onclick={handleFilterTab}
+                                >
+                                    {tab.label} <span class="tab-count">({tab.count})</span>
+                                </button>
+                            </template>
+                        </div>
+
+                        <!-- Selection Banner -->
+                        <template if:true={hasSelection}>
+                            <div class="selection-banner">
+                                <span>{selectedCount} Applications Selected</span>
+                                <button class="clear-all-btn" onclick={handleClearAll}>Clear All</button>
+                            </div>
+                        </template>
+
+                        <!-- Table Header -->
+                        <div class="table-header">
+                            <div class="col-check">
+                                <template if:true={showCheckbox}>
+                                    <input type="checkbox" checked={isAllSelected} onchange={handleSelectAll} />
+                                </template>
+                            </div>
+                            <div class="col-app">APPLICATION</div>
+                            <div class="col-customer">CUSTOMER</div>
+                            <div class="col-vehicle">VEHICLE</div>
+                            <div class="col-products">PRODUCTS</div>
+                            <div class="col-aging">AGING</div>
+                            <div class="col-total">TOTAL</div>
+                        </div>
+
+                        <!-- Application Rows -->
+                        <div class="app-list">
+                            <template if:true={hasFilteredApps}>
+                                <template for:each={filteredApps} for:item="app">
+                                    <div key={app.id} class="app-row-wrapper">
+                                        <!-- Main Row -->
+                                        <div class={app.appRowClass}>
+                                            <div class="col-check">
+                                                <template if:true={showCheckbox}>
+                                                    <input
+                                                        type="checkbox"
+                                                        data-id={app.id}
+                                                        checked={app.isSelected}
+                                                        disabled={app.isDisabled}
+                                                        onchange={handleAppCheckbox}
+                                                    />
+                                                </template>
+                                            </div>
+                                            <div class="col-app">
+                                                <div class="app-number">{app.appNumber}</div>
+                                                <div class="app-date">{app.formattedDate}</div>
+                                            </div>
+                                            <div class="col-customer">
+                                                <div class="customer-name">{app.customerName}</div>
+                                                <div class="customer-phone">{app.customerPhone}</div>
+                                                <div class="customer-email">{app.customerEmail}</div>
+                                            </div>
+                                            <div class="col-vehicle">
+                                                <div class="vehicle-info">{app.vehicleInfo}</div>
+                                                <div class="vehicle-vin">VIN #: {app.vin}</div>
+                                                <template if:true={app.odometer}>
+                                                    <div class="vehicle-odometer">Odometer: {app.odometer}</div>
+                                                </template>
+                                            </div>
+                                            <div class="col-products">
+                                                <button
+                                                    class="expand-btn"
+                                                    data-id={app.id}
+                                                    onclick={handleToggleExpand}
+                                                    aria-label="Toggle products"
+                                                >
+                                                    {app.packageCountLabel}
+                                                    <lightning-icon
+                                                        icon-name={app.expandIcon}
+                                                        size="x-small"
+                                                    ></lightning-icon>
+                                                </button>
+                                            </div>
+                                            <div class="col-aging">
+                                                <span class={app.agingClass}>{app.agingLabel}</span>
+                                            </div>
+                                            <div class="col-total">{app.formattedTotal}</div>
+                                        </div>
+
+                                        <!-- Expanded Products Row -->
+                                        <template if:true={app.isExpanded}>
+                                            <div class="products-drawer">
+                                                <template for:each={app.packages} for:item="pkg">
+                                                    <div key={pkg.id} class="product-row">
+                                                        <span class="product-name">{pkg.name}</span>
+                                                        <span class="product-price">{pkg.formattedPrice}</span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </template>
+                            <template if:false={hasFilteredApps}>
+                                <div class="empty-state">No applications found.</div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT PANEL: Remittance Summary -->
+                    <div class="right-panel">
+
+                        <!-- Outstanding Balance Card -->
+                        <div class="outstanding-card">
+                            <div class="outstanding-header">
+                                <span class="outstanding-title">Total Outstanding Balance</span>
+                                <span class="outstanding-grand-total">{outstandingGrandTotal}</span>
+                            </div>
+                            <div class="outstanding-buckets">
+                                <div class="outstanding-bucket">
+                                    <span class="ob-dot dot-current"></span>
+                                    <div class="ob-info">
+                                        <span class="ob-label">Current</span>
+                                        <span class="ob-amount">{outstandingCurrentTotal}</span>
+                                    </div>
+                                </div>
+                                <div class="outstanding-bucket">
+                                    <span class="ob-dot dot-30"></span>
+                                    <div class="ob-info">
+                                        <span class="ob-label">30+ Days</span>
+                                        <span class="ob-amount">{outstandingThirtyTotal}</span>
+                                    </div>
+                                </div>
+                                <div class="outstanding-bucket">
+                                    <span class="ob-dot dot-60"></span>
+                                    <div class="ob-info">
+                                        <span class="ob-label">60+ Days</span>
+                                        <span class="ob-amount">{outstandingSixtyTotal}</span>
+                                    </div>
+                                </div>
+                                <div class="outstanding-bucket">
+                                    <span class="ob-dot dot-90"></span>
+                                    <div class="ob-info">
+                                        <span class="ob-label">90+ Days</span>
+                                        <span class="ob-amount">{outstandingNinetyTotal}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="summary-card">
+                            <div class="summary-header">
+                                <h3 class="summary-title">Remittance Summary</h3>
+                                <template if:true={hasSelection}>
+                                    <button class="clear-all-btn" onclick={handleClearAll}>Clear All</button>
+                                </template>
+                            </div>
+
+                            <!-- Total highlight -->
+                            <div class="summary-total-highlight">
+                                <span class="highlight-count">{selectedCount} Applications Selected</span>
+                                <span class="highlight-amount">{formattedSubtotal} Subtotal</span>
+                            </div>
+
+                            <!-- Aging Breakdown Tiles -->
+                            <div class="aging-tiles">
+                                <div class="aging-tile">
+                                    <div class="aging-tile-label">Current <span class="aging-tile-dot dot-current"></span></div>
+                                    <div class="aging-tile-count">{summaryCurrentCount}</div>
+                                    <div class="aging-tile-amount">{summaryCurrentSubtotal}</div>
+                                </div>
+                                <div class="aging-tile">
+                                    <div class="aging-tile-label">30+ Days <span class="aging-tile-dot dot-30"></span></div>
+                                    <div class="aging-tile-count">{summaryThirtyCount}</div>
+                                    <div class="aging-tile-amount">{summaryThirtySubtotal}</div>
+                                </div>
+                                <div class="aging-tile">
+                                    <div class="aging-tile-label">60+ Days <span class="aging-tile-dot dot-60"></span></div>
+                                    <div class="aging-tile-count">{summarySixtyCount}</div>
+                                    <div class="aging-tile-amount">{summarySixtySubtotal}</div>
+                                </div>
+                                <div class="aging-tile">
+                                    <div class="aging-tile-label">90+ Days <span class="aging-tile-dot dot-90"></span></div>
+                                    <div class="aging-tile-count">{summaryNinetyCount}</div>
+                                    <div class="aging-tile-amount">{summaryNinetySubtotal}</div>
+                                </div>
+                            </div>
+
+                            <!-- Totals -->
+                            <div class="totals-section">
+                                <div class="totals-row">
+                                    <span>Subtotal</span>
+                                    <span>{formattedSubtotal}</span>
+                                </div>
+                                <div class="totals-row">
+                                    <span>{taxLabel}</span>
+                                    <span>{formattedTax}</span>
+                                </div>
+                                <div class="totals-row total-due-row">
+                                    <span>Total Due:</span>
+                                    <span>{formattedTotal}</span>
+                                </div>
+                            </div>
+
+                            <!-- Selected Applications List (collapsible) -->
+                            <div class="selected-apps-section">
+                                <button class="selected-apps-toggle" onclick={handleToggleSummary}>
+                                    <lightning-icon icon-name={summaryToggleIcon} size="x-small"></lightning-icon>
+                                    <span>Selected Applications ({selectedCount})</span>
+                                </button>
+                                <template if:true={isSummaryExpanded}>
+                                    <div class="summary-search">
+                                        <input
+                                            type="text"
+                                            placeholder="Search selected applications..."
+                                            value={summarySearchTerm}
+                                            oninput={handleSummarySearchChange}
+                                            class="search-input"
+                                        />
+                                    </div>
+                                    <div class="selected-app-list">
+                                        <template for:each={filteredSummaryApps} for:item="app">
+                                            <div key={app.id} class="summary-app-row">
+                                                <lightning-icon icon-name="utility:check" size="x-small" class="check-icon"></lightning-icon>
+                                                <div class="summary-app-info">
+                                                    <div class="summary-app-number">{app.appNumber}</div>
+                                                    <div class="summary-app-vehicle">{app.vehicleInfo}</div>
+                                                </div>
+                                                <div class="summary-app-total">{app.formattedTotal}</div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- Create Remittance Button -->
+                            <div class="summary-footer">
+                                <button
+                                    class="create-remittance-btn"
+                                    onclick={handleCreateRemittance}
+                                    disabled={isCreateDisabled}
+                                >
+                                    Create Remittance Form &#x2192;
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </template>
+        </div>
+    </div>
+</template>

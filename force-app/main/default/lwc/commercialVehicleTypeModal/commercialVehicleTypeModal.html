@@ -1,0 +1,130 @@
+<template>
+    <template if:true={isOpen}>
+        <!-- Modal Backdrop -->
+        <div class="slds-backdrop slds-backdrop_open" role="presentation"></div>
+
+        <!-- Modal Dialog -->
+        <section
+            role="dialog"
+            tabindex="-1"
+            aria-modal="true"
+            aria-labelledby="modal-heading"
+            aria-describedby="modal-description"
+            class="slds-modal slds-fade-in-open commercial-vehicle-modal">
+
+            <div class="slds-modal__container">
+
+                <!-- Modal Header -->
+                <header class="slds-modal__header">
+                    <lightning-button-icon
+                        icon-name="utility:close"
+                        onclick={handleClose}
+                        alternative-text="Close"
+                        variant="bare-inverse"
+                        class="slds-modal__close"
+                        title="Close">
+                    </lightning-button-icon>
+                    <h2 id="modal-heading" class="slds-modal__title slds-hyphenate">
+                        Vehicle Usage Type
+                    </h2>
+                </header>
+
+                <!-- Modal Content -->
+                <div class="slds-modal__content slds-p-around_medium" id="modal-description">
+
+                    <!-- Subtitle -->
+                    <p class="modal-subtitle slds-m-bottom_large">
+                        Please select the vehicle&apos;s Intended usage. Vehicle usage determines service plan
+                        eligibility, and only plans available for the selected usage type will be displayed.
+                    </p>
+
+                    <!-- Selection Cards -->
+                    <div class="cards-container">
+
+                        <!-- Card 1: Personal/Light Duty Vehicles -->
+                        <div class="selection-card" role="article">
+                            <div class="card-content">
+                                <h3 class="card-title">Personal/Light Duty Vehicles</h3>
+                                <p class="card-description">
+                                    Light-Duty Use includes personal transportation and general business use such
+                                    as couriering and vehicle for professional use including real estate agents,
+                                    insurance clients, consultants, and sales representatives.
+                                </p>
+                                <p class="card-description">
+                                    Vehicle not used for ride-sharing, passenger transportation for compensation,
+                                    delivery service, tour services, towing, or commercial hauling.
+                                </p>
+                            </div>
+                            <div class="card-footer">
+                                <button
+                                    type="button"
+                                    class="select-button"
+                                    data-value="Personal/Light Duty Vehicle"
+                                    onclick={handleSelect}
+                                    aria-label="Select Personal/Light Duty Vehicles">
+                                    Select
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Rideshare/Delivery Vehicles -->
+                        <div class="selection-card" role="article">
+                            <div class="card-content">
+                                <h3 class="card-title">Rideshare/Delivery Vehicles</h3>
+                                <p class="card-description">
+                                    For vehicles used to transport passengers or deliver goods for compensation
+                                    through business or delivery companies (e.g., Uber, Lyft, DoorDash, Gopuff)
+                                </p>
+                                <p class="card-description">
+                                    Earn while away from your home by transporting passengers or goods
+                                </p>
+                            </div>
+                            <div class="card-footer">
+                                <button
+                                    type="button"
+                                    class="select-button"
+                                    data-value="Rideshare/Delivery Vehicle"
+                                    onclick={handleSelect}
+                                    aria-label="Select Rideshare/Delivery Vehicles">
+                                    Select
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Commercial (Medium Duty) -->
+                        <div class="selection-card" role="article">
+                            <div class="card-content">
+                                <h3 class="card-title">Commercial (Medium Duty)</h3>
+                                <p class="card-description">
+                                    Medium Duty Use means the vehicle is used for business or commercial purposes
+                                    at least in restricted installation operation. This includes vehicles used by
+                                    contractors, tradespeople, property maintenance or inspection, mobile service
+                                    technicians, and similar occupations that regularly transport tools, equipment,
+                                    materials, or supplies. Moderate Duty Usage may also include vehicles used for
+                                    local delivery or other commercial action involving elevated driving and
+                                    increased vehicle utilization. Medium Duty Usage does not include heavy-haul,
+                                    commercial towing, construction site, heavy equipment support, emergency.
+                                    Initial Gross Vehicle Weight Rating (GVWR) exceeding 50,000 lbs which may be
+                                    classed as Heavy Duty Usage.
+                                </p>
+                            </div>
+                            <div class="card-footer">
+                                <button
+                                    type="button"
+                                    class="select-button"
+                                    data-value="Commercial (Medium Duty)"
+                                    onclick={handleSelect}
+                                    aria-label="Select Commercial (Medium Duty)">
+                                    Select
+                                </button>
+                            </div>
+                        </div>
+
+                    </div><!-- /cards-container -->
+
+                </div><!-- /modal content -->
+
+            </div><!-- /modal container -->
+        </section>
+    </template>
+</template>

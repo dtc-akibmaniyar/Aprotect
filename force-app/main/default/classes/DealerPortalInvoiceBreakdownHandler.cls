@@ -146,28 +146,53 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                         LIMIT 1000
                     ];
             } else {
-                List<Invoice__c> allInvoices = [
-                    SELECT Id, Name, Application__c, Status__c, Application__r.Name,
-                           Application_Id__c, Customer_Name__c,
-                           Vehicle_Year__c, Vehicle_Make__c, Vehicle_Model__c, Vehicle_Trim__c, Vin__c,
-                           Amount__c,
-                           Application__r.Customer_First_Name__c,
-                           Application__r.Customer_Last_Name__c,
-                           Application__r.Customer_Address__c,
-                           Application__r.Customer_Phone__c,
-                           Application__r.Customer_Home_Phone__c,
-                           Application__r.Vehicle_Year__c,
-                           Application__r.Vehicle_Make__c,
-                           Application__r.Vehicle_Model__c,
-                           Application__r.Vehicle_VIN__c,
-                           Application__r.Odometer__c,
-                           Application__r.Odometer_Unit__c,
-                           Application__r.Date_of_Purchase__c
-                    FROM Invoice__c
-                    WHERE Remittance_Form__c = :remittanceFormId
-                    ORDER BY CreatedDate DESC
-                    LIMIT 1000
-                ];
+                // FIX: Collect invoice IDs from BOTH the direct lookup AND junction records.
+                // addInvoiceToRemittance only sets the direct lookup when it is null —
+                // if an invoice was already linked to another remittance, only a junction
+                // record is created. Querying by lookup alone misses those invoices.
+                Set<Id> dealerInvoiceIds = new Set<Id>();
+
+                // Source 1: direct lookup
+                for (Invoice__c inv : [
+                    SELECT Id FROM Invoice__c WHERE Remittance_Form__c = :remittanceFormId
+                ]) {
+                    dealerInvoiceIds.add(inv.Id);
+                }
+
+                // Source 2: junction records (covers invoices added via Add Invoice
+                // whose Remittance_Form__c lookup already pointed elsewhere)
+                for (Remittance_Line_Item_Junction__c j : [
+                    SELECT Invoice__c FROM Remittance_Line_Item_Junction__c
+                    WHERE Remittance_Form__c = :remittanceFormId AND Invoice__c != null
+                ]) {
+                    dealerInvoiceIds.add(j.Invoice__c);
+                }
+
+                List<Invoice__c> allInvoices = dealerInvoiceIds.isEmpty()
+                    ? new List<Invoice__c>()
+                    : [
+                        SELECT Id, Name, Application__c, Status__c, Application__r.Name,
+                               Application_Id__c, Customer_Name__c,
+                               Vehicle_Year__c, Vehicle_Make__c, Vehicle_Model__c, Vehicle_Trim__c, Vin__c,
+                               Amount__c,
+                               Application__r.Customer_First_Name__c,
+                               Application__r.Customer_Last_Name__c,
+                               Application__r.Customer_Address__c,
+                               Application__r.Customer_Phone__c,
+                               Application__r.Customer_Home_Phone__c,
+                               Application__r.Vehicle_Year__c,
+                               Application__r.Vehicle_Make__c,
+                               Application__r.Vehicle_Model__c,
+                               Application__r.Vehicle_VIN__c,
+                               Application__r.Odometer__c,
+                               Application__r.Odometer_Unit__c,
+                               Application__r.Date_of_Purchase__c
+                        FROM Invoice__c
+                        WHERE Id IN :dealerInvoiceIds
+                        ORDER BY CreatedDate DESC
+                        LIMIT 1000
+                    ];
+
                 Map<String, Invoice__c> seenInvoices = new Map<String, Invoice__c>();
                 for (Invoice__c inv : allInvoices) {
                     String key = inv.Application__c + '|' + inv.Name;

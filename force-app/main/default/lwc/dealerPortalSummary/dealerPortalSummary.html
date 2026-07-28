@@ -6,7 +6,7 @@
       </div>
     </template>
 
-    <!-- <template if:false={loading}> -->
+    <template if:false={loading}>
       <template if:true={error}>
         <div class="slds-p-around_medium">
           <div class="slds-notify slds-notify_alert slds-theme_alert-texture slds-theme_error" role="alert">
@@ -317,6 +317,12 @@
                         <span class="package-detail-label">Retail Cost:</span>
                         <span class="package-detail-value">{packageWrapper.formattedRetailCost}</span>
                       </div>
+                      <template if:true={packageWrapper.formattedTaxRate}>
+                        <div class="package-detail-row">
+                          <span class="package-detail-label">Applied Tax:</span>
+                          <span class="package-detail-value">{packageWrapper.formattedTaxRate}</span>
+                        </div>
+                      </template>
                       <div class="package-detail-row">
                         <span class="package-detail-label">Total:</span>
                         <span class="package-detail-value">{packageWrapper.customerFormattedTotal}</span>
@@ -324,19 +330,43 @@
                     </div>
                   </div>
 
+                  <!-- Included Options: cost is covered within the package price -->
                   <div class="options-section">
-                    <div class="options-header">Additional Options Purchased:</div>
+                    <div class="options-header options-header--included">
+                      <lightning-icon icon-name="utility:check" size="x-small" class="options-icon-included"></lightning-icon>
+                      Included Options
+                    </div>
                     <div class="options-pills-container">
                       <template if:true={packageWrapper.additionalOptionsPurchased.length}>
                         <template for:each={packageWrapper.additionalOptionsPurchased} for:item="option">
-                          <span class="option-pill" key={option}>{option}</span>
+                          <span class="option-pill option-pill--included" key={option}>{option}</span>
                         </template>
                       </template>
-                      <!-- <template if:false={packageWrapper.additionalOptionsPurchased.length}>
+                      <template if:false={packageWrapper.additionalOptionsPurchased.length}>
                         <span class="no-options">None</span>
-                      </template> -->
+                      </template>
                     </div>
                   </div>
+
+                  <!-- Additional Options: only shown when the package has user-selected add-ons -->
+                  <template if:true={packageWrapper.optionalOptionsList.length}>
+                    <div class="options-section">
+                      <div class="options-header options-header--additional">
+                        <lightning-icon icon-name="utility:add" size="x-small" class="options-icon-additional"></lightning-icon>
+                        Additional Options Purchased
+                      </div>
+                      <div class="options-pills-container">
+                        <template for:each={packageWrapper.optionalOptionsList} for:item="opt">
+                          <span class="option-pill option-pill--additional" key={opt.label}>
+                            {opt.label}
+                            <template if:true={opt.price}>
+                              <span class="option-pill-price">{opt.price}</span>
+                            </template>
+                          </span>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
 
                   <div class="contract-details-section">
                     <div class="contract-detail-row">
@@ -414,6 +444,13 @@
                 onclick={handleViewInvoice}
               >VIEW INVOICE</button>
             </template>
+            <template if:true={showCreateInvoiceButton}>
+              <button
+                class="create-invoice-button"
+                onclick={handleCreateInvoice}
+                disabled={isBusy}
+              >CREATE INVOICE</button>
+            </template>
           </template>
           <template if:true={isLocked}>
             <button
@@ -426,6 +463,13 @@
                 class="view-invoice-button"
                 onclick={handleViewInvoice}
               >VIEW INVOICE</button>
+            </template>
+            <template if:true={showCreateInvoiceButton}>
+              <button
+                class="create-invoice-button"
+                onclick={handleCreateInvoice}
+                disabled={isBusy}
+              >CREATE INVOICE</button>
             </template>
           </template>
         </div>
@@ -453,5 +497,30 @@
           </div>
         </template>
       </template>
+    </template>
   </div>
+
+  <!-- Invoice Confirmation Modal -->
+  <template if:true={showInvoicePromptModal}>
+    <div class="pdf-generating-overlay">
+      <div class="pdf-generating-content">
+        <template if:true={invoicePromptLoading}>
+          <lightning-spinner alternative-text="Creating Invoice..." size="medium"></lightning-spinner>
+          <p class="pdf-generating-text">Creating Invoice...</p>
+        </template>
+        <template if:false={invoicePromptLoading}>
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="24" fill="#e6f4ea"/>
+            <path d="M14 24l7 7 13-13" stroke="#2e7d32" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <h2 class="invoice-prompt-title">Application Submitted Successfully!</h2>
+          <p class="invoice-prompt-body">Thank you for submitting the warranty. Would you like to continue to the invoice?</p>
+          <div class="invoice-prompt-actions">
+            <button class="invoice-prompt-yes" onclick={handleInvoicePromptYes}>Yes, Create Invoice</button>
+            <button class="invoice-prompt-no" onclick={handleInvoicePromptNo}>No, Go to Summary</button>
+          </div>
+        </template>
+      </div>
+    </div>
+  </template>
 </template>

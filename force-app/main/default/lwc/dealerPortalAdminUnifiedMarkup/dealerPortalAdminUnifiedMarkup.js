@@ -8,6 +8,8 @@ import updateSpecificTermMarkups from '@salesforce/apex/DealerPortalMarkupContro
 import updateOptionMarkup from '@salesforce/apex/DealerPortalMarkupController.updateOptionMarkup';
 import updateAllOptionMarkups from '@salesforce/apex/DealerPortalMarkupController.updateAllOptionMarkups';
 import updateSpecificOptionMarkups from '@salesforce/apex/DealerPortalMarkupController.updateSpecificOptionMarkups';
+import getPackageGroupsForDealer from '@salesforce/apex/DealerPortalMarkupController.getPackageGroupsForDealer';
+import savePackageGroupSortOrders from '@salesforce/apex/DealerPortalMarkupController.savePackageGroupSortOrders';
 
 export default class DealerPortalAdminUnifiedMarkup extends LightningElement {
     @track defaultTermMarkup = 0;
@@ -20,6 +22,13 @@ export default class DealerPortalAdminUnifiedMarkup extends LightningElement {
     @track dealerPackages = [];
     @track isLoading = true;
     @track error;
+    
+    // Package Group Sort Order tile state
+    @track showPackageGroupSort = false;
+    @track packageGroups = [];
+    @track pkgGroupSortLoading = false;
+    @track pkgGroupSortError = null;
+    @track pkgGroupSortSuccess = null;
     
     // Options for markup type picklist
     markupTypeOptions = [
@@ -437,6 +446,96 @@ export default class DealerPortalAdminUnifiedMarkup extends LightningElement {
         }, 100);
     }
     
+    // =====================================================================
+    // ===== Package Group Sort Order tile handlers =====
+    // =====================================================================
+
+    async togglePackageGroupSort() {
+        this.showPackageGroupSort = !this.showPackageGroupSort;
+        if (this.showPackageGroupSort && this.packageGroups.length === 0) {
+            await this.loadPackageGroups();
+        }
+    }
+
+    async loadPackageGroups() {
+        this.pkgGroupSortLoading = true;
+        this.pkgGroupSortError = null;
+        this.pkgGroupSortSuccess = null;
+        try {
+            const result = await getPackageGroupsForDealer();
+            if (result && Array.isArray(result)) {
+                this.packageGroups = result.map(pg => ({
+                    Id: pg.Id,
+                    Name: pg.Name,
+                    sortOrder: pg.sortOrder,
+                    currentSortOrderDisplay: pg.sortOrder != null ? String(pg.sortOrder) : '—',
+                    newSortOrder: pg.sortOrder != null ? String(pg.sortOrder) : ''
+                }));
+            } else {
+                this.packageGroups = [];
+            }
+        } catch (err) {
+            console.error('❌ Error loading package groups:', err);
+            this.pkgGroupSortError = err && err.body && err.body.message
+                ? err.body.message
+                : 'Error loading package groups.';
+        } finally {
+            this.pkgGroupSortLoading = false;
+        }
+    }
+
+    handleSortOrderChange(event) {
+        const id = event.target.dataset.id;
+        const val = event.target.value;
+        this.packageGroups = this.packageGroups.map(pg => {
+            if (pg.Id === id) {
+                return { ...pg, newSortOrder: val };
+            }
+            return pg;
+        });
+    }
+
+    async savePackageGroupSortOrders() {
+        this.pkgGroupSortError = null;
+        this.pkgGroupSortSuccess = null;
+        this.pkgGroupSortLoading = true;
+        try {
+            const updates = this.packageGroups.map(pg => ({
+                id: pg.Id,
+                sortOrder: pg.newSortOrder !== '' && pg.newSortOrder !== null
+                    ? Number(pg.newSortOrder)
+                    : null
+            }));
+            const result = await savePackageGroupSortOrders({ updatesJson: JSON.stringify(updates) });
+            if (result && result.startsWith('Success')) {
+                this.pkgGroupSortSuccess = result;
+                // Refresh the list to show updated sort orders
+                await this.loadPackageGroups();
+            } else {
+                this.pkgGroupSortError = result || 'Unknown error saving sort orders.';
+            }
+        } catch (err) {
+            console.error('❌ Error saving package group sort orders:', err);
+            this.pkgGroupSortError = err && err.body && err.body.message
+                ? err.body.message
+                : 'Error saving sort orders.';
+        } finally {
+            this.pkgGroupSortLoading = false;
+        }
+    }
+
+    get packageGroupSortToggleIcon() {
+        return this.showPackageGroupSort ? 'utility:chevrondown' : 'utility:chevronright';
+    }
+
+    get hasPackageGroups() {
+        return this.packageGroups && this.packageGroups.length > 0;
+    }
+
+    // =====================================================================
+    // ===== End Package Group Sort Order handlers =====
+    // =====================================================================
+
     // Toggle handlers
     togglePackage(event) {
         const packageId = event.currentTarget.dataset.packageId;

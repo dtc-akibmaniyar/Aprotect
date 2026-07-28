@@ -18,6 +18,17 @@ public without sharing class DealerActionBoardController {
         @AuraEnabled public Decimal total;
         @AuraEnabled public Decimal taxAmount;
         @AuraEnabled public Decimal taxPercentage;
+        // New fields for Make Payment Modal refactor
+        @AuraEnabled public String invoiceId;
+        @AuraEnabled public Boolean hasInvoice;
+        @AuraEnabled public String invoiceStatus;
+        @AuraEnabled public Decimal invoiceBalance;
+        @AuraEnabled public Date invoiceDueDate;
+        @AuraEnabled public Integer agingDays;
+        @AuraEnabled public String customerPhone;
+        @AuraEnabled public String customerEmail;
+        @AuraEnabled public String odometer;
+        @AuraEnabled public DateTime appCreatedDate;
     }
 
     @AuraEnabled
@@ -38,13 +49,21 @@ public without sharing class DealerActionBoardController {
         Id dealerAccountId = contacts[0].AccountId;
 
         List<Application__c> apps = [
-            SELECT Id, Name, Customer_Name__r.Name, Vehicle_Year__c, Vehicle_Make__c,
-                   Vehicle_Model__c, Vehicle_Trim__c, Vehicle_VIN__c, Payment_Status__c,
+            SELECT Id, Name, CreatedDate,
+                   Customer_Name__r.Name, Customer_Name__r.Phone,
+                   Vehicle_Year__c, Vehicle_Make__c,
+                   Vehicle_Model__c, Vehicle_Trim__c, Vehicle_VIN__c,
+                   Odometer__c,
+                   Payment_Status__c,
                    (SELECT Id, RecordType.Name, Contract_Cost_Price__c,
                            Contract_Cost_Price_Without_Tax__c, Tax_Amount_Cost__c, Tax_Percentage__c
                     FROM Application_Packages__r
                     WHERE Active__c = true
-                    ORDER BY RecordType.Name ASC)
+                    ORDER BY RecordType.Name ASC),
+                   (SELECT Id, Status__c, Invoice_Due_Date__c, Total_Balance_Amount__c, Amount__c
+                    FROM Invoice__r
+                    ORDER BY CreatedDate DESC
+                    LIMIT 1)
             FROM Application__c
             WHERE Dealer_Name__c = :dealerAccountId
               AND Application_Status__c = 'Submitted'
@@ -55,10 +74,22 @@ public without sharing class DealerActionBoardController {
 
         List<UnpaidApplicationRow> result = new List<UnpaidApplicationRow>();
         for (Application__c app : apps) {
+            // Post-filter: skip if invoice exists, is Paid, and balance <= 0
+            if (!app.Invoice__r.isEmpty()) {
+                Invoice__c inv = app.Invoice__r[0];
+                if (inv.Status__c == 'Paid' && (inv.Total_Balance_Amount__c == null || inv.Total_Balance_Amount__c <= 0)) {
+                    continue;
+                }
+            }
+
             UnpaidApplicationRow row = new UnpaidApplicationRow();
             row.id = app.Id;
             row.appNumber = app.Name;
             row.customerName = app.Customer_Name__r != null ? app.Customer_Name__r.Name : '';
+            row.appCreatedDate = app.CreatedDate;
+            row.customerPhone = app.Customer_Name__r != null ? app.Customer_Name__r.Phone : '';
+            row.customerEmail = ''; // Account does not have a standard Email field
+            row.odometer = app.Odometer__c != null ? String.valueOf(app.Odometer__c) : '';
 
             List<String> parts = new List<String>();
             if (app.Vehicle_Year__c != null) parts.add(String.valueOf(app.Vehicle_Year__c));
@@ -102,6 +133,29 @@ public without sharing class DealerActionBoardController {
             row.total = totalAmt;
             row.taxAmount = taxAmt;
             row.taxPercentage = taxPct;
+
+            // Invoice fields from subquery
+            if (!app.Invoice__r.isEmpty()) {
+                Invoice__c inv = app.Invoice__r[0];
+                row.invoiceId = inv.Id;
+                row.hasInvoice = true;
+                row.invoiceStatus = inv.Status__c;
+                row.invoiceBalance = inv.Total_Balance_Amount__c;
+                row.invoiceDueDate = inv.Invoice_Due_Date__c;
+                if (inv.Invoice_Due_Date__c != null) {
+                    Integer daysBetween = Date.today().daysBetween(inv.Invoice_Due_Date__c) * -1;
+                    row.agingDays = daysBetween < 0 ? 0 : daysBetween;
+                } else {
+                    row.agingDays = 0;
+                }
+            } else {
+                row.hasInvoice = false;
+                row.invoiceId = null;
+                row.invoiceStatus = null;
+                row.invoiceBalance = null;
+                row.invoiceDueDate = null;
+                row.agingDays = 0;
+            }
 
             result.add(row);
         }

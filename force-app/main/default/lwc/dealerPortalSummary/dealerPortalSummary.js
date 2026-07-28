@@ -72,6 +72,8 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
 
     @track packageHasFiles = false;
     @track packageFileCount = 0;
+    @track showInvoicePromptModal = false;
+    @track invoicePromptLoading = false;
     
     connectedCallback() {
         console.log('🎯 DealerPortalSummary connected');
@@ -202,6 +204,9 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
             }
 
             this.error = undefined;
+
+            // Enrich summary packages with optionalOptionsList from packageData
+            this._enrichPackageOptions();
             
         } catch (error) {
             console.error('Error loading data:', error);
@@ -296,6 +301,47 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     
     get hasInvoice() {
         return !!this.invoiceId;
+    }
+
+    get showCreateInvoiceButton() {
+        // Visible only when submitted + no invoice yet
+        return this.isApplicationSubmitted && !this.hasInvoice && !this.isBusy;
+    }
+
+    /**
+     * Cross-reference packageData (which has the clean included/optional split)
+     * into summaryData packages so the HTML can render two distinct sections.
+     * summaryData.additionalOptionsPurchased = Included option names (cost in package price).
+     * packageData.optionalOptions = user-selected add-ons with their own price.
+     */
+    _enrichPackageOptions() {
+        if (!this.summaryData.applicationPackages || !this.packageData.recordTypeWrappers) return;
+        const pkgDataMap = new Map();
+        for (const rtw of this.packageData.recordTypeWrappers) {
+            for (const pw of (rtw.packages || [])) {
+                if (pw.pkg && pw.pkg.Id) {
+                    pkgDataMap.set(pw.pkg.Id, pw);
+                }
+            }
+        }
+        const fmt = v => v != null
+            ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v)
+            : '';
+        for (const rtw of this.summaryData.applicationPackages) {
+            for (const pw of (rtw.packages || [])) {
+                const pkgId = pw.pkg && pw.pkg.Id ? pw.pkg.Id : null;
+                const matched = pkgId ? pkgDataMap.get(pkgId) : null;
+                const opts = matched && matched.optionalOptions ? matched.optionalOptions : [];
+                pw.optionalOptionsList = opts.map(opt => ({
+                    label: opt.Option__c
+                        || (opt.Package_Option__r && opt.Package_Option__r.Name)
+                        || 'Unknown',
+                    price: opt.Package_Option__r && opt.Package_Option__r.Price__c != null
+                        ? fmt(opt.Package_Option__r.Price__c)
+                        : ''
+                }));
+            }
+        }
     }
 
     /**
@@ -526,86 +572,38 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
                 return;
             }
             
-            console.log('📨 Calling updateApplicationStatus, createInvoice, and generatePDF in parallel for:', appId);
-            
-            // Execute all three methods in parallel using Promise.all
-            const [statusResponse, invoiceResponse, pdfResponse] = await Promise.all([
-                updateApplicationStatus({ 
-                    applicationId: appId, 
-                    status: 'Submitted' 
-                }),
-                createInvoiceOnApplicationSubmit({ 
-                    applicationId: appId 
-                }),
-                generateAndAttachPDF({ 
-                    applicationId: appId 
-                })
-            ]);
-            
+            console.log('📨 Calling updateApplicationStatus for:', appId);
+
+            // Step 1: Update status only (no PDF, no invoice yet)
+            const statusResponse = await updateApplicationStatus({
+                applicationId: appId,
+                status: 'Submitted'
+            });
+
             console.log('📨 Status response:', statusResponse);
-            console.log('📋 Invoice response:', invoiceResponse);
-            console.log('📄 PDF response:', pdfResponse);
-            
+
             if (!statusResponse?.success) {
                 throw new Error(statusResponse?.message || 'Application submission failed');
             }
-            
-            // Success! Application submitted
+
             console.log('✅ Application submitted successfully');
-            
-            // Check invoice creation result
-            if (!invoiceResponse?.success) {
-                console.warn('⚠️ Invoice creation failed:', invoiceResponse?.message);
-            } else {
-                console.log('✅ Invoice created successfully:', invoiceResponse?.invoiceId);
-                this.invoiceId = invoiceResponse.invoiceId;
-            }
-            
-            // Check PDF generation result
-            if (!pdfResponse?.success) {
-                console.warn('⚠️ PDF generation completed but with issues:', pdfResponse?.message);
-            } else {
-                console.log('✅ PDF generated successfully');
-            }
-            
-            // Update local application data to reflect the new status
+
+            // Update local state
             this.applicationData = {
                 ...this.applicationData,
                 status: 'Submitted'
             };
-            
-            // Show success toast
-            this.showToast('Success',
-                'Application submitted successfully, invoice created, and PDF generated!',
-                'success'
-            );
 
-            // Dispatch event to parent container to update application status imperatively
-            // This bypasses wire adapter caching and ensures immediate UI update
+            // Dispatch event to parent container to update application status
             console.log('📡 Dispatching applicationstatuschanged event to parent');
             this.dispatchEvent(new CustomEvent('applicationstatuschanged', {
-                detail: {
-                    newStatus: 'Submitted'
-                },
+                detail: { newStatus: 'Submitted' },
                 bubbles: true,
                 composed: true
             }));
 
-            // Reload data to reflect the changes
-            await this.loadData();
-
-            // Navigate to the created invoice
-            if (invoiceResponse?.success && invoiceResponse?.invoiceId) {
-                console.log('🧾 Navigating to invoice:', invoiceResponse.invoiceId);
-                this[NavigationMixin.Navigate]({
-                    type: 'standard__recordPage',
-                    attributes: {
-                        recordId: invoiceResponse.invoiceId,
-                        objectApiName: 'Invoice__c',
-                        actionName: 'view'
-                    }
-                });
-            }
+            // Step 2: Show invoice confirmation modal — do NOT navigate yet
+            this.showInvoicePromptModal = true;
             
         } catch (error) {
             console.error('❌ Submit Application error:', error);
@@ -634,6 +632,72 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
                 actionName: 'view'
             }
         });
+    }
+
+    async handleInvoicePromptYes() {
+        const appId = this.effectiveApplicationId;
+        if (!appId) return;
+        this.invoicePromptLoading = true;
+        try {
+            const invoiceResponse = await createInvoiceOnApplicationSubmit({ applicationId: appId });
+            if (invoiceResponse?.success && invoiceResponse?.invoiceId) {
+                this.invoiceId = invoiceResponse.invoiceId;
+                this.showInvoicePromptModal = false;
+                this[NavigationMixin.Navigate]({
+                    type: 'standard__recordPage',
+                    attributes: {
+                        recordId: invoiceResponse.invoiceId,
+                        objectApiName: 'Invoice__c',
+                        actionName: 'view'
+                    }
+                });
+            } else {
+                this.showToast('Warning', invoiceResponse?.message || 'Invoice creation failed.', 'warning');
+                this.showInvoicePromptModal = false;
+                await this.loadData();
+                await this.calculateTotal();
+            }
+        } catch (error) {
+            const msg = error?.body?.message || error?.message || 'Failed to create invoice';
+            this.showToast('Error', msg, 'error');
+            this.showInvoicePromptModal = false;
+        } finally {
+            this.invoicePromptLoading = false;
+        }
+    }
+
+    async handleInvoicePromptNo() {
+        this.showInvoicePromptModal = false;
+        await this.loadData();
+        await this.calculateTotal();
+    }
+
+    async handleCreateInvoice() {
+        const appId = this.effectiveApplicationId;
+        if (!appId) return;
+        this.isBusy = true;
+        try {
+            const invoiceResponse = await createInvoiceOnApplicationSubmit({ applicationId: appId });
+            if (invoiceResponse && invoiceResponse.success && invoiceResponse.invoiceId) {
+                this.invoiceId = invoiceResponse.invoiceId;
+                this.showToast('Success', 'Invoice created successfully!', 'success');
+                this[NavigationMixin.Navigate]({
+                    type: 'standard__recordPage',
+                    attributes: {
+                        recordId: invoiceResponse.invoiceId,
+                        objectApiName: 'Invoice__c',
+                        actionName: 'view'
+                    }
+                });
+            } else {
+                this.showToast('Warning', (invoiceResponse && invoiceResponse.message) || 'Invoice creation failed.', 'warning');
+            }
+        } catch (error) {
+            const msg = (error && error.body && error.body.message) || (error && error.message) || 'Failed to create invoice';
+            this.showToast('Error', msg, 'error');
+        } finally {
+            this.isBusy = false;
+        }
     }
 
     handleConvertToApplication() {

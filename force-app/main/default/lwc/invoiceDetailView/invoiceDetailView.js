@@ -1,6 +1,8 @@
 import { LightningElement, api, track } from 'lwc';
 import { NavigationMixin } from 'lightning/navigation';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import APROTECT_LOGO from '@salesforce/resourceUrl/AProtectLogo';
+import THANKYOU_BANNER from '@salesforce/resourceUrl/ThankYouBanner';
 import getInvoiceDetail from '@salesforce/apex/InvoiceDetailViewController.getInvoiceDetail';
 import downloadInvoicePDF from '@salesforce/apex/InvoiceDetailViewController.downloadInvoicePDF';
 import createRemittanceForInvoice from '@salesforce/apex/InvoiceDetailViewController.createRemittanceForInvoice';
@@ -8,6 +10,9 @@ import submitCancellationRequest from '@salesforce/apex/InvoiceDetailViewControl
 
 export default class InvoiceDetailView extends NavigationMixin(LightningElement) {
     @api recordId;
+
+    get aprotectLogoUrl() { return APROTECT_LOGO; }
+    get thankYouBannerUrl() { return THANKYOU_BANNER; }
 
     @track isLoading = false;
     @track invoiceData = null;
@@ -266,11 +271,18 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
     }
 
     transform(raw) {
+        const subTotal = raw.subTotal != null ? raw.subTotal : null;
+        const taxTotal = raw.taxTotal != null ? raw.taxTotal : null;
+        // Derive blended tax rate display (e.g. "13" for HST ON 13%)
+        const blendedTaxRate = (subTotal && taxTotal && subTotal > 0)
+            ? parseFloat((taxTotal / subTotal * 100).toFixed(2))
+            : null;
         return {
             invoiceName:         raw.invoiceName,
             invoiceDate:         raw.invoiceDate,
+            dueDate:             raw.dueDate || null,
             invoiceStatus:       raw.invoiceStatus,
-            statusClass:         'invoice-status ' + this.statusClass(raw.invoiceStatus),
+            statusClass:         this.statusClass(raw.invoiceStatus),
             hasRemittanceForm:   raw.hasRemittanceForm === true,
             hasPaymentInitiated: raw.hasPaymentInitiated === true,
             dealerName:          raw.dealerName,
@@ -282,13 +294,16 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
             vehicleInfo:      raw.vehicleInfo,
             vin:              raw.vin,
             formattedOdometer: raw.odometer != null
-                ? parseFloat(raw.odometer).toFixed(2) + ' ' + (raw.odometerUnit || 'KM')
+                ? parseFloat(raw.odometer).toLocaleString('en-CA') + ' ' + (raw.odometerUnit || 'KM')
                 : null,
             packages:        this.transformPackages(raw.packages || [], raw.hasPaymentInitiated === true),
             hasPackages:     (raw.packages || []).length > 0,
             packageCount:    raw.packageCount || 0,
             formattedTotal:   this.formatCurrency(raw.totalAmount),
-            formattedBalance: this.formatCurrency(raw.balanceAmount != null ? raw.balanceAmount : raw.totalAmount)
+            formattedBalance: this.formatCurrency(raw.balanceAmount != null ? raw.balanceAmount : raw.totalAmount),
+            formattedSubTotal: subTotal != null ? this.formatCurrency(subTotal) : null,
+            formattedTaxTotal: taxTotal != null ? this.formatCurrency(taxTotal) : null,
+            blendedTaxRate:    blendedTaxRate != null ? blendedTaxRate : ''
         };
     }
 
@@ -304,13 +319,19 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
             const basePriceWithoutTax = pkg.basePriceWithoutTax || 0;
             const displayBasePrice = basePriceWithoutTax - premiumModelFee;
 
+            // Line total = base price + add-ons + premium fee (excluding tax)
+            const baseWithAddons = (pkg.baseCostPrice || 0) + (pkg.addOnsTotal || 0) + (hasPremiumModelFee ? premiumModelFee : 0);
             return {
                 packageId:    pkg.packageId,
                 recordTypeName: pkg.recordTypeName,
                 packageName:  pkg.packageName,
                 packageTerm:  pkg.packageTerm,
+                coverageLabel: pkg.coverageLabel || null,
                 startDate:    pkg.startDate,
                 expiryDate:   pkg.expiryDate,
+                categoryRowKey: pkg.packageId + '-cat',
+                premiumRowKey: pkg.packageId + '-premium',
+                formattedLineTotal: this.formatCurrency(baseWithAddons),
                 formattedStartOdometer: pkg.startOdometer != null
                     ? this.formatNumber(pkg.startOdometer) + ' KM'
                     : null,

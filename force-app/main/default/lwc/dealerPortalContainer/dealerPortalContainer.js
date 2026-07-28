@@ -9,7 +9,7 @@ import generateQuotePDF from '@salesforce/apex/QuotePDFGeneratorService.generate
 import communityBasePath from '@salesforce/community/basePath';
 
 /**
- * 🔓 TAB LOCKING TEMPORARILY DISABLED
+ * TAB LOCKING TEMPORARILY DISABLED
  * 
  * All tabs are now accessible without completion requirements.
  * To re-enable tab locking, simply uncomment the original logic in the canAccessTab method.
@@ -54,8 +54,6 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     };
     
     connectedCallback() {
-        console.log('🏢 Container component connected');
-        console.log('🏢 Initial applicationId:', this._applicationId);
         
         // Try to get application ID from URL or record context
         this.tryToGetApplicationIdFromContext();
@@ -68,25 +66,21 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         // Check for existing warranty packages after a delay to allow child components to load
         setTimeout(() => {
             this.checkForExistingWarrantyPackage();
-        }, 2000);
+        }, 2000);''
     }
     
     // Imperative method to load application status
     async loadApplicationStatus() {
         try {
-            console.log('🔄 Loading application status imperatively for:', this._applicationId);
             const result = await getApplicationStatus({ applicationId: this._applicationId });
 
             if (result) {
-                console.log('📋 Application status loaded:', result);
                 this.applicationStatus = result.Application_Status__c;
                 this.applicationLockDate = result.Application_Lock_Date__c;
                 this.applicationPaymentStatus = result.Payment_Status__c;
-                console.log('✅ Application status set to:', this.applicationStatus);
 
                 // If the application is locked, force the user to the Summary tab only
                 if (this.isApplicationLocked) {
-                    console.log('🔒 Application is locked — forcing Summary tab');
                     this.activeTab = 'summary';
                 }
             }
@@ -99,7 +93,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     tryToGetApplicationIdFromContext() {
         // Method 1: Check if applicationId was passed via @api
         if (this._applicationId) {
-            console.log('🏢 ApplicationId already set via @api:', this._applicationId);
+            console.log('ApplicationId already set via @api:', this._applicationId);
             return;
         }
         
@@ -108,22 +102,16 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         const applicationIdFromUrl = urlParams.get('c__applicationId') || urlParams.get('applicationId');
         
         if (applicationIdFromUrl) {
-            console.log('🏢 ApplicationId found in URL:', applicationIdFromUrl);
             this._applicationId = applicationIdFromUrl;
-            console.log('🏢 Setting applicationId from URL:', this._applicationId);
             return;
         }
         
         // Method 3: Try to get from record ID if this is on a record page
         const recordId = this.getRecordIdFromUrl();
         if (recordId && recordId.startsWith('a01')) { // Application object starts with a01
-            console.log('🏢 ApplicationId found from record context:', recordId);
             this._applicationId = recordId;
-            console.log('🏢 Setting applicationId from record context:', this._applicationId);
             return;
         }
-        
-        console.log('⚠️ No applicationId found in context, URL, or record');
     }
     
     // Helper method to extract record ID from URL
@@ -242,18 +230,15 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
     
     handleWarrantyComplete(event) {
-        console.log('✅ Warranty tab completed');
-        console.log('🔍 Warranty completion event details:', event.detail);
         
         // Mark warranty tab as completed
         this.markTabAsCompleted('warranty');
         
         // Only auto-navigate if this is NOT an auto-selection
         if (!event.detail.autoSelected) {
-            console.log('🔄 Auto-navigating to More Products tab');
             this.switchToTab('moreProducts');
         } else {
-            console.log('⏸️ Auto-selection detected, staying on warranty tab');
+            console.log('Auto-selection detected, staying on warranty tab');
         }
     }
     
@@ -453,7 +438,6 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
 
     switchToTab(tabName) {
-        console.log(`🔄 Attempting to switch to tab: ${tabName}`);
 
         // When locked, only the Summary tab is visible and accessible
         if (this.isApplicationLocked && tabName !== 'summary') {
@@ -461,35 +445,39 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
             return;
         }
 
-
+        /*
         console.log(`🔒 Tab access check:`, {
             tabName,
             canAccess: this.canAccessTab(tabName),
             completionStatus: this.tabCompletionStatus,
             dependencies: this.tabDependencies[tabName] || []
         });
+        */
         
         if (this.canAccessTab(tabName)) {
+            /*
             console.log('✅ Switching to tab:', tabName);
             console.log('🔍 activeTab before assignment:', this.activeTab);
+            */
             this.activeTab = tabName;
-            console.log('🔍 activeTab after assignment:', this.activeTab);
+            //console.log('🔍 activeTab after assignment:', this.activeTab);
             
             // Notify tab activation after a short delay to ensure DOM is ready
             setTimeout(() => {
-                console.log('🔍 Notifying tab activation for:', tabName);
+                //console.log('🔍 Notifying tab activation for:', tabName);
                 this.notifyTabActivated(tabName);
             }, 100);
         } else {
-            console.log(`❌ Cannot access tab ${tabName} - dependencies not met`);
+            console.log(`Cannot access tab ${tabName} - dependencies not met`);
+            /*
             console.log(`📋 Required dependencies:`, this.tabDependencies[tabName] || []);
             console.log(`📊 Current completion status:`, this.tabCompletionStatus);
+            */
         }
     }
 
     canAccessTab(tabName) {
         // 🔓 TAB LOCKING TEMPORARILY DISABLED - All tabs are accessible
-        console.log(`🔓 Tab access check for ${tabName}: LOCKING DISABLED - All tabs accessible`);
         return true;
         
         // 🔒 ORIGINAL LOCKING LOGIC (COMMENTED OUT FOR LATER RE-IMPLEMENTATION):
@@ -522,10 +510,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     
     // Method to mark a tab as completed
     markTabAsCompleted(tabName) {
-        console.log(`✅ Marking tab ${tabName} as completed`);
-        console.log(`🔍 Before update - tabCompletionStatus:`, JSON.stringify(this.tabCompletionStatus));
         this.tabCompletionStatus[tabName] = true;
-        console.log(`🔍 After update - tabCompletionStatus:`, JSON.stringify(this.tabCompletionStatus));
         
         // Check if we can unlock next tabs
         this.checkAndUnlockNextTabs();
@@ -557,29 +542,30 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     // Method to check for existing warranty packages and unlock warranty tab
     async checkForExistingWarrantyPackage() {
         if (!this._applicationId) {
-            console.log('⚠️ No applicationId available for warranty package check');
+            console.log('No applicationId available for warranty package check');
             return;
         }
         
         try {
-            console.log('🔍 Checking for existing warranty packages in container...');
+            console.log('Checking for existing warranty packages in container...');
             
             // Get the warranty component
             const warrantyComponent = this.template.querySelector('c-dealer-portal-warranty');
             if (warrantyComponent && typeof warrantyComponent.checkForExistingApplicationPackage === 'function') {
-                console.log('🔍 Calling checkForExistingApplicationPackage on warranty component');
                 await warrantyComponent.checkForExistingApplicationPackage();
             } else {
-                console.log('⚠️ Warranty component not found or method not available');
+                console.log('Warranty component not found or method not available');
             }
         } catch (error) {
-            console.error('❌ Error checking for existing warranty package:', error);
+            console.error('Error checking for existing warranty package:', error);
         }
     }
 
     notifyTabActivated(tabName) {
+        /*
         console.log('🔄 Notifying tab activated:', tabName);
         console.log('🔄 Current applicationId:', this._applicationId);
+        */
         
         // Call onTabActivated on the appropriate component
         this.callOnTabActivated(tabName);
@@ -611,15 +597,19 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
             }
             
             if (component && typeof component.onTabActivated === 'function') {
+                /*
                 console.log('🎯 ===== CALLING onTabActivated on', tabName, 'component =====');
                 console.log('🔄 Component found:', !!component);
                 console.log('🔄 Method exists:', typeof component.onTabActivated);
+                */
                 component.onTabActivated();
-                console.log('✅ onTabActivated called successfully on', tabName);
+                //console.log('✅ onTabActivated called successfully on', tabName);
             } else {
-                console.log('❌ Component or onTabActivated method not found for', tabName);
+                console.log('Component or onTabActivated method not found for', tabName);
+                /*
                 console.log('🔍 Component:', !!component);
                 console.log('🔍 Method type:', component ? typeof component.onTabActivated : 'N/A');
+                */
             }
         } catch (error) {
             console.error('❌ Error calling onTabActivated:', error);

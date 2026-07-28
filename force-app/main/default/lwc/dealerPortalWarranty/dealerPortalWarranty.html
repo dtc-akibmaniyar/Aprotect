@@ -110,37 +110,21 @@
                                                                         <template if:true={tier.hasTerms}>
                                                                             <div class="term-group term-group-two-column">
                                                                                 <template for:each={tier.terms} for:item="term">
-                                                                                    <template if:false={fieldDisabled}>
-                                                                                        <button 
-                                                                                            key={term.id}
-                                                                                            type="button"
-                                                                                            class={term.rowClass}
-                                                                                            data-term={term.id}
-                                                                                            data-package={term.packageId}
-                                                                                            onclick={handleWarrantyTermSelection}>
-                                                                                            <div class="term-row-left">
-                                                                                                <div class="term-row-title">{term.name}</div>
-                                                                                            </div>
-                                                                                            <div class="term-row-right">
-                                                                                                <span class="term-row-price">{term.price}</span>
-                                                                                            </div>
-                                                                                        </button>
-                                                                                    </template>
-                                                                                    <template if:true={fieldDisabled}>
-                                                                                        <button 
-                                                                                            key={term.id}
-                                                                                            type="button"
-                                                                                            class={term.rowClass}
-                                                                                            data-term={term.id}
-                                                                                            data-package={term.packageId}>
-                                                                                            <div class="term-row-left">
-                                                                                                <div class="term-row-title">{term.name}</div>
-                                                                                            </div>
-                                                                                            <div class="term-row-right">
-                                                                                                <span class="term-row-price">{term.price}</span>
-                                                                                            </div>
-                                                                                        </button>
-                                                                                    </template>
+                                                                                    <button
+                                                                                        key={term.uniqueKey}
+                                                                                        type="button"
+                                                                                        class={term.rowClass}
+                                                                                        data-term={term.id}
+                                                                                        data-package={term.packageId}
+                                                                                        data-tier={term.tierId}
+                                                                                        onclick={handleWarrantyTermSelection}>
+                                                                                        <div class="term-row-left">
+                                                                                            <div class="term-row-title">{term.name}</div>
+                                                                                        </div>
+                                                                                        <div class="term-row-right">
+                                                                                            <span class="term-row-price">{term.price}</span>
+                                                                                        </div>
+                                                                                    </button>
                                                                                 </template>
                                                                             </div>
                                                                         </template>
@@ -160,37 +144,20 @@
                                                             <template if:true={pkg.hasTerms}>
                                                                 <div class="term-group term-group-two-column">
                                                                     <template for:each={pkg.terms} for:item="term">
-                                                                        <template if:false={fieldDisabled}>
-                                                                            <button 
-                                                                                key={term.id}
-                                                                                type="button"
-                                                                                class={term.rowClass}
-                                                                                data-term={term.id}
-                                                                                data-package={term.packageId}
-                                                                                onclick={handleWarrantyTermSelection}>
-                                                                                <div class="term-row-left">
-                                                                                    <div class="term-row-title">{term.name}</div>
-                                                                                </div>
-                                                                                <div class="term-row-right">
-                                                                                    <span class="term-row-price">{term.price}</span>
-                                                                                </div>
-                                                                            </button>
-                                                                        </template>
-                                                                        <template if:true={fieldDisabled}>
-                                                                            <button 
-                                                                                key={term.id}
-                                                                                type="button"
-                                                                                class={term.rowClass}
-                                                                                data-term={term.id}
-                                                                                data-package={term.packageId}>
-                                                                                <div class="term-row-left">
-                                                                                    <div class="term-row-title">{term.name}</div>
-                                                                                </div>
-                                                                                <div class="term-row-right">
-                                                                                    <span class="term-row-price">{term.price}</span>
-                                                                                </div>
-                                                                            </button>
-                                                                        </template>
+                                                                        <button
+                                                                            key={term.uniqueKey}
+                                                                            type="button"
+                                                                            class={term.rowClass}
+                                                                            data-term={term.id}
+                                                                            data-package={term.packageId}
+                                                                            onclick={handleWarrantyTermSelection}>
+                                                                            <div class="term-row-left">
+                                                                                <div class="term-row-title">{term.name}</div>
+                                                                            </div>
+                                                                            <div class="term-row-right">
+                                                                                <span class="term-row-price">{term.price}</span>
+                                                                            </div>
+                                                                        </button>
                                                                     </template>
                                                                 </div>
                                                             </template>
@@ -606,6 +573,24 @@
                                                 <span class="dcs-info-icon" tabindex="0">
                                                     &#9432;
                                                     <span class="dcs-info-tooltip">Additional charge will apply for the following makes: Acura, Alfa Romeo, Aston Martin, Audi, Bentley, BMW, Bugatti, Cadillac, DMC, Ferrari, Genesis, Infiniti, Jaguar, Lamborghini, Land Rover, Lexus, Lincoln, Lotus, Lucid, Maserati, McLaren, Mercedes, Polestar, Porsche, Rivian, Rolls Royce, Tesla, Volvo.<br/><strong>*List is subject to change without notice.</strong></span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Fees Section (Commercial Vehicle Surcharge Fee) -->
+                                    <template if:true={hasCommercialSurchargeFee}>
+                                        <div class="dcs-section-label">Fees</div>
+                                        <div class="dcs-row dcs-row-fee">
+                                            <div class="dcs-row-left">
+                                                <span class="dcs-item-name">Commercial Vehicle Surcharge</span>
+                                                <span class="dcs-item-badge">Auto-applied</span>
+                                            </div>
+                                            <div class="dcs-fee-price-wrap">
+                                                <span class="dcs-item-price">+{formattedCommercialSurchargeFee}</span>
+                                                <span class="dcs-info-icon" tabindex="0">
+                                                    &#9432;
+                                                    <span class="dcs-info-tooltip">Additional surcharge applies for commercial/business use vehicles.</span>
                                                 </span>
                                             </div>
                                         </div>

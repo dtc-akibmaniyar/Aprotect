@@ -57,9 +57,7 @@ export default class DealerActionBoard extends NavigationMixin(LightningElement)
     // Make Payment modal state
     @track showMakePaymentModal = false;
     @track unpaidApplications = [];
-    @track selectedAppIds = [];
     @track isLoadingApplications = false;
-    @track isCreatingRemittance = false;
 
     // Unpaid application count (loaded on init for badge)
     @track unpaidAppCount = 0;
@@ -241,62 +239,9 @@ export default class DealerActionBoard extends NavigationMixin(LightningElement)
         }
     }
 
-    // Make Payment Modal Getters
-    _formatCurrency(amount) {
-        if (amount == null) return '$0.00';
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-    }
-
-    get hasUnpaidApplications() {
-        return this.unpaidApplications && this.unpaidApplications.length > 0;
-    }
-
-    get applicationsWithSelection() {
-        const selectedSet = new Set(this.selectedAppIds);
-        return this.unpaidApplications.map(app => {
-            const packages = (app.packages || []).map(pkg => ({
-                ...pkg,
-                formattedPrice: this._formatCurrency(pkg.price)
-            }));
-            return {
-                ...app,
-                isSelected: selectedSet.has(app.id),
-                packages,
-                formattedSubTotal: this._formatCurrency(app.subTotal),
-                formattedTotal: this._formatCurrency(app.total)
-            };
-        });
-    }
-
-    get isAllAppsSelected() {
-        return this.unpaidApplications.length > 0 &&
-               this.selectedAppIds.length === this.unpaidApplications.length;
-    }
-
-    get selectedCount() {
-        return this.selectedAppIds.length;
-    }
-
-    get totalAppCount() {
-        return this.unpaidApplications.length;
-    }
-
-    get remittanceFormTotalFormatted() {
-        const selectedSet = new Set(this.selectedAppIds);
-        const total = this.unpaidApplications
-            .filter(app => selectedSet.has(app.id))
-            .reduce((sum, app) => sum + (app.total || 0), 0);
-        return this._formatCurrency(total);
-    }
-
-    get isCreateRemittanceDisabled() {
-        return this.selectedAppIds.length === 0 || this.isCreatingRemittance;
-    }
-
     // Make Payment Modal Handlers
     async handleOpenMakePaymentModal() {
         this.showMakePaymentModal = true;
-        this.selectedAppIds = [];
         this.unpaidApplications = [];
         this.isLoadingApplications = true;
         try {
@@ -317,33 +262,12 @@ export default class DealerActionBoard extends NavigationMixin(LightningElement)
     handleCloseMakePaymentModal() {
         this.showMakePaymentModal = false;
         this.unpaidApplications = [];
-        this.selectedAppIds = [];
     }
 
-    handleAppCheckboxChange(event) {
-        const appId = event.currentTarget.dataset.id;
-        const isChecked = event.target.checked;
-        if (isChecked) {
-            if (!this.selectedAppIds.includes(appId)) {
-                this.selectedAppIds = [...this.selectedAppIds, appId];
-            }
-        } else {
-            this.selectedAppIds = this.selectedAppIds.filter(id => id !== appId);
-        }
-    }
-
-    handleSelectAllApps(event) {
-        if (event.target.checked) {
-            this.selectedAppIds = this.unpaidApplications.map(app => app.id);
-        } else {
-            this.selectedAppIds = [];
-        }
-    }
-
-    async handleCreateRemittanceForm() {
-        this.isCreatingRemittance = true;
+    async handleCreateRemittanceFromModal(event) {
+        const { applicationIds } = event.detail;
         try {
-            const result = await createRemittanceForm({ applicationIds: this.selectedAppIds });
+            const result = await createRemittanceForm({ applicationIds });
             if (result.success && result.remittanceFormId) {
                 this.handleCloseMakePaymentModal();
                 this[NavigationMixin.Navigate]({
@@ -364,13 +288,7 @@ export default class DealerActionBoard extends NavigationMixin(LightningElement)
             }
         } catch (err) {
             const msg = (err && err.body && err.body.message) || err.message || JSON.stringify(err);
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Error',
-                message: msg,
-                variant: 'error'
-            }));
-        } finally {
-            this.isCreatingRemittance = false;
+            this.dispatchEvent(new ShowToastEvent({ title: 'Error', message: msg, variant: 'error' }));
         }
     }
 

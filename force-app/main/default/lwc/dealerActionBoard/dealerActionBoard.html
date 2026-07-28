@@ -99,122 +99,12 @@
 
     <!-- Make Payment Modal -->
     <template if:true={showMakePaymentModal}>
-        <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="modal-heading-make-payment" class="slds-modal slds-fade-in-open">
-            <div class="make-payment-modal">
-                <!-- Close button -->
-                <button class="mpm-close-btn" onclick={handleCloseMakePaymentModal} aria-label="Close">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M18 6L6 18M6 6L18 18" stroke="#444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-
-                <!-- Title -->
-                <div class="mpm-title-area">
-                    <h2 class="mpm-title" id="modal-heading-make-payment">Remittance Form</h2>
-                </div>
-
-                <!-- Content -->
-                <div class="make-payment-modal-content">
-                    <template if:true={isLoadingApplications}>
-                        <div class="no-apps-msg">
-                            <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
-                        </div>
-                    </template>
-                    <template if:false={isLoadingApplications}>
-                        <template if:true={hasUnpaidApplications}>
-                            <!-- Fixed Table Header -->
-                            <div class="rf-table">
-                                <div class="rf-table-header">
-                                    <div class="rf-col-app">
-                                        <input type="checkbox" class="rf-select-all" checked={isAllAppsSelected} onchange={handleSelectAllApps} title="Select all" />
-                                        <span class="rf-select-all-label">Select All</span>
-                                        <span class="rf-header-separator">|</span>
-                                        APPLICATION
-                                    </div>
-                                    <div class="rf-col-invoice">INVOICE DETAILS</div>
-                                </div>
-
-                                <!-- Scrollable Application Rows -->
-                                <div class="rf-table-rows-scroll">
-                                    <template for:each={applicationsWithSelection} for:item="app">
-                                        <div key={app.id} class="rf-table-row">
-                                            <div class="rf-col-app rf-app-cell">
-                                                <div class="rf-app-id-row">
-                                                    <input
-                                                        type="checkbox"
-                                                        class="rf-row-checkbox"
-                                                        data-id={app.id}
-                                                        checked={app.isSelected}
-                                                        onchange={handleAppCheckboxChange}
-                                                    />
-                                                    <span class="rf-label">Application ID #</span>
-                                                    <span class="rf-value">{app.appNumber}</span>
-                                                </div>
-                                                <div class="rf-app-detail">
-                                                    <span class="rf-label">Customer Name</span>
-                                                    <span class="rf-value">{app.customerName}</span>
-                                                </div>
-                                                <div class="rf-app-detail">
-                                                    <span class="rf-label">Vehicle Year/Make/Model/Trim</span>
-                                                    <span class="rf-value">{app.vehicleInfo}</span>
-                                                </div>
-                                                <div class="rf-app-detail">
-                                                    <span class="rf-label">VIN #</span>
-                                                    <span class="rf-value">{app.vin}</span>
-                                                </div>
-                                            </div>
-                                            <div class="rf-col-invoice rf-invoice-cell">
-                                                <template for:each={app.packages} for:item="pkg">
-                                                    <div key={pkg.id} class="rf-invoice-line">
-                                                        <span class="rf-inv-label">{pkg.name}:</span>
-                                                        <span class="rf-inv-value">{pkg.formattedPrice}</span>
-                                                    </div>
-                                                </template>
-                                                <div class="rf-invoice-divider"></div>
-                                                <div class="rf-invoice-line">
-                                                    <span class="rf-inv-label">Sub Total:</span>
-                                                    <span class="rf-inv-value">{app.formattedSubTotal}</span>
-                                                </div>
-                                                <div class="rf-invoice-line rf-invoice-total">
-                                                    <span class="rf-inv-label"><strong>Total:</strong></span>
-                                                    <span class="rf-inv-value"><strong>{app.formattedTotal}</strong></span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </template>
-                                </div>
-                            </div>
-                        </template>
-                        <template if:false={hasUnpaidApplications}>
-                            <p class="no-apps-msg">No unpaid submitted applications found.</p>
-                        </template>
-                    </template>
-                </div>
-
-                <!-- Sticky Selection Summary (outside scrollable content) -->
-                <template if:true={hasUnpaidApplications}>
-                    <div class="rf-selection-summary">
-                        <div class="rf-summary-left">
-                            <span class="rf-summary-count">{selectedCount}</span>
-                            <span class="rf-summary-count-label"> of {totalAppCount} applications selected</span>
-                        </div>
-                        <div class="rf-summary-right">
-                            <span class="rf-summary-total-label">Total Payment Amount:</span>
-                            <span class="rf-summary-total-value">{remittanceFormTotalFormatted}</span>
-                        </div>
-                    </div>
-                </template>
-
-                <!-- Footer -->
-                <div class="make-payment-modal-footer">
-                    <button class="btn-create-remittance" onclick={handleCreateRemittanceForm} disabled={isCreateRemittanceDisabled}>
-                        <template if:false={isCreatingRemittance}>Continue to Remittance Form</template>
-                        <template if:true={isCreatingRemittance}>Creating...</template>
-                    </button>
-                </div>
-            </div>
-        </section>
-        <div class="slds-backdrop slds-backdrop_open" onclick={handleCloseMakePaymentModal}></div>
+        <c-dealer-make-payment-modal
+            unpaid-applications={unpaidApplications}
+            is-loading={isLoadingApplications}
+            onclose={handleCloseMakePaymentModal}
+            oncreateremittance={handleCreateRemittanceFromModal}>
+        </c-dealer-make-payment-modal>
     </template>
 
     <!-- New Quote Modal -->

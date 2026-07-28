@@ -617,15 +617,26 @@
                 <template if:true={loading}>
                     <lightning-spinner alternative-text="Loading..." size="small"></lightning-spinner>
                 </template>
-                <template if:true={showContinueButton}>
+                <template if:true={showNextButton}>
                     <button
                         type="button"
                         class="continue-button"
-                        onclick={handleContinue}
-                        disabled={isContinueDisabled}
-                        aria-label="Save & Continue">
-                        <span class="continue-label">Save & Continue</span>
+                        onclick={handleNextToDetailForm}
+                        aria-label="Next">
+                        <span class="continue-label">Next</span>
                     </button>
+                </template>
+                <template if:false={showNextButton}>
+                    <template if:true={showContinueButton}>
+                        <button
+                            type="button"
+                            class="continue-button"
+                            onclick={handleContinue}
+                            disabled={isContinueDisabled}
+                            aria-label="Save & Continue">
+                            <span class="continue-label">Save & Continue</span>
+                        </button>
+                    </template>
                 </template>
             </div>
         </div>

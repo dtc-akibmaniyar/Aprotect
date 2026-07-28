@@ -36,6 +36,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     @track selectedDealerPackage = null;
     @track selectedWarrantyTerm = null;
     @track isChangingSelection = false;
+    @track isOnDetailForm = false;
     @track showPriceModal = false;
     @track currentPriceBreakdown = {};
     @track dealerReferenceBreakdown = {};
@@ -138,11 +139,15 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     }
 
     get showPlanSelection() {
-        return this.isPlanSelectionView && (!this.hasSelectedTerm || this.isChangingSelection);
+        return this.isPlanSelectionView && !this.isOnDetailForm;
     }
 
     get showSelectedPlanView() {
-        return this.isPlanSelectionView && this.hasSelectedTerm && !this.isChangingSelection;
+        return this.isPlanSelectionView && this.isOnDetailForm;
+    }
+
+    get showNextButton() {
+        return this.isPlanSelectionView && !this.isOnDetailForm && this.hasSelectedTerm && !this.isLocked && !this.loading;
     }
 
     get formattedSelectedPrice() {
@@ -241,6 +246,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             if (savedData.selectedWarrantyTerm && savedData.selectedDealerPackage) {
                 this.selectedWarrantyTerm = savedData.selectedWarrantyTerm;
                 this.isChangingSelection = false;
+                this.isOnDetailForm = true;
                 console.log('✅ Restored selected warranty term from session:', this.selectedWarrantyTerm);
             } else if (savedData.selectedWarrantyTerm && !savedData.selectedDealerPackage) {
                 // Clear term if no package is selected
@@ -677,6 +683,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                         if (matchingTerm) {
                             this.selectedWarrantyTerm = matchingTerm;
                             this.isChangingSelection = false;
+                            this.isOnDetailForm = true;
                             console.log('✅ Auto-selected term:', matchingTerm.packageTermName || matchingTerm.Name);
                         }
                     }
@@ -986,6 +993,11 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
 
     handleChangePlanSelection() {
         this.isChangingSelection = true;
+        this.isOnDetailForm = false;
+    }
+
+    handleNextToDetailForm() {
+        this.isOnDetailForm = true;
     }
 
     // --- Dealer Pricing Modal Getters ---
@@ -2026,6 +2038,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             if (data.selectedWarrantyTerm && data.selectedDealerPackage) {
                 this.selectedWarrantyTerm = data.selectedWarrantyTerm;
                 this.isChangingSelection = false;
+                this.isOnDetailForm = true;
                 console.log('✅ Restored selected warranty term:', this.selectedWarrantyTerm);
             } else if (data.selectedWarrantyTerm && !data.selectedDealerPackage) {
                 // Clear term if no package is selected
@@ -2181,6 +2194,8 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         this.isPriceOverridden = false;
         this.isPriceEditMode = false;
         this.priceOverrideInput = '';
+        this._overridePreTaxPrice = null;
+        this._overrideTaxAmount = null;
         console.log('💰 === UPDATE PRICE START ===');
         console.log('💰 isExistingApplication:', this.isExistingApplication);
         console.log('💰 existingApplicationPackage:', this.existingApplicationPackage);

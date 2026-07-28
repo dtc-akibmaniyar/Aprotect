@@ -236,7 +236,7 @@ export default class DealerPortalVehicle extends LightningElement {
             warrantyInServiceDate: '',
             deferralOption: false,
             deliveryDate: '',
-        lienHolder: '',
+            lienHolder: '',
             usageType: 'Personal Use',
             vehicleCategory: '',
             vehicleSubType: '',
@@ -362,141 +362,142 @@ export default class DealerPortalVehicle extends LightningElement {
     // SCALABLE SOLUTION: Works for unlimited applications using session storage
     async loadVehicleData() {
         if (!this._applicationId) {
-            console.log('⚠️ No applicationId provided, skipping data load');
+            console.log('No applicationId provided, skipping data load');
             return;
         }
         
-        console.log('📥 Loading vehicle data for application:', this._applicationId);
+        console.log('Loading vehicle data for application:', this._applicationId);
         this.loading = true;
         
-                try {
+        try {
             // Load vehicle data using the correct parameter format
             console.log('📥 Loading vehicle data for application:', this._applicationId);
             
             // Call Apex with object-wrapped parameter
             const result = await loadVehicleData({ applicationId: this._applicationId });
         
-        if (result.success && result.data) {
-            const vehicleData = result.data;
-            
-            // Set vehicle ID from Apex response
-            if (result.recordId) {
-                this.vehicleId = result.recordId;
+            if (result.success && result.data) {
+                const vehicleData = result.data;
+                
+                // Set vehicle ID from Apex response
+                if (result.recordId) {
+                    this.vehicleId = result.recordId;
                     this.isNewRecord = false;
                 } else {
                     this.isNewRecord = true;
-            }
-            
-            // Map the DTO fields to our local vehicleData object
-            const businessCommercialUse = vehicleData.businessCommercialUse || false;
-            const loadedCategory = vehicleData.vehicleCategory || '';
-            this.vehicleCategory = loadedCategory;
-            this.vehicleSubType = vehicleData.vehicleSubType || '';
-            this.isPowersports = (loadedCategory === 'Powersports');
-            this.vehicleData = {
-                stockNumber: vehicleData.stockNumber || '',
-                vin: vehicleData.vin || '',
-                vehicleIdentificationNumberVIN: vehicleData.vehicleIdentificationNumberVIN || '',
-                year: vehicleData.year || '',
-                make: vehicleData.make || '',
-                model: vehicleData.model || '',
-                trim: vehicleData.trim || '',
-                dateSold: vehicleData.dateVehicleSold || '',
-                purchasePrice: vehicleData.vehiclePurchasePrice || '',
-                isCommercial: businessCommercialUse,
-                usageType: vehicleData.usageType || (businessCommercialUse ? 'Commercial/Business Use' : 'Personal Use'),
-                isBrandedRebuilt: vehicleData.brandedRebuilt || false,
-                inServiceDate: vehicleData.inServiceDate || '',
-                odometerReading: vehicleData.odometer || '',
-                odometerUnit: vehicleData.odometerUnit || 'KM',
-                commercialUse: vehicleData.typeOfCommercialUse || 'NON-COMMERCIAL',
-                // New Vehicle Details fields
-                engine: vehicleData.engine || '',
-                transmission: vehicleData.transmission || '',
-                fuelType: vehicleData.fuelType || '',
-                driveType: vehicleData.driveType || '',
-                bodyStyle: vehicleData.bodyStyle || '',
-                color: vehicleData.color || '',
-                gvwr: vehicleData.gvwr || '',
-                // Manufacturer Warranty fields
-                manufacturerWarrantyType: vehicleData.manufacturerWarrantyType || '',
-                warrantyTerm: vehicleData.warrantyTerm || '',
-                warrantyInServiceDate: vehicleData.warrantyInServiceDate || '',
-                deferralOption: vehicleData.deferralOption || false,
-                deliveryDate: vehicleData.deliveryDate || '',
-                lienHolder: vehicleData.lienHolder || '',
-                // Powersports fields
-                vehicleCategory: loadedCategory,
-                vehicleSubType: this.vehicleSubType,
-                engineCC: vehicleData.engineCC || '',
-                coolingType: vehicleData.coolingType || '',
-                hoursUsage: vehicleData.hoursUsage || '',
-                vehicleClass: vehicleData.vehicleClass || ''
-            };
-
-            // Populate Application fields
-            if (vehicleData.dealerCommentsNotes !== undefined) {
-                this.applicationData.dealerCommentsNotes = vehicleData.dealerCommentsNotes || '';
-            }
-            if (vehicleData.showCommentsOnPrint !== undefined) {
-                this.applicationData.showCommentsOnPrint = vehicleData.showCommentsOnPrint || false;
-            }
-            if (vehicleData.salesRepId) {
-                this.applicationData.salesRepresentative = vehicleData.salesRepId;
-            }
-            // dealerSalesId is now read-only and always comes from Account.Dealership_ID__c
-            // Don't override it from saved data - it will be set by loadDealershipInfo()
-            // Dealership info from loaded data
-            if (vehicleData.dealershipName) {
-                this.applicationData.dealershipName = vehicleData.dealershipName;
-            }
-            if (vehicleData.dealershipAddress) {
-                this.applicationData.dealershipAddress = vehicleData.dealershipAddress;
-            }
-            if (vehicleData.cityProvincePostal) {
-                this.applicationData.cityProvincePostal = vehicleData.cityProvincePostal;
-            }
-            
-            // Use account ID from loaded data if available, otherwise use the one from getDealershipInfo
-            if (vehicleData.dealershipAccountId) {
-                this.dealerAccountId = vehicleData.dealershipAccountId;
-            }
-            
-            // Load dealer contacts for sales rep dropdown if we have account ID
-            if (this.dealerAccountId) {
-                await this.loadDealerContacts();
-            }
-            
-            // Ensure dealerSalesId is always set from dealership info (read-only field)
-            // If dealership info hasn't loaded yet, load it now to get Dealership_ID__c
-            if (!this.applicationData.dealerSalesId && this.dealerAccountId) {
-                const dealershipInfo = await getDealershipInfo();
-                if (dealershipInfo.success && dealershipInfo.dealershipId) {
-                    this.applicationData.dealerSalesId = dealershipInfo.dealershipId;
                 }
-            }
-            
-            // Save to session storage
-            this.saveVehicleDataToSessionStorage();
-            
-            // Initialize original data for change tracking
-            this.initializeOriginalData();
-            
-            console.log('✅ Vehicle data loaded successfully');
-            
-        } else {
-                console.log('ℹ️ No existing vehicle data found for this application');
-                this.initializeDefaultValues();
-                // Initialize original data for new records too
+                
+                // Map the DTO fields to our local vehicleData object
+                const businessCommercialUse = vehicleData.businessCommercialUse || false;
+                const loadedCategory = vehicleData.vehicleCategory || '';
+                this.vehicleCategory = loadedCategory;
+                this.vehicleSubType = vehicleData.vehicleSubType || '';
+                this.isPowersports = (loadedCategory === 'Powersports');
+                this.vehicleData = {
+                    stockNumber: vehicleData.stockNumber || '',
+                    vin: vehicleData.vin || '',
+                    vehicleIdentificationNumberVIN: vehicleData.vehicleIdentificationNumberVIN || '',
+                    year: vehicleData.year || '',
+                    make: vehicleData.make || '',
+                    model: vehicleData.model || '',
+                    trim: vehicleData.trim || '',
+                    dateSold: vehicleData.dateVehicleSold || '',
+                    purchasePrice: vehicleData.vehiclePurchasePrice || '',
+                    isCommercial: businessCommercialUse,
+                    usageType: vehicleData.usageType || (businessCommercialUse ? 'Commercial/Business Use' : 'Personal Use'),
+                    commercialVehicleType: vehicleData.commercialVehicleType || '',
+                    isBrandedRebuilt: vehicleData.brandedRebuilt || false,
+                    inServiceDate: vehicleData.inServiceDate || '',
+                    odometerReading: vehicleData.odometer || '',
+                    odometerUnit: vehicleData.odometerUnit || 'KM',
+                    commercialUse: vehicleData.typeOfCommercialUse || 'NON-COMMERCIAL',
+                    // New Vehicle Details fields
+                    engine: vehicleData.engine || '',
+                    transmission: vehicleData.transmission || '',
+                    fuelType: vehicleData.fuelType || '',
+                    driveType: vehicleData.driveType || '',
+                    bodyStyle: vehicleData.bodyStyle || '',
+                    color: vehicleData.color || '',
+                    gvwr: vehicleData.gvwr || '',
+                    // Manufacturer Warranty fields
+                    manufacturerWarrantyType: vehicleData.manufacturerWarrantyType || '',
+                    warrantyTerm: vehicleData.warrantyTerm || '',
+                    warrantyInServiceDate: vehicleData.warrantyInServiceDate || '',
+                    deferralOption: vehicleData.deferralOption || false,
+                    deliveryDate: vehicleData.deliveryDate || '',
+                    lienHolder: vehicleData.lienHolder || '',
+                    // Powersports fields
+                    vehicleCategory: loadedCategory,
+                    vehicleSubType: this.vehicleSubType,
+                    engineCC: vehicleData.engineCC || '',
+                    coolingType: vehicleData.coolingType || '',
+                    hoursUsage: vehicleData.hoursUsage || '',
+                    vehicleClass: vehicleData.vehicleClass || ''
+                };
+
+                // Populate Application fields
+                if (vehicleData.dealerCommentsNotes !== undefined) {
+                    this.applicationData.dealerCommentsNotes = vehicleData.dealerCommentsNotes || '';
+                }
+                if (vehicleData.showCommentsOnPrint !== undefined) {
+                    this.applicationData.showCommentsOnPrint = vehicleData.showCommentsOnPrint || false;
+                }
+                if (vehicleData.salesRepId) {
+                    this.applicationData.salesRepresentative = vehicleData.salesRepId;
+                }
+                // dealerSalesId is now read-only and always comes from Account.Dealership_ID__c
+                // Don't override it from saved data - it will be set by loadDealershipInfo()
+                // Dealership info from loaded data
+                if (vehicleData.dealershipName) {
+                    this.applicationData.dealershipName = vehicleData.dealershipName;
+                }
+                if (vehicleData.dealershipAddress) {
+                    this.applicationData.dealershipAddress = vehicleData.dealershipAddress;
+                }
+                if (vehicleData.cityProvincePostal) {
+                    this.applicationData.cityProvincePostal = vehicleData.cityProvincePostal;
+                }
+                
+                // Use account ID from loaded data if available, otherwise use the one from getDealershipInfo
+                if (vehicleData.dealershipAccountId) {
+                    this.dealerAccountId = vehicleData.dealershipAccountId;
+                }
+                
+                // Load dealer contacts for sales rep dropdown if we have account ID
+                if (this.dealerAccountId) {
+                    await this.loadDealerContacts();
+                }
+                
+                // Ensure dealerSalesId is always set from dealership info (read-only field)
+                // If dealership info hasn't loaded yet, load it now to get Dealership_ID__c
+                if (!this.applicationData.dealerSalesId && this.dealerAccountId) {
+                    const dealershipInfo = await getDealershipInfo();
+                    if (dealershipInfo.success && dealershipInfo.dealershipId) {
+                        this.applicationData.dealerSalesId = dealershipInfo.dealershipId;
+                    }
+                }
+                
+                // Save to session storage
+                this.saveVehicleDataToSessionStorage();
+                
+                // Initialize original data for change tracking
                 this.initializeOriginalData();
+                
+                console.log('✅ Vehicle data loaded successfully');
+                
+            } else {
+                    console.log('ℹ️ No existing vehicle data found for this application');
+                    this.initializeDefaultValues();
+                    // Initialize original data for new records too
+                    this.initializeOriginalData();
+                }
+                
+            } catch (error) {
+                console.error('❌ Error loading vehicle data:', error);
+                this.showErrorMessage('Error loading vehicle data: ' + error.message);
+            } finally {
+                this.loading = false;
             }
-            
-        } catch (error) {
-            console.error('❌ Error loading vehicle data:', error);
-            this.showErrorMessage('Error loading vehicle data: ' + error.message);
-        } finally {
-            this.loading = false;
-        }
     }
     
     requiredFields = [
@@ -509,6 +510,12 @@ export default class DealerPortalVehicle extends LightningElement {
         'odometerReading'
     ];
     
+    // Commercial Vehicle Type modal (shown when Usage Type = 'Commercial/Business Use')
+    @track showCommercialVehicleTypeModal = false;
+
+    // Stored Commercial_Vehicle_Type__c picklist value
+    @track commercialVehicleType = '';
+
     // Add commercial use dialog properties
     @track showCommercialDialog = false;
     @track commercialOptions = [
@@ -678,7 +685,7 @@ export default class DealerPortalVehicle extends LightningElement {
     // Load dealer contacts for sales rep dropdown
     async loadDealerContacts() {
         if (!this.dealerAccountId) {
-            console.warn('⚠️ No dealer account ID available to load contacts');
+            console.warn('No dealer account ID available to load contacts');
             return;
         }
         
@@ -945,6 +952,17 @@ getCurrentData() {
         ];
     }
 
+    // Show the commercial vehicle type display field when usage is Commercial/Business Use and a type has been selected
+    get showCommercialVehicleTypeField() {
+        return this.vehicleData.usageType === 'Commercial/Business Use' &&
+               !!this.vehicleData.commercialVehicleType;
+    }
+
+    // Allow user to re-open the modal to change their selection
+    handleChangeCommercialVehicleType() {
+        this.showCommercialVehicleTypeModal = true;
+    }
+
     // Handle usage type change (radio button)
     handleUsageTypeChange(event) {
         const value = event.detail.value;
@@ -954,6 +972,44 @@ getCurrentData() {
             isCommercial: value === 'Commercial/Business Use'
         };
         console.log('Usage type changed:', value);
+
+        // Open the Commercial Vehicle Type modal when "Commercial/Business Use" is selected
+        if (value === 'Commercial/Business Use') {
+            this.showCommercialVehicleTypeModal = true;
+        } else {
+            // Reset commercial vehicle type if user switches away
+            this.showCommercialVehicleTypeModal = false;
+            this.commercialVehicleType = '';
+            this.vehicleData = {
+                ...this.vehicleData,
+                commercialVehicleType: ''
+            };
+        }
+    }
+
+    // Handle selection from the Commercial Vehicle Type modal
+    handleCommercialVehicleTypeSelected(event) {
+        const selectedValue = event.detail.value;
+        this.commercialVehicleType = selectedValue;
+        this.vehicleData = {
+            ...this.vehicleData,
+            commercialVehicleType: selectedValue
+        };
+        this.showCommercialVehicleTypeModal = false;
+        console.log('✅ Commercial vehicle type set:', selectedValue);
+    }
+
+    // Handle modal close without selection
+    handleCommercialVehicleTypeClose() {
+        this.showCommercialVehicleTypeModal = false;
+        // If they close without selecting, revert usage type to Personal Use
+        if (!this.commercialVehicleType) {
+            this.vehicleData = {
+                ...this.vehicleData,
+                usageType: 'Personal Use',
+                isCommercial: false
+            };
+        }
     }
     
     // Enhanced vehicle database for VIN search
@@ -1286,6 +1342,7 @@ getCurrentData() {
             'deferralOption': 'Deferral_Option__c',
             'deliveryDate': 'Delivery_Date__c',
             'usageType': 'Usage_Type__c',
+            'commercialVehicleType': 'Commercial_Vehicle_Type__c',
             'lienHolder': 'Financial_Institution_Lender__c'
         };
         
@@ -1903,6 +1960,14 @@ async handleContinue() {
             return false;
         }
         
+        // Validate Commercial Vehicle Type when usage is Commercial/Business Use
+        if (this.vehicleData.usageType === 'Commercial/Business Use' && !this.vehicleData.commercialVehicleType) {
+            this.errorMessage = 'Please select a Commercial Vehicle Type for Commercial/Business Use vehicles.';
+            this.showError = true;
+            this.showCommercialVehicleTypeModal = true;
+            return false;
+        }
+
         // Validate manufacturer warranty fields when deferral option is selected
         const warrantyValidationErrors = this.validateManufacturerWarrantyFields();
         if (warrantyValidationErrors.length > 0) {
@@ -2083,11 +2148,7 @@ async handleContinue() {
         this.showManufacturerWarranty = !this.showManufacturerWarranty;
     }
     
-    // Handle usage type change
-    handleUsageTypeChange(event) {
-        this.vehicleData.usageType = event.detail.value;
-        console.log('📝 Usage type changed to:', this.vehicleData.usageType);
-    }
+    // (handleUsageTypeChange consolidated above with Commercial Vehicle Type modal logic)
     
     // Method to handle applicationId changes from parent
     @api
@@ -2307,6 +2368,7 @@ async handleContinue() {
                 deliveryDate: formatDateForSalesforce(this.vehicleData.deliveryDate),
                 lienHolder: this.vehicleData.lienHolder || '',
                 usageType: this.vehicleData.usageType || '',
+                commercialVehicleType: this.vehicleData.commercialVehicleType || '',
                 // Application fields
                 dealerCommentsNotes: this.applicationData.dealerCommentsNotes || '',
                 showCommentsOnPrint: this.applicationData.showCommentsOnPrint || false,

@@ -883,7 +883,7 @@ export default class DealerPortalCreatePayment extends NavigationMixin(Lightning
             // Prepare the record to update
             const fields = {};
             fields.Id = this.recordId;
-            fields.Status__c = 'Canceled';
+            fields.Status__c = 'Cancelled';
             fields.Cancelation_Reason__c = this.cancellationReason || '';
             
             const recordInput = { fields };

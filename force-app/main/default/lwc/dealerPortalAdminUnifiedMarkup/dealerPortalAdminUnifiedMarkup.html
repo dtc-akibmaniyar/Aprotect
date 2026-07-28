@@ -92,6 +92,92 @@
                 </div>
             </div>
         </div>
+
+        <!-- Package Group Sort Order Section -->
+        <div class="pkg-group-sort-section">
+            <div class="section-card">
+                <div class="card-header pkg-group-sort-card-header" onclick={togglePackageGroupSort}>
+                    <div class="pkg-group-sort-header-content">
+                        <h3 class="card-title">Package Group Sort Order</h3>
+                        <p class="card-description">Set the display sort order for each package group accessible to this dealer</p>
+                    </div>
+                    <div class="accordion-toggle">
+                        <lightning-icon icon-name={packageGroupSortToggleIcon} size="small"></lightning-icon>
+                    </div>
+                </div>
+                <template if:true={showPackageGroupSort}>
+                    <div class="card-content">
+                        <!-- Loading -->
+                        <template if:true={pkgGroupSortLoading}>
+                            <div class="loading-container" style="padding: 30px 20px;">
+                                <lightning-spinner alternative-text="Loading..." size="small"></lightning-spinner>
+                                <p class="loading-text">Loading package groups...</p>
+                            </div>
+                        </template>
+
+                        <!-- Error -->
+                        <template if:true={pkgGroupSortError}>
+                            <div class="error-container" style="padding: 20px;">
+                                <p class="error-message">{pkgGroupSortError}</p>
+                            </div>
+                        </template>
+
+                        <!-- Success message -->
+                        <template if:true={pkgGroupSortSuccess}>
+                            <div class="success-container">
+                                <lightning-icon icon-name="utility:success" size="small" class="success-icon"></lightning-icon>
+                                <span class="success-message">{pkgGroupSortSuccess}</span>
+                            </div>
+                        </template>
+
+                        <!-- Table -->
+                        <template if:false={pkgGroupSortLoading}>
+                            <template if:true={hasPackageGroups}>
+                                <div class="pkg-group-sort-table">
+                                    <div class="pkg-group-sort-table-header">
+                                        <span class="pkg-group-col-name">Package Group Name</span>
+                                        <span class="pkg-group-col-current">Current Sort Order</span>
+                                        <span class="pkg-group-col-new">New Sort Order</span>
+                                    </div>
+                                    <template for:each={packageGroups} for:item="pg">
+                                        <div key={pg.Id} class="pkg-group-sort-row">
+                                            <span class="pkg-group-col-name pkg-group-name-value">{pg.Name}</span>
+                                            <span class="pkg-group-col-current pkg-group-current-value">{pg.currentSortOrderDisplay}</span>
+                                            <div class="pkg-group-col-new">
+                                                <input
+                                                    type="number"
+                                                    class="markup-input pkg-group-sort-input"
+                                                    data-id={pg.Id}
+                                                    value={pg.newSortOrder}
+                                                    onchange={handleSortOrderChange}
+                                                    placeholder="0"
+                                                    step="1"
+                                                    min="0">
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                                <div class="pkg-group-sort-actions">
+                                    <lightning-button
+                                        label="Save Sort Orders"
+                                        variant="brand"
+                                        onclick={savePackageGroupSortOrders}
+                                        class="bulk-button">
+                                    </lightning-button>
+                                </div>
+                            </template>
+                            <template if:false={hasPackageGroups}>
+                                <template if:false={pkgGroupSortError}>
+                                    <div class="no-packages-container" style="padding: 30px;">
+                                        <p class="no-packages-message">No package groups found for this dealer.</p>
+                                    </div>
+                                </template>
+                            </template>
+                        </template>
+                    </div>
+                </template>
+            </div>
+        </div>
         
         <!-- Packages Section -->
         <div class="packages-section">

@@ -17,7 +17,7 @@ public class DealerPackageTriggerHandler {
                    Class__c, Max_Liability_Limit__c, Finance_Term_Min__c,
                    Max_Finance_Term_In_Months__c, Total_Loss_Coverage_Includes__c,
                    Loyalty_Credit__c, Loan_Amount_Limit__c, Max_Collision_Deductible_Coverage__c,
-                   Max_Vehicle_Age_Limit_In_Years__c
+                   Max_Vehicle_Age_Limit_In_Years__c, Commercial_Business_Use__c, Commercial_Vehicle_Surcharge_Fee__c
             FROM Package__c
             WHERE Id IN :packageIds
         ]);
@@ -63,6 +63,12 @@ public class DealerPackageTriggerHandler {
                 // Populate Premium_Model_Fee__c
                 if(pkg.Premium_Model_Fee__c != null) {
                     dpToUpdate.Premium_Model_Fee__c = pkg.Premium_Model_Fee__c;
+                    hasChanges = true;
+                }
+
+                // Populate Commercial_Vehicle_Surcharge_Fee__c
+                if(pkg.Commercial_Vehicle_Surcharge_Fee__c != null && pkg.Commercial_Business_Use__c == true) {
+                    dpToUpdate.Commercial_Vehicle_Surcharge_Fee__c = pkg.Commercial_Vehicle_Surcharge_Fee__c;
                     hasChanges = true;
                 }
 

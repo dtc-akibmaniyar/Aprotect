@@ -31,7 +31,7 @@ public without sharing class InvoiceDetailViewController {
         // ── 1. Query Invoice + Application + Remittance Bill To ──────────────
         List<Invoice__c> invoices = [
             SELECT Id, Name, Status__c, CreatedDate,
-                   Total_Balance_Amount__c,
+                   Total_Balance_Amount__c, Invoice_Due_Date__c,
                    Remittance_Form__c,
                    Application__c,
                    Application__r.Name,
@@ -45,7 +45,15 @@ public without sharing class InvoiceDetailViewController {
                    Application__r.Odometer__c,
                    Application__r.Odometer_Unit__c,
                    Remittance_Form__r.Bill_To__c,
-                   Remittance_Form__r.Dealer_Name__r.Name
+                   Remittance_Form__r.Dealer_Name__r.Name,
+                   Application__r.Dealer_Name__r.Name,
+                   Application__r.Dealer_Name__r.BillingStreet,
+                   Application__r.Dealer_Name__r.BillingCity,
+                   Application__r.Dealer_Name__r.BillingState,
+                   Application__r.Dealer_Name__r.BillingPostalCode,
+                   Application__r.Dealer_Name__r.BillingCountry,
+                   Application__r.Dealer_Name__r.Phone,
+                   Application__r.Dealer_Name__r.Email__c
             FROM Invoice__c
             WHERE Id = :invoiceId
             LIMIT 1
@@ -152,9 +160,32 @@ public without sharing class InvoiceDetailViewController {
             ? inv.CreatedDate.format('MMM dd, yyyy')
             : null;
         result.hasRemittanceForm = inv.Remittance_Form__c != null;
+        result.dueDate = inv.Invoice_Due_Date__c != null ? String.valueOf(inv.Invoice_Due_Date__c) : null;
         result.hasPaymentInitiated = paymentInitiated;
-        result.dealerName = inv.Remittance_Form__r?.Dealer_Name__r?.Name;
-        result.billTo     = inv.Remittance_Form__r?.Bill_To__c;
+        // Dealer name: prefer Remittance Form dealer, fall back to Application dealer
+        result.dealerName = inv.Remittance_Form__r?.Dealer_Name__r?.Name != null
+            ? inv.Remittance_Form__r.Dealer_Name__r.Name
+            : (inv.Application__r?.Dealer_Name__r?.Name != null ? inv.Application__r.Dealer_Name__r.Name : null);
+
+        // Bill To: prefer Remittance Form Bill_To__c rich-text, fall back to building from dealer account fields
+        if (inv.Remittance_Form__r?.Bill_To__c != null) {
+            result.billTo = inv.Remittance_Form__r.Bill_To__c;
+        } else if (inv.Application__r?.Dealer_Name__r != null) {
+            Account dlr = inv.Application__r.Dealer_Name__r;
+            List<String> addrParts = new List<String>();
+            if (String.isNotBlank(dlr.BillingStreet))     addrParts.add(dlr.BillingStreet);
+            String cityLine = '';
+            if (String.isNotBlank(dlr.BillingCity))       cityLine += dlr.BillingCity;
+            if (String.isNotBlank(dlr.BillingState))      cityLine += (String.isNotBlank(cityLine) ? ' ' : '') + dlr.BillingState;
+            if (String.isNotBlank(dlr.BillingPostalCode)) cityLine += (String.isNotBlank(cityLine) ? ' ' : '') + dlr.BillingPostalCode;
+            if (String.isNotBlank(cityLine))               addrParts.add(cityLine);
+            if (String.isNotBlank(dlr.BillingCountry))    addrParts.add(dlr.BillingCountry);
+            if (String.isNotBlank(dlr.Phone))              addrParts.add('Tel: ' + dlr.Phone);
+            if (String.isNotBlank(dlr.Email__c))           addrParts.add('E-mail: ' + dlr.Email__c);
+            result.billTo = String.join(addrParts, '<br/>');
+        } else {
+            result.billTo = null;
+        }
         result.applicationId       = inv.Application__r?.Name;
         result.applicationRecordId = inv.Application__c;
 
@@ -235,7 +266,18 @@ public without sharing class InvoiceDetailViewController {
             result.packages.add(pd);
         }
 
+        // Calculate subTotal (sum of base prices without tax) and taxTotal
+        Decimal subTotalCalc = 0;
+        Decimal taxTotalCalc = 0;
+        for (PackageData pd2 : result.packages) {
+            if (pd2.basePriceWithoutTax != null) subTotalCalc += pd2.basePriceWithoutTax;
+            if (pd2.hasTax == true && pd2.taxPercentage != null && pd2.basePriceWithoutTax != null) {
+                taxTotalCalc += pd2.basePriceWithoutTax * (pd2.taxPercentage / 100);
+            }
+        }
         result.totalAmount   = grandTotal;
+        result.subTotal      = subTotalCalc;
+        result.taxTotal      = taxTotalCalc;
         result.balanceAmount = inv.Total_Balance_Amount__c != null ? inv.Total_Balance_Amount__c : 0;
         result.packageCount  = result.packages.size();
         return result;
@@ -539,6 +581,9 @@ public without sharing class InvoiceDetailViewController {
         @AuraEnabled public Decimal totalAmount;
         @AuraEnabled public Decimal balanceAmount;
         @AuraEnabled public Integer packageCount;
+        @AuraEnabled public String  dueDate;
+        @AuraEnabled public Decimal subTotal;
+        @AuraEnabled public Decimal taxTotal;
     }
 
     public class PackageData {

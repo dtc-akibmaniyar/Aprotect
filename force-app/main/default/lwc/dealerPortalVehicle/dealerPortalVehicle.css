@@ -1479,3 +1479,63 @@ textarea {
     color: #999;
     font-style: italic;
 }
+
+/* ===== Usage Type + Commercial Vehicle Type row ===== */
+.usage-commercial-row {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.usage-commercial-row .usage-type-field {
+    flex: 0 0 auto;
+    min-width: 180px;
+}
+
+.commercial-vehicle-type-field {
+    flex: 1 1 auto;
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Value display — styled like a read-only text input to match the form */
+.commercial-vehicle-type-display {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.commercial-vehicle-type-value {
+    display: block;
+    font-size: var(--font-size-input, 0.8125rem);
+    font-weight: var(--font-weight-regular, 400);
+    color: var(--color-input, #1a1a1a);
+    line-height: 1.4;
+}
+
+/* Change button — small, understated, matching form secondary actions */
+.change-type-button {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.3rem 0.85rem;
+    background: transparent;
+    border: 1px solid #5184b8;
+    color: #5184b8;
+    cursor: pointer;
+    border-radius: 0;
+    transition: background 0.15s, color 0.15s;
+    align-self: flex-start;
+}
+
+.change-type-button:hover,
+.change-type-button:focus {
+    background: #5184b8;
+    color: #fff;
+    outline: none;
+}

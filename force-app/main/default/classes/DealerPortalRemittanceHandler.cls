@@ -79,6 +79,52 @@ public class DealerPortalRemittanceHandler {
     @AuraEnabled
     public static OperationResult createRemittanceForm(List<String> applicationIds) {
         try {
+            Set<Id> applicationIdSet = new Set<Id>((List<Id>)(List<Object>)applicationIds);
+
+            // ── Step: Ensure every application has an Invoice ─────────────────────
+            List<Invoice__c> existingInvoices = [
+                SELECT Id, Application__c, Status__c
+                FROM Invoice__c
+                WHERE Application__c IN :applicationIdSet
+            ];
+            Set<Id> appsWithInvoice = new Set<Id>();
+            for (Invoice__c inv : existingInvoices) {
+                appsWithInvoice.add(inv.Application__c);
+            }
+
+            List<Id> appsNeedingInvoice = new List<Id>();
+            for (Id appId : applicationIdSet) {
+                if (!appsWithInvoice.contains(appId)) {
+                    appsNeedingInvoice.add(appId);
+                }
+            }
+
+            if (!appsNeedingInvoice.isEmpty()) {
+                List<Application__c> appsForInvoice = [
+                    SELECT Id, Name,
+                           (SELECT Id, Contract_Cost_Price__c FROM Application_Packages__r WHERE Active__c = true)
+                    FROM Application__c
+                    WHERE Id IN :appsNeedingInvoice
+                ];
+                List<Invoice__c> newInvoices = new List<Invoice__c>();
+                for (Application__c app : appsForInvoice) {
+                    Decimal totalAmount = 0;
+                    for (Application_Package__c pkg : app.Application_Packages__r) {
+                        if (pkg.Contract_Cost_Price__c != null) totalAmount += pkg.Contract_Cost_Price__c;
+                    }
+                    Invoice__c newInv = new Invoice__c();
+                    newInv.Application__c = app.Id;
+                    newInv.Amount__c = totalAmount;
+                    newInv.Status__c = 'Due';
+                    newInvoices.add(newInv);
+                }
+                if (!newInvoices.isEmpty()) {
+                    insert newInvoices;
+                    existingInvoices.addAll(newInvoices);
+                }
+            }
+            // ── End invoice creation step ─────────────────────────────────────────
+
             // Query applications to get dealer information
             List<Application__c> applicationsWithDealer = [
                 SELECT Id, Dealer_Name__r.Name, Dealer_Name__c

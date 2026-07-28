@@ -688,4 +688,110 @@ public without sharing class DealerPortalMarkupController {
             return 'Error: ' + e.getMessage();
         }
     }
+
+    // =====================================================================
+    // ===== Package Group Sort Order APIs =====
+    // =====================================================================
+
+    public class PackageGroupSortDTO {
+        @AuraEnabled public String Id;
+        @AuraEnabled public String Name;
+        @AuraEnabled public Decimal sortOrder;
+
+        public PackageGroupSortDTO() {}
+    }
+
+    @AuraEnabled
+    public static List<PackageGroupSortDTO> getPackageGroupsForDealer() {
+        try {
+            String dealerId = getCurrentDealerId();
+            if (String.isBlank(dealerId)) return new List<PackageGroupSortDTO>();
+
+            // Dealer_Package__c → Package__c → Package_Group__c
+            List<Dealer_Package__c> dealerPkgs = [
+                SELECT Package__r.Package_Group__c,
+                       Package__r.Package_Group__r.Name,
+                       Package__r.Package_Group__r.Sort_Order__c
+                FROM Dealer_Package__c
+                WHERE Dealer__c = :dealerId
+                AND Package__r.Package_Group__c != null
+            ];
+
+            // Deduplicate by Package_Group__c Id
+            Map<Id, PackageGroupSortDTO> uniqueGroups = new Map<Id, PackageGroupSortDTO>();
+            for (Dealer_Package__c dp : dealerPkgs) {
+                if (dp.Package__r == null || dp.Package__r.Package_Group__c == null) continue;
+                Id groupId = dp.Package__r.Package_Group__c;
+                if (!uniqueGroups.containsKey(groupId)) {
+                    PackageGroupSortDTO dto = new PackageGroupSortDTO();
+                    dto.Id = String.valueOf(groupId);
+                    dto.Name = dp.Package__r.Package_Group__r != null
+                        ? dp.Package__r.Package_Group__r.Name
+                        : String.valueOf(groupId);
+                    dto.sortOrder = dp.Package__r.Package_Group__r != null
+                        ? dp.Package__r.Package_Group__r.Sort_Order__c
+                        : null;
+                    uniqueGroups.put(groupId, dto);
+                }
+            }
+
+            List<PackageGroupSortDTO> result = new List<PackageGroupSortDTO>(uniqueGroups.values());
+            result.sort(new PackageGroupSortDTOComparator());
+            return result;
+        } catch (Exception e) {
+            throw new AuraHandledException('Error fetching package groups: ' + e.getMessage());
+        }
+    }
+
+    private class PackageGroupSortDTOComparator implements Comparator<PackageGroupSortDTO> {
+        public Integer compare(PackageGroupSortDTO a, PackageGroupSortDTO b) {
+            // Nulls last
+            if (a.sortOrder == null && b.sortOrder == null) return a.Name.compareTo(b.Name);
+            if (a.sortOrder == null) return 1;
+            if (b.sortOrder == null) return -1;
+            if (a.sortOrder < b.sortOrder) return -1;
+            if (a.sortOrder > b.sortOrder) return 1;
+            return a.Name.compareTo(b.Name);
+        }
+    }
+
+    @AuraEnabled
+    public static String savePackageGroupSortOrders(String updatesJson) {
+        try {
+            if (String.isBlank(updatesJson)) return 'Error: No updates provided';
+
+            List<Object> updates = (List<Object>) JSON.deserializeUntyped(updatesJson);
+            if (updates == null || updates.isEmpty()) return 'Error: Empty updates list';
+
+            List<Id> groupIds = new List<Id>();
+            Map<String, Decimal> sortOrderById = new Map<String, Decimal>();
+
+            for (Object item : updates) {
+                Map<String, Object> row = (Map<String, Object>) item;
+                String idStr = String.valueOf(row.get('id'));
+                Object sortOrderVal = row.get('sortOrder');
+                Decimal sortOrder = sortOrderVal != null
+                    ? Decimal.valueOf(String.valueOf(sortOrderVal))
+                    : null;
+                groupIds.add((Id) idStr);
+                sortOrderById.put(idStr, sortOrder);
+            }
+
+            List<Package_Group__c> groups = [
+                SELECT Id, Sort_Order__c
+                FROM Package_Group__c
+                WHERE Id IN :groupIds
+            ];
+
+            for (Package_Group__c pg : groups) {
+                pg.Sort_Order__c = sortOrderById.get(pg.Id);
+            }
+
+            update groups;
+            return 'Success: Updated ' + groups.size() + ' package group sort order(s)';
+        } catch (Exception e) {
+            return 'Error: ' + e.getMessage();
+        }
+    }
+
 }

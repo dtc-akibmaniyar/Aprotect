@@ -651,32 +651,55 @@
                             variant="label-hidden">
                         </lightning-input>
                     </div>
-                                         <div class="form-field usage-type-field">
-                         <label class="field-label">USAGE TYPE
-                             <lightning-icon icon-name="utility:info" size="xx-small" class="info-icon"></lightning-icon>
-                         </label>
-                         <div class="usage-type-radio-group">
-                             <lightning-radio-group
-                                 name="usageType"
-                                 options={usageTypeOptions}
-                                 value={vehicleData.usageType}
-                                 type="radio"
-                                 onchange={handleUsageTypeChange}
-                                 disabled={fieldDisabled}
-                                 class="usage-radio-group">
-                             </lightning-radio-group>
-                         </div>
+                <!-- Usage Type + Commercial Vehicle Type row (side by side) -->
+                <div class="form-row usage-commercial-row">
+                    <div class="form-field usage-type-field">
+                        <label class="field-label">USAGE TYPE
+                            <lightning-icon icon-name="utility:info" size="xx-small" class="info-icon"></lightning-icon>
+                        </label>
+                        <div class="usage-type-radio-group">
+                            <lightning-radio-group
+                                name="usageType"
+                                options={usageTypeOptions}
+                                value={vehicleData.usageType}
+                                type="radio"
+                                onchange={handleUsageTypeChange}
+                                disabled={fieldDisabled}
+                                class="usage-radio-group">
+                            </lightning-radio-group>
+                        </div>
                         <div class="checkbox-container">
                             <!-- <lightning-input
                                 type="checkbox"
                                 label="Branded/Rebuilt"
                                 name="isBrandedRebuilt"
-                                checked={vehicleData.isBrandedRebuilt}      
+                                checked={vehicleData.isBrandedRebuilt}
                                 onchange={handleInputChange}
                                 class="branded-checkbox">
                             </lightning-input> -->
                         </div>
-                     </div>
+                    </div>
+
+                    <!-- Commercial Vehicle Type — shown when Usage Type is Commercial/Business Use -->
+                    <template if:true={showCommercialVehicleTypeField}>
+                        <div class="form-field commercial-vehicle-type-field">
+                            <label class="field-label">COMMERCIAL VEHICLE TYPE</label>
+                            <div class="commercial-vehicle-type-display">
+                                <span class="commercial-vehicle-type-value input-field">{vehicleData.commercialVehicleType}</span>
+                                <template if:false={fieldDisabled}>
+                                    <button
+                                        type="button"
+                                        class="change-type-button"
+                                        onclick={handleChangeCommercialVehicleType}
+                                        title="Change commercial vehicle type">
+                                        Change
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
                 </div>
 
                 <!-- Powersports HOURS/USAGE — only visible when vehicle is Powersports -->
@@ -983,6 +1006,13 @@
                 </div>
             </div>
         </template>
+
+        <!-- Commercial Vehicle Type Modal -->
+        <c-commercial-vehicle-type-modal
+            is-open={showCommercialVehicleTypeModal}
+            oncommercialvehicletypeselected={handleCommercialVehicleTypeSelected}
+            oncommercialvehicletypeclose={handleCommercialVehicleTypeClose}>
+        </c-commercial-vehicle-type-modal>
 
     </div>
 </template>
