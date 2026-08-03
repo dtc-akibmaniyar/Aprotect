@@ -205,6 +205,7 @@ public without sharing class ApplicationSummaryController {
         @AuraEnabled public Decimal contractExpiryOdometer { get; set; }
         @AuraEnabled public String contractStartOdometerUnit { get; set; }
         @AuraEnabled public String contractExpiryOdometerUnit { get; set; }
+        @AuraEnabled public Decimal packageTermOdometerKM { get; set; }
         @AuraEnabled public List<String> additionalOptionsPurchased { get; set; }
     }
 
@@ -529,7 +530,7 @@ public without sharing class ApplicationSummaryController {
         try {
             List<Application_Package__c> packages = [
                 SELECT Id, Name, RecordType.Name, Coverage_Plan__c, Coverage_Term__c,
-                        Package__r.Name, Package_Term__r.Name,
+                        Package__r.Name, Package_Term__r.Name, Package_Term__r.Odometer_KM__c,
                         Deductible__c, Tax_Amount__c,Tax_Amount_Cost__c, Total_Package_Price__c, Contract_Premium_Price__c,Contract_Premium_Price_Without_Tax__c,
                         Contract_Cost_Price_Without_Tax__c, Contract_Cost_Price__c,
                         Dealer_Price_Override__c, Tax_Percentage__c, Premium_Model_Fee__c,
@@ -574,7 +575,8 @@ public without sharing class ApplicationSummaryController {
                 pkgWrapper.packageHeaderName = recordTypeName + ' - ' + packageName;
                 
                 pkgWrapper.planName = pkg.Package__r != null && String.isNotBlank(pkg.Package__r.Name) ? pkg.Package__r.Name : pkg.Coverage_Plan__c;
-                pkgWrapper.coverageTerm = pkg.Package_Term__r != null && String.isNotBlank(pkg.Package_Term__r.Name) ? pkg.Package_Term__r.Name : '';
+                String rawTerm = pkg.Package_Term__r != null && String.isNotBlank(pkg.Package_Term__r.Name) ? pkg.Package_Term__r.Name : null;
+                pkgWrapper.coverageTerm = rawTerm != null ? rawTerm.replace('null', '0') : '0 Months/0 km';
                 
                 if (pkg.Dealer_Price_Override__c != null) {
                     pkgWrapper.retailCost = pkg.Dealer_Price_Override__c;
@@ -620,6 +622,7 @@ public without sharing class ApplicationSummaryController {
                 pkgWrapper.contractExpiryOdometer = pkg.Odometer_End__c;
                 pkgWrapper.contractStartOdometerUnit = pkg.Odometer_Start_Unit__c != null ? pkg.Odometer_Start_Unit__c : 'KM';
                 pkgWrapper.contractExpiryOdometerUnit = pkg.Odometer_End_Unit__c != null ? pkg.Odometer_End_Unit__c : 'KM';
+                pkgWrapper.packageTermOdometerKM = pkg.Package_Term__r != null ? pkg.Package_Term__r.Odometer_KM__c : null;
                 
                 pkgWrapper.additionalOptionsPurchased = packageOptionsMap.containsKey(pkg.Id) ? 
                     packageOptionsMap.get(pkg.Id) : new List<String>();

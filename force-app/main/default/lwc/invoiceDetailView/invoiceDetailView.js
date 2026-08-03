@@ -325,7 +325,7 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
                 packageId:    pkg.packageId,
                 recordTypeName: pkg.recordTypeName,
                 packageName:  pkg.packageName,
-                packageTerm:  pkg.packageTerm,
+                packageTerm: (pkg.packageTerm || '').replace(/\bnull\b/g, '0'),
                 coverageLabel: pkg.coverageLabel || null,
                 startDate:    pkg.startDate,
                 expiryDate:   pkg.expiryDate,

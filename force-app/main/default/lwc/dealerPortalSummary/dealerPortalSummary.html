@@ -500,27 +500,114 @@
     </template>
   </div>
 
-  <!-- Invoice Confirmation Modal -->
-  <template if:true={showInvoicePromptModal}>
-    <div class="pdf-generating-overlay">
-      <div class="pdf-generating-content">
-        <template if:true={invoicePromptLoading}>
-          <lightning-spinner alternative-text="Creating Invoice..." size="medium"></lightning-spinner>
-          <p class="pdf-generating-text">Creating Invoice...</p>
-        </template>
-        <template if:false={invoicePromptLoading}>
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="24" cy="24" r="24" fill="#e6f4ea"/>
-            <path d="M14 24l7 7 13-13" stroke="#2e7d32" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- POST-SUBMISSION SUCCESS OVERLAY -->
+  <template if:true={showSubmissionSuccess}>
+    <div class="submission-success-overlay">
+
+      <!-- Success Header -->
+      <div class="ss-header">
+        <div class="ss-check-icon">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="20" cy="20" r="20" fill="#22C55E"/>
+            <path d="M11 20L17 26L29 13" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          <h2 class="invoice-prompt-title">Application Submitted Successfully!</h2>
-          <p class="invoice-prompt-body">Thank you for submitting the warranty. Would you like to continue to the invoice?</p>
-          <div class="invoice-prompt-actions">
-            <button class="invoice-prompt-yes" onclick={handleInvoicePromptYes}>Yes, Create Invoice</button>
-            <button class="invoice-prompt-no" onclick={handleInvoicePromptNo}>No, Go to Summary</button>
-          </div>
-        </template>
+        </div>
+        <div class="ss-header-text">
+          <h2 class="ss-title">Application Submitted Successfully!</h2>
+          <p class="ss-subtitle">
+            Your application <strong>{summaryData.application.Name}</strong> has been submitted and is currently under review.
+            Coverage will become active once payment has been received and processed by A-Protect.
+          </p>
+        </div>
       </div>
+
+      <!-- Info Cards -->
+      <div class="ss-cards">
+        <div class="ss-card">
+          <div class="ss-card-icon-wrap ss-card-icon--blue">
+            <lightning-icon icon-name="utility:date_time" size="small"></lightning-icon>
+          </div>
+          <div class="ss-card-body">
+            <div class="ss-card-title">14-Day Update Window</div>
+            <div class="ss-card-desc">You may make changes to this application for up to 14 days after submission.</div>
+          </div>
+        </div>
+
+        <div class="ss-card">
+          <div class="ss-card-icon-wrap ss-card-icon--orange">
+            <lightning-icon icon-name="utility:lock" size="small"></lightning-icon>
+          </div>
+          <div class="ss-card-body">
+            <div class="ss-card-title">After 14 Days</div>
+            <div class="ss-card-desc">The application will be locked. Contact the A-Protect office for any required changes.</div>
+          </div>
+        </div>
+
+        <div class="ss-card ss-card--highlight">
+          <div class="ss-card-icon-wrap ss-card-icon--green">
+            <lightning-icon icon-name="utility:payment" size="small"></lightning-icon>
+          </div>
+          <div class="ss-card-body">
+            <div class="ss-card-title">Payment Due Date</div>
+            <div class="ss-due-date">{formattedPaymentDueDate}</div>
+            <div class="ss-card-desc">Complete payment via the Remittance section of the Dealer Portal.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documents Section -->
+      <div class="ss-docs-section">
+        <div class="ss-docs-header">
+          <lightning-icon icon-name="utility:file" size="small"></lightning-icon>
+          <span>Application Documents</span>
+        </div>
+        <p class="ss-docs-sub">Your application documents are now available for download.</p>
+
+        <div class="ss-docs-table">
+          <div class="ss-docs-table-head">
+            <span>DOCUMENT NAME</span>
+            <span>ACTION</span>
+          </div>
+          <template for:each={packageData.recordTypeWrappers} for:item="rtWrapper">
+            <div key={rtWrapper.recordTypeId} class="ss-docs-row">
+              <div class="ss-doc-info">
+                <div class="ss-doc-pdf-badge">PDF</div>
+                <div>
+                  <div class="ss-doc-name">{summaryData.application.Name} - {rtWrapper.recordTypeName}.pdf</div>
+                  <div class="ss-doc-meta">PDF Document</div>
+                </div>
+              </div>
+              <button class="ss-download-btn" data-record-type-id={rtWrapper.recordTypeId} onclick={handlePackagePdfFromSuccess}>
+                <lightning-icon icon-name="utility:download" size="x-small"></lightning-icon>
+                Download
+              </button>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="ss-actions">
+        <template if:true={invoiceId}>
+          <button class="ss-btn ss-btn--primary" onclick={handleViewInvoiceFromSuccess}>
+            <lightning-icon icon-name="utility:description" size="x-small"></lightning-icon>
+            View Invoice
+          </button>
+        </template>
+        <button class="ss-btn" onclick={handleCreateAnotherApplication}>
+          <lightning-icon icon-name="utility:add" size="x-small"></lightning-icon>
+          Create Another Application
+        </button>
+        <button class="ss-btn" onclick={handleViewApplications}>
+          <lightning-icon icon-name="utility:list" size="x-small"></lightning-icon>
+          View Applications
+        </button>
+        <button class="ss-btn" onclick={handleReturnToHome}>
+          <lightning-icon icon-name="utility:home" size="x-small"></lightning-icon>
+          Return to Home
+        </button>
+      </div>
+
     </div>
   </template>
 </template>

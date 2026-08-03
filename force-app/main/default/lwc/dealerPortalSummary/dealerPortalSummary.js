@@ -1,7 +1,8 @@
-import { LightningElement, api, track } from 'lwc';
+import { LightningElement, api, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { NavigationMixin } from 'lightning/navigation';
-import { updateRecord } from 'lightning/uiRecordApi';
+import { updateRecord, getRecord, getFieldValue } from 'lightning/uiRecordApi';
+import DUE_DATE_FIELD from '@salesforce/schema/Invoice__c.Invoice_Due_Date__c';
 
 // Base application summary (customer + vehicle)
 import getApplicationSummaryData from '@salesforce/apex/ApplicationSummaryController.getApplicationSummaryData';
@@ -74,6 +75,20 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     @track packageFileCount = 0;
     @track showInvoicePromptModal = false;
     @track invoicePromptLoading = false;
+
+    @track showSubmissionSuccess = false;
+    @track submittedInvoiceId = null;
+    @track _rawDueDate = null;
+
+    @wire(getRecord, { recordId: '$submittedInvoiceId', fields: [DUE_DATE_FIELD] })
+    wiredInvoiceRecord({ data, error }) {
+        if (data) {
+            const raw = getFieldValue(data, DUE_DATE_FIELD);
+            this._rawDueDate = raw;
+        } else if (error) {
+            this._rawDueDate = null;
+        }
+    }
     
     connectedCallback() {
         console.log('🎯 DealerPortalSummary connected');
@@ -123,6 +138,13 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     get applicationIdList() {
         const appId = this.effectiveApplicationId;
         return appId ? [appId] : [];
+    }
+
+    get formattedPaymentDueDate() {
+        if (!this._rawDueDate) return 'To be determined';
+        return new Date(this._rawDueDate).toLocaleDateString('en-US', {
+            year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC'
+        });
     }
     
     async loadData() {
@@ -602,8 +624,23 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
                 composed: true
             }));
 
-            // Step 2: Show invoice confirmation modal — do NOT navigate yet
-            this.showInvoicePromptModal = true;
+            // Step 2: Create invoice and show success screen
+            try {
+                const invoiceResponse = await createInvoiceOnApplicationSubmit({ applicationId: appId });
+                if (invoiceResponse && (invoiceResponse.success) && (invoiceResponse.id || invoiceResponse.invoiceId)) {
+                    this.invoiceId = invoiceResponse.id || invoiceResponse.invoiceId;
+                    this.submittedInvoiceId = this.invoiceId;
+                } else if (invoiceResponse && invoiceResponse.invoiceId) {
+                    this.invoiceId = invoiceResponse.invoiceId;
+                    this.submittedInvoiceId = this.invoiceId;
+                }
+            } catch (invoiceError) {
+                console.warn('Invoice creation failed, continuing to success screen:', invoiceError);
+            }
+            this.showSubmissionSuccess = true;
+            if (this.invoiceId) {
+                this.submittedInvoiceId = this.invoiceId;
+            }
             
         } catch (error) {
             console.error('❌ Submit Application error:', error);
@@ -749,5 +786,49 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
             bubbles: true,
             composed: true
         }));
+    }
+
+    handleViewInvoiceFromSuccess() {
+        if (this.invoiceId) {
+            this[NavigationMixin.Navigate]({
+                type: 'standard__recordPage',
+                attributes: {
+                    recordId: this.invoiceId,
+                    actionName: 'view'
+                }
+            });
+        }
+    }
+
+    handleCreateAnotherApplication() {
+        this.dispatchEvent(new CustomEvent('createanotherapplication'));
+    }
+
+    handleViewApplications() {
+        this.dispatchEvent(new CustomEvent('viewapplications'));
+    }
+
+    handleReturnToHome() {
+        this.dispatchEvent(new CustomEvent('returntohome'));
+    }
+
+    handlePackagePdfFromSuccess(event) {
+        const recordTypeId = event.currentTarget.dataset.recordTypeId;
+        const rtWrapper = this.packageData.recordTypeWrappers
+            ? this.packageData.recordTypeWrappers.find(w => w.recordTypeId === recordTypeId)
+            : null;
+        if (rtWrapper && rtWrapper.packages && rtWrapper.packages.length > 0) {
+            const pkg = rtWrapper.packages[0].pkg;
+            if (pkg && pkg.Id) {
+                this.handlePackagePdf({
+                    currentTarget: {
+                        dataset: {
+                            packageId: pkg.Id,
+                            recordTypeName: rtWrapper.recordTypeName
+                        }
+                    }
+                });
+            }
+        }
     }
 }
