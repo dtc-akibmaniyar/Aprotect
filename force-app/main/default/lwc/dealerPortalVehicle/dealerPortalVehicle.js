@@ -9,6 +9,18 @@ import getDealerContacts from '@salesforce/apex/DealerPortalController.getDealer
 import getVehicleWarrantyPicklists from '@salesforce/apex/DealerPortalController.getVehicleWarrantyPicklists';
 import checkDuplicateVIN from '@salesforce/apex/DealerPortalController.checkDuplicateVIN';
 
+// Powersports brand tier detection constants
+const PREMIUM_MAKES = ['harley-davidson','harley davidson','bmw motorrad','bmw','ducati','triumph','indian','can-am spyder','can-am outlander','yamaha raptor','polaris sportsman','can-am defender','polaris ranger','yamaha viking','honda pioneer','ski-doo','polaris switchback','polaris indy','arctic cat'];
+const EXOTIC_MAKES = ['ktm','aprilia','mv agusta','ducati panigale','bimota','polaris rzr','can-am maverick','yamaha yxz','krx turbo','ski-doo summit turbo','polaris matryx','arctic cat m alpha'];
+
+function deriveBrandTier(make) {
+    if (!make) return 'Standard';
+    const m = make.toLowerCase();
+    if (EXOTIC_MAKES.some(x => m.includes(x))) return 'Exotic';
+    if (PREMIUM_MAKES.some(x => m.includes(x))) return 'Premium';
+    return 'Standard';
+}
+
 export default class DealerPortalVehicle extends LightningElement {
     _applicationId;
     @api isLocked = false;
@@ -54,6 +66,11 @@ export default class DealerPortalVehicle extends LightningElement {
 
     get isNotPowersports() {
         return !this.isPowersports;
+    }
+    
+    get isPremiumBrandTier() {
+        const tier = this.vehicleData && this.vehicleData.brandTier;
+        return tier === 'Premium' || tier === 'Exotic';
     }
     
     // Getters for warranty fields that combine lock status with warranty logic
@@ -432,7 +449,10 @@ export default class DealerPortalVehicle extends LightningElement {
                     engineCC: vehicleData.engineCC || '',
                     coolingType: vehicleData.coolingType || '',
                     hoursUsage: vehicleData.hoursUsage || '',
-                    vehicleClass: vehicleData.vehicleClass || ''
+                    vehicleClass: vehicleData.vehicleClass || '',
+                    // Powersports intake hours and brand tier
+                    intakeHours: vehicleData.intakeHours || null,
+                    brandTier: vehicleData.brandTier || (this.isPowersports ? deriveBrandTier(vehicleData.make || '') : 'Standard')
                 };
 
                 // Populate Application fields
@@ -1690,7 +1710,11 @@ getCurrentData() {
                     engineCC: this.isPowersports ? (decodedData.engineCC || '') : '',
                     coolingType: this.vehicleData.coolingType || '',
                     hoursUsage: this.vehicleData.hoursUsage || '',
-                    vehicleClass: this.isPowersports ? (decodedData.powersportsClassName || '') : ''
+                    vehicleClass: this.isPowersports ? (decodedData.powersportsClassName || '') : '',
+                    // Powersports Intake Hours (from hours/mileage field in decoded response)
+                    intakeHours: this.isPowersports ? (decodedData.hoursUsage || decodedData.hours || null) : null,
+                    // Brand Tier auto-derived from make
+                    brandTier: this.isPowersports ? deriveBrandTier(decodedData.make || '') : 'Standard'
                 };
                 
                 console.log('✅ VIN decoded successfully:', {
@@ -2380,7 +2404,10 @@ async handleContinue() {
                 engineCC: this.vehicleData.engineCC ? parseFloat(this.vehicleData.engineCC) : null,
                 coolingType: this.vehicleData.coolingType || '',
                 hoursUsage: this.vehicleData.hoursUsage ? parseFloat(this.vehicleData.hoursUsage) : null,
-                vehicleClass: this.vehicleData.vehicleClass || ''
+                vehicleClass: this.vehicleData.vehicleClass || '',
+                // Powersports intake hours and brand tier
+                intakeHours: this.vehicleData.intakeHours ? parseInt(this.vehicleData.intakeHours) : null,
+                brandTier: this.vehicleData.brandTier || 'Standard'
             };
             
             console.log('🔍 dataToSend object created:', dataToSend);

@@ -13,6 +13,7 @@ import uploadFilesToApplicationPackage from '@salesforce/apex/DealerPortalFileHa
 import convertApplicationToQuote from '@salesforce/apex/DealerPortalController.convertApplicationToQuote';
 import convertQuoteToApplication from '@salesforce/apex/DealerPortalController.convertQuoteToApplication';
 import tireImage from '@salesforce/resourceUrl/tireImage';
+import hasTireRimPackages from '@salesforce/apex/DealerPortalController.hasTireRimPackages';
 
 export default class DealerPortalMoreProducts extends NavigationMixin(LightningElement) {
     @track loading = false
@@ -45,6 +46,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     @track isExistingApplication = false;
     @track hasTireRimPackage = false;
     @track hasWarrantyPackage = false;
+    @track hasDealerTireRimPackages = true; // default true until loaded
     @track showHelpModal = false;
     @track helpModalTitle = '';
     @track helpModalText = '';
@@ -143,7 +145,8 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     }
 
     get showSelectedPlanView() {
-        return this.isPlanSelectionView && this.isOnDetailForm;
+        // Do NOT show the Details form when the vehicle is ineligible for Tire & Rim plans
+        return this.isPlanSelectionView && this.isOnDetailForm && !this.showVehicleNotEligibleDisclaimer;
     }
 
     get showNextButton() {
@@ -182,6 +185,10 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         return !this.dealerHasSpecificPackages || this.allPackagesNotEligible;
     }
 
+    get showNoDealerPackagesBanner() {
+        return !this.hasDealerTireRimPackages;
+    }
+
     get showVehicleNotEligibleDisclaimer() {
         return this.dealerHasSpecificPackages && (!this.hasPlanCards || this.allPackagesNotEligible);
     }
@@ -202,6 +209,10 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             
             // Load dealer packages when applicationId changes
             if (value) {
+                // Check whether dealer has Tire & Rim packages
+                hasTireRimPackages({ applicationId: value })
+                    .then(result => { this.hasDealerTireRimPackages = result === true; })
+                    .catch(() => { this.hasDealerTireRimPackages = true; }); // fail open
                 this.loadDealerPackages();
             }
         }

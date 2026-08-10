@@ -720,6 +720,16 @@
                                 <span class="unit-badge">HRS</span>
                             </div>
                         </div>
+                        <!-- Brand Tier display (read-only, auto-derived) -->
+                        <div class="form-field">
+                            <label class="field-label">BRAND TIER</label>
+                            <div class="brand-tier-display">
+                                <span class="brand-tier-badge brand-tier-badge--{vehicleData.brandTier}">{vehicleData.brandTier}</span>
+                                <template if:true={isPremiumBrandTier}>
+                                    <span class="brand-tier-note">Premium surcharge applies</span>
+                                </template>
+                            </div>
+                        </div>
                     </div>
                 </template>
             </div>

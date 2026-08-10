@@ -29,11 +29,6 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     @track showConvertToAppModal = false;
     @track isConvertingToApp = false;
     @track isGeneratingQuotePDF = false;
-    
-    // Removed @wire decorator - using imperative approach instead for better cache control
-    
-    // Tab locking is temporarily disabled - can be re-enabled later
-    
     // Tab completion tracking
     @track tabCompletionStatus = {
         vehicle: false,
@@ -927,7 +922,7 @@ handlePreviewPDF() {
     }
 
     handleGapBack(event) {
-        console.log('🛡️ Car Loan Protection component going back to more products tab');
+        console.log('Car Loan Protection component going back to moreProducts tab');
         this.switchToTab('moreProducts');
     }
     

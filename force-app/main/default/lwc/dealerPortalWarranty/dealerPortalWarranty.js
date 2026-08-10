@@ -76,6 +76,8 @@ export default class DealerPortalWarranty extends LightningElement {
     carImageWarranty = CarImageWarranty;
     gradientAssignments = {};
     @track vehicleData = {};
+    // Powersports per-claim limit selection
+    @track selectedPerClaimLimit = null;
     // Deferral option state — driven by the active warranty package term
     @track deferralOption = false;
     @track vehicleIdForDeferral = '';
@@ -92,6 +94,65 @@ export default class DealerPortalWarranty extends LightningElement {
     // Getter for field disabled state based on lock status
     get fieldDisabled() {
         return this.isLocked;
+    }
+    
+    // Powersports getters
+    get isPowersports() {
+        return this.vehicleData && this.vehicleData.vehicleCategory === 'Powersports';
+    }
+    
+    get vehicleSubTypeLabel() {
+        return this.vehicleData && this.vehicleData.vehicleSubType ? this.vehicleData.vehicleSubType : '';
+    }
+    
+    get brandTierLabel() {
+        return this.vehicleData && this.vehicleData.brandTier ? this.vehicleData.brandTier : 'Standard';
+    }
+    
+    get hasBrandTierSurcharge() {
+        const tier = this.brandTierLabel;
+        return tier === 'Premium' || tier === 'Exotic';
+    }
+    
+    // Available per-claim limits from current selected package terms
+    get availablePerClaimLimits() {
+        if (!this.selectedDealerPackage || !this.isPowersports) return [];
+        const terms = this.selectedDealerPackage.terms || [];
+        const limits = [...new Set(terms.map(t => t.perClaimLimit).filter(l => l != null))].sort((a,b) => a-b);
+        return limits.map(l => ({ label: `$${Number(l).toLocaleString()}`, value: l }));
+    }
+    
+    // Terms filtered by selected per-claim limit
+    get filteredPowersportsTerms() {
+        if (!this.selectedDealerPackage || !this.isPowersports || this.selectedPerClaimLimit == null) return [];
+        const terms = this.selectedDealerPackage.terms || [];
+        return terms.filter(t => t.perClaimLimit === this.selectedPerClaimLimit);
+    }
+    
+    // Format selected term's base price for display
+    get formattedBasePrice() {
+        if (!this.selectedWarrantyTerm) return '';
+        return this.formatPrice(this.selectedWarrantyTerm.totalPrice || 0);
+    }
+    
+    get formattedSurcharge() {
+        if (!this.selectedWarrantyTerm) return '';
+        return this.formatPrice(this.selectedWarrantyTerm.premiumModelFee || 0);
+    }
+    
+    get formattedTotalWithSurcharge() {
+        if (!this.selectedWarrantyTerm) return '';
+        const base = this.selectedWarrantyTerm.totalPrice || 0;
+        const surcharge = this.selectedWarrantyTerm.premiumModelFee || 0;
+        return this.formatPrice(base + surcharge);
+    }
+    
+    // Eligibility warning for packages with no eligible terms
+    get powersportsEligibilityWarnings() {
+        if (!this.isPowersports || !this.allDealerPackages) return [];
+        return this.allDealerPackages
+            .filter(pkg => pkg.PackageClass === 'POWERSPORTS' && (!pkg.terms || pkg.terms.length === 0))
+            .map(pkg => `${pkg.PackageName || pkg.Name} is not available — vehicle exceeds the intake limit.`);
     }
     
     // Getter for skip button label - "Next" when locked, "Skip" when not locked
@@ -273,7 +334,11 @@ export default class DealerPortalWarranty extends LightningElement {
                     vin: vData.vehicleIdentificationNumberVIN || vData.vin || '',
                     odometer: vData.odometer || '',
                     odometerUnit: vData.odometerUnit || 'KM',
-                    purchasePrice: vData.vehiclePurchasePrice || vData.purchasePrice || ''
+                    purchasePrice: vData.vehiclePurchasePrice || vData.purchasePrice || '',
+                    // Powersports fields
+                    vehicleCategory: vData.vehicleCategory || '',
+                    vehicleSubType: vData.vehicleSubType || '',
+                    brandTier: vData.brandTier || 'Standard'
                 };
 
                 // Deferral state from Apex
@@ -318,8 +383,8 @@ export default class DealerPortalWarranty extends LightningElement {
                     return;
                 }
                 
-                // Map the data to include warranty terms and options, then sort by packageGroupSortOrder (nulls last)
-                const mappedPackages = result.data.map((pkg, index) => {
+                // Map the data to include warranty terms and options
+                this.allDealerPackages = result.data.map((pkg, index) => {
                     
                     return {
                         ...pkg,
@@ -328,16 +393,6 @@ export default class DealerPortalWarranty extends LightningElement {
                         options: pkg.options || []
                     };
                 });
-                // Sort by Package_Group Sort_Order ascending (nulls last), then by package name
-                mappedPackages.sort((a, b) => {
-                    const sortA = a.packageGroupSortOrder != null ? a.packageGroupSortOrder : Infinity;
-                    const sortB = b.packageGroupSortOrder != null ? b.packageGroupSortOrder : Infinity;
-                    if (sortA !== sortB) return sortA - sortB;
-                    const nameA = (a.PackageName || a.Name || '').toLowerCase();
-                    const nameB = (b.PackageName || b.Name || '').toLowerCase();
-                    return nameA < nameB ? -1 : nameA > nameB ? 1 : 0;
-                });
-                this.allDealerPackages = mappedPackages;
                 
                 this.dealerPackages = this.allDealerPackages;
                 this.selectedPlanType = null;
@@ -400,24 +455,7 @@ export default class DealerPortalWarranty extends LightningElement {
                 }
                 
                 // Find the matching dealer package from our loaded packages
-                // Note: getDealerPackages now filters by vehicle usage type, so a commercial package
-                // will not appear in dealerPackages when the vehicle is set to Personal Use, and vice versa.
                 const matchingDealerPackage = this.dealerPackages.find(pkg => pkg.Id === result.data.dealerPackageId);
-                
-                if (!matchingDealerPackage) {
-                    // The existing package is no longer eligible (e.g. vehicle usage type changed).
-                    // Clear existing selection so user picks from the filtered list.
-                    this.existingApplicationPackage = null;
-                    this.isExistingApplication = false;
-                    this.selectedDealerPackage = null;
-                    this.selectedWarrantyTerm = null;
-                    this.selectedWarrantyTierId = null;
-                    this.selectedWarrantyTermName = '';
-                    this.price = 0;
-                    this._retailPriceDisplay = 0;
-                    this.vehicleConfigChangedMessage = 'The previously selected package is no longer available for the current vehicle usage type. Please select an eligible package.';
-                    return;
-                }
                 
                 if (matchingDealerPackage) {
                     // Auto-select the existing package
@@ -786,6 +824,8 @@ export default class DealerPortalWarranty extends LightningElement {
         this.selectedProgram = selectedPackage.PackageName;
         this.selectedDealerPackageName = selectedPackage.PackageName;
         this.selectedPlanTypeKey = selectedPackage.planTypeId || this.otherPlanTypeKey;
+        // Reset Powersports per-claim limit selection when package changes
+        this.selectedPerClaimLimit = null;
         this.setSelectedPlanTypeFromKey(this.selectedPlanTypeKey);
         this.savedDealerPackageId = selectedPackage.Id;
         this.savedWarrantyTermId = null;
@@ -819,6 +859,12 @@ export default class DealerPortalWarranty extends LightningElement {
     }
     
     // Handle warranty term selection
+    handlePerClaimLimitSelection(event) {
+        this.selectedPerClaimLimit = Number(event.currentTarget.dataset.limit);
+        // Clear term selection when per-claim limit changes
+        this.selectedWarrantyTerm = null;
+    }
+    
     async handleWarrantyTermSelection(event) {
         if (this.fieldDisabled) return;
         const termId = event.currentTarget.dataset.term;
@@ -1484,6 +1530,23 @@ export default class DealerPortalWarranty extends LightningElement {
     get formattedDealerCostExclTax() {
         const total = (this.modalTotalWithTax || 0) - (this.modalTaxAmount || 0);
         return '$' + total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    /**
+     * Total Dealer Cost shown in the DCS modal footer.
+     * For Powersports with a brand-tier surcharge the base dealer cost (excl tax)
+     * is already captured in formattedDealerCostExclTax; we just add the surcharge.
+     * For all other vehicles (and Powersports without a surcharge) we return the
+     * plain excl-tax total.
+     */
+    get dealerCostTotal() {
+        if (this.isPowersports && this.hasBrandTierSurcharge && this.selectedWarrantyTerm) {
+            const baseExclTax = (this.modalTotalWithTax || 0) - (this.modalTaxAmount || 0);
+            const surcharge = this.selectedWarrantyTerm.premiumModelFee || 0;
+            const total = baseExclTax + surcharge;
+            return '$' + total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        return this.formattedDealerCostExclTax;
     }
 
 
@@ -2890,24 +2953,14 @@ export default class DealerPortalWarranty extends LightningElement {
                     description,
                     hasDescription: !!description,
                     headerClass: `plan-type-section-header ${gradientClass}`,
-                    packagesWithTerms: [],
-                    minGroupSortOrder: null
+                    packagesWithTerms: []
                 });
             }
-            const group = groupsMap.get(key);
-            group.packagesWithTerms.push(this.buildPackageWithTerms(pkg));
-            if (pkg.packageGroupSortOrder != null) {
-                if (group.minGroupSortOrder === null || pkg.packageGroupSortOrder < group.minGroupSortOrder) {
-                    group.minGroupSortOrder = pkg.packageGroupSortOrder;
-                }
-            }
+            groupsMap.get(key).packagesWithTerms.push(this.buildPackageWithTerms(pkg));
         });
         return Array.from(groupsMap.values()).sort((a, b) => {
             if (a.key === this.otherPlanTypeKey) return 1;
             if (b.key === this.otherPlanTypeKey) return -1;
-            const sortA = a.minGroupSortOrder != null ? a.minGroupSortOrder : Infinity;
-            const sortB = b.minGroupSortOrder != null ? b.minGroupSortOrder : Infinity;
-            if (sortA !== sortB) return sortA - sortB;
             return a.label.localeCompare(b.label);
         });
     }

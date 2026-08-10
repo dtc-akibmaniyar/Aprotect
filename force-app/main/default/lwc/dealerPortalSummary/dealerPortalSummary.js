@@ -146,6 +146,11 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
             year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC'
         });
     }
+
+    // Fix 2 — Powersports getter
+    get isPowersports() {
+        return this.summaryData?.vehicle?.specifications?.vehicleCategory === 'Powersports';
+    }
     
     async loadData() {
         this.loading = true; // Set loading to true at the start
@@ -367,20 +372,25 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     }
 
     /**
-     * Recalculate customer-facing totals on each applicationPackage,
-     * excluding the Premium Vehicle Fee (dealer-only cost).
-     * Tax is recalculated on base retail cost only.
+     * Recalculate customer-facing totals on each applicationPackage.
+     * For Powersports: total = retailCost + premiumModelFee + ((retailCost + premiumModelFee) * taxRate)
+     * For non-Powersports: total = retailCost + (retailCost * taxRate)
+     * Tax is recalculated on base retail cost only (non-Powersports) or retail+surcharge (Powersports).
      */
     _recalculateCustomerTotals() {
         if (!this.summaryData.applicationPackages) return;
+        const isPowersports = this.isPowersports;
         this.summaryData.applicationPackages.forEach(rtWrapper => {
             if (rtWrapper.packages) {
                 rtWrapper.packages.forEach(pkgWrapper => {
                     const retailCost = this._parseCurrency(pkgWrapper.formattedRetailCost);
                     const taxRate = parseFloat((pkgWrapper.formattedTaxRate || '0').replace('%', '')) / 100;
-                    // Tax on base retail cost only (no premium fee)
-                    const customerTax = retailCost * taxRate;
-                    const customerTotal = retailCost + customerTax;
+                    let taxBase = retailCost;
+                    if (isPowersports && pkgWrapper.premiumModelFee) {
+                        taxBase = retailCost + (pkgWrapper.premiumModelFee || 0);
+                    }
+                    const customerTax = taxBase * taxRate;
+                    const customerTotal = taxBase + customerTax;
                     pkgWrapper.customerFormattedTax = this._formatCurrency(customerTax);
                     pkgWrapper.customerFormattedTotal = this._formatCurrency(customerTotal);
                 });

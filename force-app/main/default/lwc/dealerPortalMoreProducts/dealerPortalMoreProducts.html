@@ -18,22 +18,34 @@
             </button>
         </div>
 
-        <template if:true={showPlanSelection}>
-            <div class="tire-hero">
-                <div class="tire-hero__media">
-                    <img src={heroImage} alt="Tire & Rim Illustration" class="tire-hero__media-image" />
-                </div>
-                <div class="tire-hero__content">
-                    <div class="tire-hero__header-row">
-                        <h1>TIRE & RIM WARRANTY</h1>
-                    </div>
-                    <p>
-                        Covers tire and rim repair or replacement from damage caused by potholes, nails, debris, and other road hazards to stay protected from costly repairs.
-                        Enter the tire and rim information for this vehicle, including tire brand, tread depth, rim size, and any visible damage or notes.
-                        Accurate details are required to confirm eligibility for Tire & Rim Protection coverage.
-                    </p>
-                </div>
+        <!-- Tire & Rim Hero Header - ALWAYS VISIBLE -->
+        <div class="tire-hero">
+            <div class="tire-hero__media">
+                <img src={heroImage} alt="Tire &amp; Rim Illustration" class="tire-hero__media-image" />
             </div>
+            <div class="tire-hero__content">
+                <div class="tire-hero__header-row">
+                    <h1>TIRE &amp; RIM WARRANTY</h1>
+                </div>
+                <p>
+                    Covers tire and rim repair or replacement from damage caused by potholes, nails, debris, and other road hazards to stay protected from costly repairs.
+                    Enter the tire and rim information for this vehicle, including tire brand, tread depth, rim size, and any visible damage or notes.
+                    Accurate details are required to confirm eligibility for Tire &amp; Rim Protection coverage.
+                </p>
+            </div>
+        </div>
+
+        <!-- No Dealer Packages Message -->
+        <template if:true={showNoDealerPackagesBanner}>
+            <div class="no-packages-message">
+                <lightning-icon icon-name="utility:warning" size="medium" variant="warning"></lightning-icon>
+                <h3>No Tire &amp; Rim Protection packages are available for this dealer.</h3>
+                <p>Please contact your administrator to set up Tire &amp; Rim plans.</p>
+            </div>
+        </template>
+
+        <template if:false={showNoDealerPackagesBanner}>
+        <template if:true={showPlanSelection}>
 
             <section class="package-list-panel">
                 <!-- Option Help Modal -->
@@ -415,7 +427,7 @@
                     </div>
                     <div class="tire-upload-section">
                         <div class="tire-upload-header">
-                            <h4 class="upload-title">Upload Tire & Rim Images</h4>
+                            <h4 class="upload-title">Upload Tire &amp; Rim Images</h4>
                             <p class="upload-description">Select files to upload. Files will be saved when you click Continue.</p>
                         </div>
                         
@@ -590,6 +602,8 @@
             </div>
         </template>
 
+        </template> <!-- end if:false={showNoDealerPackagesBanner} -->
+
          <!-- Navigation Buttons - Save As Quote and Continue at bottom -->
         <div class="navigation-buttons">
             <template if:true={showContinueButton}>
@@ -633,8 +647,8 @@
                             class="continue-button"
                             onclick={handleContinue}
                             disabled={isContinueDisabled}
-                            aria-label="Save & Continue">
-                            <span class="continue-label">Save & Continue</span>
+                            aria-label="Save &amp; Continue">
+                            <span class="continue-label">Save &amp; Continue</span>
                         </button>
                     </template>
                 </template>

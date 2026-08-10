@@ -153,6 +153,23 @@
                     <div class="vehicle-value">{summaryData.vehicle.specifications.gvwr}</div>
                   </div>
                 </div>
+
+                <!-- Fix 2 — Powersports-only vehicle fields -->
+                <template lwc:if={isPowersports}>
+                  <div class="vehicle-content-wrapper" style="margin-top: 8px;">
+                    <div class="vehicle-labels-column">
+                      <div class="vehicle-label">Vehicle Class:</div>
+                      <div class="vehicle-label">Brand Tier:</div>
+                      <div class="vehicle-label">Intake Hours:</div>
+                    </div>
+                    <div class="vehicle-values-column">
+                      <div class="vehicle-value">{summaryData.vehicle.specifications.vehicleSubType}</div>
+                      <div class="vehicle-value">{summaryData.vehicle.specifications.brandTier}</div>
+                      <div class="vehicle-value">{summaryData.vehicle.specifications.intakeHours}</div>
+                    </div>
+                  </div>
+                </template>
+
               </template>
             </template>
           </div>
@@ -310,6 +327,21 @@
                         <span class="package-detail-label">Coverage Term:</span>
                         <span class="package-detail-value">{packageWrapper.coverageTerm}</span>
                       </div>
+
+                      <!-- Fix 2 — Powersports per-package fields -->
+                      <template lwc:if={isPowersports}>
+                        <div class="package-detail-row">
+                          <span class="package-detail-label">Per-Claim Limit:</span>
+                          <span class="package-detail-value">{packageWrapper.perClaimLimit}</span>
+                        </div>
+                        <template lwc:if={packageWrapper.hasPremiumModelFee}>
+                          <div class="package-detail-row">
+                            <span class="package-detail-label">Brand Tier Surcharge ({summaryData.vehicle.specifications.brandTier}):</span>
+                            <span class="package-detail-value">+{packageWrapper.formattedSurcharge}</span>
+                          </div>
+                        </template>
+                      </template>
+
                     </div>
 
                     <div class="package-details-column">

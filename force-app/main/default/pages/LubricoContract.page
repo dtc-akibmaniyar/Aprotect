@@ -1,4 +1,4 @@
-<apex:page renderAs="pdf" applyBodyTag="false" showHeader="false" cache="false" standardStylesheets="false">
+<apex:page renderAs="pdf" applyBodyTag="false" showHeader="false" cache="false" standardStylesheets="false" controller="LubricoContractController">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
 <style type="text/css">
@@ -402,6 +402,65 @@
 <div style="margin-top:12px;font-size:7.5pt;text-align:center;">
   Aprotect Warranty Corporation is the Administrator of this Vehicle Service Contract.<br/>
   &#169; Aprotect Warranty Corporation. All rights reserved.
+</div>
+
+<div>
+  {!fileFound}
+  {!fileType}
+  {!fileName}
+  {!embedDataUri}
+  <!-- ═══ IMAGE ════════════════════════════════════════════════════ -->
+  <apex:outputPanel rendered="{!AND(fileFound, fileType == 'image')}">
+    <div style="background:#fff;min-height:calc(100vh - 60px);padding:20px;">
+        <img src="{!embedDataUri}" alt="{!fileName}" />
+    </div>
+  </apex:outputPanel>
+
+  <!-- ═══ PDF ══════════════════════════════════════════════════════ -->
+  <apex:outputPanel rendered="{!AND(fileFound, fileType == 'pdf')}">
+      <div class="embed-wrapper">
+          <!--
+          Entire PDF binary is base64-encoded and baked into the
+          data URI. No separate HTTP request. No auth dependency.
+          Browser's native PDF viewer handles rendering.
+          -->
+          <object data="{!embedDataUri}" type="application/pdf">
+              <embed src="{!embedDataUri}" type="application/pdf">
+                  <div class="state-box">
+                      <div class="icon">📄</div>
+                      <div class="title">PDF viewer not available</div>
+                      <div class="desc">
+                          Your browser does not support inline PDF rendering.
+                      </div>
+                      <a class="btn-download" href="{!downloadUrl}" target="_blank">Download PDF</a>
+                  </div>
+              </embed>
+          </object>
+      </div>
+  </apex:outputPanel>
+  
+  <!-- ═══ PLAIN TEXT ════════════════════════════════════════════════ -->
+  <apex:outputPanel rendered="{!AND(fileFound, fileType == 'text')}">
+      <div class="text-content">
+          <!--
+          textContent is escapeHtml4()-encoded in the controller
+          and wrapped in <pre>, so escape="false" is safe here.
+          -->
+          <apex:outputText value="{!textContent}" escape="false" />
+      </div>
+  </apex:outputPanel>
+  
+  <!-- ═══ HTML ══════════════════════════════════════════════════════ -->
+  <apex:outputPanel rendered="{!AND(fileFound, fileType == 'html')}">
+      <div class="text-content">
+          <!--
+          Only use escape="false" for internally trusted HTML.
+          For user-uploaded HTML, consider sandboxing in an <iframe
+          srcdoc="..."> instead.
+          -->
+          <apex:outputText value="{!textContent}" escape="false" />
+      </div>
+  </apex:outputPanel>
 </div>
 
 </body>

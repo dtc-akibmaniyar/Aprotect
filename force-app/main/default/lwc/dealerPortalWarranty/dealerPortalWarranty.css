@@ -5057,6 +5057,15 @@ lightning-accordion-section[data-package-id].gradient-default .slds-accordion__s
     border-bottom: 1px solid #DBEAFE !important;
 }
 
+/* Brand Tier Surcharge row in Dealer Cost Summary modal */
+.surcharge-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: #555;
+    padding: 2px 0;
+}
+
 .dcs-fee-price-wrap {
     display: flex;
     align-items: center;
@@ -5118,4 +5127,186 @@ lightning-accordion-section[data-package-id].gradient-default .slds-accordion__s
     justify-content: center;
     min-height: 36px;
     width: 100%;
+}
+
+/* ============================================================
+   PHASE 5 CSS FIXES
+   ============================================================ */
+
+/* --- FIX 1: Per-Claim Limit Selector Buttons (Issue 1) ---
+   Buttons were completely unstyled raw browser inputs.
+   Now styled as pill buttons matching the existing UI.          */
+.per-claim-limit-section {
+    margin-bottom: 10px;
+}
+
+.per-claim-limit-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.per-claim-limit-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #2c3e50;
+    background: #ffffff;
+    border: 1.5px solid #c4cdd8;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    appearance: none;
+    outline: none;
+    letter-spacing: 0.02em;
+}
+
+.per-claim-limit-btn:hover {
+    border-color: #4a8ed6;
+    background: #f0f6ff;
+    color: #1b3b65;
+    box-shadow: 0 2px 6px rgba(74, 142, 214, 0.18);
+}
+
+.per-claim-limit-btn:focus-visible {
+    outline: 2px solid #1e88ff;
+    outline-offset: 2px;
+}
+
+.per-claim-limit-btn.selected {
+    background: #1b3b65;
+    border-color: #1b3b65;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(27, 59, 101, 0.25);
+}
+
+/* --- FIX 2: Remove duplicate program-content padding (Issue 2) ---
+   A second .program-content rule later in this file overrides
+   padding to 1rem and margin-top to 0.5rem, creating an empty
+   visual gap above the plan accordion in the left column.
+   Force back to zero for the programs area.                      */
+.programs-container .program-content,
+.program-wrapper .program-content {
+    padding: 0 !important;
+    margin-top: 0 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+}
+
+/* --- FIX 3: Term card height consistency (Issue 3) ---
+   Enforce equal min-height and flex alignment for all .term-row
+   cards in the two-column grid so selected/unselected cards
+   have the same height and don't resize the row.                 */
+.term-group-two-column .term-row {
+    min-height: 56px;
+    height: auto;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.term-group-two-column .term-row .term-row-left {
+    flex: 1;
+    min-width: 0;
+}
+
+.term-group-two-column .term-row .term-row-right {
+    flex-shrink: 0;
+}
+
+.term-group-two-column .term-row.selected {
+    min-height: 56px;
+}
+
+/* --- FIX 4: Vehicle sidebar purchase price text clipping (Issue 4) ---
+   Ensure no overflow:hidden clips the price text in the
+   right-column vehicle details card.                             */
+.vehicle-details-panel {
+    overflow: visible !important;
+}
+
+.vehicle-info-container {
+    overflow: visible;
+    min-width: 0;
+    flex: 1;
+}
+
+.vehicle-detail-text {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    word-break: break-word;
+}
+
+/* --- FIX 5: Two-column height synchronisation (Issue 5) ---
+   .details-grid had align-items: flex-start which caused left
+   and right columns to be different heights. Now uses stretch
+   so both columns fill to the same height.                       */
+.details-grid.slds-grid {
+    align-items: stretch !important;
+}
+
+.warranty-left-column,
+.warranty-right-column {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+/* Powersports info panel (right sidebar) */
+.powersports-info-panel {
+    background: #f0f6ff;
+    border: 1px solid #c4d8f0;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #1b3b65;
+}
+
+.powersports-info-panel .vehicle-class-label,
+.powersports-info-panel .brand-tier-label {
+    margin: 0 0 4px 0;
+    font-size: 12px;
+    color: #1b3b65;
+}
+
+.powersports-info-panel .vehicle-class-label:last-child,
+.powersports-info-panel .brand-tier-label:last-child {
+    margin-bottom: 0;
+}
+
+.eligibility-warning {
+    background: #fff8e1;
+    border-left: 3px solid #f9a825;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+    font-size: 11px;
+    color: #6d4c00;
+    border-radius: 0 4px 4px 0;
+}
+
+/* Powersports price breakdown (inside price summary box) */
+.powersports-price-breakdown {
+    margin-bottom: 8px;
+    width: 100%;
+}
+
+.price-breakdown-line {
+    font-size: 11px;
+    color: #555;
+    margin: 2px 0;
+}
+
+.price-breakdown-total {
+    font-size: 12px;
+    color: #1b3b65;
+    margin: 4px 0 0 0;
+    border-top: 1px solid #e0e0e0;
+    padding-top: 4px;
 }

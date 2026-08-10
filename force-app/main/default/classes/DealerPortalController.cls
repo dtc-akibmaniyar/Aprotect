@@ -252,6 +252,8 @@ public without sharing class DealerPortalController {
         @AuraEnabled public Decimal engineCC;          // engine_displacement from Powersports API (stored on Vehicle__c)
         @AuraEnabled public Decimal hoursUsage;        // manual entry, stored on Vehicle__c
         @AuraEnabled public String vehicleClass;       // Powersports class_name, stored on Vehicle__c / Application__c
+        @AuraEnabled public Decimal intakeHours;       // Intake_Hours__c on Vehicle__c
+        @AuraEnabled public String brandTier;          // Brand_Tier__c on Vehicle__c (Standard/Premium/Exotic)
 
         // Powersports modal-only display fields (not stored in database)
         @AuraEnabled public String powersportsClassName;
@@ -880,6 +882,8 @@ public without sharing class DealerPortalController {
                     vehicleData.vehicleSubType = vehicle.Vehicle_Sub_Type__c;
                     vehicleData.vehicleClass = vehicle.Vehicle_Class__c;
                     vehicleData.vehicleCategory = vehicle.Vehicle_Category__c;
+                    vehicleData.intakeHours = vehicle.Intake_Hours__c;
+                    vehicleData.brandTier = vehicle.Brand_Tier__c;
 
                     if (app.Dealer_Comments_Notes__c != null) {
                         vehicleData.dealerCommentsNotes = app.Dealer_Comments_Notes__c;
@@ -1076,7 +1080,9 @@ public without sharing class DealerPortalController {
                         Vehicle__r.Model_Lookup__c, Vehicle__r.Model_Lookup__r.Class__c,
                         Vehicle__r.Make_Lookup__c, Vehicle__r.Make_Lookup__r.Premium_Model_Fee__c,
                         Vehicle__r.Model_Lookup__r.Premium_Model_Fee__c,
-                        Vehicle__r.Usage_Type__c, Vehicle__r.Commercial_Vehicle_Type__c
+                        Vehicle__r.Usage_Type__c, Vehicle__r.Commercial_Vehicle_Type__c,
+                        Vehicle__r.Vehicle_Category__c, Vehicle__r.Vehicle_Sub_Type__c,
+                        Vehicle__r.Intake_Hours__c, Vehicle__r.Brand_Tier__c
                 FROM Application__c 
                 WHERE Id = :applicationId
                 LIMIT 1
@@ -1136,6 +1142,12 @@ public without sharing class DealerPortalController {
             String vehicleClass = null;
             Boolean isCommercialVehicle = false;
             String vehicleCommercialType = null;
+            // Powersports fields
+            String vehicleCategory = null;
+            String vehicleSubType = null;
+            Double vehicleIntakeHours = null;
+            String vehicleBrandTier = null;
+            Boolean isPowersports = false;
             if (application.Vehicle__r != null) {
                 vehicleYear = application.Vehicle__r.Year__c;
                 vehicleOdometer = application.Vehicle__r.Odometer__c;
@@ -1143,6 +1155,18 @@ public without sharing class DealerPortalController {
                 vehicleClass = application.Vehicle__r.Model_Lookup__r != null ? application.Vehicle__r.Model_Lookup__r.Class__c : null;
                 isCommercialVehicle = 'Commercial/Business Use'.equals(application.Vehicle__r.Usage_Type__c);
                 vehicleCommercialType = application.Vehicle__r.Commercial_Vehicle_Type__c;
+                vehicleCategory = application.Vehicle__r.Vehicle_Category__c;
+                vehicleSubType = application.Vehicle__r.Vehicle_Sub_Type__c;
+                vehicleIntakeHours = application.Vehicle__r.Intake_Hours__c;
+                vehicleBrandTier = application.Vehicle__r.Brand_Tier__c;
+                isPowersports = 'Powersports'.equalsIgnoreCase(vehicleCategory);
+            }
+            
+            // Brand tier multiplier for Powersports surcharge
+            Decimal tierMultiplier = 1.0;
+            if (isPowersports) {
+                if ('Premium'.equalsIgnoreCase(vehicleBrandTier)) tierMultiplier = 1.25;
+                else if ('Exotic'.equalsIgnoreCase(vehicleBrandTier)) tierMultiplier = 1.60;
             }
             
             Boolean isTireRimRequest = String.isNotBlank(recordType) && recordType.containsIgnoreCase('Tire_Rim');
@@ -1153,13 +1177,31 @@ public without sharing class DealerPortalController {
                 for (Dealer_Package__c dp : dealerPackages) {
                     String packageClass = dp.Class__c;
                     
-                    if (String.isNotBlank(packageClass)) {
-                        if (String.isBlank(vehicleClass)) {
-                            continue;
+                    // Determine if this is a Powersports package:
+                    // - Primary signal: Class__c = 'POWERSPORTS' on Dealer_Package__c
+                    // - Fallback signal: Vehicle_Category_Filter__c = 'Powersports' on parent Package__c
+                    String vcFilter = dp.Package__r != null ? dp.Package__r.Vehicle_Category_Filter__c : null;
+                    Boolean isPackagePowersports = 'POWERSPORTS'.equalsIgnoreCase(packageClass)
+                        || 'Powersports'.equalsIgnoreCase(vcFilter);
+                    
+                    if (isPackagePowersports) {
+                        if (!isPowersports) continue; // Non-Powersports vehicle: skip Powersports packages
+                        // Intake hours eligibility check
+                        Decimal maxHours = dp.Package__r != null ? dp.Package__r.Max_Intake_Hours__c : null;
+                        if (maxHours != null && vehicleIntakeHours != null && vehicleIntakeHours > maxHours) {
+                            continue; // Vehicle exceeds max intake hours for this package
                         }
+                    } else {
+                        // For non-Powersports packages, skip if vehicle is Powersports
+                        if (isPowersports) continue;
                         
-                        if (!vehicleClass.equalsIgnoreCase(packageClass)) {
-                            continue;
+                        if (String.isNotBlank(packageClass)) {
+                            if (String.isBlank(vehicleClass)) {
+                                continue;
+                            }
+                            if (!vehicleClass.equalsIgnoreCase(packageClass)) {
+                                continue;
+                            }
                         }
                     }
 
@@ -1204,6 +1246,8 @@ public without sharing class DealerPortalController {
                         Expiry_Term__c, Odometer_KM__c,
                         Package_Term__r.Allow_Deferral__c,
                         Package_Term__r.Premium_Model_Fee__c,
+                        Package_Term__r.Vehicle_Sub_Type__c,
+                        Package_Term__r.Per_Claim_Limit__c,
                         Dealer_Package_Tier__c, Dealer_Package__c,
                         Dealer_Package_Tier__r.Id,
                         Dealer_Package_Tier__r.Name,
@@ -1326,6 +1370,14 @@ public without sharing class DealerPortalController {
                                 if (!isEligible) {
                                     continue;
                                 }
+                                
+                                // Powersports term sub-type filtering
+                                if (isPowersports && term.Package_Term__c != null) {
+                                    String termSubType = term.Package_Term__r != null ? term.Package_Term__r.Vehicle_Sub_Type__c : null;
+                                    if (String.isNotBlank(termSubType) && !termSubType.equalsIgnoreCase(vehicleSubType)) {
+                                        continue; // Skip terms for other vehicle sub-types
+                                    }
+                                }
                             }
                     
                             eligibleTerms++;
@@ -1382,7 +1434,13 @@ public without sharing class DealerPortalController {
                             for (Dealer_Package_Term__c term : tierTerms) {
                                 DealerPackageTermDTO termDto = new DealerPackageTermDTO();
                                 termDto.Id = term.Id;
-                                termDto.premiumModelFee = term.Package_Term__r != null && term.Package_Term__r.Premium_Model_Fee__c != null ? term.Package_Term__r.Premium_Model_Fee__c : 0;
+                                // For Powersports: use Package_Term__r.Per_Claim_Limit__c (per-term), 
+                                // else use Dealer_Package per-claim limit
+                                Decimal termPerClaimLimit = (isPowersports && term.Package_Term__r != null && term.Package_Term__r.Per_Claim_Limit__c != null)
+                                    ? term.Package_Term__r.Per_Claim_Limit__c
+                                    : dp.Per_Claim_Limit__c;
+                                termDto.perClaimLimit = termPerClaimLimit;
+                                
                                 termDto.originalPackageTermCost = term.Original_Package_Term_Cost__c != null ? term.Original_Package_Term_Cost__c : 0;
                                 termDto.includedOptionsPrice = term.Included_Options_Price__c != null ? term.Included_Options_Price__c : 0;
                                 termDto.additionalOptionsPrice = term.Additional_Options_Price__c != null ? term.Additional_Options_Price__c : 0;
@@ -1391,7 +1449,6 @@ public without sharing class DealerPortalController {
                                 termDto.markup = term.Markup__c != null ? term.Markup__c : 0;
                                 termDto.markupType = term.Markup_Type__c != null ? term.Markup_Type__c : '';
                                 termDto.deductible = dp.Deductable__c;
-                                termDto.perClaimLimit = dp.Per_Claim_Limit__c;
                         
                                 Decimal basePrice = termDto.originalPackageTermCost + termDto.includedOptionsPrice + termDto.additionalOptionsPrice;
                                 Decimal discountAmount = 0;
@@ -1430,6 +1487,14 @@ public without sharing class DealerPortalController {
                                 termDto.expiryTerm = term.Expiry_Term__c;
                                 termDto.odometerKM = term.Odometer_KM__c;
                                 termDto.allowDeferral = term.Package_Term__r != null && term.Package_Term__r.Allow_Deferral__c == true;
+                                
+                                // Powersports brand-tier surcharge: override Premium_Model_Fee__c
+                                if (isPowersports && tierMultiplier != 1.0) {
+                                    Decimal baseForSurcharge = termDto.totalPrice != null ? termDto.totalPrice : 0;
+                                    termDto.premiumModelFee = (baseForSurcharge * (tierMultiplier - 1.0)).setScale(2);
+                                } else {
+                                    termDto.premiumModelFee = term.Package_Term__r != null && term.Package_Term__r.Premium_Model_Fee__c != null ? term.Package_Term__r.Premium_Model_Fee__c : 0;
+                                }
 
                                 tierTermList.add(termDto);
                                 termList.add(termDto); // Also add to flat list for backward compatibility
@@ -3062,6 +3127,16 @@ vehicle.Delivery_Date__c = null;
         vehicle.Vehicle_Sub_Type__c = (String) vehicleDataMap.get('vehicleSubType');
         vehicle.Vehicle_Class__c = (String) vehicleDataMap.get('vehicleClass');
         vehicle.Vehicle_Category__c = (String) vehicleDataMap.get('vehicleCategory');
+        // Powersports-specific fields
+        Object intakeHoursObj = vehicleDataMap.get('intakeHours');
+        if (intakeHoursObj == null) intakeHoursObj = vehicleDataMap.get('hoursUsage'); // fallback to hoursUsage
+        if (intakeHoursObj != null) {
+            try { vehicle.Intake_Hours__c = Integer.valueOf(String.valueOf(intakeHoursObj)); } catch(Exception e) { vehicle.Intake_Hours__c = null; }
+        }
+        String brandTierStr = (String) vehicleDataMap.get('brandTier');
+        if (String.isNotBlank(brandTierStr)) {
+            vehicle.Brand_Tier__c = brandTierStr;
+        }
 
 
         String vehicleName = '';
@@ -3849,7 +3924,8 @@ private static Map<String, Decimal> calculatePricing(Decimal basePrice, Decimal 
                                 Dealer__c, Dealer__r.Name, Dealer__r.Tax_Region__c, Dealer__r.Tax_Region__r.Total_Tax_Rate__c,
                                 RecordType.DeveloperName, RecordType.Name,
                                 Commercial_Business_Use__c, Commercial_Vehicle_Type__c, Commercial_Vehicle_Surcharge_Fee__c,
-                                Package__r.Package_Group__c, Package__r.Package_Group__r.Name, Package__r.Package_Group__r.Sort_Order__c
+                                Package__r.Package_Group__c, Package__r.Package_Group__r.Name, Package__r.Package_Group__r.Sort_Order__c,
+                                Package__r.Vehicle_Category_Filter__c, Package__r.Max_Intake_Hours__c
                         FROM Dealer_Package__c 
                         WHERE Dealer__c = :dealerId AND RecordType.DeveloperName = :recordType
                         ORDER BY Name
@@ -3866,7 +3942,8 @@ private static Map<String, Decimal> calculatePricing(Decimal basePrice, Decimal 
                             Dealer__c, Dealer__r.Name, Dealer__r.Tax_Region__c, Dealer__r.Tax_Region__r.Total_Tax_Rate__c,
                             RecordType.DeveloperName, RecordType.Name,
                             Commercial_Business_Use__c, Commercial_Vehicle_Type__c, Commercial_Vehicle_Surcharge_Fee__c,
-                            Package__r.Package_Group__c, Package__r.Package_Group__r.Name, Package__r.Package_Group__r.Sort_Order__c
+                            Package__r.Package_Group__c, Package__r.Package_Group__r.Name, Package__r.Package_Group__r.Sort_Order__c,
+                            Package__r.Vehicle_Category_Filter__c, Package__r.Max_Intake_Hours__c
                     FROM Dealer_Package__c 
                     WHERE Dealer__c = :dealerId
                     ORDER BY Name
@@ -4105,7 +4182,7 @@ return new List<Application_Package__c>();
                 'Vehicle__r.Odometer__c, Vehicle__r.Odometer_Unit__c, Vehicle__r.Business_Commercial_Use__c, Vehicle__r.Type_of_Commercial_Use__c, ' +
                 'Vehicle__r.Engine__c, Vehicle__r.Transmission__c, Vehicle__r.Fuel_Type__c, Vehicle__r.Drive_Type__c, Vehicle__r.Body_Style__c, ' +
                 'Vehicle__r.Color__c, Vehicle__r.GVWR__c, Vehicle__r.Manufacturer_Warranty_Type__c, Vehicle__r.Warranty_Term__c, ' +
-                'Vehicle__r.Deferral_Option__c, Vehicle__r.Delivery_Date__c, Vehicle__r.Usage_Type__c, Vehicle__r.Commercial_Vehicle_Type__c, Vehicle__r.Vehicle_Sub_Type__c, Vehicle__r.Vehicle_Class__c, Vehicle__r.Vehicle_Category__c, ' +
+                'Vehicle__r.Deferral_Option__c, Vehicle__r.Delivery_Date__c, Vehicle__r.Usage_Type__c, Vehicle__r.Commercial_Vehicle_Type__c, Vehicle__r.Vehicle_Sub_Type__c, Vehicle__r.Vehicle_Class__c, Vehicle__r.Vehicle_Category__c, Vehicle__r.Intake_Hours__c, Vehicle__r.Brand_Tier__c, ' +
                 'Dealer_Name__c, Dealer_Name__r.Id, Dealer_Name__r.Name, Dealer_Name__r.BillingStreet, Dealer_Name__r.BillingCity, ' +
                 'Dealer_Name__r.BillingState, Dealer_Name__r.BillingPostalCode, Dealer_Comments_Notes__c, Show_Comments_On_Print__c, ' +
                 'Sales_Rep__c, Sales_Rep__r.Id, Sales_Rep__r.Name, Dealer_Sales_ID_License__c, Financial_Institution_Lender__c' :
@@ -6377,6 +6454,36 @@ for (Integer i = 0; i < dmlEx.getNumDml(); i++) {
         }
 
         return result;
+    }
+
+
+    /**
+     * Returns true if the dealer associated with the given application has at least one
+     * active Dealer_Package__c record with record type Tire_Rim_Protection_Plan.
+     * Used by the portal container to conditionally show or hide the Tire & Rim tab.
+     */
+    @AuraEnabled(cacheable=true)
+    public static Boolean hasTireRimPackages(String applicationId) {
+        try {
+            if (String.isBlank(applicationId)) return false;
+            Application__c application = [
+                SELECT Dealer_Name__c
+                FROM Application__c
+                WHERE Id = :applicationId
+                LIMIT 1
+            ];
+            if (application.Dealer_Name__c == null) return false;
+            Integer cnt = [
+                SELECT COUNT()
+                FROM Dealer_Package__c
+                WHERE Dealer__c = :application.Dealer_Name__c
+                  AND RecordType.DeveloperName = 'Tire_Rim_Protection_Plan'
+            ];
+            return cnt > 0;
+        } catch (Exception e) {
+            System.debug('hasTireRimPackages error: ' + e.getMessage());
+            return false;
+        }
     }
 
 }

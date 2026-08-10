@@ -125,6 +125,11 @@ public without sharing class ApplicationSummaryController {
         @AuraEnabled public String bodyType { get; set; }
         @AuraEnabled public String color { get; set; }
         @AuraEnabled public String gvwr { get; set; }
+        // Fix 2 — Powersports fields
+        @AuraEnabled public String vehicleCategory { get; set; }
+        @AuraEnabled public String vehicleSubType { get; set; }
+        @AuraEnabled public String brandTier { get; set; }
+        @AuraEnabled public String intakeHours { get; set; }
     }
 
     /**
@@ -207,6 +212,9 @@ public without sharing class ApplicationSummaryController {
         @AuraEnabled public String contractExpiryOdometerUnit { get; set; }
         @AuraEnabled public Decimal packageTermOdometerKM { get; set; }
         @AuraEnabled public List<String> additionalOptionsPurchased { get; set; }
+        // Fix 2 — Powersports per-package fields
+        @AuraEnabled public Decimal perClaimLimit { get; set; }
+        @AuraEnabled public String formattedSurcharge { get; set; }
     }
 
     /**
@@ -294,6 +302,7 @@ public without sharing class ApplicationSummaryController {
                 Vehicle__r.Business_Commercial_Use__c, Vehicle__r.Type_Of_Commercial_Use__c, Vehicle__r.Engine__c, Vehicle__r.Transmission__c, Vehicle__r.Fuel_Type__c,
                 Vehicle__r.Drive_Type__c, Vehicle__r.Body_Type__c, Vehicle__r.Color__c, Vehicle__r.GVWR__c,
                 Vehicle__r.Factory_Warranty__c, Vehicle__r.Warranty_Term__c, Vehicle__r.In_Service_Date__c, Vehicle__r.Delivery_Date__c, Vehicle__r.Manufacturer_Warranty_Type__c,
+                Vehicle__r.Vehicle_Category__c, Vehicle__r.Vehicle_Sub_Type__c, Vehicle__r.Brand_Tier__c, Vehicle__r.Intake_Hours__c,
                 Dealer_Name__c,Dealer_Name__r.Name, Dealer_Name__r.Email__c, Dealer_Name__r.BillingStreet, Dealer_Name__r.BillingCity, Dealer_Name__r.BillingState, Dealer_Name__r.BillingPostalCode, Dealer_Name__r.BillingCountry, Dealer_Address__c, Dealer_Phone__c,
                 Financial_Institution_Lender__c, Lender_Address__c, Lender_Phone__c,
                 Finance_Loan_Term_Months__c, Amount_Financed__c, Interest_Rate__c, 
@@ -505,6 +514,12 @@ public without sharing class ApplicationSummaryController {
                 data.vehicle.specifications.color = app.Vehicle__r.Color__c != null ? app.Vehicle__r.Color__c : '';
                 data.vehicle.specifications.gvwr = app.Vehicle__r.GVWR__c != null ? String.valueOf(app.Vehicle__r.GVWR__c) : '';
                 
+                // Fix 2 — Powersports fields
+                data.vehicle.specifications.vehicleCategory = app.Vehicle__r.Vehicle_Category__c != null ? app.Vehicle__r.Vehicle_Category__c : '';
+                data.vehicle.specifications.vehicleSubType = app.Vehicle__r.Vehicle_Sub_Type__c != null ? app.Vehicle__r.Vehicle_Sub_Type__c : '';
+                data.vehicle.specifications.brandTier = app.Vehicle__r.Brand_Tier__c != null ? app.Vehicle__r.Brand_Tier__c : '';
+                data.vehicle.specifications.intakeHours = app.Vehicle__r.Intake_Hours__c != null ? String.valueOf(app.Vehicle__r.Intake_Hours__c) : '';
+                
                 data.vehicle.warranty.factoryWarrantyType = app.Vehicle__r.Manufacturer_Warranty_Type__c != null ? app.Vehicle__r.Manufacturer_Warranty_Type__c : '';
                 data.vehicle.warranty.coverageTerm = app.Vehicle__r.Warranty_Term__c != null ? app.Vehicle__r.Warranty_Term__c : '';
                 data.vehicle.warranty.inServiceDate = app.Vehicle__r.In_Service_Date__c != null ? String.valueOf(app.Vehicle__r.In_Service_Date__c) : '';
@@ -512,7 +527,7 @@ public without sharing class ApplicationSummaryController {
                 data.vehicle.tireRimDetails = getTireRimDetails(applicationId);
             }
             
-            data.applicationPackages = getApplicationPackagesForSummary(applicationId);
+            data.applicationPackages = getApplicationPackagesForSummary(applicationId, app.Vehicle__r);
             
             return data;
             
@@ -523,14 +538,19 @@ public without sharing class ApplicationSummaryController {
     
     /**
      * @description Get Application Packages for Summary Display
+     * @param applicationId  The Application record Id
+     * @param vehicle        The queried Vehicle__r from the parent application (for Rolling Odometer calc)
      */
-    private static List<ApplicationPackageRecordTypeWrapper> getApplicationPackagesForSummary(Id applicationId) {
+    private static List<ApplicationPackageRecordTypeWrapper> getApplicationPackagesForSummary(Id applicationId, Vehicle__c vehicle) {
         Map<String, ApplicationPackageRecordTypeWrapper> recordTypeMap = new Map<String, ApplicationPackageRecordTypeWrapper>();
         
         try {
             List<Application_Package__c> packages = [
                 SELECT Id, Name, RecordType.Name, Coverage_Plan__c, Coverage_Term__c,
-                        Package__r.Name, Package_Term__r.Name, Package_Term__r.Odometer_KM__c,
+                        Package__r.Name,
+                        Package_Term__r.Name, Package_Term__r.Odometer_KM__c,
+                        Package_Term__r.Restriction_Type__c,
+                        Package_Term__r.Per_Claim_Limit__c,
                         Deductible__c, Tax_Amount__c,Tax_Amount_Cost__c, Total_Package_Price__c, Contract_Premium_Price__c,Contract_Premium_Price_Without_Tax__c,
                         Contract_Cost_Price_Without_Tax__c, Contract_Cost_Price__c,
                         Dealer_Price_Override__c, Tax_Percentage__c, Premium_Model_Fee__c,
@@ -562,6 +582,9 @@ public without sharing class ApplicationSummaryController {
                 }
             }
             
+            // Vehicle odometer for Rolling Odometer calculation
+            Decimal vehicleOdometer = (vehicle != null) ? vehicle.Odometer__c : null;
+
             for (Application_Package__c pkg : packages) {
                 String recordTypeName = pkg.RecordType.Name;
                 
@@ -604,10 +627,12 @@ public without sharing class ApplicationSummaryController {
                     pkgWrapper.premiumModelFee = pkg.Premium_Model_Fee__c;
                     pkgWrapper.formattedPremiumModelFee = formatCurrency(pkg.Premium_Model_Fee__c);
                     pkgWrapper.hasPremiumModelFee = true;
+                    pkgWrapper.formattedSurcharge = formatCurrency(pkg.Premium_Model_Fee__c);
                 } else {
                     pkgWrapper.premiumModelFee = 0;
                     pkgWrapper.formattedPremiumModelFee = '$0.00';
                     pkgWrapper.hasPremiumModelFee = false;
+                    pkgWrapper.formattedSurcharge = '$0.00';
                 }
 
                 pkgWrapper.deductible = pkg.Deductible__c;
@@ -619,10 +644,24 @@ public without sharing class ApplicationSummaryController {
                 pkgWrapper.contractExpiryDate = formatDate(pkg.Contract_End_Date__c);
                 
                 pkgWrapper.contractStartOdometer = pkg.Odometer_Start__c;
-                pkgWrapper.contractExpiryOdometer = pkg.Odometer_End__c;
                 pkgWrapper.contractStartOdometerUnit = pkg.Odometer_Start_Unit__c != null ? pkg.Odometer_Start_Unit__c : 'KM';
                 pkgWrapper.contractExpiryOdometerUnit = pkg.Odometer_End_Unit__c != null ? pkg.Odometer_End_Unit__c : 'KM';
                 pkgWrapper.packageTermOdometerKM = pkg.Package_Term__r != null ? pkg.Package_Term__r.Odometer_KM__c : null;
+
+                // Fix 1 — Contract Expiry Odometer: compute based on Restriction_Type__c
+                String restrictionType = pkg.Package_Term__r != null ? pkg.Package_Term__r.Restriction_Type__c : null;
+                Decimal odometerKM = pkg.Package_Term__r != null ? pkg.Package_Term__r.Odometer_KM__c : null;
+                Decimal expiryOdometer = null;
+                if (restrictionType == 'Fixed Odometer' && odometerKM != null) {
+                    expiryOdometer = odometerKM;
+                } else if (restrictionType == 'Rolling Odometer' && odometerKM != null && vehicleOdometer != null) {
+                    expiryOdometer = vehicleOdometer + odometerKM;
+                }
+                // else null — blank in UI
+                pkgWrapper.contractExpiryOdometer = expiryOdometer;
+
+                // Fix 2 — Per-Claim Limit
+                pkgWrapper.perClaimLimit = pkg.Package_Term__r != null ? pkg.Package_Term__r.Per_Claim_Limit__c : null;
                 
                 pkgWrapper.additionalOptionsPurchased = packageOptionsMap.containsKey(pkg.Id) ? 
                     packageOptionsMap.get(pkg.Id) : new List<String>();

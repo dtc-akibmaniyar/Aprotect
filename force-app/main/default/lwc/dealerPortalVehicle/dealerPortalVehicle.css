@@ -1539,3 +1539,42 @@ textarea {
     color: #fff;
     outline: none;
 }
+/* ===== Powersports Brand Tier Display ===== */
+.brand-tier-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 32px;
+}
+
+.brand-tier-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 2px;
+    background: #e8e8e8;
+    color: #4a4a4a;
+    border: 1px solid #d0d0d0;
+}
+
+.brand-tier-badge--Premium,
+.brand-tier-badge--Exotic {
+    background: #fff3cd;
+    color: #856404;
+    border-color: #ffc107;
+}
+
+.brand-tier-badge--Standard {
+    background: #e8f0fe;
+    color: #1a56db;
+    border-color: #5184b8;
+}
+
+.brand-tier-note {
+    font-size: 0.75rem;
+    color: #856404;
+    font-style: italic;
+}
