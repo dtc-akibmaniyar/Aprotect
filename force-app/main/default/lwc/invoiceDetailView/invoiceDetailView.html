@@ -229,21 +229,14 @@
             </div><!-- /invoice-doc -->
         </div><!-- /invoice-wrapper -->
 
-        <!-- PAY NOW MODAL -->
-        <template if:true={showPayModal}>
-            <div class="modal-overlay" onclick={handleClosePayModal}>
-                <div class="modal-box" onclick={handleModalBoxClick}>
-                    <button class="modal-close" onclick={handleClosePayModal} aria-label="Close">&#x2715;</button>
-                    <h2 class="modal-title">Pay Invoice</h2>
-                    <p class="modal-msg">Are you sure you want to pay for Invoice # <strong>{invoiceData.invoiceName}</strong>? A remittance form will be created.</p>
-                    <div class="modal-footer">
-                        <button class="modal-btn" disabled={isPayLoading} onclick={handleConfirmPay}>
-                            <template if:true={isPayLoading}>Processing...</template>
-                            <template if:false={isPayLoading}>Continue to Pay</template>
-                        </button>
-                    </div>
-                </div>
-            </div>
+        <!-- MAKE PAYMENT MODAL -->
+        <template if:true={showMakePaymentModal}>
+            <c-dealer-make-payment-modal
+                unpaid-applications={unpaidApplications}
+                is-loading={isLoadingApplications}
+                onclose={handleCloseMakePaymentModal}
+                oncreateremittance={handleCreateRemittanceFromModal}>
+            </c-dealer-make-payment-modal>
         </template>
 
         <!-- CANCEL MODAL -->

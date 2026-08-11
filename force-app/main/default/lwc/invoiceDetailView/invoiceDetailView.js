@@ -7,6 +7,8 @@ import getInvoiceDetail from '@salesforce/apex/InvoiceDetailViewController.getIn
 import downloadInvoicePDF from '@salesforce/apex/InvoiceDetailViewController.downloadInvoicePDF';
 import createRemittanceForInvoice from '@salesforce/apex/InvoiceDetailViewController.createRemittanceForInvoice';
 import submitCancellationRequest from '@salesforce/apex/InvoiceDetailViewController.submitCancellationRequest';
+import getUnpaidApplications from '@salesforce/apex/DealerActionBoardController.getUnpaidApplications';
+import createRemittanceForm from '@salesforce/apex/DealerPortalRemittanceHandler.createRemittanceForm';
 
 export default class InvoiceDetailView extends NavigationMixin(LightningElement) {
     @api recordId;
@@ -23,6 +25,9 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
     @track isCancelLoading = false;
     @track cancelContext = null;
     @track cancelReason = '';
+    @track showMakePaymentModal = false;
+    @track unpaidApplications = [];
+    @track isLoadingApplications = false;
 
     connectedCallback() {
         if (this.recordId) {
@@ -71,7 +76,62 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
     }
 
     handlePayNow() {
-        this.showPayModal = true;
+        if (!this.canPay) return;
+        this.handleOpenMakePaymentModal();
+    }
+
+    async handleOpenMakePaymentModal() {
+        this.showMakePaymentModal = true;
+        this.unpaidApplications = [];
+        this.isLoadingApplications = true;
+        try {
+            const apps = await getUnpaidApplications();
+            this.unpaidApplications = apps || [];
+        } catch (err) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Error loading applications',
+                message: this.extractError(err),
+                variant: 'error'
+            }));
+        } finally {
+            this.isLoadingApplications = false;
+        }
+    }
+
+    handleCloseMakePaymentModal() {
+        this.showMakePaymentModal = false;
+        this.unpaidApplications = [];
+    }
+
+    async handleCreateRemittanceFromModal(event) {
+        const { applicationIds } = event.detail;
+        try {
+            const result = await createRemittanceForm({ applicationIds });
+            if (result.success && result.remittanceFormId) {
+                this.handleCloseMakePaymentModal();
+                this[NavigationMixin.Navigate]({
+                    type: 'standard__recordPage',
+                    attributes: {
+                        recordId: result.remittanceFormId,
+                        objectApiName: 'Remittance_Form__c',
+                        actionName: 'view'
+                    }
+                });
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Success',
+                    message: 'Remittance form created successfully',
+                    variant: 'success'
+                }));
+            } else {
+                throw new Error(result.message || 'Failed to create remittance form');
+            }
+        } catch (err) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Error',
+                message: this.extractError(err),
+                variant: 'error'
+            }));
+        }
     }
 
     handleClosePayModal() {

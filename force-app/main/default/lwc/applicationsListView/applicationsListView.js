@@ -4,6 +4,8 @@ import { updateRecord } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getApplicationsList from '@salesforce/apex/ApplicationsListViewController.getApplicationsList';
 import createNewApplication from '@salesforce/apex/ApplicationsListViewController.createNewApplication';
+import getUnpaidApplications from '@salesforce/apex/DealerActionBoardController.getUnpaidApplications';
+import createRemittanceForm from '@salesforce/apex/DealerPortalRemittanceHandler.createRemittanceForm';
 
 export default class ApplicationsListView extends NavigationMixin(LightningElement) {
 	@track isLoading = true;
@@ -24,9 +26,10 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 	@track cancellationApplicationStatus = '';
 	@track showNewApplicationModal = false;
 	@track statusFilter = 'Pending';
-	@track selectedApplicationIds = new Set();
-	@track isSelectAllChecked = false;
 	@track paymentDueDateFilter = 'All';
+	@track showMakePaymentModal = false;
+	@track unpaidApplications = [];
+	@track isLoadingApplications = false;
 
 	// Payment due date filter options
 	get paymentDueDateOptions() {
@@ -449,9 +452,6 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 		this.pageCache.clear();
 		this.countFetched = 0;
 		this.page = 1;
-		// Reset selections when filter changes
-		this.selectedApplicationIds.clear();
-		this.isSelectAllChecked = false;
 		this.loadInitial();
 	}
 
@@ -461,9 +461,6 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 		this.pageCache.clear();
 		this.countFetched = 0;
 		this.page = 1;
-		// Reset selections when filter changes
-		this.selectedApplicationIds.clear();
-		this.isSelectAllChecked = false;
 		this.loadInitial();
 	}
 
@@ -473,64 +470,14 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 		this.pageCache.clear();
 		this.countFetched = 0;
 		this.page = 1;
-		// Reset selections when filter changes
-		this.selectedApplicationIds.clear();
-		this.isSelectAllChecked = false;
 		this.loadInitial();
 	}
 
-	get showSelectionColumn() {
-		// Show selection checkbox only when "Submitted" is selected
-		return this.statusFilter === 'Submitted';
-	}
-
-	get applicationsWithSelection() {
-		// Add a 'selected' property to each application based on selectedApplicationIds
-		return this.applications.map(app => ({
-			...app,
-			selected: this.selectedApplicationIds.has(app.id),
-			applicationStatusClass: (app.applicationStatus === 'Submitted' || app.applicationStatus === 'Active') ? app.applicationStatus : 'Draft'
-		}));
-	}
-
-	get selectedApplicationIdsList() {
-		// Convert Set to array for passing to remittance form
-		return Array.from(this.selectedApplicationIds);
-	}
-
-	get shouldShowRemittanceForm() {
-		// Show form only when Submitted is selected and at least one application is checked
-		return this.showSelectionColumn && this.selectedApplicationIds.size > 0;
-	}
-
-	handleSelectAllChange(event) {
-		this.isSelectAllChecked = event.target.checked;
-		if (this.isSelectAllChecked) {
-			// Select all applications on current page that are not disabled for remittance
-			this.applications.forEach(app => {
-				if (!app.remittanceDisabled) {
-					this.selectedApplicationIds.add(app.id);
-				}
-			});
-		} else {
-			// Deselect all
-			this.selectedApplicationIds.clear();
-		}
-		// Force reactivity
-		this.selectedApplicationIds = new Set(this.selectedApplicationIds);
-	}
-
-	handleApplicationSelectionChange(event) {
-		const appId = event.target.dataset.id;
-		const app = this.applications.find(a => a.id === appId);
-		if (event.target.checked && !app.remittanceDisabled) {
-			this.selectedApplicationIds.add(appId);
-		} else {
-			this.selectedApplicationIds.delete(appId);
-			this.isSelectAllChecked = false;
-		}
-		// Force reactivity
-		this.selectedApplicationIds = new Set(this.selectedApplicationIds);
+	get hasDueSubmittedApplications() {
+		const records = this.allFetchedRecords || [];
+		return records.some(app =>
+			app && app.applicationStatus === 'Submitted' && app.statusBadge !== 'Paid'
+		);
 	}
 
 	async clickNewApplication() {
@@ -700,6 +647,62 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 			console.error('Error creating application', err);
 		} finally {
 			this.isLoading = false;
+		}
+	}
+
+	async handleOpenMakePaymentModal() {
+		this.showMakePaymentModal = true;
+		this.unpaidApplications = [];
+		this.isLoadingApplications = true;
+		try {
+			const apps = await getUnpaidApplications();
+			this.unpaidApplications = apps || [];
+		} catch (err) {
+			const msg = (err && err.body && err.body.message) || err.message || JSON.stringify(err);
+			this.dispatchEvent(new ShowToastEvent({
+				title: 'Error loading applications',
+				message: msg,
+				variant: 'error'
+			}));
+		} finally {
+			this.isLoadingApplications = false;
+		}
+	}
+
+	handleCloseMakePaymentModal() {
+		this.showMakePaymentModal = false;
+		this.unpaidApplications = [];
+	}
+
+	async handleCreateRemittanceFromModal(event) {
+		const { applicationIds } = event.detail;
+		try {
+			const result = await createRemittanceForm({ applicationIds });
+			if (result.success && result.remittanceFormId) {
+				this.handleCloseMakePaymentModal();
+				this[NavigationMixin.Navigate]({
+					type: 'standard__recordPage',
+					attributes: {
+						recordId: result.remittanceFormId,
+						objectApiName: 'Remittance_Form__c',
+						actionName: 'view'
+					}
+				});
+				this.dispatchEvent(new ShowToastEvent({
+					title: 'Success',
+					message: 'Remittance form created successfully',
+					variant: 'success'
+				}));
+			} else {
+				throw new Error(result.message || 'Failed to create remittance form');
+			}
+		} catch (err) {
+			const msg = (err && err.body && err.body.message) || err.message || JSON.stringify(err);
+			this.dispatchEvent(new ShowToastEvent({
+				title: 'Error',
+				message: msg,
+				variant: 'error'
+			}));
 		}
 	}
 

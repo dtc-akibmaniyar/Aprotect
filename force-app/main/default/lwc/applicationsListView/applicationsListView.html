@@ -1,13 +1,16 @@
 <template>
     <div class="dp-container">
-        <!-- Header -->
+        <!-- Enhanced Header -->
         <div class="dp-header">
+            <!-- Branded left strip accent -->
+            <div class="dp-header-accent"></div>
+
             <div class="dp-header-left">
-                <div class="dp-app-icon" aria-hidden="true">
-                    <!-- Placeholder SVG -->
-                    <svg width="29" height="38" viewBox="0 0 29 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Icon badge -->
+                <div class="dp-app-icon-badge" aria-hidden="true">
+                    <svg width="28" height="36" viewBox="0 0 29 38" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <g clip-path="url(#clip0_34_2151)">
-                            <path d="M26.9337 0H1.41647C0.645743 0 0 0.842427 0 1.84791V35.4363C0 36.4418 0.645743 37.2842 1.41647 37.2842H19.5181L28.3502 25.4902V1.84791C28.3502 0.842427 27.7045 0 26.9337 0ZM6.62407 9.18518C6.62407 9.02213 6.76989 8.85908 6.95736 8.85908H21.2262C21.4137 8.85908 21.5595 8.99495 21.5595 9.18518V12.3647C21.5595 12.5277 21.4137 12.6908 21.2262 12.6908H6.97819C6.79072 12.6908 6.64491 12.5549 6.64491 12.3647V9.18518H6.62407ZM6.62407 15.8702C6.62407 15.7072 6.76989 15.5441 6.95736 15.5441H21.2262C21.4137 15.5441 21.5595 15.68 21.5595 15.8702V19.0497C21.5595 19.2128 21.4137 19.3758 21.2262 19.3758H6.97819C6.79072 19.3758 6.64491 19.24 6.64491 19.0497V15.8702H6.62407ZM16.9351 25.4359C16.9351 25.5989 16.831 25.762 16.706 25.762H6.87404C6.74906 25.762 6.64491 25.6261 6.64491 25.4359V22.2564C6.64491 22.0933 6.74906 21.9303 6.87404 21.9303H16.706C16.831 21.9303 16.9351 22.0662 16.9351 22.2564V25.4359ZM19.4348 34.1863V25.1913H26.3297L19.4348 34.1863Z" fill="#5184B7" />
+                            <path d="M26.9337 0H1.41647C0.645743 0 0 0.842427 0 1.84791V35.4363C0 36.4418 0.645743 37.2842 1.41647 37.2842H19.5181L28.3502 25.4902V1.84791C28.3502 0.842427 27.7045 0 26.9337 0ZM6.62407 9.18518C6.62407 9.02213 6.76989 8.85908 6.95736 8.85908H21.2262C21.4137 8.85908 21.5595 8.99495 21.5595 9.18518V12.3647C21.5595 12.5277 21.4137 12.6908 21.2262 12.6908H6.97819C6.79072 12.6908 6.64491 12.5549 6.64491 12.3647V9.18518H6.62407ZM6.62407 15.8702C6.62407 15.7072 6.76989 15.5441 6.95736 15.5441H21.2262C21.4137 15.5441 21.5595 15.68 21.5595 15.8702V19.0497C21.5595 19.2128 21.4137 19.3758 21.2262 19.3758H6.97819C6.79072 19.3758 6.64491 19.24 6.64491 19.0497V15.8702H6.62407ZM16.9351 25.4359C16.9351 25.5989 16.831 25.762 16.706 25.762H6.87404C6.74906 25.762 6.64491 25.6261 6.64491 25.4359V22.2564C6.64491 22.0933 6.74906 21.9303 6.87404 21.9303H16.706C16.831 21.9303 16.9351 22.0662 16.9351 22.2564V25.4359ZM19.4348 34.1863V25.1913H26.3297L19.4348 34.1863Z" fill="#ffffff" />
                         </g>
                         <defs>
                             <clipPath id="clip0_34_2151">
@@ -15,13 +18,22 @@
                             </clipPath>
                         </defs>
                     </svg>
-
                 </div>
+
                 <div class="dp-header-left-content">
-                    <h2 class="dp-title">APPLICATIONS</h2>
+                    <!-- Title + subtitle -->
+                    <div class="dp-title-block">
+                        <h2 class="dp-title">APPLICATIONS</h2>
+                        <span class="dp-title-sub">Manage &amp; track submissions</span>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="dp-header-divider"></div>
+
+                    <!-- Status filter -->
                     <div class="dp-status-filters">
                         <span class="dp-status-icon" aria-hidden="true">
-                            <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <svg width="16" height="16" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <g clip-path="url(#clip0_34_2089)">
                                     <path d="M19 0H0V3.39769H19V0Z" fill="#5184B8"/>
                                     <path d="M0 4.07379L7.47153 11.5284V18.983H9.5L11.5285 17.5969V11.4946L14.5881 8.46881L19 4.05688H0V4.07379Z" fill="#5184B8"/>
@@ -41,9 +53,11 @@
                             <option value="Cancelled" selected={isCancelledSelected}>Cancelled</option>
                         </select>
                     </div>
+
+                    <!-- Due date filter -->
                     <div class="dp-status-filters dp-due-date-filters">
                         <span class="dp-status-icon" aria-hidden="true">
-                            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="#5184B8" stroke-width="2" fill="none"></rect>
                                 <line x1="16" y1="2" x2="16" y2="6" stroke="#5184B8" stroke-width="2"></line>
                                 <line x1="8" y1="2" x2="8" y2="6" stroke="#5184B8" stroke-width="2"></line>
@@ -57,11 +71,23 @@
                             <option value="90" selected={isPaymentDue90}>Due in 90 Days</option>
                         </select>
                     </div>
-                    <template if:true={shouldShowRemittanceForm}>
-                        <c-dealer-postal-remitance-form 
-                            record-ids={selectedApplicationIdsList}
-                            bulk-mode="true">
-                        </c-dealer-postal-remitance-form>
+
+                    <!-- Make Payment button -->
+                    <template if:true={hasDueSubmittedApplications}>
+                        <button class="dp-new-btn dp-make-payment-btn" onclick={handleOpenMakePaymentModal} aria-label="Make Payment">
+                            <span class="dp-new-icon dp-payment-icon" aria-hidden="true">
+                                <svg width="34" height="34" viewBox="0 0 49 49" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="24.5" cy="24.5" r="23" stroke="#80C52C" stroke-width="2.5" fill="#f0fce0"/>
+                                    <text x="24.5" y="31" text-anchor="middle" font-size="22" font-weight="700" fill="#4a8f0f" font-family="sans-serif">$</text>
+                                    <path d="M35 18 L24.5 8 L14 18" stroke="#80C52C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                                    <line x1="24.5" y1="8" x2="24.5" y2="20" stroke="#80C52C" stroke-width="2.5" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                            <span class="dp-new-text">
+                                <span class="dp-new-top">MAKE</span>
+                                <span class="dp-new-bottom">PAYMENT</span>
+                            </span>
+                        </button>
                     </template>
                 </div>
             </div>
@@ -168,11 +194,6 @@
 
         <!-- Columns -->
         <div class="dp-columns">
-            <template if:true={showSelectionColumn}>
-                <div class="col checkbox">
-                    <input type="checkbox" class="dp-select-all" checked={isSelectAllChecked} onchange={handleSelectAllChange} title="Select all" />
-                </div>
-            </template>
             <div class="col date">DATE</div>
             <div class="col id">APPLICATION ID #</div>
             <div class="col customer">CUSTOMER</div>
@@ -190,13 +211,8 @@
             </div>
         </template>
         <template if:false={isLoading}>
-            <template for:each={applicationsWithSelection} for:item="app">
+            <template for:each={applications} for:item="app">
                 <div key={app.id} class="dp-row">
-                    <template if:true={showSelectionColumn}>
-                        <div class="cell checkbox">
-                            <input type="checkbox" class="dp-app-checkbox" data-id={app.id} checked={app.selected} onchange={handleApplicationSelectionChange} disabled={app.remittanceDisabled} />
-                        </div>
-                    </template>
                     <div class="cell date">{app.date}</div>
                     <div class="cell id">
                         <a class="record-link" data-id={app.id} onclick={handleOpenRecord}>{app.appNumber}</a>
@@ -291,7 +307,7 @@
                                 <!-- <lightning-icon size="xx-small" style="background-color: #5184B8;" icon-name="action:update_status" alternative-text={app.applicationStatus}></lightning-icon> -->
                             <svg class="svg-icon" style="width: 2.0078125em;height: 2em;vertical-align: middle;fill: #5184B8;overflow: hidden;" viewBox="0 0 1032 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M723.225575 426.413452c-164.083086 0-297.780415 132.684471-297.780416 297.780415s132.684471 297.780415 297.780416 297.780416 297.780415-132.684471 297.780415-297.780416S887.308661 426.413452 723.225575 426.413452z m-26.334323 464.902077c-10.128586 10.128586-27.347181 10.128586-38.488625 0l-21.27003-21.270029L510.525278 743.43818c-10.128586-10.128586-10.128586-27.347181 0-38.488625l21.27003-21.27003c10.128586-10.128586 27.347181-10.128586 38.488625 0l107.363007 107.363007 202.571711-202.571711c10.128586-10.128586 27.347181-10.128586 38.488625 0l21.27003 21.27003c10.128586 10.128586 10.128586 27.347181 0 38.488625l-243.086054 243.086053zM262.374932 175.22453h418.310583c29.372898 0 52.668645-23.295747 52.668645-52.668645 0-29.372898-23.295747-52.668645-52.668645-52.668645H557.116772c-8.102868-40.514342-43.552918-69.88724-85.080119-69.88724-41.527201 0-76.97725 29.372898-85.080119 69.88724H262.374932c-29.372898 0-52.668645 23.295747-52.668645 52.668645 0 29.372898 23.295747 52.668645 52.668645 52.668645z"  /><path d="M340.365041 809.273986c-5.064293-2.025717-10.128586-5.064293-15.192879-10.128585-8.102868-8.102868-13.167161-20.257171-13.167161-32.411474 0-12.154303 5.064293-23.295747 13.167161-32.411474 2.025717-2.025717 4.051434-3.038576 5.064293-4.051434v-7.09001c0-33.424332 4.051434-64.822948 12.154303-95.208704-6.077151-2.025717-12.154303-6.077151-17.218596-10.128586-8.102868-8.102868-13.167161-20.257171-13.167161-32.411474 0-12.154303 5.064293-23.295747 13.167161-32.411473 8.102868-8.102868 20.257171-13.167161 32.411474-13.167162h19.244313c18.231454-33.424332 40.514342-63.810089 66.848664-91.15727H358.596495c-12.154303 0-23.295747-5.064293-32.411474-13.167161-8.102868-8.102868-13.167161-20.257171-13.167161-32.411474 0-12.154303 5.064293-23.295747 13.167161-32.411474 8.102868-8.102868 20.257171-13.167161 32.411474-13.167161h224.854599c43.552918-16.205737 90.144411-25.321464 139.774481-25.321464 81.028684 0 156.993076 24.308605 219.790306 66.848665V203.58457c0-24.308605-10.128586-47.604352-27.347181-64.822948-17.218595-17.218595-40.514342-26.334322-64.822947-26.334322h-91.15727v22.282888c0 18.231454-7.09001 35.450049-20.257171 48.617211-13.167161 13.167161-30.385757 20.257171-48.617211 20.257171H252.246346c-37.475767 0-68.874382-30.385757-68.874382-67.861524v-22.282888h-91.15727c-24.308605 0-47.604352 9.115727-64.822947 26.334323-17.218595 17.218595-27.347181 40.514342-27.347181 64.822947v728.245302c0 24.308605 10.128586 47.604352 26.334322 64.822948 17.218595 17.218595 40.514342 26.334322 64.822948 26.334322H470.010936c-63.810089-55.707221-110.401583-129.645895-129.645895-214.726014z m-87.105836-10.128585c-8.102868 8.102868-20.257171 13.167161-32.411474 13.167161-12.154303 0-23.295747-5.064293-32.411474-13.167161-8.102868-8.102868-13.167161-20.257171-13.167161-32.411474 0-12.154303 5.064293-23.295747 13.167161-32.411474 8.102868-8.102868 20.257171-13.167161 32.411474-13.167161 12.154303 0 23.295747 5.064293 32.411474 13.167161 8.102868 8.102868 13.167161 20.257171 13.167161 32.411474 0 13.167161-5.064293 24.308605-13.167161 32.411474z m-20.257171-170.160238c-20.257171 5.064293-41.527201-3.038576-51.655787-21.270029-8.102868-14.18002-8.102868-31.398615 0-45.578635s23.295747-23.295747 39.501484-23.295747c12.154303 0 23.295747 5.064293 32.411474 13.167161 8.102868 8.102868 13.167161 20.257171 13.167161 32.411474 0 21.27003-14.18002 39.501484-33.424332 44.565776z m0-182.31454c-20.257171 5.064293-41.527201-3.038576-51.655787-21.27003-8.102868-14.18002-8.102868-31.398615 0-45.578635s23.295747-22.282888 39.501484-22.282888c25.321464 0 45.578635 20.257171 45.578635 45.578635 0 20.257171-14.18002 38.488625-33.424332 43.552918z"  /></svg>
                             <!-- </button> -->
-                            <span class={app.applicationStatusClass}>
+                            <span class={app.applicationStatus}>
                                 {app.applicationStatus}
                             </span>
                         </div>
@@ -391,6 +407,16 @@
                 </div>
             </section>
             <div class="slds-backdrop slds-backdrop_open" onclick={handleCloseNewApplicationModal}></div>
+        </template>
+
+        <!-- Make Payment Modal -->
+        <template if:true={showMakePaymentModal}>
+            <c-dealer-make-payment-modal
+                unpaid-applications={unpaidApplications}
+                is-loading={isLoadingApplications}
+                onclose={handleCloseMakePaymentModal}
+                oncreateremittance={handleCreateRemittanceFromModal}>
+            </c-dealer-make-payment-modal>
         </template>
     </div>
 </template>

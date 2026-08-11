@@ -3,6 +3,7 @@ import { LightningElement, api, track } from 'lwc';
 export default class DealerMakePaymentModal extends LightningElement {
     @api unpaidApplications = [];
     @api isLoading = false;
+    @api preSelectedAppId = null;
 
     @track searchTerm = '';
     @track activeFilter = 'all';
@@ -11,6 +12,12 @@ export default class DealerMakePaymentModal extends LightningElement {
     @track summarySearchTerm = '';
     @track isSummaryExpanded = true;
     @track showCheckbox = true;
+
+    connectedCallback() {
+        if (this.preSelectedAppId && !this.selectedAppIds.includes(this.preSelectedAppId)) {
+            this.selectedAppIds = [this.preSelectedAppId];
+        }
+    }
 
     // ── Aging helpers ──────────────────────────────────────────
     _agingBucket(agingDays) {

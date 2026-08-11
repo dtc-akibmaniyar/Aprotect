@@ -37,7 +37,6 @@
 	margin: 0;
 	color: #5184B7;
 	font-size: 24px;
-    /* font-family: 'sans-serif'; */
 	font-weight: 600;
 }
 
@@ -123,7 +122,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 12px;
-	background: #EEEEEE; /* light gray pill */
+	background: #6fbcff;
 	border: none;
 	color: #111;
 	border-radius: 12px;
@@ -178,7 +177,6 @@
 	cursor: default;
 }
 
-/* Standalone calendar icon button next to search pill */
 .dp-date-icon-btn {
 	display: inline-flex;
 	align-items: center;
@@ -211,13 +209,11 @@
 	border-color: #5184B7;
 }
 
-/* Wrapper to allow badge dot positioning */
 .dp-date-icon-wrap {
 	position: relative;
 	display: inline-flex;
 }
 
-/* Orange dot badge shown when filter is applied */
 .dp-date-badge {
 	position: absolute;
 	top: 2px;
@@ -230,8 +226,6 @@
 	pointer-events: none;
 }
 
-
-/* Wrapper so dropdown is positioned relative to the row */
 .dp-search-wrapper {
 	position: relative;
 	display: flex;
@@ -239,7 +233,6 @@
 	gap: 8px;
 }
 
-/* Dropdown panel */
 .dp-date-dropdown {
 	position: absolute;
 	top: calc(100% + 8px);
@@ -343,7 +336,6 @@
 	cursor: not-allowed;
 }
 
-/* Transparent backdrop to close dropdown on outside click */
 .dp-date-backdrop {
 	position: fixed;
 	inset: 0;
@@ -356,13 +348,11 @@
 	gap: 0;
 	background: #5184B7;
 	color: #fff;
-	/* border-radius: 4px; */
 	font-size: 12px;
 	font-weight: 600;
 	overflow: hidden;
 }
 
-/* When selection column is visible, adjust grid */
 .dp-columns:has(.col.checkbox) {
 	grid-template-columns: 50px 100px 160px 1fr 1fr 500px 220px;
 }
@@ -394,7 +384,6 @@
 	overflow: hidden;
 }
 
-/* When selection column is visible, adjust row grid */
 .dp-row:has(.cell.checkbox) {
 	grid-template-columns: 50px 100px 160px 1fr 1fr 500px 220px;
 }
@@ -404,7 +393,6 @@
 
 .dp-row .cell.checkbox {
 	display: flex;
-	/* align-items: center; */
 	justify-content: center;
 	padding: 14px 10px;
 }
@@ -496,25 +484,18 @@
 }
 .cell.actions > div:first-child {
 	display: flex;
-	/* gap: 10px; */
 	align-items: center;
 	justify-content: center;
 }
 .icon-btn {
-	/* width: 28px;
-	height: 28px; */
 	border: 0px solid #cfd6df;
 	background: #f8f8f8;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	cursor: pointer;
-	/* border-radius: 6px; */
 }
 
-/* Ensure icon buttons show pointer and are clickable even if nested SVGs or nearby
-   status badges might otherwise capture pointer events. Also keep disabled buttons
-   showing the default cursor. */
 .cell.actions {
 	position: relative;
 	display: grid;
@@ -565,11 +546,6 @@
 	cursor: pointer;
 }
 
-.status-icon-container ::slotted(lightning-icon) {
-	width: 24px;
-	height: 24px;
-}
-
 .status-label {
 	font-size: 12px;
 	color: #333;
@@ -577,18 +553,6 @@
 	font-weight: 500;
 }
 
-/* .icon-btn svg {
-	width: 16px;
-	height: 16px;
-	fill: #5184B7;
-	stroke: #5184B7;
-} */
-/* .icon-btn.danger svg {
-	fill: #e61e25;
-	stroke: #e61e25;
-} */
-
-/* Status badge in actions cell */
 .cell.actions .Paid,
 .cell.actions .Due {
 	display: inline-block;
@@ -617,7 +581,7 @@
 	border-radius: 4px;
 	font-size: 10px;
 	color: #fff;
-  }
+}
 .cell.status .Paid {
 	background: #6bb616;
 }
@@ -625,7 +589,6 @@
 	background: #ffaa00;
 }
 
-/* Application Status styles - matching Payment Status pattern */
 .cell.actions .Submitted,
 .cell.actions .Draft,
 .cell.actions .Active {
@@ -668,7 +631,6 @@
 	color: #000;
 }
 
-/* Pagination */
 .dp-pagination {
 	margin-top: 12px;
 	display: flex;
@@ -711,7 +673,6 @@
 	color: #5a6472;
 }
 
-/* Cancellation Modal Styles */
 .slds-modal {
 	position: fixed;
 	top: 0;
@@ -752,22 +713,22 @@
 	justify-content: center;
 }
 
-.Create-New-modal{
-    width: 320px;
-    max-height: 239px;
-    height: 139px;
-    max-width: 90vw;
-    left: 28px;
-    top: 31px;
-    background: #FFFFFF;
-    border: 1px solid #E1DCDC;
-    box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
-    border-radius: 6px;
-    position: relative;
-    z-index: 9001;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+.Create-New-modal {
+	width: 320px;
+	max-height: 239px;
+	height: 139px;
+	max-width: 90vw;
+	left: 28px;
+	top: 31px;
+	background: #FFFFFF;
+	border: 1px solid #E1DCDC;
+	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+	border-radius: 6px;
+	position: relative;
+	z-index: 9001;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
 }
 
 .modal-close-btn {
@@ -841,7 +802,6 @@
 	align-items: center;
 }
 
-/* Reusable button utility for consistent behavior and accessibility */
 .dp-btn {
 	--btn-bg: #5184B7;
 	--btn-fg: #ffffff;
@@ -859,7 +819,7 @@
 	border: 1px solid var(--btn-border);
 	background: var(--btn-bg);
 	color: var(--btn-fg);
-	font-size: 0.875rem; /* 14px */
+	font-size: 0.875rem;
 	font-weight: 600;
 	line-height: 1;
 	text-align: center;
@@ -893,32 +853,22 @@
 	box-shadow: none;
 }
 
-/* Modal primary button extends utility with smaller size and specific shadows */
 .modal-btn-continue {
-	/* apply utility by adding both classes in markup: class="dp-btn modal-btn-continue" */
 	border-radius: 6px;
 	padding: 8px 16px;
-
-	/* smaller type for modal footer */
-	font-size: 0.75rem; /* 12px */
+	font-size: 0.75rem;
 	font-weight: 600;
 	line-height: 1;
 	text-align: center;
-
-	/* interaction */
 	cursor: pointer;
-
-	/* theme via variables with sensible fallbacks */
 	--btn-bg: #5184B7;
 	--btn-fg: #ffffff;
 	--btn-border: #cfd6df;
 	--btn-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
-
 	background: var(--btn-bg);
 	color: var(--btn-fg);
 	border: 1px solid var(--btn-border);
 	box-shadow: var(--btn-shadow);
-
 	transition: background-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 
@@ -949,7 +899,6 @@
 	box-shadow: none;
 }
 
-/* Cancellation status badge */
 .cancellation-badge-row {
 	margin-top: 4px;
 }
@@ -967,7 +916,294 @@
 	-webkit-box-decoration-break: clone;
 }
 
-/* Payment Due Date Filter */
 .dp-due-date-filters {
 	margin-left: 12px;
 }
+/* Make Payment button — green accent variant of dp-new-btn */
+.dp-make-payment-btn {
+    background: linear-gradient(135deg, #f0fce0 0%, #e6f9cc 100%);
+    border: 1.5px solid #a8d96c;
+    box-shadow: 0 4px 10px rgba(128, 197, 44, 0.18);
+}
+.dp-make-payment-btn:hover {
+    background: linear-gradient(135deg, #e6f9cc 0%, #d4f0a8 100%);
+    box-shadow: 0 8px 20px rgba(128, 197, 44, 0.28);
+    transform: translateY(-1px);
+}
+.dp-make-payment-btn:active {
+    transform: translateY(0);
+}
+.dp-payment-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Enhanced header ───────────────────────────────────── */
+.dp-container {
+    position: relative;
+}
+
+.dp-header {
+    background: linear-gradient(135deg, #f0f6ff 0%, #e8f0fb 60%, #f7f9ff 100%);
+    border-radius: 14px;
+    padding: 18px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 12px rgba(81,132,183,0.10), 0 1px 3px rgba(81,132,183,0.08);
+    border: 1px solid rgba(81,132,183,0.13);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle diagonal watermark stripes in background */
+.dp-header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 18px,
+        rgba(81,132,183,0.04) 18px,
+        rgba(81,132,183,0.04) 20px
+    );
+    pointer-events: none;
+    border-radius: 14px;
+}
+
+/* Left accent bar */
+.dp-header-accent {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    background: linear-gradient(180deg, #5184B7 0%, #80C52C 100%);
+    border-radius: 14px 0 0 14px;
+}
+
+/* Icon badge — circle behind the doc icon */
+.dp-app-icon-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    height: 54px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #5184B7 0%, #3a6496 100%);
+    box-shadow: 0 4px 12px rgba(81,132,183,0.30);
+    flex-shrink: 0;
+}
+
+/* Title block */
+.dp-title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dp-title {
+    margin: 0;
+    color: #1a3a5c;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    line-height: 1;
+}
+
+.dp-title-sub {
+    font-size: 11px;
+    color: #5184B7;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    opacity: 0.85;
+}
+
+/* Vertical divider between title and filters */
+.dp-header-divider {
+    width: 1px;
+    height: 36px;
+    background: linear-gradient(180deg, transparent, rgba(81,132,183,0.3), transparent);
+    flex-shrink: 0;
+}
+
+.dp-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+}
+
+.dp-header-left-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+/* Filter pills — slightly elevated look */
+.dp-status-filters {
+    background: rgba(255,255,255,0.75);
+    border: 1px solid rgba(81,132,183,0.2);
+    box-shadow: 0 1px 4px rgba(81,132,183,0.08);
+    backdrop-filter: blur(4px);
+}
+
+.dp-header-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: relative;
+    z-index: 1;
+}
+
+/* Make payment button pulse ring on hover */
+.dp-make-payment-btn {
+    position: relative;
+}
+.dp-make-payment-btn::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 14px;
+    border: 2px solid rgba(128,197,44,0);
+    transition: border-color 200ms ease, inset 200ms ease;
+}
+.dp-make-payment-btn:hover::after {
+    border-color: rgba(128,197,44,0.45);
+    inset: -5px;
+}
+/* ── End enhanced header ────────────────────────────────── */
+
+/* ── Single-line header fix ─────────────────────────────── */
+
+/* Full header: one flex row, no wrapping, vertically centred */
+.dp-header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 12px;
+    padding: 14px 20px 14px 26px;
+}
+
+/* Left side stretches to fill, no wrap */
+.dp-header-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+
+/* Content row inside left — single line, no wrap */
+.dp-header-left-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* Title block — prevent shrink, compact */
+.dp-title-block {
+    flex-shrink: 0;
+}
+
+.dp-title {
+    font-size: 20px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+.dp-title-sub {
+    white-space: nowrap;
+}
+
+/* Filters — keep pill shape but allow slight shrink */
+.dp-status-filters {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 10px 10px 8px 10px;
+}
+
+.dp-due-date-filters {
+    margin-left: 0;
+}
+
+/* Make Payment button — no icon SVG overflow, stays inline */
+.dp-make-payment-btn {
+    flex-shrink: 0;
+    padding: 8px 14px;
+}
+
+/* Right side — no shrink */
+.dp-header-right {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Icon badge — slightly smaller to save horizontal space */
+.dp-app-icon-badge {
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+}
+
+/* Divider — keep but reduce height */
+.dp-header-divider {
+    height: 28px;
+    flex-shrink: 0;
+}
+/* ── End single-line fix ────────────────────────────────── */
+
+/* ── Compact header action buttons ──────────────────────── */
+
+/* Both buttons share a compact size inside the header */
+.dp-header .dp-new-btn {
+    padding: 6px 10px;
+    gap: 6px;
+    border-radius: 8px;
+}
+
+/* Hide the large SVG icon — show only text in header context */
+.dp-header .dp-new-icon {
+    display: none;
+}
+
+/* Compact two-line text stack */
+.dp-header .dp-new-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.1;
+    gap: 1px;
+}
+
+.dp-header .dp-new-top {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #222;
+}
+
+.dp-header .dp-new-bottom {
+    font-size: 10px;
+    font-weight: 700;
+    color: #111;
+}
+
+/* Make Payment compact overrides */
+.dp-header .dp-make-payment-btn {
+    padding: 6px 10px;
+}
+
+/* ── End compact buttons ─────────────────────────────────── */
