@@ -6466,19 +6466,23 @@ for (Integer i = 0; i < dmlEx.getNumDml(); i++) {
     public static Boolean hasTireRimPackages(String applicationId) {
         try {
             if (String.isBlank(applicationId)) return false;
+
             Application__c application = [
                 SELECT Dealer_Name__c
                 FROM Application__c
                 WHERE Id = :applicationId
                 LIMIT 1
             ];
+
             if (application.Dealer_Name__c == null) return false;
+            
             Integer cnt = [
                 SELECT COUNT()
                 FROM Dealer_Package__c
                 WHERE Dealer__c = :application.Dealer_Name__c
                   AND RecordType.DeveloperName = 'Tire_Rim_Protection_Plan'
             ];
+
             return cnt > 0;
         } catch (Exception e) {
             System.debug('hasTireRimPackages error: ' + e.getMessage());

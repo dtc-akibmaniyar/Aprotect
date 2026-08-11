@@ -7,6 +7,7 @@ import convertApplicationToQuote from '@salesforce/apex/DealerPortalController.c
 import convertQuoteToApplication from '@salesforce/apex/DealerPortalController.convertQuoteToApplication';
 import generateQuotePDF from '@salesforce/apex/QuotePDFGeneratorService.generateQuotePDF';
 import communityBasePath from '@salesforce/community/basePath';
+import hasTireRimPackages from '@salesforce/apex/DealerPortalController.hasTireRimPackages';
 
 /**
  * TAB LOCKING TEMPORARILY DISABLED
@@ -27,6 +28,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     // @track isApplicationLocked = false;
     applicationPaymentStatus = null;
     @track showConvertToAppModal = false;
+    @track showTireRimTab = false; // default true until loaded
     @track isConvertingToApp = false;
     @track isGeneratingQuotePDF = false;
     // Tab completion tracking
@@ -56,6 +58,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         // Load application status imperatively
         if (this._applicationId) {
             this.loadApplicationStatus();
+            this.checkTireRimTabVisibility();
         }
         
         // Check for existing warranty packages after a delay to allow child components to load
@@ -81,6 +84,16 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
             }
         } catch (error) {
             console.error('❌ Error loading application status:', error);
+        }
+    }
+    
+    async checkTireRimTabVisibility() {
+        if (!this._applicationId) return;
+        try {
+            const result = await hasTireRimPackages({ applicationId: this._applicationId });
+            this.showTireRimTab = result === true;
+        } catch (e) {
+            this.showTireRimTab = false; // fail closed
         }
     }
     
@@ -164,6 +177,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
                 
                 // Load application status imperatively
                 this.loadApplicationStatus();
+                this.checkTireRimTabVisibility();
                 
                 // Notify child components that applicationId has changed
                 this.notifyChildComponents();
@@ -231,7 +245,13 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         
         // Only auto-navigate if this is NOT an auto-selection
         if (!event.detail.autoSelected) {
-            this.switchToTab('moreProducts');
+            if (this.showTireRimTab) {
+                this.switchToTab('moreProducts');
+            } else {
+                // Tire & Rim hidden — auto-complete it and jump straight to GAP
+                this.markTabAsCompleted('moreProducts');
+                this.switchToTab('gap');
+            }
         } else {
             console.log('Auto-selection detected, staying on warranty tab');
         }
@@ -294,7 +314,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
 
     get moreProductsTabClass() {
-        if (this.isApplicationLocked) return 'tab-button hidden';
+        if (this.isApplicationLocked || !this.showTireRimTab) return 'tab-button hidden';
         const isCompleted = this.tabCompletionStatus.moreProducts;
         const isActive = this.activeTab === 'moreProducts';
         const isAccessible = this.canAccessTab('moreProducts');
@@ -379,7 +399,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
 
     get moreProductsTabDisabled() {
-        return this.isApplicationLocked || !this.canAccessTab('moreProducts');
+        return this.isApplicationLocked || !this.showTireRimTab || !this.canAccessTab('moreProducts');
     }
 
     get gapTabDisabled() {
@@ -408,7 +428,7 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
 
     get moreProductsTabContentClass() {
-        return `tab-content-section ${this.activeTab === 'moreProducts' ? 'active' : 'hidden'}`;
+        return `tab-content-section ${(this.activeTab === 'moreProducts' && this.showTireRimTab) ? 'active' : 'hidden'}`;
     }
 
     get gapTabContentClass() {
@@ -922,8 +942,8 @@ handlePreviewPDF() {
     }
 
     handleGapBack(event) {
-        console.log('Car Loan Protection component going back to moreProducts tab');
-        this.switchToTab('moreProducts');
+        const prevTab = this.showTireRimTab ? 'moreProducts' : 'warranty';
+        this.switchToTab(prevTab);
     }
     
     handleCustomerNavigate(event) {

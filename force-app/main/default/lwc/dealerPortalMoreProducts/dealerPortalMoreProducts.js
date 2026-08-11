@@ -363,7 +363,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                 console.log('🚗 Vehicle model class for filtering:', this.vehicleModelClass);
                 
                 // Critical warning if modelClass is missing
-                if (!this.vehicleModelClass) {
+                if (!this.vehicleModelClass && vehicleData.vehicleCategory !== 'Powersports') {
                     console.warn('⚠️ CRITICAL: Vehicle Model Class is empty!');
                     console.warn('⚠️ This will cause ALL packages to show as "Not Available"');
                     console.warn('⚠️ Please ensure the Vehicle record has Model_Lookup__c populated with a Class__c value');
@@ -590,7 +590,9 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                     this.dealerPackages = [];
                     this.planCards = [];
                     this.currentView = 'planSelection';
-                    this.showErrorMessage('No Tire & Rim Protection packages are available for this dealer. Please contact your administrator.');
+                    if (!this.dealerHasSpecificPackages) {
+                        this.showErrorMessage('No Tire & Rim Protection packages are available for this dealer. Please contact your administrator.');
+                    }
                     this.loading = false;
                     return;
                 }
@@ -1782,14 +1784,14 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     
     // Validate form before continuing
     validateForm() {
-        if (!this.selectedDealerPackage) {
-            this.errorMessage = 'Please select a warranty package before continuing.';
+        if (!this.selectedDealerPackage && !this.showVehicleNotEligibleDisclaimer) {
+            this.errorMessage = 'Please select a tire & rim package before continuing.';
             this.showError = true;
             return false;
         }
         
-        if (!this.selectedWarrantyTerm) {
-            this.errorMessage = 'Please select a warranty term before continuing.';
+        if (!this.selectedWarrantyTerm && !this.showVehicleNotEligibleDisclaimer) {
+            this.errorMessage = 'Please select a tire & rim term before continuing.';
             this.showError = true;
             return false;
         }
@@ -2614,7 +2616,7 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     }
     
     async handleContinue() {
-        if (this.showNoPackageDisclaimer) {
+        if (this.showNoPackageDisclaimer || this.showVehicleNotEligibleDisclaimer) {
             this.handleSkip();
             return;
         }
