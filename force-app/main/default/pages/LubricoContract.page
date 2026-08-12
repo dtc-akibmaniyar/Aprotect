@@ -1,12 +1,12 @@
 <apex:page renderAs="pdf" applyBodyTag="false" showHeader="false" cache="false" standardStylesheets="false" controller="LubricoContractController">
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
-<style type="text/css">
-    @page {
-        size: letter;
-        margin: 0.45in 0.5in 0.55in 0.5in;
-        @bottom-left {
-            content: "CONTRACT NUMBER: APP000395  |  APPLICATION NUMBER: APP000395  |  GST/HST #: 83214 2467 RT0001";
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+        <style type="text/css">
+            @page {
+            size: letter;
+            margin: 0.45in 0.5in 0.55in 0.5in;
+            @bottom-left {
+            content: "{!$Label.Application_PDF_Footer_Contract_Number_Label} APP000395  |  {!$Label.Application_PDF_Footer_Application_Number_Label} APP000395  |  {!$Label.Application_PDF_Footer_GST_HST_Label} 83214 2467 RT0001";
             font-family: Arial, Helvetica, sans-serif;
             font-size: 6.5pt;
             color: #000;
@@ -14,9 +14,9 @@
             padding-top: 3px;
             vertical-align: top;
             width: 70%;
-        }
-        @bottom-right {
-            content: "Page " counter(page) " of " counter(pages) "  |  Printed on: Jul 29, 2026";
+            }
+            @bottom-right {
+            content: "{!$Label.Application_PDF_Footer_Page} " counter(page) " {!$Label.Application_PDF_Footer_Of} " counter(pages) "  |  {!$Label.Application_PDF_Footer_Printed_On} Jul 29, 2026";
             font-family: Arial, Helvetica, sans-serif;
             font-size: 6.5pt;
             color: #000;
@@ -25,443 +25,338 @@
             vertical-align: top;
             text-align: right;
             width: 30%;
-        }
-    }
-    * { box-sizing: border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 8.5pt; line-height: 1.3; color: #000; margin: 0; padding: 0; }
-    .header-wrap { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-    .logo-cell { width: 50%; vertical-align: top; }
-    .logo-info { font-size: 7.5pt; margin-top: 5px; line-height: 1.5; }
-    .title-cell { width: 50%; vertical-align: top; text-align: right; }
-    .doc-title  { font-size: 12pt; font-weight: bold; color: #5184B8; }
-    .doc-notice { font-size: 7pt; margin-top: 5px; line-height: 1.4; }
-    .privacy { background: #f2f2f2; border: 1px solid #bbb; padding: 5px 7px; font-size: 6.8pt; line-height: 1.4; margin-bottom: 8px; }
-    .sec-hdr { background-color: #5184B8; color: #fff; font-weight: bold; font-size: 8.5pt; padding: 4px 7px; margin: 9px 0 3px 0; }
-    .sub-hdr { background-color: #5184B8; color: #fff; font-weight: bold; font-size: 8pt; padding: 3px 7px; margin: 7px 0 3px 0; }
-    .dtbl { width: 100%; border-collapse: collapse; margin-bottom: 5px; border: 1px solid #aaa; }
-    .dtbl td { border: 1px solid #aaa; padding: 3px 5px; vertical-align: top; font-size: 8pt; }
-    .lbl { font-weight: bold; background: #f5f5f5; width: 23%; white-space: nowrap; }
-    .val { width: 27%; }
-    .note { font-size: 7.5pt; margin: 4px 0; }
-    .bold { font-weight: bold; }
-    .ital { font-style: italic; }
-    ul { margin: 3px 0 3px 16px; padding: 0; }
-    ol { margin: 3px 0 3px 8px; padding: 0 0 0 20px; }
-    li { margin: 2px 0; font-size: 8pt; }
-    p  { margin: 4px 0; font-size: 8pt; }
-    .center { text-align: center; }
-    .tc-body { font-size: 7.8pt; line-height: 1.4; }
-    .cov-name { font-weight: bold; font-size: 8pt; margin-top: 5px; }
-    .indent { margin-left: 10px; }
-</style>
-</head>
-<body>
-
-<table class="header-wrap">
-  <tr>
-    <td class="logo-cell">
-      <img src="{!URLFOR($Resource.AProtectLogo)}" style="max-height:55px; max-width:200px;" alt="AProtect"/>
-      <div class="logo-info" style="margin-top:5px;">
-        8800 Dufferin St. Suite 302B<br/>
-        Concord, Ontario L4K 0C5<br/>
-        TF: 1-866-660-6444  Tel: 416-661-7444<br/>
-        E-mail: info@a-protectwarranty.com<br/>
-        HST #: 832142467RT0001
-      </div>
-    </td>
-    <td class="title-cell">
-      <div class="doc-title">AProtect Vehicle Service Contract</div>
-      <div class="doc-notice">
-        It is the responsibility of the Contract Holder to check that the coverage listed
-        on this document agrees with the original Application given to You by the Selling
-        Dealer. Any discrepancies must be reported to AProtect immediately.
-      </div>
-    </td>
-  </tr>
-</table>
-
-<div class="privacy">
-  <span class="bold">PRIVACY NOTICE:</span> We will collect and retain all personal information concerning Your Contract and Claims. The information will be used for purposes of underwriting, marketing, administration and cancellation of Your Contract and investigation of Claims. We will only access Your file on a need to know basis and it will be kept at our secure location. It can be reviewed and/or rectified by written request. AProtect Group, its affiliates and their agents may use and share Your personal information with each other so that You can benefit from personalized offers and improved products and services. If You do not wish Your information to be shared within the AProtect Group, please contact the Administrator.
-</div>
-
-<div class="sec-hdr">Section 1 - CONTRACT INFORMATION</div>
-<table class="dtbl">
-  <tr>
-    <td class="lbl">Contract Number:</td><td class="val">APP000395</td>
-    <td class="lbl">Status:</td><td class="val">Application</td>
-  </tr>
-  <tr>
-    <td class="lbl">Program:</td><td class="val">Essential 220K Luxury Max</td>
-    <td class="lbl">Term (months):</td><td class="val">24 Months/40,000 Km</td>
-  </tr>
-  <tr>
-    <td class="lbl">Mileage (km):</td><td class="val">40,000 Km</td>
-    <td class="lbl">Deductible:</td><td class="val">$0</td>
-  </tr>
-  <tr>
-    <td class="lbl">Per-Claim Limit:</td><td class="val">$18,500</td>
-    <td class="lbl">Liability Limit:</td>
-    <td class="val">$36,999 <span style="font-size:6.8pt;"> Total liability equals the purchase price of the vehicle before taxes.</span></td>
-  </tr>
-  <tr>
-    <td class="lbl">Contract Premium:</td><td class="val">$9,800.00</td>
-    <td class="lbl">GST/HST:</td><td class="val">$1,274.00</td>
-  </tr>
-  <tr>
-    <td class="lbl">PST/QST/RST:</td><td class="val">$0.00</td>
-    <td class="lbl">Total Premium:</td><td class="val"><span class="bold">$11,074.00</span></td>
-  </tr>
-  <tr>
-    <td class="lbl">Commencement Date:</td><td class="val">Jul 29, 2026</td>
-    <td class="lbl">Expiration Date:</td><td class="val">&#160;</td>
-  </tr>
-  <tr>
-    <td class="lbl">Commencement Odometer:</td><td class="val">1000 Km</td>
-    <td class="lbl">Expiration Odometer:</td><td class="val">40,000 Km</td>
-  </tr>
-</table>
-<div class="note">Our obligations shall commence on the date and odometer reading listed above, and shall terminate on the anniversary applicable to the length in months chosen (expiration date), or on the date when the registered vehicle has travelled the distance chosen (expiration odometer), whichever comes first.</div>
-
-<div class="sec-hdr">Section 2 - REGISTERED OWNER</div>
-<table class="dtbl">
-  <tr><td class="lbl">Name:</td><td colspan="3">LOWE, DIANA</td></tr>
-  <tr><td class="lbl">Address:</td><td colspan="3">3535 REXWAY DRIVE BURLINGTON, BURLINGTON, ON Canada, L7N2L8</td></tr>
-  <tr>
-    <td class="lbl">Primary Phone:</td><td class="val">(289) 208-5664</td>
-    <td class="lbl">Secondary Phone:</td><td>(289) 208-5664</td>
-  </tr>
-  <tr>
-    <td class="lbl">Email:</td><td class="val">DIANE.LOWE22@HOTMAIL.COM</td>
-    <td class="lbl">Lienholder (if applicable):</td><td>&#160;</td>
-  </tr>
-</table>
-
-<div class="sec-hdr">Section 3 - VEHICLE</div>
-<table class="dtbl">
-  <tr><td class="lbl">VIN:</td><td colspan="3">3VWGM7BU8PM019783</td></tr>
-  <tr>
-    <td class="lbl">Year:</td><td class="val">2023</td>
-    <td class="lbl">Make:</td><td>Volkswagen</td>
-  </tr>
-  <tr>
-    <td class="lbl">Model:</td><td class="val">JETTA</td>
-    <td class="lbl">Purchase Price:</td><td>$36,999.00</td>
-  </tr>
-  <tr>
-    <td class="lbl">Odometer:</td><td class="val">1000 Km</td>
-    <td></td><td></td>
-  </tr>
-</table>
-<div class="note">If your odometer is listed in miles, this reading reflects a conversion to kilometers.</div>
-
-<div class="sec-hdr">Section 4 - CUSTOMER OBLIGATIONS</div>
-<p><span class="bold ital">IMPORTANT: in order to keep Your Contract valid, the following MUST be adhered to:</span></p>
-<p>At maximum intervals of 12,000 km from the purchase or lease date, you must, at your own expense:</p>
-<ul>
-  <li><span class="bold">have the engine oil and filter changed</span></li>
-  <li><span class="bold">have all other fluid levels checked</span><br/>
-    <span style="font-size:7.5pt;">(Maintaining proper fluid levels at all times will help make your vehicle safer and more reliable, and will protect it against avoidable breakdowns.)</span>
-  </li>
-</ul>
-<p class="bold">Within 15 calendar days of having the required maintenance performed on your vehicle, please report it to AProtect in ONE of the following ways:</p>
-<ul>
-  <li><span class="bold">WEBSITE:</span> complete online form located at oilchange.aprotect.com</li>
-  <li><span class="bold">EMAIL</span> a copy of the invoice with your Contract number clearly indicated, to: info@a-protectwarranty.com</li>
-  <li><span class="bold">MAIL</span> a copy of the invoice, with your Contract number clearly indicated, to: AProtect Warranty Corporation, 8800 Dufferin St. Suite 302B, Concord, Ontario L4K 0C5</li>
-</ul>
-<p>In all cases, please ensure that you keep the original invoices. Should You make a claim under the Contract, You may be required to provide these original invoices.</p>
-<p class="bold">Do-it-Yourself oil changes are NOT ACCEPTABLE.</p>
-<p class="bold">Failure to comply with all of the above constitutes non-performance of the conditions and may operate to void this Contract. A grace period of 1,000 km will be allowed with regards to the maintenance requirements described above.</p>
-<p><span class="bold">A.</span> Repairs made to covered components without prior authorization by Lubrico Warranty (1-800-265-1510) will not be reimbursed. Please refer to the Terms and Conditions for complete details.</p>
-<p><span class="bold">B.</span> In signing the Application for the Lubrico Vehicle Service Contract, the Contract Holder has certified that they:</p>
-<ol>
-  <li>have read, accepted and understand the Terms and Conditions of the Contract as set forth in this document,</li>
-  <li>acknowledged that the Selling Dealer has made no representations outside of the Terms and Conditions,</li>
-  <li>understand that Application for coverage must be made at time of vehicle purchase or prior to the expiration of an existing manufacturer's warranty,</li>
-  <li>understand that changes cannot be made to the Contract regarding coverage and options chosen after acceptance by Lubrico,</li>
-  <li>confirm that the information herein is true, accurate and the vehicle was in proper operating condition at the date of purchase (i.e. date of Application for Lubrico Vehicle Service Contract).</li>
-</ol>
-<p class="bold">Please Note: Misleading information will void this Contract.</p>
-<p>In signing the Application for the Lubrico Vehicle Service Contract, the Selling Dealer has certified that the registered vehicle qualifies for the coverage option chosen above, the information provided is correct, the vehicle is in proper operating condition, that no representations have been made outside of the Terms and Conditions and that the Contract Holder has been given a copy of the Contract Application at the time of sale.</p>
-
-<div class="sub-hdr">Dealer Information</div>
-<table class="dtbl">
-  <tr>
-    <td class="lbl">Dealer Name:</td><td class="val">GO Auto</td>
-    <td class="lbl">Dealership Registration #:</td><td>5358429</td>
-  </tr>
-  <tr><td class="lbl">Address:</td><td colspan="3">10220 184 St NW Floor 2, Edmonton AB T5S 0B9, Canada</td></tr>
-  <tr>
-    <td class="lbl">Salesperson:</td><td class="val">Andy Portal User</td>
-    <td class="lbl">Salesperson Registration #:</td><td>5589825</td>
-  </tr>
-  <tr>
-    <td class="lbl">Dealer Signature (if applicable for financing):</td><td class="val">&#160;</td>
-    <td class="lbl">Customer Signature (if applicable for financing):</td><td>&#160;</td>
-  </tr>
-</table>
-
-<div class="center" style="font-size:10pt;font-weight:bold;margin:10px 0 6px 0;text-decoration:underline;">TERMS AND CONDITIONS</div>
-<div class="tc-body">
-  <p>Subject to the Terms and Conditions, SAL Marketing Inc. warrants that it will reimburse the registered owner for all reasonable costs incurred by the registered owner during the term of this Contract for parts and labour required to repair any mechanical breakdown or failure of those parts covered under this Contract.</p>
-  <p>For the purposes of this Contract, &#8220;mechanical breakdown or failure&#8221; means the inability of any covered part to perform the function for which it was designed.</p>
-  <p>For the purposes of this Contract, We/Us/Our refers to SAL Marketing Inc., which is covered by a surety bond issued by Industrial Alliance Pacific General Insurance Corporation.</p>
-  <p>For the purposes of this Contract, You/Your/Contract Holder refers to the registered owner (the purchaser/lessee of the described vehicle) or the person to whom this Contract has been transferred.</p>
-  <p>The Lubrico Vehicle Service Contract can only be applied for at the time of sale/lease of the registered vehicle or prior to the expiration of an existing Manufacturer&#8217;s Warranty of equal or greater coverage. Our obligations shall commence: (1) on the date and odometer reading at the time of purchase/lease of the registered vehicle; or (2) on the date and odometer reading of the expiration of equivalent or greater Factory Warranty coverage, and shall terminate on the anniversary applicable to the length in months of the Contract term indicated in Section 1, or on the date when the registered vehicle has traveled the distance indicated in Section 1, whichever comes first.</p>
-</div>
-
-<div class="sub-hdr">1. Covered Services</div>
-<div class="tc-body">
-
-  <p class="cov-name">AIR BAGS / SUPPLEMENTARY RESTRAINT SYSTEM</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> All components of the Safety Air Bag System</p>
-
-  <p class="cov-name">BRAKES / ANTI LOCK BRAKING SYSTEM &amp; TRACTION CONTROL</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> ABS Pump and Pressure Modulator Assembly, Anti-Lock Brake Sensor Rings, Anti-Lock Brake/Traction Control Module, Backing Plates, Brake Assist Booster, Disc Brake Calipers, Emergency Brake Components, Flexible Brake Fluid Hoses, Hydraulic Steel Lines &amp; Fittings, Master Cylinder, Proportioning Valve, Stop Lamp Switch, Wheel Cylinders, Wheel Speed Sensors</p>
-  <p class="indent"><span class="bold">Coverage Excludes:</span> Brake Drums, Brake Linings, Brake Pads, Brake Rotors</p>
-
-  <p class="cov-name">BREAKDOWN AWAY FROM HOME</p>
-  <p class="indent">You will be reimbursed up to a maximum of $150 per claim for expenses incurred if a covered component fails while travelling. Eligible expenses include the cost of hotel rooms, bus fare, taxis, train or airfare. Lubrico will pay if the following conditions apply: You are at least 300km (180 miles) from Your residence at the time of breakdown, the labour time allocated by a current recognized professional Labour Guide exceeds 8 hours and requires that Your vehicle be kept in the shop overnight. Valid receipts are required for reimbursement.</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Expenses related to Breakdown Away From Home</p>
-
-  <p class="cov-name">CAR RENTAL</p>
-  <p class="indent">You will be reimbursed for the rental of an automobile if a covered component fails. Expenses shall be limited to $50 a day to a maximum of $300 for the lifetime of the coverage term. Valid rental receipts are required for reimbursement.</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Car Rental</p>
-
-  <p class="cov-name">COOLING SYSTEM</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Coolant Control Valve, Coolant Reservoir/Over-flow Tank, Coolant Temperature Sending Unit, Coolant Temperature Sensor, Electric Radiator Fan, Motor &amp; Assembly, Engine Cooling Fan Clutch &amp; Assembly, Engine Cooling Radiator, Engine Water Pump, Heater Core, Thermostat &amp; Housing</p>
-
-  <p class="cov-name">DIFFERENTIAL (FRONT &amp; REAR)</p>
-  <p class="indent">Housings covered when damaged from within</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Crown &amp; Pinion and their Gears &amp; Bearings, Differential Cover, Differential Engagement Components (Electronic &amp; Vacuum), Differential Housing (Front), Differential Housing (Rear), Differential Internally Lubricated Parts (Front), Differential Internally Lubricated Parts (Rear), Differential Mounts, Differential Viscous Couplers</p>
-  <p class="indent"><span class="bold">Coverage Excludes:</span> Differential 4WD Locking Hubs</p>
-
-  <p class="cov-name">DRIVELINE</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> 4x4 Locking Hubs, CV Axle Shafts, CV Boots, CV Joints, Drive Shafts, Driveshaft Universal Joints, Hanger Bearings, Wheel Bearings</p>
-
-  <p class="cov-name">ELECTRICAL</p>
-  <p class="indent">Does not include computerized systems and other electronics not specifically listed</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Alternator, Alternator Voltage Regulator, Headlamp Wiper Motor, Horn Assembly, Ignition Coils/Coil Packs, Starter Motor, Starter Motor Solenoid, Windshield Washer Pump (Front &amp; Rear), Windshield Wiper Motor (Front &amp; Rear)</p>
-
-  <p class="cov-name">ENGINE</p>
-  <p class="indent">Excludes damage caused by overheating regardless of cause</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Broken Piston Rings, Camshaft and Bearings, Connecting Rods and Bearings, Crankshaft, Cylinder Heads (excluding damage caused by overheating regardless of the cause), Dipstick and Tube, Engine Block (excluding damage caused by overheating regardless of the cause), Engine Internally Lubricated Parts, Engine Main Bearings, Engine Oil Cooler &amp; Lines, Engine Oil Pump, Engine Torque Struts, Exhaust Manifold, Exhaust Valves, Harmonic Balancer and Pulley, Intake Manifold, Intake Plenum, Intake Valves, Internal Variable Timing Components, Motor Mounts, Oil Filter Housing, Oil Pan, Oil Pressure Sending Unit, Oil Temperature Sending Unit, Pistons, Rocker Arm Assemblies, Serpentine Belt Tensioner &amp; Pulley, Timing Belt/Timing Chain and related gears and tensioners, Timing Cover, Vacuum Pump, Valve Covers, Valve Guides, Valve Lifters and Push Rods, Valve Springs and Retainers, Wrist Pins</p>
-  <p class="indent"><span class="bold">Coverage Excludes:</span> Catalytic Converter, Diesel Fuel Injection Systems, Hybrid-Specific Components</p>
-
-  <p class="cov-name">ENGINE &amp; EMISSION MANAGEMENT SYSTEM</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Camshaft Sensors, Crankshaft Sensors, Electronic Control Module (ECU), Engine Wiring Harness, EVAP Evaporative Emissions Control Components, Fuel Injection Management &amp; Electronic Engine Management Sensors, Idle Air Control Module &amp; Valve, Ignition Coils/Coil Packs, Intake Manifold Actuators, Knock Sensor, MAP/Manifold Pressure Sensor, Mass Airflow Sensor, NOx Sensors, Oxygen Sensors, PCV Valve, Powertrain Control Module, Purge Canister &amp; Solenoid, Throttle Body &amp; Actuators</p>
-
-  <p class="cov-name">FLUIDS &amp; FILTERS</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Fluids &amp; Filters necessary to complete covered repairs, excluding vehicle maintenance.</p>
-
-  <p class="cov-name">FUEL SYSTEM</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> EVAP Evaporative Emissions Control Components, Fuel Delivery Lines, Fuel Door Release Cable, Fuel Injection Computer Control Module, Fuel Injection Management &amp; Electronic Engine Management Sensors, Fuel Injector Lines, Fuel Injectors, Fuel Pressure Regulators, Fuel Pump, Fuel Pump Driver Module, Fuel Rail, Fuel Sending Unit, Fuel Tank, Injection/Distribution Pumps</p>
-  <p class="indent"><span class="bold">Coverage Excludes:</span> Fuel Filter</p>
-
-  <p class="cov-name">HEATING, AIR CONDITIONING &amp; CLIMATE CONTROL</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> A/C &amp; Climate Control Module, A/C Seals and Gaskets for covered components, Accumulator, Air Conditioning Belt Tensioner, Idler &amp; Pulley, Air Conditioning Clutch, Air Conditioning Compressor, Air Conditioning Condenser, Air Conditioning Evaporator, Air Conditioning Lines, Air Conditioning Pulley &amp; Bearings, Blower Motor Resistor, Electric A/C Condenser Fan, Motor &amp; Clutch, Expansion Valve, Heater Box Blend Door Actuators / Motors, Heating &amp; Cooling Auxiliary Water Pump &amp; Valve, Heating &amp; Cooling Blower Motor &amp; Fan, High/Low Pressure Cycling Switch, Orifice Tube, Rear / Auxiliary Air Conditioning, Receiver Dryer, Schrader Valves</p>
-
-  <p class="cov-name">ROADSIDE ASSISTANCE</p>
-  <p class="indent">You will be reimbursed up to $100 per occurrence for the following services: Towing, Fuel Delivery (excluding the cost of fuel), Battery Boost, Lockout Services (excluding locksmith costs), Tire Change and Winching Services. This coverage applies to the registered vehicle and anyone who is driving it. Coverage is limited to a maximum of 3 (three) service calls. Coverage is terminated on the expiration date or odometer reading, whichever occurs first, and is subject to the Terms and Conditions outlined in this document. For details on how to receive reimbursement, refer to Section 2: How To Claim.</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Battery Boost, Fuel Delivery, Lockout Services (excluding locksmith costs), Tire Change, Vehicle Towing, Winching</p>
-
-  <p class="cov-name">SEALS AND GASKETS</p>
-  <p class="indent">All those used to contain fluids/lubricants within the covered parts. Seeping or sweating is not covered as this is considered normal and acceptable.</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> All seals and gaskets used to contain fluids/lubricants within the covered components, Camshaft Seals, Crankshaft Seals, Cylinder Head Gaskets, Differential Seals and Gaskets, Intake Manifold Gaskets, Oil Pan Gasket, Timing Cover Gasket, Transfer Case Seals and Gaskets, Transmission/Transaxle Seals and Gaskets, Valve Cover Gaskets, Valve Seals</p>
-
-  <p class="cov-name">STEERING</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Centre Link, Electric Power Assist Motor, Idler Arms, Inner &amp; Outer Tie Rod Ends, Main &amp; Intermediate Shafts, Manual and Power Steering Gear Box Housing and internally lubricated parts, Pitman Arms, Power Steering Cooler &amp; Lines, Power Steering Fluid Reservoir, Power Steering Hoses &amp; Lines, Power Steering Pump, Power Steering Pump Pulley, Power Steering Pump Seals and Gaskets, Rack and Pinion and all internally lubricated parts, Rack and Pinion Seals and Gaskets, Steering Angle Sensor, Upper &amp; Lower Steering Column (including tilt mechanism)</p>
-
-  <p class="cov-name">SUSPENSION (FRONT)</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Air Ride/Load Levelling Compressor &amp; Lines (Front), Air Ride/Load Levelling Height Sensors (Front), Control Arm Bushings (Front), Control Arm Shaft (Front), Lower Ball Joint (Front), Lower Control Arm (Front), Stabilizer Bar &amp; Links (Front), Stabilizer Bushings, Steering Knuckles (Front), Upper Ball Joint (Front), Upper Control Arm (Front), Variable Suspension Dampening Control Module</p>
-
-  <p class="cov-name">SUSPENSION (REAR)</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Air Ride/Load Levelling Compressor &amp; Lines (Rear), Air Ride/Load Levelling Height Sensors (Rear), Control Arm Bushings (Rear), Control Arm Shaft (Rear), Lower Ball Joint (Rear), Lower Control Arm (Rear), Stabilizer Bar &amp; Links (Rear), Stabilizer Bushings, Upper Ball Joint (Rear), Upper Control Arm (Rear), Variable Suspension Dampening Control Module</p>
-
-  <p class="cov-name">TECHNOLOGY EQUIPMENT</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Adaptive Cruise Control Components, Anti-Theft Control Module, Auto Lights Sensors, Auto Wiper Sensors, Blind Spot Monitoring Sensors, Bluetooth Voice Activation Control Module, Body/Power Control Module, Cameras - Front, Rear &amp; Side, Centre Console Lock Actuators, Child Safety Door Locking Mechanisms, Collision Avoidance System Sensors &amp; Modules, Convertible Top Motor, Cruise Control Module, Cruise Control Radar Distance Sensor, Cruise Control Servo, Daytime Running Lights Module, Display &amp; Screen/Monitor (Including Navigation, Climate Control &amp; Media Settings), Radio/DVD, GPS Module, Electronic Hood Release Actuator Motor, Electronic Instrument Displays (Speedometer, Tachometer, Odometer, Fuel, Oil, Temperature and Voltage), Electronic Trunk Release Actuator Motor, Exterior Mirror Motors, Global Positioning System Control Module, Glove Box Lock Actuators, Heated Mirrors, Heated Seat Components, Heated Steering Wheel Components, Ignition Switch, Interior Manually Operated Electrical Switches, Keyless Entry Door Handle Sensor, Keyless Entry Door Keypad, Keyless Entry Receiver, Lane Assist/Collision Avoidance System Components, Lift Gate Motor, Parking Assist Sensors (Front/Rear), Power Antenna Motor, Power Door Lock Actuator Motors, Power Mirror Controllers, Power Seat Motor, Power Sliding Door Motor, Power Window Motors, Power Window Regulators, Power Window Switches, Sunroof Motor, Tailgate Activation Sensor, Tire Pressure Warning Control Module (TPMS), Wi-Fi Control Module</p>
-
-  <p class="cov-name">TRANSFER CASE 4WD/AWD</p>
-  <p class="indent">4WD/AWD. Housings covered when damaged from within</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> 4WD Actuator Motor, Gears, Sprockets &amp; Chains, Transfer Case Control Module, Transfer Case Cover, Transfer Case Engagement Components (Electronic &amp; Vacuum), Transfer Case Housing, Transfer Case Internally Lubricated Parts, Transfer Case Mounts</p>
-
-  <p class="cov-name">TRANSMISSION (AUTOMATIC/STANDARD)</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> Dipstick and Tube, Flexplate / Ring Gear, Flywheel, Internal Gears, Main &amp; Intermediate Shafts, Modulator Valve Body, Solenoid Packs, Torque Converter, Transmission Case (when damaged from within), Transmission Computer Control Module, Transmission Cooler &amp; Lines, Transmission Internally Lubricated Parts, Transmission Mounts, Transmission Oil Pan, Transmission Oil Pump, Transmission Wiring Harness</p>
-  <p class="indent"><span class="bold">Coverage Excludes:</span> External Linkages, Manual Clutch Components</p>
-
-  <p class="cov-name">TURBO / SUPERCHARGER</p>
-  <p class="indent">Housings covered when damaged from within</p>
-  <p class="indent"><span class="bold">Coverage Includes:</span> By-Pass Valve, Clutch &amp; Pulley, Intercooler, Oil Feed Lines, Parts, Turbo Water Pump, Wastegate, Wastegate Blow Off Valve, Wastegate Controller, Supercharger Compressor, Supercharger Housing, Supercharger Internally Lubricated Parts, Supercharger Water Pump, Turbo Housing, Turbo Internally Lubricated Parts</p>
-
-</div>
-
-<div class="tc-body" style="margin-top:6px;font-style:italic;font-size:7.5pt;">
-  Includes only those parts and services listed within this document, all others are not covered. It is agreed that the selection of parts used for repairs shall be made by Lubrico and that the parts can be used, new, rebuilt or of an equal or superior quality. Exchanged parts removed by Lubrico or the service centre will remain the property of Lubrico.
-</div>
-
-<div class="sub-hdr">2. How To Claim</div>
-<div class="tc-body">
-  <p><span class="bold">CALL LUBRICO IMMEDIATELY. Canada &amp; U.S. Toll-Free 1-800-265-1510</span><br/>
-  Lubrico Office Hours: 8:00 am &#8211; 8:00 pm EST, Monday to Friday</p>
-  <p>In the event that repairs to the registered vehicle become necessary and are covered by this Contract, the registered owner must telephone Lubrico immediately for the name and location of the nearest Lubrico Authorized Repair Establishment. Our liability under this Contract will extend only to repairs which have first been duly authorized by Lubrico.</p>
-  <p>For Roadside Assistance Claims, please contact a local service facility of Your choice to arrange for assistance. Forward the original receipt to Lubrico within 60 days of occurrence in order to receive reimbursement. Please include Your Contract number, the date of occurrence, vehicle year, make and model, and the odometer reading at time of occurrence. All Roadside Assistance services listed expire at the time of Contract expiration.</p>
-  <p>All repairs must be made by a Lubrico Authorized Repair Establishment. We shall not be responsible for repairs made by establishments other than a Lubrico Authorized Repair Establishment unless first approved by Lubrico. If Lubrico authorizes repairs to be carried out at other than a Lubrico Authorized Repair Establishment, We shall only be required to pay that amount which We would have had to pay for such repairs at a Lubrico Authorized Repair Establishment. Lubrico reserves the right to refuse any repair estimate judged unreasonable in relation to other alternatives.</p>
-  <p>In the event that the Terms and Conditions set out in this Contract have been met and this Contract is accordingly in force and the estimate as to costs is satisfactory to Lubrico, Lubrico will issue an authorization number to proceed with such repairs. If the registered vehicle is repaired at a Lubrico Authorized Repair Establishment, the registered owner will only have to pay the deductible and other miscellaneous non-covered items. If the registered vehicle is repaired at a non-Lubrico Authorized Repair Establishment, upon receipt by Lubrico from the registered owner of an itemized invoice for such repair, We shall reimburse the registered owner an amount equal thereto (labour time based on a current recognized Labour Guide), less the deductible and other miscellaneous non-covered items.</p>
-  <p>We shall be under no obligation to reimburse the registered owner for costs incurred for fluid loss, shop supplies, maintenance items, adjustments or diagnostic costs.</p>
-  <p>For procedures on how to file a complaint, please visit www.lubrico.com/complaints.</p>
-</div>
-
-<div class="sub-hdr">3. Renewals, Transfers, etc.</div>
-<div class="tc-body">
-  <p><span class="bold">INQUIRIES &#8211;</span> 1-800-668-3331</p>
-  <p><span class="bold">RENEWALS &#8211;</span> This program and/or term is not eligible for renewal.</p>
-  <p><span class="bold">CLAIMS-FREE DOUBLE YOUR TERM OFFER &#8211;</span> This program and/or term is not eligible for the Claims-Free Double Your Term Offer.</p>
-  <p><span class="bold">TRANSFERS &#8211;</span> This Contract is for the benefit of the registered Contract Holder and applies only to the vehicle listed within this Contract. This Contract may be transferred to a new owner of the registered vehicle, one time only during the lifetime of the Contract, provided the maintenance schedule has been followed. All original documents, a copy of the bill of sale and a transfer fee of $100 (plus applicable taxes) made payable to Lubrico Warranty Inc. must be received by Lubrico within 15 days of the date of sale or the transfer will be refused and the fee returned.</p>
-  <p><span class="bold">VEHICLE INSPECTION &#8211;</span> Lubrico reserves the right to request that a Vehicle Inspection Report be completed on any vehicle.</p>
-  <p><span class="bold">STORAGE &#8211;</span> Time spent in storage cannot be used to extend the Contract period.</p>
-  <p><span class="bold">CANCELLATION &#8211;</span> This Contract is non-cancellable except within 10 business days (Monday-Friday, excluding Statutory Holidays) of the purchase/lease of the vehicle as declared on the Application. During this period, the registered owner may cancel this Contract by supplying written notice to Lubrico Warranty Inc. and the Selling Dealer by email or fax. The cancellation will be processed through the Selling Dealer provided that no claims have been made.</p>
-  <p><span class="bold">CONTRACT HOLDER&#8217;S LEGAL RIGHT &#8211;</span> The Contract Holder has the right to commence legal action against Us for the settlement of a claim. You must consult with Your legal counsel regarding any time limitations that may affect Your right to bring a legal action against Us.</p>
-</div>
-
-<div class="sub-hdr">4. This Contract Does Not Cover</div>
-<div class="tc-body">
-  <ol>
-    <li>Any mechanical defect, if deemed to have existed prior to Application for coverage.</li>
-    <li>Any loss while Your vehicle is protected by the factory warranty (including its parts).</li>
-    <li>Any loss if You have failed to adhere to the Lubrico Maintenance Schedule.</li>
-    <li>Any repair or replacement made without prior approval by Lubrico.</li>
-    <li>Diagnostic charges, adjustments, tune-ups, alignments or storage costs.</li>
-    <li>Any parts that are not listed as covered by this Contract.</li>
-    <li>Any loss or damage caused by an unauthorized repair or teardown.</li>
-    <li>Loss caused by the failure of any part or parts of the vehicle that are not included in this Contract, regardless if the resulting damage is to a covered part or parts.</li>
-    <li>Further loss or damage resulting from failure to properly protect the vehicle in the event or indication of damage to an operating part.</li>
-    <li>Any loss caused by lack of necessary and proper amounts of lubricants or coolants, including damage caused by the failure of water hoses, radiators or their connections or in the transmission oil cooler lines.</li>
-    <li>Any damage caused by loss, contamination or improper type of engine oil, lubricants, anti-freeze and refrigerants or mechanical failure caused by overheating, regardless of cause.</li>
-    <li>Loss or damage as a result of corrosion.</li>
-    <li>Your vehicle if an inoperable odometer is not repaired immediately, or if the odometer is altered or tampered with in any way.</li>
-    <li>Repairs of carbonized or burnt valves and/or seized piston rings.</li>
-    <li>Repair/replacement of valve guides or piston rings when diagnosed as worn and the only malfunction is high oil consumption and/or low compression.</li>
-    <li>Any loss to You because Your vehicle has broken down, except as provided in this Contract.</li>
-    <li>Any loss caused by: abuse, negligence, collision, fire, theft, vandalism, water or freezing.</li>
-    <li>Damage to any property or injury and/or death to any person or persons regardless if the damage or injury was caused by Your vehicle or its parts.</li>
-    <li>Your vehicle if used to pull a trailer in excess of the limits recommended by the vehicle's manufacturer.</li>
-    <li>Any mechanical breakdown caused by a defect that the manufacturer has publicly announced it would correct and You have failed to have done.</li>
-    <li>Any loss or inconvenience due to the inability of Lubrico or the servicing dealer to obtain parts to repair the vehicle.</li>
-    <li>Motorhome coverage does not include auxiliary generator, roof air conditioning or appliances.</li>
-    <li>The registered vehicle if it is in any way modified from its factory specifications.</li>
-    <li>Any part that is not factory installed including air conditioning, superchargers, turbochargers and cruise control.</li>
-    <li>Any vehicle equipped with or used for the following: a snowplow, emergency vehicles, driving schools, public hire, taxi, limo, daily rentals, courier service or delivery.</li>
-    <li>Four wheel or rear wheel steering.</li>
-    <li>Your vehicle if You use it to race or drive competitively.</li>
-    <li>United States residents unless prior approval received from Lubrico at time of sale.</li>
-    <li>Vehicles rated at over 1 ton unless prior approval received from Lubrico at time of sale.</li>
-  </ol>
-</div>
-
-<div class="sub-hdr">Contact Information</div>
-<table class="dtbl">
-  <tr>
-    <td class="lbl">Claims / Authorization:</td><td>1-800-265-1510</td>
-    <td class="lbl">Inquiries:</td><td>1-800-668-3331</td>
-  </tr>
-  <tr>
-    <td class="lbl">Maintenance Reporting:</td><td>info@a-protectwarranty.com</td>
-    <td class="lbl">Maintenance Web Form:</td><td>https://a-protectwarranty.com</td>
-  </tr>
-  <tr>
-    <td class="lbl">General Website:</td><td>https://a-protectwarranty.com</td>
-    <td class="lbl">Complaints:</td><td>https://a-protectwarranty.com</td>
-  </tr>
-  <tr>
-    <td class="lbl">Mailing Address:</td>
-    <td colspan="3">8800 Dufferin St. Suite 302B Concord, Ontario L4K 0C5</td>
-  </tr>
-  <tr>
-    <td class="lbl">Business Hours:</td>
-    <td colspan="3">Monday&#8211;Friday 8:00 AM &#8211; 8:00 PM EST &#160;|&#160; Saturday 9:00 AM &#8211; 4:00 PM EST</td>
-  </tr>
-</table>
-
-<div class="sub-hdr" style="margin-top:8px;">Acknowledgement</div>
-<div class="tc-body">
-  <p>By accepting this Contract, the Contract Holder acknowledges having received, read, and agreed to all Terms and Conditions set out herein.</p>
-</div>
-
-<table class="dtbl" style="margin-top:16px;">
-  <tr>
-    <td style="width:45%;height:36px;border:1px solid #aaa;vertical-align:bottom;padding:4px;">
-      <span style="font-size:7pt;">Contract Holder Signature</span>
-    </td>
-    <td style="width:10%;border:none;">&#160;</td>
-    <td style="width:45%;height:36px;border:1px solid #aaa;vertical-align:bottom;padding:4px;">
-      <span style="font-size:7pt;">Date</span>
-    </td>
-  </tr>
-</table>
-
-<div style="margin-top:12px;font-size:7.5pt;text-align:center;">
-  Aprotect Warranty Corporation is the Administrator of this Vehicle Service Contract.<br/>
-  &#169; Aprotect Warranty Corporation. All rights reserved.
-</div>
-
-<div>
-  {!fileFound}
-  {!fileType}
-  {!fileName}
-  {!embedDataUri}
-  <!-- ═══ IMAGE ════════════════════════════════════════════════════ -->
-  <apex:outputPanel rendered="{!AND(fileFound, fileType == 'image')}">
-    <div style="background:#fff;min-height:calc(100vh - 60px);padding:20px;">
-        <img src="{!embedDataUri}" alt="{!fileName}" />
-    </div>
-  </apex:outputPanel>
-
-  <!-- ═══ PDF ══════════════════════════════════════════════════════ -->
-  <apex:outputPanel rendered="{!AND(fileFound, fileType == 'pdf')}">
-      <div class="embed-wrapper">
-          <!--
-          Entire PDF binary is base64-encoded and baked into the
-          data URI. No separate HTTP request. No auth dependency.
-          Browser's native PDF viewer handles rendering.
-          -->
-          <object data="{!embedDataUri}" type="application/pdf">
-              <embed src="{!embedDataUri}" type="application/pdf">
-                  <div class="state-box">
-                      <div class="icon">📄</div>
-                      <div class="title">PDF viewer not available</div>
-                      <div class="desc">
-                          Your browser does not support inline PDF rendering.
-                      </div>
-                      <a class="btn-download" href="{!downloadUrl}" target="_blank">Download PDF</a>
-                  </div>
-              </embed>
-          </object>
-      </div>
-  </apex:outputPanel>
-  
-  <!-- ═══ PLAIN TEXT ════════════════════════════════════════════════ -->
-  <apex:outputPanel rendered="{!AND(fileFound, fileType == 'text')}">
-      <div class="text-content">
-          <!--
-          textContent is escapeHtml4()-encoded in the controller
-          and wrapped in <pre>, so escape="false" is safe here.
-          -->
-          <apex:outputText value="{!textContent}" escape="false" />
-      </div>
-  </apex:outputPanel>
-  
-  <!-- ═══ HTML ══════════════════════════════════════════════════════ -->
-  <apex:outputPanel rendered="{!AND(fileFound, fileType == 'html')}">
-      <div class="text-content">
-          <!--
-          Only use escape="false" for internally trusted HTML.
-          For user-uploaded HTML, consider sandboxing in an <iframe
-          srcdoc="..."> instead.
-          -->
-          <apex:outputText value="{!textContent}" escape="false" />
-      </div>
-  </apex:outputPanel>
-</div>
-
-</body>
+            }
+            }
+            * { box-sizing: border-box; }
+            body { font-family: Arial, Helvetica, sans-serif; font-size: 8.5pt; line-height: 1.3; color: #000; margin: 0; padding: 0; }
+            .header-wrap { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+            .logo-cell { width: 50%; vertical-align: top; }
+            .logo-info { font-size: 7.5pt; margin-top: 5px; line-height: 1.5; }
+            .title-cell { width: 50%; vertical-align: top; text-align: right; }
+            .doc-title  { font-size: 12pt; font-weight: bold; color: #5184B8; }
+            .doc-notice { font-size: 7pt; margin-top: 5px; line-height: 1.4; }
+            .privacy { background: #f2f2f2; border: 1px solid #bbb; padding: 5px 7px; font-size: 6.8pt; line-height: 1.4; margin-bottom: 8px; }
+            .sec-hdr { background-color: #5184B8; color: #fff; font-weight: bold; font-size: 8.5pt; padding: 4px 7px; margin: 9px 0 3px 0; }
+            .sub-hdr { background-color: #5184B8; color: #fff; font-weight: bold; font-size: 8pt; padding: 3px 7px; margin: 7px 0 3px 0; }
+            .dtbl { width: 100%; border-collapse: collapse; margin-bottom: 5px; border: 1px solid #aaa; }
+            .dtbl td { border: 1px solid #aaa; padding: 3px 5px; vertical-align: top; font-size: 8pt; }
+            .lbl { font-weight: bold; background: #f5f5f5; width: 23%; white-space: nowrap; }
+            .val { width: 27%; }
+            .note { font-size: 7.5pt; margin: 4px 0; }
+            .bold { font-weight: bold; }
+            .ital { font-style: italic; }
+            ul { margin: 3px 0 3px 16px; padding: 0; }
+            ol { margin: 3px 0 3px 8px; padding: 0 0 0 20px; }
+            li { margin: 2px 0; font-size: 8pt; }
+            p  { margin: 4px 0; font-size: 8pt; }
+            .center { text-align: center; }
+            .tc-body { font-size: 7.8pt; line-height: 1.4; }
+            .cov-name { font-weight: bold; font-size: 8pt; margin-top: 5px; }
+            .indent { margin-left: 10px; }
+        </style>
+    </head>
+    <body>
+        
+        <table class="header-wrap">
+            <tr>
+                <td class="logo-cell">
+                    <img src="{!URLFOR($Resource.AProtectLogo)}" style="max-height:55px; max-width:200px;" alt="{!$Label.Application_PDF_Company_Name}"/>
+                    <div class="logo-info" style="margin-top:5px;">
+                        {!$Label.Application_PDF_Company_Address_Line1}<br/>
+                        {!$Label.Application_PDF_Company_Address_Line2}<br/>
+                        {!$Label.Application_PDF_Company_Phone}<br/>
+                        {!$Label.Application_PDF_Company_Email}<br/>
+                        {!$Label.Application_PDF_HST_Label} 832142467RT0001
+                    </div>
+                </td>
+                <td class="title-cell">
+                    <div class="doc-title">{!$Label.Application_PDF_Document_Title}</div>
+                    <div class="doc-notice">
+                        {!$Label.Application_PDF_Document_Notice}
+                    </div>
+                </td>
+            </tr>
+        </table>
+        
+        <div class="privacy">
+            <span class="bold">{!$Label.Application_PDF_Privacy_Notice_Title}</span> {!$Label.Application_PDF_Privacy_Notice_Body}
+        </div>
+        
+        <div class="sec-hdr">{!$Label.Application_PDF_Section1_Title}</div>
+        <table class="dtbl">
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Contract_Number_Label}</td><td class="val">APP000395</td>
+                <td class="lbl">{!$Label.Application_PDF_Status_Label}</td><td class="val">Application</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Program_Label}</td><td class="val">Essential 220K Luxury Max</td>
+                <td class="lbl">{!$Label.Application_PDF_Term_Label}</td><td class="val">24 Months/40,000 Km</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Mileage_Label}</td><td class="val">40,000 Km</td>
+                <td class="lbl">{!$Label.Application_PDF_Deductible_Label}</td><td class="val">$0</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Per_Claim_Limit_Label}</td><td class="val">$18,500</td>
+                <td class="lbl">{!$Label.Application_PDF_Liability_Limit_Label}</td>
+                <td class="val">$36,999 <span style="font-size:6.8pt;"> {!$Label.Application_PDF_Liability_Note}</span></td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Premium_Label}</td><td class="val">$9,800.00</td>
+                <td class="lbl">{!$Label.Application_PDF_Premium_Plus_Tax_Label}</td><td class="val">$1,274.00</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_PST_QST_RST_Label}</td><td class="val">$0.00</td>
+                <td class="lbl">{!$Label.Application_PDF_Total_Premium_Label}</td><td class="val"><span class="bold">$11,074.00</span></td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Commencement_Date_Label}</td><td class="val">Jul 29, 2026</td>
+                <td class="lbl">{!$Label.Application_PDF_Expiration_Date_Label}</td><td class="val">&#160;</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Commencement_Odometer_Label}</td><td class="val">1000 Km</td>
+                <td class="lbl">{!$Label.Application_PDF_Expiration_Odometer_Label}</td><td class="val">40,000 Km</td>
+            </tr>
+        </table>
+        <div class="note">{!$Label.Application_PDF_Section1_Note}</div>
+        
+        <div class="sec-hdr">{!$Label.Application_PDF_Section2_Title}</div>
+        <table class="dtbl">
+            <tr><td class="lbl">{!$Label.Application_PDF_Owner_Name_Label}</td><td colspan="3">LOWE, DIANA</td></tr>
+            <tr><td class="lbl">{!$Label.Application_PDF_Owner_Address_Label}</td><td colspan="3">3535 REXWAY DRIVE BURLINGTON, BURLINGTON, ON Canada, L7N2L8</td></tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Owner_Primary_Phone_Label}</td><td class="val">(289) 208-5664</td>
+                <td class="lbl">{!$Label.Application_PDF_Owner_Secondary_Phone_Label}</td><td>(289) 208-5664</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Owner_Email_Label}</td><td class="val">DIANE.LOWE22@HOTMAIL.COM</td>
+                <td class="lbl">{!$Label.Application_PDF_Owner_Lienholder_Label}</td><td>&#160;</td>
+            </tr>
+        </table>
+        
+        <div class="sec-hdr">{!$Label.Application_PDF_Section3_Title}</div>
+        <table class="dtbl">
+            <tr><td class="lbl">{!$Label.Application_PDF_Vehicle_VIN_Label}</td><td colspan="3">3VWGM7BU8PM019783</td></tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Vehicle_Year_Label}</td><td class="val">2023</td>
+                <td class="lbl">{!$Label.Application_PDF_Vehicle_Make_Label}</td><td>Volkswagen</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Vehicle_Model_Label}</td><td class="val">JETTA</td>
+                <td class="lbl">{!$Label.Application_PDF_Vehicle_Purchase_Price_Label}</td><td>$36,999.00</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Vehicle_Odometer_Label}</td><td class="val">1000 Km</td>
+                <td></td><td></td>
+            </tr>
+        </table>
+        <div class="note">{!$Label.Application_PDF_Section3_Note}</div>
+        
+        <div class="sec-hdr">{!$Label.Application_PDF_Section4_Title}</div>
+        <p><span class="bold ital">{!$Label.Application_PDF_Important_Notice}</span></p>
+        <p>{!$Label.Application_PDF_Maintenance_Intro}</p>
+        <ul>
+            <li><span class="bold">{!$Label.Application_PDF_Obligation_Oil_Change}</span></li>
+            <li><span class="bold">{!$Label.Application_PDF_Obligation_Fluid_Levels}</span><br/>
+                <span style="font-size:7.5pt;">{!$Label.Application_PDF_Obligation_Fluid_Note}</span>
+            </li>
+        </ul>
+        <p class="bold">{!$Label.Application_PDF_Maintenance_Reporting_Intro}</p>
+        <ul>
+            <li><span class="bold">{!$Label.Application_PDF_Website_Method_Label}</span> {!$Label.Application_PDF_Website_Method_Instruction}</li>
+            <li><span class="bold">{!$Label.Application_PDF_Email_Method_Label}</span> {!$Label.Application_PDF_Email_Method_Instruction}</li>
+            <li><span class="bold">{!$Label.Application_PDF_Mail_Method_Label}</span> {!$Label.Application_PDF_Mail_Method_Instruction}</li>
+        </ul>
+        <p>{!$Label.Application_PDF_Keep_Invoices_Notice}</p>
+        <p class="bold">{!$Label.Application_PDF_DIY_Oil_Change_Notice}</p>
+        <p class="bold">{!$Label.Application_PDF_Non_Compliance_Notice}</p>
+        <p><span class="bold">A.</span> {!$Label.Application_PDF_Certification_Line1}</p>
+        <p><span class="bold">B.</span> {!$Label.Application_PDF_Certification_Line2}</p>
+        <ol>
+            <li>{!$Label.Application_PDF_Certification_Item1}</li>
+            <li>{!$Label.Application_PDF_Certification_Item2}</li>
+            <li>{!$Label.Application_PDF_Certification_Item3}</li>
+            <li>{!$Label.Application_PDF_Certification_Item4}</li>
+            <li>{!$Label.Application_PDF_Certification_Item5}</li>
+        </ol>
+        <p class="bold">{!$Label.Application_PDF_Misleading_Info_Notice}</p>
+        <p>{!$Label.Application_PDF_Dealer_Certification}</p>
+        
+        <div class="sub-hdr">{!$Label.Application_PDF_Dealer_Information_Title}</div>
+        <table class="dtbl">
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Dealer_Name_Label}</td><td class="val">GO Auto</td>
+                <td class="lbl">{!$Label.Application_PDF_Dealership_Registration_Label}</td><td>5358429</td>
+            </tr>
+            <tr><td class="lbl">{!$Label.Application_PDF_Dealer_Address_Label}</td><td colspan="3">10220 184 St NW Floor 2, Edmonton AB T5S 0B9, Canada</td></tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Salesperson_Label}</td><td class="val">Andy Portal User</td>
+                <td class="lbl">{!$Label.Application_PDF_Salesperson_Registration_Label}</td><td>5589825</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Dealer_Signature_Label}</td><td class="val">&#160;</td>
+                <td class="lbl">{!$Label.Application_PDF_Customer_Signature_Label}</td><td>&#160;</td>
+            </tr>
+        </table>
+        
+        <div class="center" style="font-size:10pt;font-weight:bold;margin:10px 0 6px 0;text-decoration:underline;">{!$Label.Application_PDF_TC_Title}</div>
+        <div class="tc-body">
+            <p>{!$Label.Application_PDF_TC_Intro1}</p>
+            <p>{!$Label.Application_PDF_TC_Intro2}</p>
+            <p>{!$Label.Application_PDF_TC_Intro3}</p>
+            <p>{!$Label.Application_PDF_TC_Intro4}</p>
+            <p>{!$Label.Application_PDF_TC_Intro5}</p>
+        </div>
+        
+        <div class="sub-hdr">{!$Label.Application_PDF_TC_Covered_Services_Title}</div>
+        <div class="tc-body">
+            
+            <p class="cov-name">{!$Label.Application_PDF_Coverage_AirBags_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_AirBags_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_Brakes_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Brakes_Includes}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Excludes_Label}</span> {!$Label.Application_PDF_Coverage_Brakes_Excludes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_BreakdownAwayFromHome_Title}</p>
+            <p class="indent">{!$Label.Application_PDF_Coverage_BreakdownAwayFromHome_Description}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_BreakdownAwayFromHome_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_CarRental_Title}</p>
+            <p class="indent">{!$Label.Application_PDF_Coverage_CarRental_Description}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_CarRental_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_CoolingSystem_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_CoolingSystem_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_Differential_Title}</p>
+            <p class="indent">{!$Label.Application_PDF_Coverage_Differential_Description}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Differential_Includes}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Excludes_Label}</span> {!$Label.Application_PDF_Coverage_Differential_Excludes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_Driveline_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Driveline_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_Electrical_Title}</p>
+            <p class="indent">{!$Label.Application_PDF_Coverage_Electrical_Description}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Electrical_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_Engine_Title}</p>
+            <p class="indent">{!$Label.Application_PDF_Coverage_Engine_Description}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Engine_Includes}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Excludes_Label}</span> {!$Label.Application_PDF_Coverage_Engine_Excludes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_EngineEmission_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_EngineEmission_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_FluidsFilters_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_FluidsFilters_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_FuelSystem_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_FuelSystem_Includes}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Excludes_Label}</span> {!$Label.Application_PDF_Coverage_FuelSystem_Excludes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_HVAC_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_HVAC_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_RoadsideAssistance_Title}</p>
+            <p class="indent">{!$Label.Application_PDF_Coverage_RoadsideAssistance_Description}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_RoadsideAssistance_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_SealsGaskets_Title}</p>
+            <p class="indent">{!$Label.Application_PDF_Coverage_SealsGaskets_Description}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_SealsGaskets_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_Steering_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Steering_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_SuspensionFront_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_SuspensionFront_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_SuspensionRear_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_SuspensionRear_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_TechnologyEquipment_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_TechnologyEquipment_Includes_Part1}, {!$Label.Application_PDF_Coverage_TechnologyEquipment_Includes_Part2}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_TransferCase_Title}</p>
+            <p class="indent">{!$Label.Application_PDF_Coverage_TransferCase_Description}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_TransferCase_Includes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_Transmission_Title}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Transmission_Includes}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Excludes_Label}</span> {!$Label.Application_PDF_Coverage_Transmission_Excludes}</p><p class="cov-name">{!$Label.Application_PDF_Coverage_TurboSupercharger_Title}</p>
+            <p class="indent">{!$Label.Application_PDF_Coverage_TurboSupercharger_Description}</p>
+            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_TurboSupercharger_Includes}</p></div>
+        
+        <div class="tc-body" style="margin-top:6px;font-style:italic;font-size:7.5pt;">
+            {!$Label.Application_PDF_TC_Coverage_Footer}
+        </div>
+        
+        <div class="sub-hdr">{!$Label.Application_PDF_TC_Claim_Title}</div>
+        <div class="tc-body">
+            <p><span class="bold">{!$Label.Application_PDF_Claim_Call_Line}</span><br/>
+                {!$Label.Application_PDF_Claim_Hours}</p>
+            <p>{!$Label.Application_PDF_Claim_Para1}</p>
+            <p>{!$Label.Application_PDF_Claim_Para2}</p>
+            <p>{!$Label.Application_PDF_Claim_Para3}</p>
+            <p>{!$Label.Application_PDF_Claim_Para4}</p>
+            <p>{!$Label.Application_PDF_Claim_Para5}</p>
+            <p>{!$Label.Application_PDF_Claim_Para6}</p>
+        </div>
+        
+        <div class="sub-hdr">{!$Label.Application_PDF_TC_Renewals_Title}</div>
+        <div class="tc-body">
+            <p><span class="bold">{!$Label.Application_PDF_Renewals_Inquiries_Label}</span> {!$Label.Application_PDF_Renewals_Inquiries_Text}</p>
+            <p><span class="bold">{!$Label.Application_PDF_Renewals_Renewals_Label}</span> {!$Label.Application_PDF_Renewals_Renewals_Text}</p>
+            <p><span class="bold">{!$Label.Application_PDF_Renewals_ClaimsFree_Label}</span> {!$Label.Application_PDF_Renewals_ClaimsFree_Text}</p>
+            <p><span class="bold">{!$Label.Application_PDF_Renewals_Transfers_Label}</span> {!$Label.Application_PDF_Renewals_Transfers_Text}</p>
+            <p><span class="bold">{!$Label.Application_PDF_Renewals_VehicleInspection_Label}</span> {!$Label.Application_PDF_Renewals_VehicleInspection_Text}</p>
+            <p><span class="bold">{!$Label.Application_PDF_Renewals_Storage_Label}</span> {!$Label.Application_PDF_Renewals_Storage_Text}</p>
+            <p><span class="bold">{!$Label.Application_PDF_Renewals_Cancellation_Label}</span> {!$Label.Application_PDF_Renewals_Cancellation_Text}</p>
+            <p><span class="bold">{!$Label.Application_PDF_Renewals_LegalRight_Label}</span> {!$Label.Application_PDF_Renewals_LegalRight_Text}</p>
+        </div>
+        
+        <div class="sub-hdr">{!$Label.Application_PDF_TC_DNC_Title}</div>
+        <div class="tc-body">
+            <ol>
+                <li>{!$Label.Application_PDF_DNC_Item1}</li>
+                <li>{!$Label.Application_PDF_DNC_Item2}</li>
+                <li>{!$Label.Application_PDF_DNC_Item3}</li>
+                <li>{!$Label.Application_PDF_DNC_Item4}</li>
+                <li>{!$Label.Application_PDF_DNC_Item5}</li>
+                <li>{!$Label.Application_PDF_DNC_Item6}</li>
+                <li>{!$Label.Application_PDF_DNC_Item7}</li>
+                <li>{!$Label.Application_PDF_DNC_Item8}</li>
+                <li>{!$Label.Application_PDF_DNC_Item9}</li>
+                <li>{!$Label.Application_PDF_DNC_Item10}</li>
+                <li>{!$Label.Application_PDF_DNC_Item11}</li>
+                <li>{!$Label.Application_PDF_DNC_Item12}</li>
+                <li>{!$Label.Application_PDF_DNC_Item13}</li>
+                <li>{!$Label.Application_PDF_DNC_Item14}</li>
+                <li>{!$Label.Application_PDF_DNC_Item15}</li>
+                <li>{!$Label.Application_PDF_DNC_Item16}</li>
+                <li>{!$Label.Application_PDF_DNC_Item17}</li>
+                <li>{!$Label.Application_PDF_DNC_Item18}</li>
+                <li>{!$Label.Application_PDF_DNC_Item19}</li>
+                <li>{!$Label.Application_PDF_DNC_Item20}</li>
+                <li>{!$Label.Application_PDF_DNC_Item21}</li>
+                <li>{!$Label.Application_PDF_DNC_Item22}</li>
+                <li>{!$Label.Application_PDF_DNC_Item23}</li>
+                <li>{!$Label.Application_PDF_DNC_Item24}</li>
+                <li>{!$Label.Application_PDF_DNC_Item25}</li>
+                <li>{!$Label.Application_PDF_DNC_Item26}</li>
+                <li>{!$Label.Application_PDF_DNC_Item27}</li>
+                <li>{!$Label.Application_PDF_DNC_Item28}</li>
+                <li>{!$Label.Application_PDF_DNC_Item29}</li>
+            </ol>
+        </div>
+        
+        <div class="sub-hdr">{!$Label.Application_PDF_Contact_Info_Title}</div>
+        <table class="dtbl">
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Claims_Auth_Label}</td><td>{!$Label.Application_PDF_Claims_Auth_Value}</td>
+                <td class="lbl">{!$Label.Application_PDF_Inquiries_Label}</td><td>{!$Label.Application_PDF_Inquiries_Value}</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Maintenance_Reporting_Label}</td><td>{!$Label.Application_PDF_Maintenance_Reporting_Value}</td>
+                <td class="lbl">{!$Label.Application_PDF_Maintenance_Web_Form_Label}</td><td>{!$Label.Application_PDF_Maintenance_Web_Form_Value}</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_General_Website_Label}</td><td>{!$Label.Application_PDF_General_Website_Value}</td>
+                <td class="lbl">{!$Label.Application_PDF_Complaints_Label}</td><td>{!$Label.Application_PDF_Complaints_Value}</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Mailing_Address_Label}</td>
+                <td colspan="3">{!$Label.Application_PDF_Mailing_Address_Value}</td>
+            </tr>
+            <tr>
+                <td class="lbl">{!$Label.Application_PDF_Business_Hours_Label}</td>
+                <td colspan="3">{!$Label.Application_PDF_Business_Hours_Value}</td>
+            </tr>
+        </table>
+        
+        <div class="sub-hdr" style="margin-top:8px;">{!$Label.Application_PDF_Acknowledgement_Title}</div>
+        <div class="tc-body">
+            <p>{!$Label.Application_PDF_Acknowledgement_Body}</p>
+        </div>
+        
+        <table class="dtbl" style="margin-top:16px;">
+            <tr>
+                <td style="width:45%;height:36px;border:1px solid #aaa;vertical-align:bottom;padding:4px;">
+                    <span style="font-size:7pt;">{!$Label.Application_PDF_Owner_Signature_Label}</span>
+                </td>
+                <td style="width:10%;border:none;">&#160;</td>
+                <td style="width:45%;height:36px;border:1px solid #aaa;vertical-align:bottom;padding:4px;">
+                    <span style="font-size:7pt;">{!$Label.Application_PDF_Owner_Date_Label}</span>
+                </td>
+            </tr>
+        </table>
+        
+        <div style="margin-top:12px;font-size:7.5pt;text-align:center;">
+            {!$Label.Application_PDF_Footer_Line1}<br/>
+            {!$Label.Application_PDF_Footer_Copyright}
+        </div>
+        
+    </body>
 </apex:page>
