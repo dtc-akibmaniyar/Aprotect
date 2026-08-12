@@ -197,7 +197,11 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
                     ...rtWrapper,
                     packages: rtWrapper.packages.map(pkgWrapper => {
                         const clonedPkg = { ...pkgWrapper.pkg }; // Shallow copy of pkg
-                        const packageTermName = clonedPkg.Package_Term__r && clonedPkg.Package_Term__r.Name ? clonedPkg.Package_Term__r.Name : '';
+                        // Display name: prefer the dealer-selected term, fall back to the master term
+                        const packageTermName = (clonedPkg.Dealer_Package_Term__r && clonedPkg.Dealer_Package_Term__r.Name)
+                            ? clonedPkg.Dealer_Package_Term__r.Name
+                            : (clonedPkg.Package_Term__r && clonedPkg.Package_Term__r.Name ? clonedPkg.Package_Term__r.Name : '');
+                        console.log('Package Term for package: ', clonedPkg.Package_Term__c);
                         if(clonedPkg.Application_Status__c == 'Quote' || clonedPkg.Application_Status__c == 'Submitted'){
                             this.saveAsQuoteButtonDisabled = true;
                         }

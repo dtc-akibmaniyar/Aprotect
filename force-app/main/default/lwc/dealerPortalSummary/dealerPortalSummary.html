@@ -520,6 +520,9 @@
           application-id={effectiveApplicationId}>
         </c-dealer-portal-p-d-f-preview> -->
         <!-- Show remittance form only when Application_Status__c = 'Submitted' or 'Active' -->
+        <!--
+        comment: romoved remittance creation as payments can only be done by make a payment component.
+
         <template if:true={isApplicationOrActive}>
           <div class="remittance-form-wrapper">
             <c-dealer-postal-remitance-form 
@@ -528,6 +531,7 @@
             </c-dealer-postal-remitance-form>
           </div>
         </template>
+        -->
       </template>
     </template>
   </div>

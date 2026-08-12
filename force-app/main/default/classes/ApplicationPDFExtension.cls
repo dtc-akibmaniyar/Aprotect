@@ -78,11 +78,16 @@ public without sharing class ApplicationPDFExtension {
             wrapper.packageLogoUrl  = packageLogoUrls.get(pkg.Id);
             wrapper.hasPackageLogo  = packageHasLogo.containsKey(pkg.Id) ? packageHasLogo.get(pkg.Id) : false;
 
-            // Flatten relationship fields to avoid PDF renderer traversal issues
-            wrapper.planName = (pkg.Package__r != null && pkg.Package__r.Name != null)
-                ? pkg.Package__r.Name : '';
-            wrapper.termName = (pkg.Package_Term__r != null && pkg.Package_Term__r.Name != null)
-                ? pkg.Package_Term__r.Name : '';
+            // Display name: prefer the dealer-selected package, fall back to the master package
+            wrapper.planName = (pkg.Dealer_Package__r != null && pkg.Dealer_Package__r.Name != null)
+                ? pkg.Dealer_Package__r.Name
+                : ((pkg.Package__r != null && pkg.Package__r.Name != null)
+                    ? pkg.Package__r.Name : '');
+            // Display name: prefer the dealer-selected term, fall back to the master term
+            wrapper.termName = (pkg.Dealer_Package_Term__r != null && pkg.Dealer_Package_Term__r.Name != null)
+                ? pkg.Dealer_Package_Term__r.Name
+                : ((pkg.Package_Term__r != null && pkg.Package_Term__r.Name != null)
+                    ? pkg.Package_Term__r.Name : '');
 
             if (pkg.Contract_Start_Date__c != null) {
                 wrapper.contractStartDate = ((DateTime) pkg.Contract_Start_Date__c).format('yyyy-MM-dd');
@@ -316,8 +321,10 @@ public without sharing class ApplicationPDFExtension {
                        Package_Plan_Type__r.Name,
                        Package__r.Name,
                        Package__r.Id,
+                       Dealer_Package__r.Name,
                        Package_Tier__r.Name,
                        Package_Term__r.Name,
+                       Dealer_Package_Term__r.Name,
                        Coverage_Plan__c,
                        Package_Record_Type__c,
                        Disclaimer_Heading__c,

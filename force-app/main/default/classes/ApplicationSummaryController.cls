@@ -548,6 +548,8 @@ public without sharing class ApplicationSummaryController {
             List<Application_Package__c> packages = [
                 SELECT Id, Name, RecordType.Name, Coverage_Plan__c, Coverage_Term__c,
                         Package__r.Name,
+                        Dealer_Package__r.Name,
+                        Dealer_Package_Term__r.Name, Dealer_Package_Term__r.Restriction_Type__c, Dealer_Package_Term__r.Odometer_KM__c,
                         Package_Term__r.Name, Package_Term__r.Odometer_KM__c,
                         Package_Term__r.Restriction_Type__c,
                         Package_Term__r.Per_Claim_Limit__c,
@@ -597,8 +599,14 @@ public without sharing class ApplicationSummaryController {
                 String packageName = String.isNotBlank(pkg.Name) ? pkg.Name : '';
                 pkgWrapper.packageHeaderName = recordTypeName + ' - ' + packageName;
                 
-                pkgWrapper.planName = pkg.Package__r != null && String.isNotBlank(pkg.Package__r.Name) ? pkg.Package__r.Name : pkg.Coverage_Plan__c;
-                String rawTerm = pkg.Package_Term__r != null && String.isNotBlank(pkg.Package_Term__r.Name) ? pkg.Package_Term__r.Name : null;
+                // Display name: prefer the dealer-selected package, fall back to the master package, then Coverage_Plan__c
+                pkgWrapper.planName = (pkg.Dealer_Package__r != null && String.isNotBlank(pkg.Dealer_Package__r.Name))
+                    ? pkg.Dealer_Package__r.Name
+                    : (pkg.Package__r != null && String.isNotBlank(pkg.Package__r.Name) ? pkg.Package__r.Name : pkg.Coverage_Plan__c);
+                // Display name: prefer the dealer-selected term, fall back to the master term
+                String rawTerm = (pkg.Dealer_Package_Term__r != null && String.isNotBlank(pkg.Dealer_Package_Term__r.Name))
+                    ? pkg.Dealer_Package_Term__r.Name
+                    : (pkg.Package_Term__r != null && String.isNotBlank(pkg.Package_Term__r.Name) ? pkg.Package_Term__r.Name : null);
                 pkgWrapper.coverageTerm = rawTerm != null ? rawTerm.replace('null', '0') : '0 Months/0 km';
                 
                 if (pkg.Dealer_Price_Override__c != null) {
@@ -646,11 +654,17 @@ public without sharing class ApplicationSummaryController {
                 pkgWrapper.contractStartOdometer = pkg.Odometer_Start__c;
                 pkgWrapper.contractStartOdometerUnit = pkg.Odometer_Start_Unit__c != null ? pkg.Odometer_Start_Unit__c : 'KM';
                 pkgWrapper.contractExpiryOdometerUnit = pkg.Odometer_End_Unit__c != null ? pkg.Odometer_End_Unit__c : 'KM';
-                pkgWrapper.packageTermOdometerKM = pkg.Package_Term__r != null ? pkg.Package_Term__r.Odometer_KM__c : null;
+                pkgWrapper.packageTermOdometerKM = (pkg.Dealer_Package_Term__r != null && pkg.Dealer_Package_Term__r.Odometer_KM__c != null)
+                    ? pkg.Dealer_Package_Term__r.Odometer_KM__c
+                    : (pkg.Package_Term__r != null ? pkg.Package_Term__r.Odometer_KM__c : null);
 
-                // Fix 1 — Contract Expiry Odometer: compute based on Restriction_Type__c
-                String restrictionType = pkg.Package_Term__r != null ? pkg.Package_Term__r.Restriction_Type__c : null;
-                Decimal odometerKM = pkg.Package_Term__r != null ? pkg.Package_Term__r.Odometer_KM__c : null;
+                // Fix 1 — Contract Expiry Odometer: prefer the dealer term's restriction/odometer, fall back to the master term
+                String restrictionType = (pkg.Dealer_Package_Term__r != null && String.isNotBlank(pkg.Dealer_Package_Term__r.Restriction_Type__c))
+                    ? pkg.Dealer_Package_Term__r.Restriction_Type__c
+                    : (pkg.Package_Term__r != null ? pkg.Package_Term__r.Restriction_Type__c : null);
+                Decimal odometerKM = (pkg.Dealer_Package_Term__r != null && pkg.Dealer_Package_Term__r.Odometer_KM__c != null)
+                    ? pkg.Dealer_Package_Term__r.Odometer_KM__c
+                    : (pkg.Package_Term__r != null ? pkg.Package_Term__r.Odometer_KM__c : null);
                 Decimal expiryOdometer = null;
                 if (restrictionType == 'Fixed Odometer' && odometerKM != null) {
                     expiryOdometer = odometerKM;
