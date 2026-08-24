@@ -980,7 +980,9 @@ getCurrentData() {
 
     // Allow user to re-open the modal to change their selection
     handleChangeCommercialVehicleType() {
+        this.scrollToTop();
         this.showCommercialVehicleTypeModal = true;
+        this.lockBodyScroll();
     }
 
     // Handle usage type change (radio button)
@@ -995,10 +997,13 @@ getCurrentData() {
 
         // Open the Commercial Vehicle Type modal when "Commercial/Business Use" is selected
         if (value === 'Commercial/Business Use') {
+            this.scrollToTop();
             this.showCommercialVehicleTypeModal = true;
+            this.lockBodyScroll();
         } else {
             // Reset commercial vehicle type if user switches away
             this.showCommercialVehicleTypeModal = false;
+            this.unlockBodyScroll();
             this.commercialVehicleType = '';
             this.vehicleData = {
                 ...this.vehicleData,
@@ -1016,12 +1021,14 @@ getCurrentData() {
             commercialVehicleType: selectedValue
         };
         this.showCommercialVehicleTypeModal = false;
+        this.unlockBodyScroll();
         console.log('✅ Commercial vehicle type set:', selectedValue);
     }
 
     // Handle modal close without selection
     handleCommercialVehicleTypeClose() {
         this.showCommercialVehicleTypeModal = false;
+        this.unlockBodyScroll();
         // If they close without selecting, revert usage type to Personal Use
         if (!this.commercialVehicleType) {
             this.vehicleData = {
@@ -1411,7 +1418,9 @@ getCurrentData() {
                 
                 // Always start on the main options view
                 this.showDuplicateSubList = false;
+                this.scrollToTop();
                 this.showDuplicateVinModal = true;
+                this.lockBodyScroll();
                 this.loading = false;
                 return; // Stop here — user must choose. NO API call.
             }
@@ -1457,6 +1466,7 @@ getCurrentData() {
 
     navigateToApplication(recordId, recordName) {
         this.showDuplicateVinModal = false;
+        this.unlockBodyScroll();
         this.showDuplicateSubList = false;
         const url = `/dealerportal/s/application/${recordId}/${recordName || ''}`;
         window.location.href = url;
@@ -1469,6 +1479,7 @@ getCurrentData() {
     // Handle "Continue with New Record" button in duplicate modal
     handleStartNewApplication() {
         this.showDuplicateVinModal = false;
+        this.unlockBodyScroll();
         this.showDuplicateSubList = false;
         this.loading = true;
 
@@ -1529,11 +1540,13 @@ getCurrentData() {
     // Close duplicate VIN modal
     closeDuplicateVinModal() {
         this.showDuplicateVinModal = false;
+        this.unlockBodyScroll();
         this.showDuplicateSubList = false;
     }
 
     handleContactSupport() {
         this.showDuplicateVinModal = false;
+        this.unlockBodyScroll();
         this.showDuplicateSubList = false;
         
         // Show support contact information
@@ -1837,13 +1850,17 @@ async handleContinue() {
                             console.error('❌ _applicationId:', this._applicationId);
                             console.error('❌ applicationId getter:', this._applicationId);
                             this.errorMessage = 'No application found. Please contact support.';
+                            this.scrollToTop();
                             this.showError = true;
+                            this.lockBodyScroll();
                         }
 
     } catch (error) {
         console.error('❌ Error in handleContinue:', error);
         this.errorMessage = 'Error saving vehicle data. Please try again.';
+        this.scrollToTop();
         this.showError = true;
+        this.lockBodyScroll();
     } finally {
         this.loading = false;
     }
@@ -1853,13 +1870,52 @@ async handleContinue() {
     
 
     
+    // --- Modal scroll helpers (Phase B) ---
+    lockBodyScroll() {
+        // Phase C: idempotent lock - remember the previous overflow value so we
+        // restore it exactly, and never double-lock or clobber another
+        // component's lock. A modal that fails to open can never leave the page
+        // locked, because unlock restores the saved value on every close path.
+        if (!this._bodyScrollLocked) {
+            this._bodyScrollLocked = true;
+            this._bodyScrollPrevOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    unlockBodyScroll() {
+        // Phase C: idempotent unlock - only restore when this component owns
+        // the lock; never lets the page stay locked after a modal closes.
+        if (this._bodyScrollLocked) {
+            this._bodyScrollLocked = false;
+            document.body.style.overflow = this._bodyScrollPrevOverflow || '';
+        }
+    }
+
+    scrollToTop() {
+        // Verified: this app's content flows in normal document layout (container
+        // .tab-content is overflow:visible), so the viewport/document is the
+        // scroller — the standard Experience Cloud (Aura) shell behavior.
+        window.scrollTo(0, 0);
+        const scroller = document.scrollingElement || document.documentElement;
+        if (scroller) {
+            scroller.scrollTop = 0;
+        }
+        if (document.body) {
+            document.body.scrollTop = 0;
+        }
+    }
+
     // Methods for commercial use dialog
     openCommercialDialog() {
+        this.scrollToTop();
         this.showCommercialDialog = true;
+        this.lockBodyScroll();
     }
     
     closeCommercialDialog() {
         this.showCommercialDialog = false;
+        this.unlockBodyScroll();
     }
     
     selectCommercialOption(event) {
@@ -1973,22 +2029,28 @@ async handleContinue() {
         const missingFields = this.validateFields();
         if (missingFields.length > 0) {
             this.errorMessage = `Please fill in all required fields before continuing: ${missingFields.join(', ')}`;
+            this.scrollToTop();
             this.showError = true;
+            this.lockBodyScroll();
             return false;
         }
         
         // Ensure we have at least basic vehicle data
         if (!this.vehicleData.vin || !this.vehicleData.year || !this.vehicleData.make || !this.vehicleData.model) {
             this.errorMessage = 'Please provide at least VIN, Year, Make, and Model before continuing.';
+            this.scrollToTop();
             this.showError = true;
+            this.lockBodyScroll();
             return false;
         }
         
         // Validate Commercial Vehicle Type when usage is Commercial/Business Use
         if (this.vehicleData.usageType === 'Commercial/Business Use' && !this.vehicleData.commercialVehicleType) {
             this.errorMessage = 'Please select a Commercial Vehicle Type for Commercial/Business Use vehicles.';
+            this.scrollToTop();
             this.showError = true;
             this.showCommercialVehicleTypeModal = true;
+            this.lockBodyScroll();
             return false;
         }
 
@@ -1996,7 +2058,9 @@ async handleContinue() {
         const warrantyValidationErrors = this.validateManufacturerWarrantyFields();
         if (warrantyValidationErrors.length > 0) {
             this.errorMessage = warrantyValidationErrors.join(' ');
+            this.scrollToTop();
             this.showError = true;
+            this.lockBodyScroll();
             return false;
         }
         
@@ -2534,7 +2598,9 @@ async handleContinue() {
             console.error('❌ Error saving vehicle data:', error);
             
             this.errorMessage = 'Error saving vehicle data: ' + error.message;
+            this.scrollToTop();
             this.showError = true;
+            this.lockBodyScroll();
             return false;
         } finally {
             this.loading = false;
@@ -2685,7 +2751,9 @@ async handleContinue() {
     // Show error message
     showErrorMessage(message) {
         this.errorMessage = message;
+        this.scrollToTop();
         this.showError = true;
+        this.lockBodyScroll();
         console.error('❌ Error:', message);
     }
     
@@ -2693,6 +2761,7 @@ async handleContinue() {
     closeErrorModal() {
         this.showError = false;
         this.errorMessage = '';
+        this.unlockBodyScroll();
     }
     
     // Close success message
@@ -2713,13 +2782,16 @@ async handleContinue() {
         }
         
         this.processAdditionalVehicleData();
+        this.scrollToTop();
         this.showMoreInfoModal = true;
+        this.lockBodyScroll();
         console.log('✅ Modal should be showing now');
     }
     
     // Close more information modal
     closeMoreInfoModal() {
         this.showMoreInfoModal = false;
+        this.unlockBodyScroll();
     }
     
     // Process additional vehicle data into organized sections

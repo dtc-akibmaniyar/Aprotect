@@ -117,3 +117,9 @@
         width: 100vw;
     }
 }
+
+/* Modal content — scroll internally instead of the page (mirrors dealerPortalVehicle.css pattern) */
+.commercial-vehicle-modal .slds-modal__content {
+    max-height: 70vh;
+    overflow-y: auto;
+}

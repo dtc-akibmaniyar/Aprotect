@@ -1480,6 +1480,131 @@ textarea {
     font-style: italic;
 }
 
+/* ===== Commercial Use Dialog ===== */
+/* Previously unstyled (.modal-backdrop / .modal-container.commercial-modal had no CSS rules).
+   Now styled consistently with the other dialogs in the app: fixed full-screen
+   semi-transparent backdrop + centered scrollable container. */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-container.commercial-modal {
+    background-color: #fff;
+    border-radius: 8px;
+    width: min(720px, 95vw);
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-container.commercial-modal .modal-header {
+    background-color: #000;
+    color: #fff;
+    padding: 15px 20px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    flex-shrink: 0;
+}
+
+.modal-container.commercial-modal .modal-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.modal-container.commercial-modal .modal-body {
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.modal-container.commercial-modal .modal-footer {
+    padding: 12px 20px;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid #e9ecef;
+    flex-shrink: 0;
+    background: #fafbfc;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.commercial-description {
+    font-size: 0.85rem;
+    color: #4a4a4a;
+    line-height: 1.55;
+    margin: 0 0 16px;
+}
+
+.commercial-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+}
+
+.commercial-option {
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px 12px 12px;
+    text-align: center;
+    cursor: pointer;
+    background: #fff;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    position: relative;
+}
+
+.commercial-option:hover {
+    border-color: #5184b8;
+}
+
+.commercial-option.selected {
+    border-color: #5184b8;
+    background: #f0f6fc;
+}
+
+.commercial-option .option-icon {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    color: #22a06b;
+}
+
+.commercial-option .option-image {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 8px;
+    color: #5184b8;
+}
+
+.commercial-option .option-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+    color: #1a1a1a;
+}
+
+.commercial-option .option-description {
+    font-size: 0.72rem;
+    color: #666;
+    line-height: 1.45;
+}
+
+/* Check-icon visibility toggling (get*IconClass returns '' or 'hidden') */
+.hidden {
+    display: none;
+}
+
 /* ===== Usage Type + Commercial Vehicle Type row ===== */
 .usage-commercial-row {
     display: flex;

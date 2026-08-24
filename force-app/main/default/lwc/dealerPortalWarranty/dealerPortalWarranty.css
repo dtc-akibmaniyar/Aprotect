@@ -1008,7 +1008,7 @@ lightning-accordion-section[data-package-id].selected {
 
 /* Scrollable Terms Container */
 .terms-scroll-container {
-    /* max-height: 400px; Fixed height for terms section */
+    max-height: 400px; /* Fixed height for terms section — re-enabled (mirrors dealerPortalMoreProducts.css) */
     overflow-y: auto;
     overflow-x: hidden;
     padding: 5px;
@@ -1052,6 +1052,12 @@ lightning-accordion-section[data-package-id].selected {
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
+}
+
+/* SLDS modal content — scroll internally instead of the page (mirrors dealerPortalVehicle.css pattern) */
+.slds-modal__content {
+    max-height: 70vh;
+    overflow-y: auto;
 }
 
 /* Compact Included Options Panel */

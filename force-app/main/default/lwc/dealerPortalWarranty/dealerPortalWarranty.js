@@ -17,6 +17,42 @@ import loadVehicleData from '@salesforce/apex/DealerPortalController.loadVehicle
 import CarImageWarranty from '@salesforce/resourceUrl/Car_Image_Warranty';
 
 export default class DealerPortalWarranty extends LightningElement {
+    // --- Modal scroll helpers (Phase B) ---
+    lockBodyScroll() {
+        // Phase C: idempotent lock - remember the previous overflow value so we
+        // restore it exactly, and never double-lock or clobber another
+        // component's lock. A modal that fails to open can never leave the page
+        // locked, because unlock restores the saved value on every close path.
+        if (!this._bodyScrollLocked) {
+            this._bodyScrollLocked = true;
+            this._bodyScrollPrevOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    unlockBodyScroll() {
+        // Phase C: idempotent unlock - only restore when this component owns
+        // the lock; never lets the page stay locked after a modal closes.
+        if (this._bodyScrollLocked) {
+            this._bodyScrollLocked = false;
+            document.body.style.overflow = this._bodyScrollPrevOverflow || '';
+        }
+    }
+
+    scrollToTop() {
+        // Verified: this app's content flows in normal document layout (container
+        // .tab-content is overflow:visible), so the viewport/document is the
+        // scroller — the standard Experience Cloud (Aura) shell behavior.
+        window.scrollTo(0, 0);
+        const scroller = document.scrollingElement || document.documentElement;
+        if (scroller) {
+            scroller.scrollTop = 0;
+        }
+        if (document.body) {
+            document.body.scrollTop = 0;
+        }
+    }
+
     @track loading = false
     @track renderKey = 0 // Used to force re-renders;
     @track price = 0.00;
@@ -1079,12 +1115,15 @@ export default class DealerPortalWarranty extends LightningElement {
         
         this.helpModalTitle = helpType === 'inclusion' ? 'Inclusion Details' : 'Exclusion Details';
         this.helpModalText = helpText;
+        this.scrollToTop();
         this.showHelpModal = true;
+        this.lockBodyScroll();
     }
     
     // Close help modal
     closeHelpModal() {
         this.showHelpModal = false;
+        this.unlockBodyScroll();
     }
     
     
@@ -1269,7 +1308,9 @@ export default class DealerPortalWarranty extends LightningElement {
     }
     
     handleDeclineWarranty() {
+        this.scrollToTop();
         this.showDeclineModal = true;
+        this.lockBodyScroll();
     }
     
     // Handle confirm decline from modal - REMOVED DUPLICATE
@@ -1278,6 +1319,7 @@ export default class DealerPortalWarranty extends LightningElement {
     // Handle cancel decline from modal
     cancelDeclineWarranty() {
         this.showDeclineModal = false;
+        this.unlockBodyScroll();
     }
     
     
@@ -1452,7 +1494,9 @@ export default class DealerPortalWarranty extends LightningElement {
         this.modalTaxAmount = recalcTaxAmount;
         this.modalTotalWithTax = totalBeforeTax + recalcTaxAmount;
 
+        this.scrollToTop();
         this.showPriceModal = true;
+        this.lockBodyScroll();
     }
     
     handleToggleDealerReference(event) {
@@ -1574,6 +1618,7 @@ export default class DealerPortalWarranty extends LightningElement {
 
     hidePriceBreakdownModal() {
         this.showPriceModal = false;
+        this.unlockBodyScroll();
     }
     
     stopPropagation(event) {
@@ -2056,6 +2101,7 @@ export default class DealerPortalWarranty extends LightningElement {
         this.savedDealerPackageId = null;
         this.savedWarrantyTermId = null;
         this.showDeclineModal = false;
+        this.unlockBodyScroll();
         
         sessionStorage.removeItem('warrantyData');
         this.fireCompletionEvent();
@@ -2063,6 +2109,7 @@ export default class DealerPortalWarranty extends LightningElement {
     
     closeWarrantyModal() {
         this.showWarrantyModal = false;
+        this.unlockBodyScroll();
     }
     
     get warrantyStatus() {
@@ -2114,11 +2161,14 @@ export default class DealerPortalWarranty extends LightningElement {
         
         this.helpModalTitle = helpType === 'inclusion' ? 'What\'s Included' : 'What\'s Excluded';
         this.helpModalText = helpText;
+        this.scrollToTop();
         this.showHelpModal = true;
+        this.lockBodyScroll();
     }
     
     closeHelpModal() {
         this.showHelpModal = false;
+        this.unlockBodyScroll();
     }
     
     get availableTerms() {
@@ -3241,7 +3291,9 @@ export default class DealerPortalWarranty extends LightningElement {
             this.showErrorMessage('Select at least two packages to compare.');
             return;
         }
+        this.scrollToTop();
         this.showComparisonModal = true;
+        this.lockBodyScroll();
     }
 
     buildPackageComparison() {
@@ -3286,6 +3338,7 @@ export default class DealerPortalWarranty extends LightningElement {
 
     closePackageComparison() {
         this.showComparisonModal = false;
+        this.unlockBodyScroll();
     }
 
     async selectPackageFromComparison(event) {

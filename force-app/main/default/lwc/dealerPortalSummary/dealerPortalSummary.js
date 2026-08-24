@@ -577,8 +577,45 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
         console.log('📁 Files fileCount:', this.packageFileCount);
     }
 
+    // --- Modal scroll helpers (Phase B) ---
+    lockBodyScroll() {
+        // Phase C: idempotent lock - remember the previous overflow value so we
+        // restore it exactly, and never double-lock or clobber another
+        // component's lock. A modal that fails to open can never leave the page
+        // locked, because unlock restores the saved value on every close path.
+        if (!this._bodyScrollLocked) {
+            this._bodyScrollLocked = true;
+            this._bodyScrollPrevOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    unlockBodyScroll() {
+        // Phase C: idempotent unlock - only restore when this component owns
+        // the lock; never lets the page stay locked after a modal closes.
+        if (this._bodyScrollLocked) {
+            this._bodyScrollLocked = false;
+            document.body.style.overflow = this._bodyScrollPrevOverflow || '';
+        }
+    }
+
+    scrollToTop() {
+        // Verified: this app's content flows in normal document layout (container
+        // .tab-content is overflow:visible), so the viewport/document is the
+        // scroller — the standard Experience Cloud (Aura) shell behavior.
+        window.scrollTo(0, 0);
+        const scroller = document.scrollingElement || document.documentElement;
+        if (scroller) {
+            scroller.scrollTop = 0;
+        }
+        if (document.body) {
+            document.body.scrollTop = 0;
+        }
+    }
+
     async handleSaveAsQuote() {
         console.log('💾 Save as Quote requested from summary');
+        this.scrollToTop();
         this.dispatchEvent(new CustomEvent('saveasquote', {
             detail: {
                 applicationId: this.effectiveApplicationId
@@ -652,6 +689,8 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
                 console.warn('Invoice creation failed, continuing to success screen:', invoiceError);
             }
             this.showSubmissionSuccess = true;
+            this.lockBodyScroll();
+            this.scrollToTop();
             if (this.invoiceId) {
                 this.submittedInvoiceId = this.invoiceId;
             }
@@ -761,11 +800,13 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
 
     handleGenerateQuotePDF() {
         console.log('📄 Generate Quote PDF - dispatching to container');
+        this.scrollToTop();
         this.dispatchEvent(new CustomEvent('generatequotepdf'));
     }
 
     handlePreviewQuotePDF() {
         console.log('👁️ Preview Quote PDF requested from summary');
+        this.scrollToTop();
         this.dispatchEvent(new CustomEvent('previewpdf', {
             bubbles: true,
             composed: true
@@ -803,6 +844,7 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     }
 
     handleViewInvoiceFromSuccess() {
+        this.unlockBodyScroll();
         if (this.invoiceId) {
             this[NavigationMixin.Navigate]({
                 type: 'standard__recordPage',
@@ -815,14 +857,17 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     }
 
     handleCreateAnotherApplication() {
+        this.unlockBodyScroll();
         this.dispatchEvent(new CustomEvent('createanotherapplication'));
     }
 
     handleViewApplications() {
+        this.unlockBodyScroll();
         this.dispatchEvent(new CustomEvent('viewapplications'));
     }
 
     handleReturnToHome() {
+        this.unlockBodyScroll();
         this.dispatchEvent(new CustomEvent('returntohome'));
     }
 

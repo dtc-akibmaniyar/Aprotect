@@ -445,6 +445,42 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
 
 
 
+    // --- Modal scroll helpers (Phase B) ---
+    lockBodyScroll() {
+        // Phase C: idempotent lock - remember the previous overflow value so we
+        // restore it exactly, and never double-lock or clobber another
+        // component's lock. A modal that fails to open can never leave the page
+        // locked, because unlock restores the saved value on every close path.
+        if (!this._bodyScrollLocked) {
+            this._bodyScrollLocked = true;
+            this._bodyScrollPrevOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    unlockBodyScroll() {
+        // Phase C: idempotent unlock - only restore when this component owns
+        // the lock; never lets the page stay locked after a modal closes.
+        if (this._bodyScrollLocked) {
+            this._bodyScrollLocked = false;
+            document.body.style.overflow = this._bodyScrollPrevOverflow || '';
+        }
+    }
+
+    scrollToTop() {
+        // Verified: this app's content flows in normal document layout (container
+        // .tab-content is overflow:visible), so the viewport/document is the
+        // scroller — the standard Experience Cloud (Aura) shell behavior.
+        window.scrollTo(0, 0);
+        const scroller = document.scrollingElement || document.documentElement;
+        if (scroller) {
+            scroller.scrollTop = 0;
+        }
+        if (document.body) {
+            document.body.scrollTop = 0;
+        }
+    }
+
     // Handle direct tab click navigation
     handleTabClick(event) {
         const tabName = event.currentTarget.dataset.tab;
@@ -470,12 +506,19 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         */
         
         if (this.canAccessTab(tabName)) {
+            // Phase C failsafe: switching tabs must always restore page scroll.
+            // Clears any body scroll-lock left behind by a modal that could not
+            // be closed (error path, stale open modal on another tab, etc.).
+            document.body.style.overflow = '';
             /*
             console.log('✅ Switching to tab:', tabName);
             console.log('🔍 activeTab before assignment:', this.activeTab);
             */
             this.activeTab = tabName;
             //console.log('🔍 activeTab after assignment:', this.activeTab);
+
+            // Scroll back to the top of the page when switching tabs
+            this.scrollToTop();
             
             // Notify tab activation after a short delay to ensure DOM is ready
             setTimeout(() => {
@@ -893,11 +936,14 @@ handlePreviewPDF() {
 
 // Convert to Application handlers
     handleConvertToApplication() {
+        this.scrollToTop();
         this.showConvertToAppModal = true;
+        this.lockBodyScroll();
     }
 
     handleCloseConvertToAppModal() {
         this.showConvertToAppModal = false;
+        this.unlockBodyScroll();
     }
 
     async handleContinueConvertToApp() {
@@ -910,6 +956,8 @@ handlePreviewPDF() {
                 // Update local status immediately
                 this.applicationStatus = 'Draft';
                 this.showConvertToAppModal = false;
+                this.unlockBodyScroll();
+                this.scrollToTop();
                 
                 this.dispatchEvent(new ShowToastEvent({
                     title: 'Success',

@@ -1555,6 +1555,12 @@ lightning-accordion-section[data-package-id].selected {
     bottom: 0 !important;
 }
 
+/* SLDS modal content — scroll internally instead of the page (mirrors dealerPortalVehicle.css pattern) */
+.slds-modal__content {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
 /* Compact Included Options Panel */
 .included-options-panel {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);

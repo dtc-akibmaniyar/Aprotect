@@ -155,7 +155,13 @@
 .tab-content-section.active {
     opacity: 1;
     visibility: visible;
-    transform: translateX(0);
+    /* Phase C: transform none (not translateX(0)) - any non-none transform
+       creates a containing block for position:fixed descendants, which made
+       every modal inside the tab render relative to the whole form (invisible
+       after the Phase B scroll-to-top). none keeps the slide-in transition
+       (identity interpolates with translateX(20px)) and fixes modal
+       positioning back to the viewport. */
+    transform: none;
     position: relative;
 }
 
@@ -244,6 +250,8 @@
 /* Convert modal */
 .convert-modal {
     max-width: 500px;
+    max-height: 85vh;
+    overflow-y: auto;
     border-radius: 12px;
     padding: 20px 0;
     background: #fff;
