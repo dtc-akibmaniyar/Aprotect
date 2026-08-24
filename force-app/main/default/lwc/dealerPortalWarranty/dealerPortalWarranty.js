@@ -480,14 +480,15 @@ export default class DealerPortalWarranty extends LightningElement {
 
                 // Restore dealer price override if one was previously saved
                 if (result.data.dealerPriceOverride != null && result.data.dealerPriceOverride !== undefined) {
-                    this.price = result.data.dealerPriceOverride;
-                    this.isPriceOverridden = true;
-                    // For override, extract pre-tax from stored override
+                    // Override is stored as pre-tax; recalculate tax-inclusive total for display
+                    const preTax = result.data.dealerPriceOverride;
                     const taxRate = result.data.taxPercentage || 0;
-                    const preTax = taxRate > 0 ? this.price / (1 + taxRate / 100) : this.price;
-                    this._retailPriceDisplay = preTax;
+                    const taxAmount = taxRate > 0 ? preTax * (taxRate / 100) : 0;
                     this._overridePreTaxPrice = preTax;
-                    this._overrideTaxAmount = parseFloat((this.price - preTax).toFixed(2));
+                    this._overrideTaxAmount = parseFloat(taxAmount.toFixed(2));
+                    this.price = parseFloat((preTax + taxAmount).toFixed(2));
+                    this._retailPriceDisplay = preTax;
+                    this.isPriceOverridden = true;
                 }
                 
                 // Find the matching dealer package from our loaded packages
@@ -1634,6 +1635,15 @@ export default class DealerPortalWarranty extends LightningElement {
             return;
         }
         
+        // ✅ FIX: Commit any in-progress custom price override before saving.
+        // If the user typed a custom price and clicked Continue without tabbing away,
+        // onblur fires AFTER onclick in LWC. Calling _applyPriceOverride() here
+        // ensures isPriceOverridden and _overridePreTaxPrice are set before
+        // finalData is constructed below.
+        if (this.isPriceEditMode) {
+            this._applyPriceOverride();
+        }
+        
         this.loading = true;
         
         try {
@@ -1644,7 +1654,7 @@ export default class DealerPortalWarranty extends LightningElement {
                 packageName: this.selectedDealerPackage.PackageName,
                 selectedTermId: this.selectedWarrantyTerm.Id,
                 includeDeductible: false,
-                dealerPriceOverride: this.isPriceOverridden ? this.price : null
+                dealerPriceOverride: this.isPriceOverridden ? (this._overridePreTaxPrice || this.price) : null
             };
 
             // ========== NEW ACTIVE MANAGEMENT CODE ==========
@@ -1837,6 +1847,14 @@ export default class DealerPortalWarranty extends LightningElement {
             this.handleSkip();
             return;
         }
+        // ✅ FIX: Commit any in-progress custom price override before saving.
+        // If the user typed a custom price and clicked Continue without tabbing away,
+        // onblur fires AFTER onclick in LWC. Calling _applyPriceOverride() here
+        // ensures isPriceOverridden and _overridePreTaxPrice are set before
+        // finalData is constructed below.
+        if (this.isPriceEditMode) {
+            this._applyPriceOverride();
+        }
 
         // Check if applicationId is missing
         if (!this.applicationId) {
@@ -1865,7 +1883,7 @@ export default class DealerPortalWarranty extends LightningElement {
                     dealerPackageId: this.selectedDealerPackage.Id,
                     packageName: this.selectedDealerPackage.PackageName,
                     selectedTermId: this.selectedWarrantyTerm.Id,
-                    dealerPriceOverride: this.isPriceOverridden ? this.price : null
+                    dealerPriceOverride: this.isPriceOverridden ? (this._overridePreTaxPrice || this.price) : null
                 };
 
                 // ========== NEW ACTIVE MANAGEMENT CODE ==========
