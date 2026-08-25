@@ -302,7 +302,7 @@ export default class DealerPortalApplicationList extends LightningElement {
     getStatusClass(status) {
         const statusMap = {
             'Active': 'slds-badge slds-theme_success',
-            'Pending': 'slds-badge slds-theme_warning',
+            'Draft': 'slds-badge slds-theme_warning',
             'Completed': 'slds-badge slds-theme_info',
             'Cancelled': 'slds-badge slds-theme_error'
         };

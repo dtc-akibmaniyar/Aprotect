@@ -25,7 +25,7 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 	@track cancellationVIN = '';
 	@track cancellationApplicationStatus = '';
 	@track showNewApplicationModal = false;
-	@track statusFilter = 'Pending';
+	@track statusFilter = 'All';
 	@track paymentDueDateFilter = 'All';
 	@track showMakePaymentModal = false;
 	@track unpaidApplications = [];
