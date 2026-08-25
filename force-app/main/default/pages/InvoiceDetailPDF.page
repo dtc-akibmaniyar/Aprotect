@@ -3,235 +3,238 @@
         <head>
             <style>
                 @page {
-                    size: letter;
-                    margin: 25mm;
+                    size: A4;
+                    margin: 15mm 14mm;
+                    @bottom-center {
+                        content: "Page " counter(page) " of " counter(pages);
+                        font-size: 9px;
+                        color: #666;
+                    }
                 }
                 body {
                     font-family: Arial, sans-serif;
                     margin: 0;
                     padding: 0;
-                    color: #333;
-                    font-size: 11px;
+                    color: #111;
+                    font-size: 12px;
+                    line-height: 1.5;
                 }
-                .page-content {
-                    padding: 20px;
+                table {
+                    border-collapse: collapse;
+                }
+                /* Keep table header visible when the table splits across pages (best-effort) */
+                thead {
+                    display: table-header-group;
+                }
+                /* Avoid splitting rows / blocks across pages */
+                tr {
+                    page-break-inside: avoid;
+                }
+                .keep-together {
+                    page-break-inside: avoid;
                 }
             </style>
         </head>
         <body>
-            <div class="page-content">
 
-                <!-- INVOICE HEADER -->
-                <div style="border-bottom:2px solid #5184B8; padding-bottom:8px; margin-bottom:20px;">
-                    <div style="font-size:15px; font-weight:600; color:#5184B8; font-family:Arial, sans-serif;">INVOICE</div>
-                    <div style="font-size:9px; color:#333; margin-top:2px;">Invoice ID # {!invoice.Name}</div>
-                </div>
-
-                <!-- DATE & STATUS ROW -->
-                <div style="display:table; width:100%; margin-bottom:20px;">
-                    <div style="display:table-cell; width:50%; vertical-align:top;">
-                        <div style="font-size:10px; font-weight:600; color:#000;">Date:</div>
-                        <div style="font-size:10px; color:#666;">
-                            <apex:outputText rendered="{!invoice.CreatedDate != null}" value="{0,date,MMM dd, yyyy}">
-                                <apex:param value="{!invoice.CreatedDate}"/>
-                            </apex:outputText>
-                        </div>
-                    </div>
-                    <div style="display:table-cell; width:50%; vertical-align:top; text-align:right;">
-                        <div style="font-size:10px; font-weight:600; color:#000;">Status:</div>
-                        <apex:outputPanel rendered="{!invoice.Status__c == 'Due'}">
-                            <div style="font-size:22px; font-weight:bold; color:#d9534f;">{!invoice.Status__c}</div>
-                        </apex:outputPanel>
-                        <apex:outputPanel rendered="{!invoice.Status__c == 'Partial Paid'}">
-                            <div style="font-size:22px; font-weight:bold; color:#f0ad4e;">{!invoice.Status__c}</div>
-                        </apex:outputPanel>
-                        <apex:outputPanel rendered="{!invoice.Status__c == 'Paid'}">
-                            <div style="font-size:22px; font-weight:bold; color:#5cb85c;">{!invoice.Status__c}</div>
-                        </apex:outputPanel>
-                        <apex:outputPanel rendered="{!invoice.Status__c == 'Cancelled'}">
-                            <div style="font-size:22px; font-weight:bold; color:#d9534f;">{!invoice.Status__c}</div>
-                        </apex:outputPanel>
-                        <apex:outputPanel rendered="{!AND(invoice.Status__c != 'Due', invoice.Status__c != 'Partial Paid', invoice.Status__c != 'Paid', invoice.Status__c != 'Cancelled')}">
-                            <div style="font-size:22px; font-weight:bold; color:#999;">{!invoice.Status__c}</div>
-                        </apex:outputPanel>
+            <!-- ══════════════ HEADER: Logo (left) + INVOICE title block (right) ══════════════ -->
+            <div style="display:table; width:100%; border-bottom:1px solid #e5e7eb;">
+                <div style="display:table-cell; vertical-align:top; padding:20px 24px; border-right:1px solid #e5e7eb;">
+                    <img src="{!$Resource.AProtectLogo}" alt="A-Protect Warranty Corporation"
+                         style="max-height:70px; max-width:220px; margin-bottom:12px;"/>
+                    <div style="font-size:11.5px; color:#555; line-height:1.8;">
+                        <div>8800 Dufferin St. Suite 302B</div>
+                        <div>Concord, Ontario L4K 0C5</div>
+                        <div>TF: 1-866-660-6444&nbsp;&nbsp;Tel: 416-661-7444</div>
+                        <div>E-mail: info@a-protectwarranty.com</div>
+                        <div>HST #: 832142467RT0001</div>
                     </div>
                 </div>
+                <div style="display:table-cell; vertical-align:top; padding:20px 24px; text-align:right; width:300px;">
+                    <div style="font-size:32px; font-weight:900; color:#1a3a6b; letter-spacing:4px; text-transform:uppercase; margin-bottom:16px; line-height:1;">INVOICE</div>
+                    <table style="width:100%;">
+                        <tr>
+                            <td style="font-size:11px; font-weight:700; color:#555; text-transform:uppercase; padding:3px 10px 3px 0; white-space:nowrap; text-align:left;">INVOICE #</td>
+                            <td style="font-size:15px; font-weight:700; color:#1a3a6b; text-align:right; padding:3px 0;">{!invoice.Name}</td>
+                        </tr>
+                        <tr>
+                            <td style="font-size:11px; font-weight:700; color:#555; text-transform:uppercase; padding:3px 10px 3px 0; white-space:nowrap; text-align:left;">DATE:</td>
+                            <td style="font-size:12px; color:#111; text-align:right; padding:3px 0;">{!invoiceDate}</td>
+                        </tr>
+                        <apex:outputPanel rendered="{!dueDate != null}" layout="none">
+                            <tr>
+                                <td style="font-size:11px; font-weight:700; color:#555; text-transform:uppercase; padding:3px 10px 3px 0; white-space:nowrap; text-align:left;">DUE DATE:</td>
+                                <td style="font-size:12px; color:#111; text-align:right; padding:3px 0;">{!dueDate}</td>
+                            </tr>
+                        </apex:outputPanel>
+                        <tr>
+                            <td style="font-size:11px; font-weight:700; color:#555; text-transform:uppercase; padding:3px 10px 3px 0; white-space:nowrap; text-align:left;">STATUS:</td>
+                            <td style="font-size:12px; text-align:right; padding:3px 0; {!statusStyle}">{!invoice.Status__c}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
 
-                <!-- BILL TO -->
-                <div style="margin-bottom:20px;">
-                    <div style="font-size:10px; font-weight:600; color:#000; margin-bottom:4px;">Bill to:</div>
-                    <apex:outputPanel rendered="{!dealerName != null}">
-                        <div style="font-size:12px; font-weight:bold; color:#333; margin-bottom:4px;">{!dealerName}</div>
+            <!-- ══════════════ DIVIDER ══════════════ -->
+            <div style="height:3px; background:#1a3a6b; margin:0;"></div>
+
+            <!-- ══════════════ BILL TO + VEHICLE ══════════════ -->
+            <div style="display:table; width:100%; padding:16px 24px; border-bottom:1px solid #ddd;">
+                <div style="display:table-cell; vertical-align:top; width:50%; padding-right:24px; border-right:1px solid #ddd;">
+                    <div style="font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:1.5px; color:#1a3a6b; border-bottom:2px solid #1a3a6b; padding-bottom:4px; margin-bottom:10px;">BILL TO</div>
+                    <apex:outputPanel rendered="{!hasDealerName}">
+                        <div style="font-weight:700; font-size:13px; color:#111; text-transform:uppercase; margin-bottom:4px;">{!dealerName}</div>
                     </apex:outputPanel>
-                    <apex:outputPanel rendered="{!billTo != null}">
-                        <div style="font-size:11px; color:#333; line-height:1.6;">
+                    <apex:outputPanel rendered="{!hasBillTo}">
+                        <div style="font-size:12px; color:#333; line-height:1.7;">
                             <apex:outputText escape="false" value="{!billTo}"/>
                         </div>
                     </apex:outputPanel>
+                    <apex:outputPanel rendered="{!AND(!hasDealerName, !hasBillTo)}">
+                        <div style="color:#aaa; font-style:italic; font-size:12px;">—</div>
+                    </apex:outputPanel>
                 </div>
-
-                <!-- 3-COLUMN INFO TABLE -->
-                <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
-                    <tr>
-                        <td style="width:20%; padding:6px 8px; background:#5184B8; color:#fff; font-size:8px; font-weight:bold; text-align:center; border:1px solid #4070a0;">Application Id</td>
-                        <td style="width:40%; padding:6px 8px; background:#5184B8; color:#fff; font-size:8px; font-weight:bold; text-align:center; border:1px solid #4070a0;">CUSTOMER INFORMATION</td>
-                        <td style="width:40%; padding:6px 8px; background:#5184B8; color:#fff; font-size:8px; font-weight:bold; text-align:center; border:1px solid #4070a0;">VEHICLE INFORMATION</td>
-                    </tr>
-                    <tr>
-                        <td style="width:20%; padding:8px; font-size:10px; font-weight:bold; text-align:center; vertical-align:top; border:1px solid #ddd;">
-                            {!invoice.Application__r.Name}
-                        </td>
-                        <td style="width:40%; padding:8px; font-size:9px; vertical-align:top; border:1px solid #ddd; color:#333;">
-                            <div style="font-weight:bold; font-size:10px; text-transform:uppercase; margin-bottom:3px;">
-                                {!invoice.Application__r.Customer_First_Name__c} {!invoice.Application__r.Customer_Last_Name__c}
-                            </div>
-                            <apex:outputPanel rendered="{!invoice.Application__r.Customer_Address__c != null}">
-                                <div>{!invoice.Application__r.Customer_Address__c}</div>
-                            </apex:outputPanel>
-                        </td>
-                        <td style="width:40%; padding:8px; font-size:9px; vertical-align:top; border:1px solid #ddd; color:#333;">
-                            <div style="font-weight:bold; font-size:10px; text-transform:uppercase; margin-bottom:3px;">
-                                {!invoice.Application__r.Vehicle_Year__c}/{!invoice.Application__r.Vehicle_Make__c}/{!invoice.Application__r.Vehicle_Model__c}
-                            </div>
-                            <div>VIN # {!invoice.Application__r.Vehicle_VIN__c}</div>
-                            <apex:outputPanel rendered="{!invoice.Application__r.Odometer__c != null}">
-                                <div>Odometer: <apex:outputText value="{0,number,###,##0}"><apex:param value="{!invoice.Application__r.Odometer__c}"/></apex:outputText> {!invoice.Application__r.Odometer_Unit__c}</div>
-                            </apex:outputPanel>
-                        </td>
-                    </tr>
-                </table>
-
-                <!-- SERVICES SECTION -->
-                <apex:outputPanel rendered="{!packages.size > 0}">
-                    <table style="width:100%; border-collapse:collapse;">
+                <div style="display:table-cell; vertical-align:top; width:50%; padding-left:24px;">
+                    <div style="font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:1.5px; color:#1a3a6b; border-bottom:2px solid #1a3a6b; padding-bottom:4px; margin-bottom:10px;">VEHICLE</div>
+                    <table style="font-size:12px;">
                         <tr>
-                            <td style="padding:6px 8px; background:#5184B8; color:#fff; font-size:8px; font-weight:bold; text-align:center; letter-spacing:1px;">SERVICES</td>
+                            <td style="font-weight:700; color:#444; white-space:nowrap; padding:2px 12px 2px 0;">Application (REF):</td>
+                            <td style="color:#111; padding:2px 0;">{!applicationId}</td>
                         </tr>
-                    </table>
-
-                    <apex:repeat var="row" value="{!packages}">
-                        <div style="padding:12px 16px; border:1px solid #ddd; border-top:none;">
-                            <!-- Record Type Name -->
-                            <apex:outputPanel rendered="{!row.pkg.RecordType.Name != null}" layout="none">
-                                <div style="font-size:8px; font-weight:bold; color:#5184B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">{!row.pkg.RecordType.Name}</div>
-                            </apex:outputPanel>
-
-                            <!-- Package Name + Line Items -->
-                            <div style="display:table; width:100%; margin-bottom:4px;">
-                                <div style="display:table-cell; width:70%; font-weight:bold; font-size:10px; color:#333; text-transform:uppercase;">
-                                    {!row.pkg.Package__r.Name}
-                                </div>
-                                <div style="display:table-cell; width:30%; text-align:right; vertical-align:middle;">
-                                    <apex:repeat var="li" value="{!row.lineItems}">
-                                        <div style="display:table; width:100%;">
-                                            <span style="display:table-cell; padding-right:6px; font-size:8px; font-weight:bold; text-align:right; white-space:nowrap;">
-                                                <apex:outputPanel rendered="{!li.lineItem.Status__c == 'Paid'}">
-                                                    <span style="color:#5cb85c;">{!li.lineItem.Status__c}</span>
-                                                </apex:outputPanel>
-                                                <apex:outputPanel rendered="{!li.lineItem.Status__c == 'Planned'}">
-                                                    <span style="color:#5184B8;">{!li.lineItem.Status__c}</span>
-                                                </apex:outputPanel>
-                                                <apex:outputPanel rendered="{!li.lineItem.Status__c == 'Partial Paid'}">
-                                                    <span style="color:#f0ad4e;">{!li.lineItem.Status__c}</span>
-                                                </apex:outputPanel>
-                                                <apex:outputPanel rendered="{!AND(li.lineItem.Status__c != 'Paid', li.lineItem.Status__c != 'Planned', li.lineItem.Status__c != 'Partial Paid')}">
-                                                    <span style="color:#d9534f;">{!li.lineItem.Status__c}</span>
-                                                </apex:outputPanel>
-                                            </span>
-                                            <span style="display:table-cell; font-size:9px; font-weight:600; color:#5184B8; text-align:right;">
-                                                <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!li.displayPrice}"/></apex:outputText>
-                                            </span>
-                                        </div>
-                                    </apex:repeat>
-                                </div>
-                            </div>
-
-                            <!-- Tax Breakdown -->
-                            <apex:outputPanel rendered="{!row.hasTax}" layout="none">
-                                <div style="margin-top:6px; padding:6px 10px; background:#f0f7ff; border:1px solid #d0e3f7; border-radius:3px; font-size:8px; color:#555;">
-                                    <div style="display:table; width:100%; margin-bottom:2px;">
-                                        <span style="display:table-cell; width:75%;">Base Price:</span>
-                                        <span style="display:table-cell; text-align:right; font-weight:600;">
-                                            <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!row.basePriceWithoutTax}"/></apex:outputText>
-                                        </span>
-                                    </div>
-                                    <div style="display:table; width:100%; margin-bottom:2px;">
-                                        <span style="display:table-cell; width:75%;">Tax (<apex:outputText value="{0,number,0.00}"><apex:param value="{!row.taxPercentage}"/></apex:outputText>%):</span>
-                                        <span style="display:table-cell; text-align:right; font-weight:600;">
-                                            <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!row.taxAmount}"/></apex:outputText>
-                                        </span>
-                                    </div>
-                                    <div style="display:table; width:100%; border-top:1px solid #c0d6ec; margin-top:3px; padding-top:3px;">
-                                        <span style="display:table-cell; width:75%; font-weight:700; color:#333;">Total:</span>
-                                        <span style="display:table-cell; text-align:right; font-weight:700; color:#5184B8;">
-                                            <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!row.basePriceWithoutTax + row.taxAmount}"/></apex:outputText>
-                                        </span>
-                                    </div>
-                                </div>
-                            </apex:outputPanel>
-
-                            <!-- Price Breakdown (if add-ons exist) -->
-                            <apex:outputPanel rendered="{!row.hasBreakdown}" layout="none">
-                                <div style="margin-top:6px; padding:6px 10px; background:#f8f9fa; border:1px solid #e9ecef; border-radius:3px; font-size:8px; color:#555;">
-                                    <div style="display:table; width:100%; margin-bottom:2px;">
-                                        <span style="display:table-cell; width:75%;">Base Package Price:</span>
-                                        <span style="display:table-cell; text-align:right; font-weight:600;">
-                                            <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!row.baseCostPrice}"/></apex:outputText>
-                                        </span>
-                                    </div>
-                                    <apex:repeat var="opt" value="{!row.options}">
-                                        <div style="display:table; width:100%; margin-bottom:2px;">
-                                            <span style="display:table-cell; width:75%;">{!opt.optionName} (add-on):</span>
-                                            <span style="display:table-cell; text-align:right; font-weight:600;">
-                                                <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!opt.costPrice}"/></apex:outputText>
-                                            </span>
-                                        </div>
-                                    </apex:repeat>
-                                </div>
-                            </apex:outputPanel>
-
-                            <!-- Package Details -->
-                            <div style="font-size:9px; color:#333; line-height:1.7;">
-                                <apex:outputPanel rendered="{!row.pkg.Package_Term__r != null}">
-                                    <div>Selected Term: {!row.pkg.Package_Term__r.Name}</div>
-                                </apex:outputPanel>
-                                <apex:outputPanel rendered="{!row.pkg.Contract_Start_Date__c != null}">
-                                    <div>Start Date: <apex:outputText value="{0,date,dd-MM-yyyy}"><apex:param value="{!row.pkg.Contract_Start_Date__c}"/></apex:outputText></div>
-                                </apex:outputPanel>
-                                <apex:outputPanel rendered="{!row.pkg.Contract_End_Date__c != null}">
-                                    <div>Expiry Date: <apex:outputText value="{0,date,dd-MM-yyyy}"><apex:param value="{!row.pkg.Contract_End_Date__c}"/></apex:outputText></div>
-                                </apex:outputPanel>
-                                <apex:outputPanel rendered="{!row.pkg.Odometer_Start__c != null}">
-                                    <div>Start Odometer: <apex:outputText value="{0,number,###,##0}"><apex:param value="{!row.pkg.Odometer_Start__c}"/></apex:outputText> KM</div>
-                                </apex:outputPanel>
-                                <apex:outputPanel rendered="{!row.pkg.Odometer_End__c != null}">
-                                    <div>Expiry Odometer: <apex:outputText value="{0,number,###,##0}"><apex:param value="{!row.pkg.Odometer_End__c}"/></apex:outputText> KM</div>
-                                </apex:outputPanel>
-                            </div>
-                        </div>
-                    </apex:repeat>
-                </apex:outputPanel>
-
-                <!-- FOOTER: QTY + TOTAL -->
-                <div style="display:table; width:100%; margin-top:10px;">
-                    <div style="display:table-cell; width:50%; vertical-align:bottom;">
-                        <div style="font-size:9px; font-weight:bold; color:#333;">
-                            <strong>Qty:</strong> {!packages.size}
-                        </div>
-                    </div>
-                    <div style="display:table-cell; width:50%; vertical-align:top;">
-                        <table style="width:100%; border-collapse:collapse;">
+                        <apex:outputPanel rendered="{!AND(customerFullName != null, customerFullName != '')}" layout="none">
                             <tr>
-                                <td style="padding:6px 10px; font-size:10px; font-weight:bold; color:#333; text-align:right; border:1px solid #ddd;">Total Amount:</td>
-                                <td style="padding:6px 10px; font-size:10px; font-weight:bold; color:#333; text-align:right; border:1px solid #ddd;">
-                                    <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!grandTotal}"/></apex:outputText>
+                                <td style="font-weight:700; color:#444; white-space:nowrap; padding:2px 12px 2px 0;">Customer:</td>
+                                <td style="color:#111; font-weight:700; text-transform:uppercase; padding:2px 0;">{!customerFullName}</td>
+                            </tr>
+                        </apex:outputPanel>
+                        <apex:outputPanel rendered="{!AND(vehicleInfo != null, vehicleInfo != '')}" layout="none">
+                            <tr>
+                                <td style="font-weight:700; color:#444; white-space:nowrap; padding:2px 12px 2px 0;">Year/Make/Model/Trim:</td>
+                                <td style="color:#111; padding:2px 0;">{!vehicleInfo}</td>
+                            </tr>
+                        </apex:outputPanel>
+                        <apex:outputPanel rendered="{!AND(vin != null, vin != '')}" layout="none">
+                            <tr>
+                                <td style="font-weight:700; color:#444; white-space:nowrap; padding:2px 12px 2px 0;">VIN #</td>
+                                <td style="color:#111; padding:2px 0;">{!vin}</td>
+                            </tr>
+                        </apex:outputPanel>
+                        <apex:outputPanel rendered="{!invoice.Application__r.Odometer__c != null}" layout="none">
+                            <tr>
+                                <td style="font-weight:700; color:#444; white-space:nowrap; padding:2px 12px 2px 0;">Odometer:</td>
+                                <td style="color:#111; padding:2px 0;">
+                                    <apex:outputText value="{0,number,###,##0}"><apex:param value="{!invoice.Application__r.Odometer__c}"/></apex:outputText> {!odometerUnit}
                                 </td>
                             </tr>
-                        </table>
-                    </div>
+                        </apex:outputPanel>
+                    </table>
                 </div>
-
             </div>
+
+            <!-- ══════════════ LINE ITEMS TABLE ══════════════ -->
+            <apex:outputPanel rendered="{!packages.size > 0}">
+                <table style="width:100%; font-size:12px; margin-top:16px;">
+                    <thead>
+                        <tr style="background:#1a3a6b;">
+                            <th style="padding:10px 14px; color:#fff; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; text-align:left; width:48%;">ITEM/DESCRIPTION</th>
+                            <th style="padding:10px 14px; color:#fff; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; text-align:center; width:18%;">TERM</th>
+                            <th style="padding:10px 14px; color:#fff; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; text-align:right; width:17%;">PRICE</th>
+                            <th style="padding:10px 14px; color:#fff; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; text-align:right; width:17%;">SUB-TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <apex:repeat var="row" value="{!packages}">
+                            <!-- Category row -->
+                            <tr style="background:#eef3fb;">
+                                <td colspan="4" style="padding:6px 14px; font-size:11px; font-weight:700; color:#1a3a6b; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid #c5d7f0;">{!row.pkg.RecordType.Name}</td>
+                            </tr>
+                            <!-- Package row -->
+                            <tr style="border-bottom:1px solid #e5e7eb;">
+                                <td style="padding:10px 14px; vertical-align:top; color:#222;">
+                                    <div style="font-weight:700; font-size:13px; color:#111; margin-bottom:2px;">{!row.pkg.Package__r.Name}</div>
+                                </td>
+                                <td style="padding:10px 14px; vertical-align:top; text-align:center; color:#444; white-space:nowrap;">{!row.termDisplay}</td>
+                                <td style="padding:10px 14px; vertical-align:top; text-align:right; white-space:nowrap;">
+                                    <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!row.baseCostPrice}"/></apex:outputText>
+                                </td>
+                                <td style="padding:10px 14px; vertical-align:top; text-align:right; font-weight:700; white-space:nowrap; border-left:1px solid #e5e7eb;">
+                                    <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!row.lineTotal}"/></apex:outputText>
+                                </td>
+                            </tr>
+                            <!-- Add-on rows -->
+                            <apex:repeat var="opt" value="{!row.options}">
+                                <tr style="background:#fafafa; border-bottom:1px solid #f0f0f0;">
+                                    <td style="padding:10px 14px 10px 28px; font-size:12px; color:#555; vertical-align:top;">
+                                        {!opt.optionName}
+                                        <apex:outputPanel rendered="{!AND(opt.selectionType != null, opt.selectionType != '')}" layout="none">
+                                            <span style="font-size:11px; color:#1a3a6b; font-style:italic; margin-left:4px;">({!opt.selectionType})</span>
+                                        </apex:outputPanel>
+                                    </td>
+                                    <td style="padding:10px 14px; vertical-align:top; text-align:center; color:#444;">-</td>
+                                    <td style="padding:10px 14px; vertical-align:top; text-align:right; white-space:nowrap;">
+                                        <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!opt.costPrice}"/></apex:outputText>
+                                    </td>
+                                    <td style="padding:10px 14px; vertical-align:top; text-align:right; border-left:1px solid #e5e7eb;"></td>
+                                </tr>
+                            </apex:repeat>
+                            <!-- Premium fee row -->
+                            <apex:outputPanel rendered="{!row.hasPremiumModelFee}" layout="none">
+                                <tr style="background:#fafafa; border-bottom:1px solid #f0f0f0;">
+                                    <td style="padding:10px 14px 10px 28px; font-size:12px; color:#555; vertical-align:top;">
+                                        Premium Vehicle Fee
+                                        <span style="font-size:11px; color:#1a3a6b; font-style:italic; margin-left:4px;">(Fee)</span>
+                                    </td>
+                                    <td style="padding:10px 14px; vertical-align:top; text-align:center; color:#444;">-</td>
+                                    <td style="padding:10px 14px; vertical-align:top; text-align:right; white-space:nowrap;">
+                                        <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!row.premiumModelFee}"/></apex:outputText>
+                                    </td>
+                                    <td style="padding:10px 14px; vertical-align:top; text-align:right; border-left:1px solid #e5e7eb;"></td>
+                                </tr>
+                            </apex:outputPanel>
+                        </apex:repeat>
+                    </tbody>
+                </table>
+            </apex:outputPanel>
+
+            <!-- ══════════════ TOTALS ══════════════ -->
+            <div class="keep-together" style="display:table; width:100%; margin-top:16px; padding-top:16px; border-top:2px solid #1a3a6b;">
+                <div style="display:table-cell; width:50%;"></div>
+                <div style="display:table-cell; width:50%;">
+                    <table style="width:100%;">
+                        <tr>
+                            <td style="font-size:13px; font-weight:700; color:#333; text-transform:uppercase; text-align:right; padding-right:20px; white-space:nowrap;">SUB-TOTAL:</td>
+                            <td style="font-size:13px; font-weight:700; color:#111; text-align:right; white-space:nowrap;">
+                                <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!subTotal}"/></apex:outputText>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="font-size:13px; font-weight:700; color:#333; text-transform:uppercase; text-align:right; padding-right:20px; white-space:nowrap;">HST (ON) <apex:outputText rendered="{!blendedTaxRate != null}" value="{0,number,0.00}"><apex:param value="{!blendedTaxRate}"/></apex:outputText>%:</td>
+                            <td style="font-size:13px; font-weight:700; color:#111; text-align:right; white-space:nowrap;">
+                                <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!taxTotal}"/></apex:outputText>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="font-size:15px; font-weight:700; color:#1a3a6b; text-transform:uppercase; text-align:right; padding-right:20px; white-space:nowrap; border-top:2px solid #1a3a6b; padding-top:6px;">TOTAL DUE:</td>
+                            <td style="font-size:15px; font-weight:700; color:#1a3a6b; text-align:right; white-space:nowrap; border-top:2px solid #1a3a6b; padding-top:6px;">
+                                <apex:outputText value="${0,number,###,##0.00}"><apex:param value="{!balanceAmount}"/></apex:outputText>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ══════════════ BOTTOM ROW: Thank You (left) + Footer note (right) ══════════════ -->
+            <div class="keep-together" style="display:table; width:100%; border-top:1px solid #e5e7eb; margin-top:20px;">
+                <div style="display:table-cell; vertical-align:middle; width:30%; padding:20px 24px; border-right:1px solid #e5e7eb; text-align:center;">
+                    <img src="{!$Resource.ThankYouBanner}" alt="Thank You for Your Business!" style="max-width:180px; height:auto;"/>
+                </div>
+                <div style="display:table-cell; vertical-align:middle; padding:18px 24px; font-size:11px; color:#555; line-height:1.8;">
+                    <p style="margin:0 0 2px;">Please remit payment within 30 days of the invoice date.</p>
+                    <p style="margin:0 0 2px;">Any cheque returned or dishonoured by a financial institution will be subject to a $5.00 Administration Fee.</p>
+                    <p style="margin:0 0 2px;">Please make all cheques payable to <strong>A-Protect Warranty Corporation</strong>.</p>
+                </div>
+            </div>
+
         </body>
     </html>
 </apex:page>
