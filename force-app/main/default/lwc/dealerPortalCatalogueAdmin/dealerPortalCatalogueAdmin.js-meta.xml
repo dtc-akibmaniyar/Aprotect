@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>60.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Dealer Portal Catalogue Admin</masterLabel>
+    <description>Consolidated catalogue admin: create Included / Optional Package_Option__c rows for a Package__c or Package_Term__c via PackageOptionMaintenanceService (change-plan §09.3).</description>
+    <targets>
+        <target>lightning__RecordPage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__RecordPage">
+            <objects>
+                <object>Package__c</object>
+                <object>Package_Term__c</object>
+            </objects>
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

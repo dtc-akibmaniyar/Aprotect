@@ -1,0 +1,131 @@
+<template>
+    <div class="slds-box slds-theme_default release-admin">
+        <div class="slds-grid slds-grid_align-spread slds-m-bottom_medium">
+            <div>
+                <h1 class="slds-text-heading_medium">Catalogue Releases</h1>
+                <p class="slds-text-body_small slds-text-color_weak">
+                    Draft → Publish (honours Effective Date, supersedes the previous Published book) → Superseded.
+                </p>
+            </div>
+            <lightning-button label="New Draft" variant="brand" icon-name="utility:add"
+                onclick={openNewDraft} disabled={isLoading}></lightning-button>
+        </div>
+
+        <template if:true={error}>
+            <div class="slds-m-bottom_medium">
+                <lightning-alert variant="error" title="Error" message={error}></lightning-alert>
+            </div>
+        </template>
+
+        <!-- New / edit Draft form -->
+        <template if:true={showForm}>
+            <lightning-card class="slds-m-bottom_medium">
+                <div class="slds-p-around_medium">
+                    <div class="slds-grid slds-wrap slds-gutters">
+                        <div class="slds-col slds-size_1-of-2 slds-p-around_x-small">
+                            <lightning-input label="Release Number" data-field="releaseNumber"
+                                value={form.releaseNumber} onchange={handleInput} required></lightning-input>
+                        </div>
+                        <div class="slds-col slds-size_1-of-2 slds-p-around_x-small">
+                            <lightning-input label="Release Name" data-field="name"
+                                value={form.name} onchange={handleInput}></lightning-input>
+                        </div>
+                        <div class="slds-col slds-size_1-of-2 slds-p-around_x-small">
+                            <lightning-input label="Effective Date" type="date" data-field="effectiveDate"
+                                value={form.effectiveDate} onchange={handleInput}></lightning-input>
+                        </div>
+                        <div class="slds-col slds-size_1-of-2 slds-p-around_x-small">
+                            <lightning-input label="Notes" data-field="notes"
+                                value={form.notes} onchange={handleInput}></lightning-input>
+                        </div>
+                    </div>
+                    <div class="slds-m-top_medium">
+                        <lightning-button label="Save Draft" variant="brand" onclick={saveDraft}
+                            disabled={isSaving}></lightning-button>
+                        <lightning-button label="Cancel" variant="neutral" class="slds-m-left_x-small"
+                            onclick={closeForm}></lightning-button>
+                    </div>
+                </div>
+            </lightning-card>
+        </template>
+
+        <template if:true={isLoading}>
+            <div class="slds-align_absolute-center slds-p-vertical_large">
+                <lightning-spinner alternative-text="Loading releases"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:false={isLoading}>
+            <template if:false={hasReleases}>
+                <p class="slds-text-body_regular slds-text-color_weak">No releases yet — create a Draft to begin.</p>
+            </template>
+
+            <template for:each={releases} for:item="rel">
+                <div key={rel.id} class="slds-border_bottom slds-p-vertical_small">
+                    <div class="slds-grid slds-grid_align-spread slds-wrap">
+                        <div class="slds-media">
+                            <div class="slds-media__body">
+                                <div class="slds-grid slds-gutters slds-align_center">
+                                    <span class="slds-text-heading_small">{rel.releaseNumber}</span>
+                                    <lightning-badge class="slds-m-left_x-small"
+                                        label={rel.status}></lightning-badge>
+                                    <lightning-badge class="slds-m-left_x-small" variant="inverse"
+                                        label={rel.groupLabel}></lightning-badge>
+                                </div>
+                                <p class="slds-text-body_small slds-text-color_weak">
+                                    {rel.name}
+                                    <template if:true={rel.effectiveDate}> · effective {rel.effectiveDate}</template>
+                                </p>
+                                <p class="slds-text-body_small" if:true={rel.notes}>{rel.notes}</p>
+                            </div>
+                        </div>
+                        <div class="slds-m-left_auto slds-grid slds-gutters_horizontal">
+                            <template if:true={rel.isDraft}>
+                                <lightning-button label="Edit" variant="neutral" size="small"
+                                    data-action="edit" data-id={rel.id} onclick={handleAction}></lightning-button>
+                                <lightning-button label="Publish" variant="brand" size="small"
+                                    data-action="publish" data-id={rel.id} onclick={handleAction}></lightning-button>
+                                <lightning-button label="Delete" variant="destructive" size="small"
+                                    data-action="delete" data-id={rel.id} onclick={handleAction}></lightning-button>
+                            </template>
+                            <template if:true={rel.isPublished}>
+                                <lightning-button label="Unpublish" variant="neutral" size="small"
+                                    data-action="unpublish" data-id={rel.id} onclick={handleAction}></lightning-button>
+                                <lightning-button label="Supersede" variant="neutral" size="small"
+                                    data-action="supersede" data-id={rel.id} onclick={handleAction}></lightning-button>
+                            </template>
+                            <lightning-button label={expandButtonLabel}
+                                variant="base" size="small"
+                                icon-name={expandIconName}
+                                data-action="groups" data-id={rel.id} onclick={handleAction}></lightning-button>
+                        </div>
+                    </div>
+
+                    <template if:true={rel.isExpanded}>
+                        <div class="slds-m-top_x-small slds-m-left_large">
+                            <template if:true={groupRows.length}>
+                                <template for:each={groupRows} for:item="g">
+                                    <div key={g.id} class="slds-grid slds-gutters slds-m-bottom_x-small">
+                                        <lightning-icon icon-name="utility:layers" size="x-small"
+                                            class="slds-m-right_x-small"></lightning-icon>
+                                        <span>{g.name}</span>
+                                        <lightning-badge class="slds-m-left_x-small" variant="light"
+                                            label={g.activeLabel}></lightning-badge>
+                                        <span class="slds-text-body_small slds-text-color_weak slds-m-left_x-small">
+                                            {g.packageCount} package(s)
+                                        </span>
+                                    </div>
+                                </template>
+                            </template>
+                            <template if:false={groupRows.length}>
+                                <p class="slds-text-body_small slds-text-color_weak">
+                                    No plan-type families (Package_Group__c) linked to this release.
+                                </p>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </template>
+    </div>
+</template>

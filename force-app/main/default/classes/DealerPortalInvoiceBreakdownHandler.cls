@@ -266,7 +266,9 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                            Contract_Cost_Price__c, Contract_Cost_Price_Without_Tax__c,
                            Tax_Amount__c, Tax_Percentage__c,
                            Package_Tier__c, Package_Tier__r.Name,
-                           Dealer_Package_Term__c, Dealer_Package_Term__r.Odometer_KM__c,
+                           Dealer_Package__c,
+                           Dealer_Package_Term__c, Dealer_Package_Term__r.Dealer_Package__c,
+                           Dealer_Package_Term__r.Odometer_KM__c,
                            Dealer_Package_Term__r.Month__c
                     FROM Application_Package__c
                     WHERE Id IN :allPackageIds
@@ -275,24 +277,61 @@ public without sharing class DealerPortalInvoiceBreakdownHandler {
                 }
             }
 
-            // Query Application Package Options for breakdown
+            // Query Option LINE ITEMS for breakdown (P4 [S]: option state
+            // lives on the package's priced Option lines — the engine snapshot
+            // contract; Application_Package_Option__c children are retired).
+            // The line carries the priced retail; the cost side is re-derived
+            // from the dealer-option mirror (the Net_Cost formula the legacy
+            // child copied).
             Map<Id, List<OptionRecord>> pkgToOptions = new Map<Id, List<OptionRecord>>();
             if (!allPackageIds.isEmpty()) {
-                for (Application_Package_Option__c opt : [
-                    SELECT Id, Application_Package__c, Option__c, Net_Cost__c, Selection_Type__c
-                    FROM Application_Package_Option__c
-                    WHERE Application_Package__c IN :allPackageIds
-                    AND Net_Cost__c != null AND Net_Cost__c != 0
-                    ORDER BY Option__c ASC
-                ]) {
-                    if (!pkgToOptions.containsKey(opt.Application_Package__c)) {
-                        pkgToOptions.put(opt.Application_Package__c, new List<OptionRecord>());
+                Map<Id, Id> dealerPkgByPkg = new Map<Id, Id>();
+                for (Application_Package__c p : appPkgMap.values()) {
+                    Id dpId = (p.Dealer_Package_Term__r != null && p.Dealer_Package_Term__r.Dealer_Package__c != null)
+                        ? p.Dealer_Package_Term__r.Dealer_Package__c : p.Dealer_Package__c;
+                    if (dpId != null) {
+                        dealerPkgByPkg.put(p.Id, dpId);
                     }
+                }
+                Map<Id, Dealer_Package_Option__c> mirrorByMaster = new Map<Id, Dealer_Package_Option__c>();
+                Set<Id> dealerPkgIds = new Set<Id>(dealerPkgByPkg.values());
+                if (!dealerPkgIds.isEmpty()) {
+                    for (Dealer_Package_Option__c dpo : [
+                        SELECT Id, Package_Option__c, Net_Cost__c
+                        FROM Dealer_Package_Option__c
+                        WHERE Dealer_Package__c IN :dealerPkgIds
+                          AND Package_Option__c != null
+                          AND Net_Cost__c != null AND Net_Cost__c != 0
+                    ]) {
+                        if (!mirrorByMaster.containsKey(dpo.Package_Option__c)) {
+                            mirrorByMaster.put(dpo.Package_Option__c, dpo);
+                        }
+                    }
+                }
+                for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.queryWithBinds(
+                        'SELECT Application_Package__c, Description__c, Amount__c, Package_Option__c' +
+                        ' FROM Application_Package_Line_Item__c' +
+                        ' WHERE Application_Package__c IN :packageIds' +
+                        ' AND Line_Type__c = \'Option\'' +
+                        ' ORDER BY Package_Option__c, Id',
+                        new Map<String, Object>{ 'packageIds' => allPackageIds },
+                        System.AccessLevel.SYSTEM_MODE)) {
+                    if (line.Application_Package__c == null) {
+                        continue;
+                    }
+                    List<OptionRecord> rows = pkgToOptions.get(line.Application_Package__c);
+                    if (rows == null) {
+                        rows = new List<OptionRecord>();
+                        pkgToOptions.put(line.Application_Package__c, rows);
+                    }
+                    Dealer_Package_Option__c mirror = line.Package_Option__c != null
+                        ? mirrorByMaster.get(line.Package_Option__c) : null;
                     OptionRecord or2 = new OptionRecord();
-                    or2.optionName = opt.Option__c;
-                    or2.costPrice  = opt.Net_Cost__c != null ? opt.Net_Cost__c : 0;
-                    or2.selectionType = opt.Selection_Type__c;
-                    pkgToOptions.get(opt.Application_Package__c).add(or2);
+                    or2.optionName = String.isNotBlank(line.Description__c) ? line.Description__c : 'Additional Option';
+                    or2.costPrice  = mirror != null && mirror.Net_Cost__c != null
+                        ? mirror.Net_Cost__c : (line.Amount__c != null ? line.Amount__c : 0);
+                    or2.selectionType = 'Optional';
+                    rows.add(or2);
                 }
             }
 

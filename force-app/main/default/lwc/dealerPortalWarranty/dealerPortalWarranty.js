@@ -1,4 +1,5 @@
-import { LightningElement, track, api } from 'lwc';
+import { LightningElement, track, api, wire } from 'lwc';
+import { refreshApex } from '@salesforce/apex';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getDealerPackages from '@salesforce/apex/DealerPortalController.getDealerPackages';
 import getExistingApplicationPackage from '@salesforce/apex/DealerPortalController.getExistingApplicationPackage';
@@ -14,6 +15,13 @@ import updateAdditionalOptions from '@salesforce/apex/DealerPortalController.upd
 import updateWarrantyFieldsSelective from '@salesforce/apex/DealerPortalController.updateWarrantyFieldsSelective';
 import updateVehicleFieldsSelective from '@salesforce/apex/DealerPortalController.updateVehicleFieldsSelective';
 import loadVehicleData from '@salesforce/apex/DealerPortalController.loadVehicleData';
+// FEATURE A — live premium indication: one read-only, cacheable Apex call that
+// returns { isPremiumVehicle, premiumFee, waived, overrideApplied } for the
+// current selection so the badge + premium fee render BEFORE any save.
+import getPremiumPreview from '@salesforce/apex/DealerPortalController.getPremiumPreview';
+// P4 [L] warranty viewer cutover: read the engine-snapshot gate through Apex
+// (Aprotect_Portal_Settings__c flags — never hardcoded client-side).
+import isWarrantyEngineViewerActive from '@salesforce/apex/DealerPortalController.isWarrantyEngineViewerActive';
 import CarImageWarranty from '@salesforce/resourceUrl/Car_Image_Warranty';
 
 export default class DealerPortalWarranty extends LightningElement {
@@ -68,6 +76,16 @@ export default class DealerPortalWarranty extends LightningElement {
     @track isPremiumVehicle = false;
     @track premiumFeeAmount = 0;
     @track modalPremiumFee = 0;
+    // FEATURE A — live premium preview (read-only Apex; no save required).
+    @track livePremiumFee = 0;
+    @track premiumWaived = false;
+    // Reactive wire inputs for getPremiumPreview — refreshed on vehicle entry
+    // (make/model/vehicleId) and on every term selection (dealerTermId).
+    @track premiumPreviewTermId = null;
+    @track premiumPreviewVehicleId = null;
+    @track premiumPreviewMake = '';
+    @track premiumPreviewModel = '';
+    @track premiumPreviewApplicationPackageId = null;
     @track isCommercialVehicle = false;
     @track modalCommercialSurchargeFee = 0;
     @track vehicleConfigChangedMessage = '';
@@ -91,6 +109,15 @@ export default class DealerPortalWarranty extends LightningElement {
     @track showDealerReferencePrice = false;
     @track existingApplicationPackage = null;
     @track isExistingApplication = false;
+
+    // P4 [L] engine-snapshot viewer gate (read from Apex on every existing
+    // package load — isWarrantyEngineViewerActive). False in the current org
+    // (zero Aprotect_Portal_Settings rows), so the legacy stored-field display
+    // path stays authoritative while every engine flag is off. When true AND
+    // the loaded package carries the server-attached engine line set
+    // (hasEngineLineItems), the tab renders the stored engine totals.
+    @track engineViewerActive = false;
+    @track hasEngineLineItems = false;
     @track showComparisonModal = false;
     @track selectedPackagesForComparison = [];
     @track showCompareButton = false;
@@ -294,8 +321,25 @@ export default class DealerPortalWarranty extends LightningElement {
         this._previousTermId = this.selectedWarrantyTerm ? this.selectedWarrantyTerm.Id : null;
         this._previousPackageName = this.selectedDealerPackage ? (this.selectedDealerPackage.PackageName || this.selectedDealerPackage.Name) : null;
         this._previousTermName = this.selectedWarrantyTerm ? (this.selectedWarrantyTerm.packageTermName || this.selectedWarrantyTerm.Name) : null;
+        // LAYER 2 — reset the live premium client state SYNCHRONOUSLY. The new
+        // vehicle may not be premium; leaving the previous vehicle's premium
+        // toggle/fee in place is half of the stale-premium defect (the preview was
+        // otherwise refreshed only on the next term selection).
+        this.isPremiumVehicle = false;
+        this.livePremiumFee = 0;
+        this.premiumFeeAmount = 0;
+        this.modalPremiumFee = 0;
+        this.premiumWaived = false;
         this.vehicleConfigChangedMessage = 'Vehicle details have been updated. Reloading available packages...';
-        this.loadDealerPackages().then(() => { this._validatePreviousSelection(); });
+        // Reload packages (new eligibility/terms), then reload the vehicle context
+        // (make/model/id drive the premium-preview inputs) and force a fresh
+        // premium preview — so the badge and fee reflect the NEW vehicle
+        // immediately, not only after the next term selection.
+        this.loadDealerPackages()
+            .then(() => this.loadVehicleData())
+            .then(() => this._refreshPremiumPreview())
+            .catch(() => {})
+            .then(() => { this._validatePreviousSelection(); });
     }
 
     _validatePreviousSelection() {
@@ -382,6 +426,8 @@ export default class DealerPortalWarranty extends LightningElement {
                 this.deferralOption = vData.deferralOption === true;
                 this.packageTermAllowsDeferral = vData.packageTermAllowsDeferral === true;
                 this.isManufacturerWarrantyExpired = vData.isManufacturerWarrantyExpired === true;
+                // FEATURE A — vehicle entry: evaluate the live premium badge now.
+                this._syncPremiumPreviewContext();
             }
         } catch (error) {
         }
@@ -477,6 +523,19 @@ export default class DealerPortalWarranty extends LightningElement {
                 // Store the existing application package data
                 this.existingApplicationPackage = result.data;
                 this.isExistingApplication = true;
+                // FEATURE A — keep the premium waiver/context inputs current.
+                this._syncPremiumPreviewContext();
+
+                // P4 [L] engine-snapshot viewer (warranty cutover). The gate is
+                // read through Apex (Aprotect_Portal_Settings__c flags — never
+                // hardcoded client-side). When it is ON and the server attached
+                // the persisted engine line set to this package (hasEngineLineItems,
+                // money fields rebuilt from the stored lines), the tab renders the
+                // stored engine values; while the gate is OFF the payload carries
+                // no line set and this block is inert.
+                this.engineViewerActive = (await isWarrantyEngineViewerActive()) === true;
+                this.hasEngineLineItems = this.engineViewerActive &&
+                    result.data.hasEngineLineItems === true;
 
                 // Restore dealer price override if one was previously saved
                 if (result.data.dealerPriceOverride != null && result.data.dealerPriceOverride !== undefined) {
@@ -575,6 +634,9 @@ export default class DealerPortalWarranty extends LightningElement {
                 this.isExistingApplication = false;
                 this.currentView = 'packageList';
                 this.selectedDealerPackageName = '';
+                // P4 [L] engine-snapshot state: no package -> no line set.
+                this.engineViewerActive = false;
+                this.hasEngineLineItems = false;
 
                 // Clear stale sessionStorage data — no active package in Salesforce
                 this.savedDealerPackageId = null;
@@ -1004,6 +1066,9 @@ export default class DealerPortalWarranty extends LightningElement {
 
         this.updatePrice();
         this.isPriceCalculating = false;
+        // FEATURE A: term selection -> re-fetch the live premium preview so the
+        // fee line updates immediately (refreshApex on the cached result).
+        await this._refreshPremiumPreview();
         this.saveDataToSession();
         this.renderKey++;
     }
@@ -1352,6 +1417,9 @@ export default class DealerPortalWarranty extends LightningElement {
     }
     
     updatePrice() {
+        // FEATURE A: keep the live premium preview inputs in step with the
+        // current selection before any early return.
+        this._syncPremiumPreviewContext();
         if (this.isPriceOverridden) return;
         
         // Check if user selected a different term than the stored one
@@ -1363,7 +1431,14 @@ export default class DealerPortalWarranty extends LightningElement {
         // For Draft/Pending applications, always recalculate from current term pricing
         // so admin pricing changes are reflected. Only use stored values for locked/submitted apps.
         const appStatus = this.applicationStatus || '';
-        const shouldUseStoredPrice = isSameTerm && !['Draft', 'Pending', 'Quote'].includes(appStatus);
+        // LAYER 1 — only fall back to the STORED total when the stored package
+        // still encodes the CURRENT premium state. If the vehicle's premium
+        // eligibility/amount changed since the package was saved (typically
+        // premium -> non-premium after a vehicle change), the stored total still
+        // folds in the old premium, so re-stamping it would show a stale premium
+        // over the correct live recompute. Let the live path drive the box then.
+        const shouldUseStoredPrice = isSameTerm && !['Draft', 'Pending', 'Quote'].includes(appStatus)
+            && this._premiumStateMatchesStored();
         
         if (shouldUseStoredPrice) {
             // For submitted/active applications with same term, use stored pricing directly from Application_Package__c.
@@ -1404,8 +1479,10 @@ export default class DealerPortalWarranty extends LightningElement {
                 return total + (option ? (option.retailPrice || option.netCost || 0) : 0);
             }, 0);
             
-            // Calculate premium vehicle fee
-            const premiumFee = this.isPremiumVehicle && this.selectedWarrantyTerm && this.selectedWarrantyTerm.premiumModelFee ? this.selectedWarrantyTerm.premiumModelFee : 0;
+            // FEATURE A: premium fee now comes from the live read-only preview
+            // (getPremiumPreview) — the SAME combined eligibility + term-anchored
+            // fee rule the save path resolves — so the line updates live.
+            const premiumFee = this.isPremiumVehicle && this.livePremiumFee > 0 ? this.livePremiumFee : 0;
             
             // Calculate commercial vehicle surcharge fee
             const commercialSurchargeFee = this.isCommercialVehicle && this.selectedDealerPackage && this.selectedDealerPackage.commercialVehicleSurchargeFee ? this.selectedDealerPackage.commercialVehicleSurchargeFee : 0;
@@ -1428,7 +1505,60 @@ export default class DealerPortalWarranty extends LightningElement {
             this.price = 0.00;
             this._retailPriceDisplay = 0;
         }
-        
+
+        // P4 [L] engine-snapshot render (warranty viewer cutover). Every
+        // updatePrice path that lands back on the stored engine-priced term
+        // re-stamps the display from the stored engine totals the controller
+        // attached to the payload (money keys rebuilt from the persisted
+        // lines). Legacy math above runs first exactly as before and stays the
+        // sole path while the flags are off (engineViewerActive false — the
+        // payload also carries no line set then, so this is inert).
+        this._applyStoredEngineRender();
+    }
+
+    /**
+     * P4 [L] engine-snapshot render (warranty viewer cutover). Re-stamps the
+     * price display from the stored engine totals the controller attached to
+     * the active-package payload (money keys rebuilt from the persisted lines,
+     * hasEngineLineItems true) — stored = displayed, plan §07.3. Runs only
+     * when the Apex gate read (isWarrantyEngineViewerActive) is ON, the
+     * payload carried the engine line set, and the view is the pristine stored
+     * quote (same package + term, no pending option changes, no override). Any
+     * dealer edit (new term, option toggle, custom price) falls back to the
+     * legacy display paths, which stay sole and byte-for-byte while the flags
+     * are off.
+     */
+    _applyStoredEngineRender() {
+        if (!this.engineViewerActive || !this.hasEngineLineItems) return;
+        if (!this.isExistingApplication || !this.existingApplicationPackage) return;
+        if (!this.selectedDealerPackage || !this.selectedWarrantyTerm) return;
+        // Only re-stamp when the selection IS the stored engine-priced quote:
+        // same dealer package + same term. A different/new selection has no
+        // persisted line set yet.
+        if (this.existingApplicationPackage.dealerPackageId !== this.selectedDealerPackage.Id) return;
+        if (this.existingApplicationPackage.selectedTermId !== this.selectedWarrantyTerm.Id) return;
+        // Pristine view only: pending option changes or an active override are
+        // live dealer edits the engine has not re-priced yet.
+        if (this.isPriceOverridden) return;
+        if (this.hasAdditionalOptionsChanges()) return;
+        // LAYER 1 — the stored engine line set encodes the premium state at save
+        // time. If the vehicle's premium eligibility/amount no longer matches it
+        // (premium -> non-premium after a vehicle change), do NOT re-stamp the
+        // stored totals over the live recompute — the live path (which excludes
+        // the premium when not eligible) is authoritative.
+        if (!this._premiumStateMatchesStored()) return;
+        const stored = this.existingApplicationPackage;
+        // Same semantics as the legacy stored-price branch: price = stored
+        // with-tax total, retail display = stored no-tax total. Under the gate
+        // these payload keys are the engine line sums (contractPremiumPrice =
+        // all lines, contractPremiumPriceWithoutTax = non-Tax lines), so the
+        // price box shows exactly the persisted engine quote.
+        if (stored.contractPremiumPrice != null) {
+            this.price = stored.contractPremiumPrice;
+        }
+        if (stored.contractPremiumPriceWithoutTax != null) {
+            this._retailPriceDisplay = stored.contractPremiumPriceWithoutTax;
+        }
     }
     
     // Price breakdown modal methods
@@ -1478,8 +1608,8 @@ export default class DealerPortalWarranty extends LightningElement {
             taxAmount = totalDealerBeforeTax * (taxRate / 100);
         }
 
-        // Premium vehicle fee
-        const premiumFee = this.isPremiumVehicle && this.selectedWarrantyTerm && this.selectedWarrantyTerm.premiumModelFee ? this.selectedWarrantyTerm.premiumModelFee : 0;
+        // FEATURE A: premium fee from the live read-only preview.
+        const premiumFee = this.isPremiumVehicle && this.livePremiumFee > 0 ? this.livePremiumFee : 0;
         this.modalPremiumFee = premiumFee;
 
         // Commercial vehicle surcharge fee (per-package, from DealerPackageDTO)
@@ -1604,6 +1734,93 @@ export default class DealerPortalWarranty extends LightningElement {
             return '$' + this.modalPremiumFee.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         }
         return '$0.00';
+    }
+
+    // ------------------------------------------------------------------
+    // FEATURE A — LIVE premium indication (read-only, pre-save).
+    //
+    // ONE read-only Apex call returns only
+    // { isPremiumVehicle, premiumFee, waived, overrideApplied } for the current
+    // selection (no schedule/member ids, no wholesale cost). It is wired with
+    // reactive inputs so it fires the moment the vehicle is known (badge) and
+    // again on every term selection (fee), and it is re-fetched with
+    // refreshApex so the cached result can never go stale.
+    // ------------------------------------------------------------------
+    @wire(getPremiumPreview, {
+        dealerTermId: '$premiumPreviewTermId',
+        vehicleId: '$premiumPreviewVehicleId',
+        vehicleMake: '$premiumPreviewMake',
+        vehicleModel: '$premiumPreviewModel',
+        applicationPackageId: '$premiumPreviewApplicationPackageId',
+        priceOverrideActive: '$isPriceOverridden'
+    })
+    wiredPremiumPreview(result) {
+        this._premiumPreviewWired = result;
+        const { data, error } = result;
+        if (data) {
+            this.isPremiumVehicle = data.isPremiumVehicle === true;
+            this.livePremiumFee = data.premiumFee != null ? data.premiumFee : 0;
+            this.premiumWaived = data.waived === true;
+        } else if (error) {
+            // Fail safe: never show a premium we could not resolve server-side.
+            this.isPremiumVehicle = false;
+            this.livePremiumFee = 0;
+            this.premiumWaived = false;
+        }
+        this.updatePrice();
+    }
+
+    /** Keep the premium-preview wire inputs in step with the current selection. */
+    _syncPremiumPreviewContext() {
+        this.premiumPreviewTermId = this.selectedWarrantyTerm ? this.selectedWarrantyTerm.Id : null;
+        this.premiumPreviewVehicleId = this.vehicleIdForDeferral || null;
+        this.premiumPreviewMake = (this.vehicleData && this.vehicleData.make) ? this.vehicleData.make : '';
+        this.premiumPreviewModel = (this.vehicleData && this.vehicleData.model) ? this.vehicleData.model : '';
+        this.premiumPreviewApplicationPackageId = (this.existingApplicationPackage && this.existingApplicationPackage.Id)
+            ? this.existingApplicationPackage.Id
+            : null;
+    }
+
+    /** Force a live re-fetch of the cached premium preview (called on term selection). */
+    _refreshPremiumPreview() {
+        this._syncPremiumPreviewContext();
+        if (this._premiumPreviewWired) {
+            return refreshApex(this._premiumPreviewWired);
+        }
+        return Promise.resolve();
+    }
+
+    /**
+     * LAYER 1 — does the LIVE premium state still match what the STORED package
+     * encodes (Application_Package__c.Premium_Model_Fee__c)?
+     *
+     * True  => the stored totals are current; the stored-* re-stamp paths may run.
+     * False => eligibility flipped (premium -> non-premium) or the amount moved,
+     *          so the stored total is stale and must not overwrite the live
+     *          recompute.
+     *
+     * Eligibility is compared first (isPremiumVehicle vs storedPremium > 0) so a
+     * still-premium retained term keeps its stored total even before the preview
+     * fee resolves; the amount is only compared once the live fee is known.
+     * A payload without the stored value (premiumModelFee absent) is treated as
+     * no stored premium — legacy, non-premium records are therefore unchanged.
+     */
+    _premiumStateMatchesStored() {
+        if (!this.isExistingApplication || !this.existingApplicationPackage) {
+            return true;
+        }
+        const raw = this.existingApplicationPackage.premiumModelFee;
+        const storedPremium = (raw != null && raw !== '') ? Number(raw) : 0;
+        const storedCharges = storedPremium > 0;
+        const eligible = this.isPremiumVehicle === true;
+        if (eligible !== storedCharges) {
+            return false;
+        }
+        const livePremium = (eligible && this.livePremiumFee > 0) ? Number(this.livePremiumFee) : 0;
+        if (eligible && storedCharges && livePremium > 0 && Math.abs(livePremium - storedPremium) > 0.005) {
+            return false;
+        }
+        return true;
     }
 
     get hasCommercialSurchargeFee() {
@@ -2093,6 +2310,7 @@ export default class DealerPortalWarranty extends LightningElement {
         }
         return this.formatPrice(this.price);
     }
+
     
     
     get availableTerms() {

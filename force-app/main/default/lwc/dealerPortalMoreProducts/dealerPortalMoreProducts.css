@@ -5283,3 +5283,48 @@ lightning-accordion-section.program-section-selected lightning-button:hover {
     min-height: 36px;
     width: 100%;
 }
+/* P4 [L] engine snapshot: stored line-item breakdown. Rendered only when the
+   server attaches the engine line set (hasEngineLineItems — T5 gate on);
+   inert while the flags are off — flag-off payloads never carry the line set. */
+.engine-lines-block {
+    margin: 10px 0 0 0;
+    padding: 10px 12px;
+    background: #f7fafd;
+    border: 1px solid #dce7f1;
+    border-radius: 6px;
+}
+.engine-lines-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1b3b65;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-bottom: 6px;
+}
+.engine-lines-list {
+    display: flex;
+    flex-direction: column;
+}
+.engine-line-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 3px 0;
+    font-size: 0.8125rem;
+    border-bottom: 1px solid #eef3f8;
+}
+.engine-line-row:last-child {
+    border-bottom: none;
+}
+.engine-line-desc {
+    color: #3e3e3c;
+}
+.engine-line-amount {
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+    margin-left: 12px;
+}

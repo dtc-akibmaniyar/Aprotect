@@ -18,7 +18,7 @@ public with sharing class CancellationReviewController {
             SELECT Id, Name, Application_Package__c, Application_Package__r.Name,
                    Application_Package__r.Coverage_Plan__c, 
                    Application_Package__r.Coverage_Term__c,
-                   Application_Package__r.Total_Package_Price__c,
+                   Application_Package__r.Contract_Premium_Price__c,
                    Refund_Amount__c
             FROM Cancellation_Service__c 
             WHERE App_Cancellation_Request__c = :requestId

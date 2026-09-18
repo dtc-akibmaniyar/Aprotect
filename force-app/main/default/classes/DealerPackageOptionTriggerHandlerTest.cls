@@ -41,6 +41,13 @@ private class DealerPackageOptionTriggerHandlerTest {
     @TestSetup
     static void setup() {
         Account dealer           = TestDataFactory.createDealer(true);
+        // Catalogue package owning the master term + options. It is deliberately
+        // NOT the package the dealer mirror points at: since P7-f the sync
+        // mirrors a tier-less master term (C1), so mirroring this catalogue would
+        // seed the dealer package with a dealer term (and the term-level Optional
+        // option) before the test runs. Keeping the mirror on a separate empty
+        // master keeps this fixture hermetic — each test drives the dealer rows
+        // it asserts on explicitly.
         Package__c pkg           = TestDataFactory.createPackage('Extended_Limited_Warranty', true);
         Package_Term__c pkgTerm  = TestDataFactory.createPackageTerm(pkg.Id, null, true);
 
@@ -49,16 +56,21 @@ private class DealerPackageOptionTriggerHandlerTest {
         TestDataFactory.createPackageOption(pkg.Id, pkgTerm.Id, 'Included', true);
         TestDataFactory.createPackageOption(pkg.Id, pkgTerm.Id, 'Optional', true);
 
+        // The dealer mirror points at a SEPARATE empty master (no terms/options):
+        // the after-insert fan-out builds only the header.
+        Package__c mirrorMaster  = TestDataFactory.createPackage('Extended_Limited_Warranty', true);
         Dealer_Package__c dp     = TestDataFactory.createDealerPackage(
-            dealer.Id, pkg.Id, 'Extended_Limited_Warranty', true
+            dealer.Id, mirrorMaster.Id, 'Extended_Limited_Warranty', true
         );
         TestDataFactory.createDealerPackageTerm(dp.Id, pkgTerm.Id, null, true);
     }
 
     // ── Private query helpers ─────────────────────────────────────────────────
 
+    /** The catalogue package that owns the master term/options (never mirrored here). */
     private static Package__c getPkg() {
-        return [SELECT Id FROM Package__c LIMIT 1];
+        Id pkgId = [SELECT Package__c FROM Package_Option__c ORDER BY CreatedDate ASC LIMIT 1].Package__c;
+        return new Package__c(Id = pkgId);
     }
 
     private static Package_Term__c getPkgTerm() {

@@ -148,9 +148,12 @@ private class InvoiceDetailPDFControllerTest {
     }
 
     /**
-     * Full package hierarchy + a priced add-on (Application_Package_Option__c)
-     * with a Selection_Type__c, so Option__c / Net_Cost__c / Selection_Type__c
-     * formula fields resolve through the Package_Option__c chain.
+     * Full package hierarchy + a priced add-on. P4 [S]: the option state is
+     * the package's priced Option LINE ITEM (the engine snapshot contract;
+     * Application_Package_Option__c children are retired) with the dealer-
+     * option mirror as the cost source — the reader re-derives costPrice from
+     * mirror.Net_Cost__c (Original 100, no discount -> 100) and the name from
+     * the line description.
      */
     private static Map<String, SObject> setupInvoiceWithPackageOption() {
         Map<String, SObject> chain = setupInvoiceWithPackageAndLineItem();
@@ -179,16 +182,19 @@ private class InvoiceDetailPDFControllerTest {
             dealerPkg.Id, pkgOpt.Id, null, 'Optional', true
         );
 
-        Application_Package_Option__c apo = new Application_Package_Option__c(
-            Application__c                  = app.Id,
-            Application_Package__c          = appPkg.Id,
-            Package_Option__c               = pkgOpt.Id,
-            Dealer_Package_Option__c        = dpOpt.Id,
-            Original_Package_Option_Price__c = 100.00
+        Application_Package_Line_Item__c line = new Application_Package_Line_Item__c(
+            Application_Package__c = appPkg.Id,
+            Name = 'Windshield Protection',
+            Line_Type__c = 'Option',
+            Description__c = 'Windshield Protection',
+            Amount__c = 100.00,
+            Taxable__c = true,
+            Quantity__c = 1,
+            Package_Option__c = pkgOpt.Id
         );
-        insert apo;
+        Database.insert(line, System.AccessLevel.SYSTEM_MODE);
 
-        chain.put('packageOption', apo);
+        chain.put('packageOption', line);
         return chain;
     }
 
@@ -981,10 +987,12 @@ private class InvoiceDetailPDFControllerTest {
         System.assertEquals('', ctrl1.packages[0].termDisplay,
             'termDisplay should be empty when the term is null');
 
-        // 2) Term named 'null' → replaced with '0' (LWC JS quirk).
-        //    The "Application Package - Update values" flow populates
-        //    Package_Term__c from the DPT; rename that term to 'null'
-        //    (a duplicate rule blocks INSERTing a term named 'null', but
+        // 2) Dealer-copy-linked AP (the engine record shape: NO master
+        //    Package__c / Package_Term__c — the create-time flow that used to
+        //    populate them from the DPT is retired, P4 [F]). The PDF resolves
+        //    plan/term through the dealer copy links. Renaming the resolved
+        //    term to 'null' exercises the LWC null→'0' display quirk (a
+        //    duplicate rule blocks INSERTing a term named 'null', but
         //    renaming an existing record is allowed).
         Application__c app = TestDataFactory.createApplicationWithDetails(dealer.Id, true);
         Invoice__c     inv = TestDataFactory.createInvoice(app.Id, true);
@@ -1002,27 +1010,118 @@ private class InvoiceDetailPDFControllerTest {
                                         );
         TestDataFactory.createInvoiceLineItem(inv.Id, appPkg.Id, true);
 
-        // Re-read the AP so the flow-populated Package_Term__c is visible
+        // Engine contract (P4 [F]): the retired flow no longer copies the
+        // master links onto the record — the dealer copy links are the source.
         Application_Package__c fresh = [
-            SELECT Id, Package_Term__c
+            SELECT Id, Package__c, Package_Term__c
             FROM Application_Package__c
             WHERE Id = :appPkg.Id
             LIMIT 1
         ];
-        System.assertNotEquals(null, fresh.Package_Term__c,
-            'the flow should have populated Package_Term__c from the DPT');
-        Package_Term__c term = [
-            SELECT Id, Name
-            FROM Package_Term__c
-            WHERE Id = :fresh.Package_Term__c
-            LIMIT 1
-        ];
-        term.Name = 'null';
-        update term;
+        System.assertEquals(null, fresh.Package__c,
+            'master Package__c stays null on a dealer-copy-linked record (flow retired)');
+        System.assertEquals(null, fresh.Package_Term__c,
+            'master Package_Term__c stays null on a dealer-copy-linked record (flow retired)');
+        String masterTermName = [SELECT Name FROM Package_Term__c WHERE Id = :srcTerm.Id].Name;
+
+        InvoiceDetailPDFController ctrlA = buildController(inv.Id);
+        System.assertEquals(masterTermName, ctrlA.packages[0].termDisplay,
+            'termDisplay should resolve via the dealer copy links (Dealer_Package_Term__c -> Package_Term__c)');
+
+        // Rename the resolved (master) term to 'null' → rendered '0'
+        srcTerm.Name = 'null';
+        update srcTerm;
 
         InvoiceDetailPDFController ctrl2 = buildController(inv.Id);
         System.assertEquals('0', ctrl2.packages[0].termDisplay,
             'termDisplay should replace the word null with 0');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SECTION 13 — P4 [F]: ENGINE-CONTRACT PLAN/TERM RESOLUTION + MONEY PARITY
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @isTest
+    static void testConstructor_engineRecord_noMasterLinks_planTermResolveViaDealerLinks() {
+        // Engine-priced record shape: dealer copy links only (no master
+        // Package__c / Package_Term__c — the create-time flow that wrote them
+        // is retired). Plan + term must resolve through the dealer links.
+        Map<String, SObject> chain = setupInvoiceWithPackageAndLineItem();
+        Invoice__c             inv    = (Invoice__c)             chain.get('invoice');
+        Application_Package__c appPkg = (Application_Package__c) chain.get('appPackage');
+
+        appPkg.Priced_By_Engine__c = true;
+        update appPkg;
+
+        Application_Package__c fresh = [
+            SELECT Id, Package__c, Package_Term__c, Dealer_Package__c, Dealer_Package_Term__c,
+                   Dealer_Package__r.Package__c, Dealer_Package_Term__r.Package_Term__c
+            FROM Application_Package__c
+            WHERE Id = :appPkg.Id
+            LIMIT 1
+        ];
+        System.assertEquals(null, fresh.Package__c,
+            'engine record has no master Package__c link (flow retired)');
+        System.assertEquals(null, fresh.Package_Term__c,
+            'engine record has no master Package_Term__c link (flow retired)');
+        System.assertNotEquals(null, fresh.Dealer_Package__c,
+            'engine record carries the dealer copy link');
+        System.assertNotEquals(null, fresh.Dealer_Package_Term__c,
+            'engine record carries the dealer copy term link');
+
+        String masterPkgName = [
+            SELECT Name FROM Package__c WHERE Id = :fresh.Dealer_Package__r.Package__c
+        ].Name;
+        String masterTermName = [
+            SELECT Name FROM Package_Term__c WHERE Id = :fresh.Dealer_Package_Term__r.Package_Term__c
+        ].Name;
+
+        InvoiceDetailPDFController ctrl = buildController(inv.Id);
+        System.assertEquals(1, ctrl.packages.size(), 'one package expected');
+        InvoiceDetailPDFController.PackageRow row = ctrl.packages[0];
+        System.assertEquals(masterPkgName, row.packageName,
+            'packageName should resolve through Dealer_Package__c -> Package__c (master name)');
+        System.assertEquals(masterTermName, row.termDisplay,
+            'termDisplay should resolve through Dealer_Package_Term__c -> Package_Term__c (master name)');
+        // Money is untouched by the display re-point: lineTotal comes from the
+        // stored price fields (Dealer_Package_Price__c = 1500) + add-ons + fee.
+        System.assertEquals(1500.00, row.baseCostPrice, 'base cost price unchanged');
+        System.assertEquals(0, row.addOnsTotal, 'no add-ons on this record');
+        System.assertEquals(1500.00, row.lineTotal,
+            'lineTotal unchanged by the display re-point (money from stored fields)');
+    }
+
+    @isTest
+    static void testConstructor_legacyRecord_masterLinksPreferred_rendersIdentical() {
+        // Legacy (flow-written) shape: master links PRESENT. Master-first
+        // resolution must render exactly the master names — byte-identical to
+        // the pre-retirement behaviour — and the same money as the engine shape.
+        Map<String, SObject> chain = setupInvoiceWithPackageAndLineItem();
+        Invoice__c             inv    = (Invoice__c)             chain.get('invoice');
+        Application_Package__c appPkg = (Application_Package__c) chain.get('appPackage');
+        Application_Package__c fresh  = [
+            SELECT Id, Dealer_Package__r.Package__c, Dealer_Package_Term__r.Package_Term__c
+            FROM Application_Package__c
+            WHERE Id = :appPkg.Id
+            LIMIT 1
+        ];
+        // Simulate the retired create-time flow's write: master links copied
+        // from the dealer copy chain.
+        appPkg.Package__c      = fresh.Dealer_Package__r.Package__c;
+        appPkg.Package_Term__c = fresh.Dealer_Package_Term__r.Package_Term__c;
+        update appPkg;
+
+        InvoiceDetailPDFController ctrl = buildController(inv.Id);
+        InvoiceDetailPDFController.PackageRow row = ctrl.packages[0];
+
+        String masterPkgName = [SELECT Name FROM Package__c WHERE Id = :appPkg.Package__c].Name;
+        String masterTermName = [SELECT Name FROM Package_Term__c WHERE Id = :appPkg.Package_Term__c].Name;
+        System.assertEquals(masterPkgName, row.packageName,
+            'master-linked record renders the master package name (master-first)');
+        System.assertEquals(masterTermName, row.termDisplay,
+            'master-linked record renders the master term name (master-first)');
+        System.assertEquals(1500.00, row.lineTotal,
+            'legacy money path unchanged (stored price fields)');
     }
 
     @isTest

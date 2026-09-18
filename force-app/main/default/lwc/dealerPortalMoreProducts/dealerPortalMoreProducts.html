@@ -354,6 +354,29 @@
                 </template>
             </div>
 
+            <!-- P4 [L] engine snapshot: stored engine line items. The block
+                 renders only when the server attaches the engine line set
+                 (hasEngineLineItems — T5 gate on + engine-priced package with
+                 a persisted snapshot) AND the Apex gate read is active;
+                 flag-off payloads never carry it, so this renders nothing and
+                 the legacy layout is untouched. -->
+            <template if:true={showStoredEngineLines}>
+                <div class="engine-lines-block">
+                    <div class="engine-lines-header">
+                        <lightning-icon icon-name="utility:list" size="x-small"></lightning-icon>
+                        Engine-Priced Breakdown
+                    </div>
+                    <div class="engine-lines-list">
+                        <template for:each={engineLineItems} for:item="lineItem">
+                            <div class="engine-line-row" key={lineItem.key}>
+                                <span class="engine-line-desc">{lineItem.description}</span>
+                                <span class="engine-line-amount">{lineItem.formattedAmount}</span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
             <div class="tire-details-form-card">
                 <div class="tire-details-header">
                     <h3>Tire &amp; Rim Details</h3>

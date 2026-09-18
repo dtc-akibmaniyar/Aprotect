@@ -325,7 +325,7 @@
                       </div>
                       <div class="package-detail-row">
                         <span class="package-detail-label">Coverage Term:</span>
-                        <span class="package-detail-value">{packageWrapper.coverageTerm}</span>
+                        <span class="package-detail-value">{packageWrapper.coverageTermDisplay}</span>
                       </div>
 
                       <!-- Fix 2 — Powersports per-package fields -->
@@ -409,14 +409,16 @@
                       <span class="contract-detail-label">Contract Expiry Date:</span>
                       <span class="contract-detail-value">{packageWrapper.contractExpiryDate}</span>
                     </div>
-                    <div class="contract-detail-row">
-                      <span class="contract-detail-label">Contract Start Odometer:</span>
-                      <span class="contract-detail-value">{packageWrapper.contractStartOdometer} {packageWrapper.contractStartOdometerUnit}</span>
-                    </div>
-                    <div class="contract-detail-row">
-                      <span class="contract-detail-label">Contract Expiry Odometer:</span>
-                      <span class="contract-detail-value">{packageWrapper.contractExpiryOdometer} {packageWrapper.contractExpiryOdometerUnit}</span>
-                    </div>
+                    <template if:false={packageWrapper.isTireRim}>
+                      <div class="contract-detail-row">
+                        <span class="contract-detail-label">Contract Start Odometer:</span>
+                        <span class="contract-detail-value">{packageWrapper.contractStartOdometer} {packageWrapper.contractStartOdometerUnit}</span>
+                      </div>
+                      <div class="contract-detail-row">
+                        <span class="contract-detail-label">Contract Expiry Odometer:</span>
+                        <span class="contract-detail-value">{packageWrapper.contractExpiryOdometer} {packageWrapper.contractExpiryOdometerUnit}</span>
+                      </div>
+                    </template>
                   </div>
                 </div>
               </div>

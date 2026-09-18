@@ -32,6 +32,47 @@ public without sharing class InvoiceDetailPDFController {
     }
 
     /**
+     * P4 [F] close-out (create-time flow retirement): engine-priced
+     * Application_Package records carry NO master Package__c / Package_Term__c
+     * links (the create-time flow that wrote them is retired), so the invoice
+     * PDF's ITEM column and TERM column would render blank on engine records.
+     * Resolve the display through the dealer copy links the engine path DOES
+     * carry (Dealer_Package__c / Dealer_Package_Term__c -> their masters, then
+     * the copy names), master-first so the legacy path stays byte-identical —
+     * the same re-point QuotePDFExtension/ApplicationPDFExtension received in
+     * the p4-t2 follow-up. Money (PackageRow.lineTotal / grandTotal) comes from
+     * the stored price fields and the invoice line items — untouched by this
+     * display re-point.
+     */
+    private static String resolvePackageName(Application_Package__c pkg) {
+        if (pkg.Package__r != null && String.isNotBlank(pkg.Package__r.Name)) {
+            return pkg.Package__r.Name;
+        }
+        if (pkg.Dealer_Package__r != null && pkg.Dealer_Package__r.Package__r != null
+                && String.isNotBlank(pkg.Dealer_Package__r.Package__r.Name)) {
+            return pkg.Dealer_Package__r.Package__r.Name;
+        }
+        if (pkg.Dealer_Package__r != null && String.isNotBlank(pkg.Dealer_Package__r.Name)) {
+            return pkg.Dealer_Package__r.Name;
+        }
+        return '';
+    }
+
+    private static String resolveTermName(Application_Package__c pkg) {
+        if (pkg.Package_Term__r != null && String.isNotBlank(pkg.Package_Term__r.Name)) {
+            return pkg.Package_Term__r.Name;
+        }
+        if (pkg.Dealer_Package_Term__r != null && pkg.Dealer_Package_Term__r.Package_Term__r != null
+                && String.isNotBlank(pkg.Dealer_Package_Term__r.Package_Term__r.Name)) {
+            return pkg.Dealer_Package_Term__r.Package_Term__r.Name;
+        }
+        if (pkg.Dealer_Package_Term__r != null && String.isNotBlank(pkg.Dealer_Package_Term__r.Name)) {
+            return pkg.Dealer_Package_Term__r.Name;
+        }
+        return '';
+    }
+
+    /**
      * Inline style for the STATUS meta value — mirrors the LWC status classes:
      *   Paid #5cb85c / Partial Paid #f0ad4e / Due #d9534f / Planned #5bc0de /
      *   Cancelled #999 + line-through / default #999
@@ -184,30 +225,71 @@ public without sharing class InvoiceDetailPDFController {
             }
         }
 
-        // ── 2b. Query Application Package Options for add-on rows ────────────
+        // ── 2b. Query Option LINE ITEMS for add-on rows (P4 [S]: option state
+        // lives on the package's priced Option lines — the engine snapshot
+        // contract; Application_Package_Option__c children are retired). The
+        // line carries the priced retail (Amount__c); the cost side (the
+        // invoice shows cost prices) is re-derived from the dealer-option
+        // mirror — the same Net_Cost formula the legacy child copied.
         Map<Id, List<OptionWrapper>> pkgToOptions = new Map<Id, List<OptionWrapper>>();
         try {
             if (!packageIds.isEmpty()) {
-                for (Application_Package_Option__c opt : [
-                    SELECT Id, Application_Package__c, Option__c, Net_Cost__c, Selection_Type__c
-                    FROM Application_Package_Option__c
-                    WHERE Application_Package__c IN :packageIds
-                    AND Net_Cost__c != null AND Net_Cost__c != 0
-                    ORDER BY Option__c ASC
+                Map<Id, Id> dealerPkgByPkg = new Map<Id, Id>();
+                for (Application_Package__c p : [
+                    SELECT Id, Dealer_Package__c, Dealer_Package_Term__r.Dealer_Package__c
+                    FROM Application_Package__c WHERE Id IN :packageIds
                 ]) {
-                    if (!pkgToOptions.containsKey(opt.Application_Package__c)) {
-                        pkgToOptions.put(opt.Application_Package__c, new List<OptionWrapper>());
+                    Id dpId = (p.Dealer_Package_Term__r != null && p.Dealer_Package_Term__r.Dealer_Package__c != null)
+                        ? p.Dealer_Package_Term__r.Dealer_Package__c : p.Dealer_Package__c;
+                    if (dpId != null) {
+                        dealerPkgByPkg.put(p.Id, dpId);
+                    }
+                }
+                Map<Id, Dealer_Package_Option__c> mirrorByMaster = new Map<Id, Dealer_Package_Option__c>();
+                Set<Id> dealerPkgIds = new Set<Id>(dealerPkgByPkg.values());
+                if (!dealerPkgIds.isEmpty()) {
+                    for (Dealer_Package_Option__c dpo : [
+                        SELECT Id, Package_Option__c, Net_Cost__c
+                        FROM Dealer_Package_Option__c
+                        WHERE Dealer_Package__c IN :dealerPkgIds
+                          AND Package_Option__c != null
+                          AND Net_Cost__c != null AND Net_Cost__c != 0
+                    ]) {
+                        if (!mirrorByMaster.containsKey(dpo.Package_Option__c)) {
+                            mirrorByMaster.put(dpo.Package_Option__c, dpo);
+                        }
+                    }
+                }
+                for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.queryWithBinds(
+                        'SELECT Application_Package__c, Description__c, Amount__c, Package_Option__c' +
+                        ' FROM Application_Package_Line_Item__c' +
+                        ' WHERE Application_Package__c IN :packageIds' +
+                        ' AND Line_Type__c = \'Option\'' +
+                        ' ORDER BY Package_Option__c, Id',
+                        new Map<String, Object>{ 'packageIds' => packageIds },
+                        System.AccessLevel.SYSTEM_MODE)) {
+                    if (line.Application_Package__c == null) {
+                        continue;
+                    }
+                    List<OptionWrapper> rows = pkgToOptions.get(line.Application_Package__c);
+                    if (rows == null) {
+                        rows = new List<OptionWrapper>();
+                        pkgToOptions.put(line.Application_Package__c, rows);
                     }
                     OptionWrapper ow = new OptionWrapper();
-                    ow.optionName    = opt.Option__c != null ? opt.Option__c : 'Additional Option';
-                    ow.costPrice     = opt.Net_Cost__c != null ? opt.Net_Cost__c : 0;
-                    ow.selectionType = opt.Selection_Type__c;
-                    pkgToOptions.get(opt.Application_Package__c).add(ow);
+                    Dealer_Package_Option__c mirror = line.Package_Option__c != null
+                        ? mirrorByMaster.get(line.Package_Option__c) : null;
+                    ow.optionName    = String.isNotBlank(line.Description__c)
+                        ? line.Description__c : 'Additional Option';
+                    ow.costPrice     = mirror != null && mirror.Net_Cost__c != null
+                        ? mirror.Net_Cost__c : (line.Amount__c != null ? line.Amount__c : 0);
+                    ow.selectionType = 'Optional';
+                    rows.add(ow);
                 }
             }
         } catch (Exception e) {
             // Silently continue without options if query fails (e.g., FLS issue in community context)
-            System.debug(LoggingLevel.WARN, 'PDF: Failed to query package options: ' + e.getMessage());
+            System.debug(LoggingLevel.WARN, 'PDF: Failed to query option lines: ' + e.getMessage());
         }
 
         // ── 3. Packages scoped to the invoice's line items (LWC parity) ───────
@@ -215,6 +297,10 @@ public without sharing class InvoiceDetailPDFController {
         if (!packageIds.isEmpty()) {
             List<Application_Package__c> appPkgs = [
                 SELECT Id, Package__r.Name, Package_Term__r.Name,
+                       Dealer_Package__c, Dealer_Package__r.Name,
+                       Dealer_Package__r.Package__r.Name,
+                       Dealer_Package_Term__c, Dealer_Package_Term__r.Name,
+                       Dealer_Package_Term__r.Package_Term__r.Name,
                        Odometer_Start__c, Odometer_End__c,
                        Contract_Start_Date__c, Contract_End_Date__c,
                        RecordType.Name,
@@ -240,6 +326,7 @@ public without sharing class InvoiceDetailPDFController {
             for (Application_Package__c pkg : appPkgs) {
                 PackageRow row    = new PackageRow();
                 row.pkg           = pkg;
+                row.packageName   = resolvePackageName(pkg);
                 row.lineItems     = new List<LineItemWrapper>();
                 row.packageTotal  = 0;
                 row.baseCostPrice = pkg.Dealer_Package_Price__c != null ? pkg.Dealer_Package_Price__c : 0;
@@ -253,9 +340,7 @@ public without sharing class InvoiceDetailPDFController {
                 row.premiumModelFee    = pkg.Premium_Model_Fee__c != null ? pkg.Premium_Model_Fee__c : 0;
                 row.hasPremiumModelFee = row.premiumModelFee > 0;
                 row.lineTotal          = row.baseCostPrice + row.addOnsTotal + row.premiumModelFee;
-                row.termDisplay        = (pkg.Package_Term__r != null && pkg.Package_Term__r.Name != null)
-                    ? pkg.Package_Term__r.Name.replaceAll('\\bnull\\b', '0')
-                    : '';
+                row.termDisplay        = resolveTermName(pkg).replaceAll('\\bnull\\b', '0');
 
                 // Tax breakdown
                 row.basePriceWithoutTax = pkg.Contract_Cost_Price_Without_Tax__c != null ? pkg.Contract_Cost_Price_Without_Tax__c : 0;
@@ -303,6 +388,7 @@ public without sharing class InvoiceDetailPDFController {
 
     public class PackageRow {
         public Application_Package__c      pkg          { get; set; }
+        public String                      packageName  { get; set; }
         public List<LineItemWrapper>        lineItems    { get; set; }
         public Decimal                     packageTotal { get; set; }
         public Decimal                     baseCostPrice { get; set; }

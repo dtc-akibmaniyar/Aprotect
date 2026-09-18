@@ -391,9 +391,9 @@
                                                     <tr>
                                                         <td class="plan-value">
                                                             <apex:repeat value="{!wrapper.optionalOptions}" var="opt">
-                                                                {!opt.Option__c}
-                                                                <apex:outputPanel layout="none" rendered="{!opt.Retail_Price__c != null && opt.Retail_Price__c > 0}">
-                                                                    (<apex:outputText value="${0, number, ###,##0.00}"><apex:param value="{!opt.Retail_Price__c}"/></apex:outputText>)
+                                                                {!opt.optionName}
+                                                                <apex:outputPanel layout="none" rendered="{!opt.retailPrice != null && opt.retailPrice > 0}">
+                                                                    (<apex:outputText value="${0, number, ###,##0.00}"><apex:param value="{!opt.retailPrice}"/></apex:outputText>)
                                                                 </apex:outputPanel>
                                                                 <apex:outputText value=", " rendered="{!opt != wrapper.optionalOptions[wrapper.optionalOptions.size - 1]}"/>
                                                             </apex:repeat>

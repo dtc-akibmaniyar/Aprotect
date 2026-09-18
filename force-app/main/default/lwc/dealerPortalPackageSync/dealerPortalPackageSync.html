@@ -1,0 +1,173 @@
+<template>
+    <!-- Loading -->
+    <template if:true={viewLoading}>
+        <div class="slds-p-around_large slds-align_absolute-center">
+            <lightning-spinner alternative-text="Loading packages" size="medium"></lightning-spinner>
+            <span class="slds-m-left_small slds-text-body_regular">Loading packages…</span>
+        </div>
+    </template>
+
+    <!-- Error -->
+    <template if:true={viewError}>
+        <div class="slds-p-around_medium">
+            <lightning-alert variant="error" title="Packages could not be loaded"
+                message={errorMessage}></lightning-alert>
+            <div class="slds-m-top_small">
+                <lightning-button label="Try again" variant="brand"
+                    onclick={loadInventory}></lightning-button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Not a dealer account -->
+    <template if:true={viewNotDealer}>
+        <div class="slds-p-around_medium">
+            <lightning-alert variant="info" title="Dealer accounts only"
+                message="This action is available on dealer accounts only."></lightning-alert>
+        </div>
+    </template>
+
+    <!-- Ready -->
+    <template if:true={viewReady}>
+        <div class="console slds-p-around_medium" role="region" aria-label="Dealer package sync">
+
+            <!-- Header -->
+            <header class="console__header slds-grid slds-grid_align-spread slds-grid_vertical-align-start slds-wrap">
+                <div class="slds-m-right_medium slds-m-bottom_x-small">
+                    <h2 class="slds-text-heading_small slds-truncate" title={accountName}>{accountName}</h2>
+                    <p class="slds-text-body_small slds-text-color_weak slds-m-top_xxx-small">
+                        {syncEnabledMessage}
+                    </p>
+                </div>
+                <div class="counts slds-grid slds-wrap" role="status" aria-live="polite">
+                    <span class="count-chip count-chip_attention">
+                        <span class="count-chip__num">{updateCount}</span>
+                        <span class="count-chip__lbl">update available</span>
+                    </span>
+                    <span class="count-chip count-chip_new">
+                        <span class="count-chip__num">{toAddCount}</span>
+                        <span class="count-chip__lbl">available to add</span>
+                    </span>
+                    <span class="count-chip count-chip_ok">
+                        <span class="count-chip__num">{uptodateCount}</span>
+                        <span class="count-chip__lbl">up to date</span>
+                    </span>
+                </div>
+            </header>
+
+            <!-- View-only lock -->
+            <template if:true={flagOff}>
+                <div class="slds-m-top_small">
+                    <lightning-alert variant="warning" title="Editing is switched off"
+                        message={flagOffMessage}></lightning-alert>
+                </div>
+            </template>
+
+            <!-- Quick filter -->
+            <div class="filter-bar slds-m-top_medium" role="group" aria-label="Filter packages">
+                <template for:each={filterButtons} for:item="f">
+                    <button key={f.value} type="button" class={f.cls} data-value={f.value}
+                        onclick={handleFilter} aria-pressed={f.aria}>{f.text}</button>
+                </template>
+            </div>
+
+            <!-- The one unified list -->
+            <section class="slds-m-top_small">
+                <h3 class="section-title slds-text-title_bold">Packages</h3>
+
+                <template if:true={noRows}>
+                    <p class="empty-state slds-text-body_small slds-text-color_weak">{emptyMessage}</p>
+                </template>
+
+                <ul class="pkg-list" role="list">
+                    <template for:each={visibleRows} for:item="row">
+                        <li key={row.rowId} class={row.rowClass}>
+                            <div class="pkg-row__body">
+                                <div class="pkg-row__head">
+                                    <span class="pkg-row__name slds-text-body_regular">{row.name}</span>
+                                    <span class={row.chipClass}>{row.statusLabel}</span>
+                                </div>
+                                <div class="pkg-row__meta">
+                                    <span class="slds-badge slds-badge_lightest">{row.recordTypeLabel}</span>
+                                    <template if:true={row.hasPlanType}>
+                                        <span class="meta-text">{row.planTypeLabel}</span>
+                                    </template>
+                                    <span class="meta-text">{row.countsLabel}</span>
+                                    <template if:true={row.hasSchedule}>
+                                        <span class="meta-text">{row.scheduleLabel}</span>
+                                    </template>
+                                    <template if:true={row.hasRelease}>
+                                        <span class="meta-text">{row.releaseLabel}</span>
+                                    </template>
+                                    <template if:true={row.hasLastSynced}>
+                                        <span class="meta-text">{row.lastSyncedLabel}</span>
+                                    </template>
+                                </div>
+                                <p class="pkg-row__reason slds-text-body_small">{row.reason}</p>
+                            </div>
+                            <template if:true={row.hasAction}>
+                                <div class="pkg-row__action">
+                                    <lightning-button variant="brand" label={row.primaryActionLabel}
+                                        disabled={row.busy} onclick={handleRowAction}
+                                        data-id={row.actionId} data-kind={row.primaryAction}
+                                        data-rowid={row.rowId} data-name={row.name}>
+                                    </lightning-button>
+                                </div>
+                            </template>
+                        </li>
+                    </template>
+                </ul>
+            </section>
+
+            <!-- Informational footer -->
+            <template if:true={hasFooterRows}>
+                <section class="slds-m-top_large">
+                    <h3 class="section-title slds-text-title_bold">Inactive or master-less copies</h3>
+                    <p class="slds-text-body_small slds-text-color_weak slds-m-top_xxx-small">
+                        These are kept for reference and are not updated automatically.
+                    </p>
+                    <ul class="pkg-list" role="list">
+                        <template for:each={footerRows} for:item="row">
+                            <li key={row.dealerPackageId} class="pkg-row pkg-row_muted">
+                                <div class="pkg-row__body">
+                                    <div class="pkg-row__head">
+                                        <span class="pkg-row__name slds-text-body_regular">{row.name}</span>
+                                        <span class="slds-badge slds-badge_lightest">{row.statusLabel}</span>
+                                    </div>
+                                    <p class="pkg-row__reason slds-text-body_small slds-text-color_weak">{row.reason}</p>
+                                </div>
+                            </li>
+                        </template>
+                    </ul>
+                </section>
+            </template>
+
+            <div class="console__footer slds-m-top_large">
+                <lightning-button label="Done" variant="neutral" onclick={closeAction}></lightning-button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Shared confirmation dialog, fed by the server dry-run summary -->
+    <template if:true={dialogOpen}>
+        <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="confirmHeading"
+            class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <h2 id="confirmHeading" class="slds-text-heading_medium">{dialogTitle}</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium" id="dialogContent">
+                    <p class="slds-text-body_regular">{dialogSummary}</p>
+                    <p class="slds-text-body_small slds-text-color_weak slds-m-top_small">{dialogNote}</p>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Cancel" variant="neutral"
+                        onclick={dialogCancel}></lightning-button>
+                    <lightning-button label={dialogConfirmLabel} variant="brand"
+                        disabled={dialogBusy} onclick={dialogConfirm}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+</template>

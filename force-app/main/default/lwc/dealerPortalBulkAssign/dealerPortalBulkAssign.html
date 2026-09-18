@@ -1,0 +1,85 @@
+<template>
+    <lightning-card
+        title="Bulk Assign Plan to Dealers"
+        icon-name="utility:groups">
+        <template if:true={isPackageRecord}>
+            <div class="slds-p-around_medium">
+                <lightning-layout vertical-align="end">
+                    <lightning-layout-item size="6" padding="around-small">
+                        <lightning-combobox
+                            name="scope"
+                            label="Dealer scope"
+                            value={scope}
+                            placeholder="Select scope"
+                            options={scopeOptions}
+                            onchange={handleScopeChange}></lightning-combobox>
+                    </lightning-layout-item>
+                    <lightning-layout-item size="6" padding="around-small">
+                        <p class="slds-text-color_weak slds-text-body_small">
+                            ALL = every Dealer Account. FAMILY = dealers already
+                            selling this package's plan group.
+                        </p>
+                    </lightning-layout-item>
+                </lightning-layout>
+
+                <div class="slds-p-around_small">
+                    <lightning-button
+                        variant="brand"
+                        label="Preview (dry run)"
+                        title="Preview (dry run)"
+                        onclick={handlePreview}
+                        disabled={running}></lightning-button>
+                    <lightning-button
+                        variant="success"
+                        label="Assign to all dealers"
+                        title="Assign to all dealers"
+                        onclick={handleAssign}
+                        disabled={running}></lightning-button>
+                    <lightning-button
+                        variant="neutral"
+                        label="Re-check"
+                        title="Re-check current assignment counts"
+                        onclick={handleCheck}
+                        disabled={running}></lightning-button>
+                </div>
+
+                <template if:true={resultMessage}>
+                    <lightning-alert
+                        variant={resultVariant}
+                        title={resultTitle}
+                        message={resultMessage}
+                        close-text="Dismiss">
+                    </lightning-alert>
+                </template>
+                <template if:true={hasResult}>
+                    <lightning-layout class="slds-p-around_medium" multiple-rows="true">
+                        <lightning-layout-item size="3">
+                            <div class="slds-text-body_small slds-text-color_weak">Dealers considered</div>
+                            <div class="slds-text-heading_medium">{totalDealers}</div>
+                        </lightning-layout-item>
+                        <lightning-layout-item size="3">
+                            <div class="slds-text-body_small slds-text-color_weak">Already assigned</div>
+                            <div class="slds-text-heading_medium">{alreadyAssigned}</div>
+                        </lightning-layout-item>
+                        <lightning-layout-item size="3">
+                            <div class="slds-text-body_small slds-text-color_weak">Will assign / assigned</div>
+                            <div class="slds-text-heading_medium">{toAssign}</div>
+                        </lightning-layout-item>
+                        <lightning-layout-item size="3">
+                            <div class="slds-text-body_small slds-text-color_weak">Batch job</div>
+                            <div class="slds-text-heading_medium">{batchJobIdText}</div>
+                        </lightning-layout-item>
+                    </lightning-layout>
+                </template>
+                <template if:true={running}>
+                    <lightning-spinner alternative-text="Working…" size="medium"></lightning-spinner>
+                </template>
+            </div>
+        </template>
+        <template if:false={isPackageRecord}>
+            <div class="slds-p-around_medium slds-text-color_weak">
+                Open this component on a Package (master catalogue plan) record.
+            </div>
+        </template>
+    </lightning-card>
+</template>

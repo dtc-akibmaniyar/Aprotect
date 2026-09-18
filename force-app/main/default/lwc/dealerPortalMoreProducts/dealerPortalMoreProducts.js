@@ -14,6 +14,9 @@ import convertApplicationToQuote from '@salesforce/apex/DealerPortalController.c
 import convertQuoteToApplication from '@salesforce/apex/DealerPortalController.convertQuoteToApplication';
 import tireImage from '@salesforce/resourceUrl/tireImage';
 import hasTireRimPackages from '@salesforce/apex/DealerPortalController.hasTireRimPackages';
+// P4 [L] T&R host viewer cutover: read the engine-snapshot gate through Apex
+// (Aprotect_Portal_Settings__c flags — never hardcoded client-side).
+import isTireRimEngineViewerActive from '@salesforce/apex/DealerPortalController.isTireRimEngineViewerActive';
 
 export default class DealerPortalMoreProducts extends NavigationMixin(LightningElement) {
     @track loading = false
@@ -46,6 +49,16 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
     @track isExistingApplication = false;
     @track hasTireRimPackage = false;
     @track hasWarrantyPackage = false;
+
+    // P4 [L] engine-snapshot viewer gate (read from Apex on every existing
+    // package load — isTireRimEngineViewerActive). False in the current org
+    // (zero Aprotect_Portal_Settings rows), so the legacy stored-field display
+    // path stays authoritative while every engine flag is off. When true AND
+    // the loaded package carries the server-attached engine line set
+    // (hasEngineLineItems), the tab renders the stored engine totals.
+    @track engineViewerActive = false;
+    @track hasEngineLineItems = false;
+    @track engineLineItems = [];
     @track hasDealerTireRimPackages = true; // default true until loaded
     @track showHelpModal = false;
     @track helpModalTitle = '';
@@ -157,6 +170,17 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
         // Show the custom pre-tax price the user entered (not tax-inclusive)
         if (this.isPriceOverridden && this._overridePreTaxPrice != null) {
             return '$' + Number(this._overridePreTaxPrice).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        // P4 [L] engine-snapshot render (T&R host viewer cutover): the summary
+        // card price re-stamps to the stored engine no-tax total when the Apex
+        // gate is ON and the payload carried the engine line set (pristine
+        // stored quote) — same retail-display semantics as the legacy branch
+        // below, fed from the persisted lines (stored = displayed, §07.3).
+        if (this.showStoredEngineLines && this.existingApplicationPackage) {
+            const storedNoTax = this.existingApplicationPackage.contractPremiumPriceWithoutTax;
+            if (storedNoTax != null && storedNoTax !== undefined) {
+                return '$' + Number(storedNoTax).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            }
         }
         if (this.selectedWarrantyTerm) {
             const price = this.selectedWarrantyTerm.totalPrice || this.selectedWarrantyTerm.netCost || 0;
@@ -413,11 +437,18 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             packageClassType: typeof packageClass
         });
         
-        if (!this.vehicleModelClass || !packageClass) {
-            console.log('❌ Missing data - vehicleModelClass:', this.vehicleModelClass, 'packageClass:', packageClass);
+        if (!this.vehicleModelClass) {
+            console.log('❌ Missing vehicle class');
             return false;
         }
-        
+
+        // C-7 (Rev 4): a blank package class means the package applies to ALL
+        // classes (class-agnostic) — render it selectable instead of disabled.
+        // When a class IS set, keep the exact (case-insensitive) match.
+        if (!packageClass) {
+            return true;
+        }
+
         // Normalize class names for comparison
         const vehicleClass = this.vehicleModelClass.trim();
         const pkgClass = packageClass.trim();
@@ -667,6 +698,20 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                 this.existingApplicationPackage = result.data;
                 this.isExistingApplication = true;
                 this.hasTireRimPackage = true;
+
+                // P4 [L] engine-snapshot viewer (T&R host cutover). The gate is
+                // read through Apex (Aprotect_Portal_Settings__c flags — never
+                // hardcoded client-side). When it is ON and the server attached
+                // the persisted engine line set to this package (hasEngineLineItems,
+                // money fields rebuilt from the stored lines), the tab renders the
+                // stored engine values; while the gate is OFF the payload carries
+                // no line set and this block is inert.
+                this.engineViewerActive = (await isTireRimEngineViewerActive()) === true;
+                this.hasEngineLineItems = this.engineViewerActive &&
+                    result.data.hasEngineLineItems === true;
+                this.engineLineItems = this.hasEngineLineItems && Array.isArray(result.data.lineItems)
+                    ? result.data.lineItems
+                    : [];
                 // Store the package ID for file uploads - ensure it's a string
                 if (result.data.Id) {
                     this.applicationPackageId = String(result.data.Id);
@@ -751,6 +796,10 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
                 this.existingApplicationPackage = null;
                 this.isExistingApplication = false;
                 this.hasTireRimPackage = false;
+                // P4 [L] engine-snapshot state: no package -> no line set.
+                this.engineViewerActive = false;
+                this.hasEngineLineItems = false;
+                this.engineLineItems = [];
                 // Clear sessionStorage to prevent stale data from causing auto-selection
                 sessionStorage.removeItem('moreProductsData');
                 // Force re-render to clear any visual highlighting from stale sessionStorage data
@@ -2332,9 +2381,69 @@ export default class DealerPortalMoreProducts extends NavigationMixin(LightningE
             this.price = 0.00;
             console.log('💰 No valid pricing data, setting price to 0');
         }
-        
+
+        // P4 [L] engine-snapshot render (T&R host viewer cutover). Every
+        // updatePrice path that lands back on the stored engine-priced term
+        // re-stamps the display from the stored engine totals the controller
+        // attached to the payload (money keys rebuilt from the persisted
+        // lines). Legacy math above runs first exactly as before and stays the
+        // sole path while the flags are off (engineViewerActive false — the
+        // payload also carries no line set then, so this is inert).
+        this._applyStoredEngineRender();
+
         console.log('💰 Final price:', this.price);
         console.log('💰 === UPDATE PRICE END ===');
+    }
+
+    /**
+     * P4 [L] engine-snapshot render (T&R host viewer cutover). Re-stamps the
+     * price display from the stored engine totals the controller attached to
+     * the active-package payload (money keys rebuilt from the persisted lines,
+     * hasEngineLineItems true) — stored = displayed, plan §07.3. Runs only
+     * when the Apex gate read (isTireRimEngineViewerActive) is ON, the payload
+     * carried the engine line set, and the view is the pristine stored quote
+     * (same package + term, no override, no pending edits). Any dealer edit
+     * (new term, custom price) falls back to the legacy display paths, which
+     * stay sole and byte-for-byte while the flags are off.
+     */
+    _applyStoredEngineRender() {
+        if (!this.engineViewerActive || !this.hasEngineLineItems) return;
+        if (!this.isExistingApplication || !this.existingApplicationPackage) return;
+        if (!this.selectedDealerPackage || !this.selectedWarrantyTerm) return;
+        // Only re-stamp when the selection IS the stored engine-priced quote:
+        // same dealer package + same term. A different/new selection has no
+        // persisted line set yet.
+        if (this.existingApplicationPackage.dealerPackageId !== this.selectedDealerPackage.Id) return;
+        if (this.existingApplicationPackage.selectedTermId !== this.selectedWarrantyTerm.Id) return;
+        // Pristine view only: a pending override is a live dealer edit the
+        // engine has not re-priced yet.
+        if (this.isPriceOverridden) return;
+        if (this._overridePreTaxPrice != null) return;
+        const stored = this.existingApplicationPackage;
+        // Same semantics as the legacy stored-price branch: price = stored
+        // with-tax total, retail display = stored no-tax total. Under the gate
+        // these payload keys are the engine line sums (contractPremiumPrice =
+        // all lines, contractPremiumPriceWithoutTax = non-Tax lines), so the
+        // price box shows exactly the persisted engine quote.
+        if (stored.contractPremiumPrice != null) {
+            this.price = stored.contractPremiumPrice;
+        }
+        if (stored.contractPremiumPriceWithoutTax != null) {
+            this._retailPriceDisplay = stored.contractPremiumPriceWithoutTax;
+        }
+    }
+
+    // P4 [L] engine-snapshot viewer (T&R host cutover): the engine line set is
+    // shown only when the Apex gate read is ON, the server attached the stored
+    // lines to the restored active package AND the currently selected term is
+    // that stored term (a different/new term has no persisted line set yet).
+    // False in the current org (gate off) — the block cannot render.
+    get showStoredEngineLines() {
+        if (!this.engineViewerActive || !this.hasEngineLineItems) return false;
+        if (!this.isExistingApplication || !this.existingApplicationPackage) return false;
+        if (!this.selectedWarrantyTerm) return false;
+        if (this.existingApplicationPackage.selectedTermId !== this.selectedWarrantyTerm.Id) return false;
+        return this.engineLineItems.length > 0;
     }
     
     // Price breakdown modal methods

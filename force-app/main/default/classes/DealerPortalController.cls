@@ -1076,6 +1076,7 @@ public without sharing class DealerPortalController {
             List<Application__c> applications = [
                 SELECT Id, Dealer_Name__c, Dealer_Name__r.Id, Dealer_Name__r.Name,
                         Dealer_Name__r.Charge_Premium_Vehicle_Fee__c,
+                        Vehicle__c,
                         Vehicle__r.Year__c, Vehicle__r.Odometer__c, Vehicle__r.Odometer_Unit__c,
                         Vehicle__r.Model_Lookup__c, Vehicle__r.Model_Lookup__r.Class__c,
                         Vehicle__r.Make_Lookup__c, Vehicle__r.Make_Lookup__r.Premium_Model_Fee__c,
@@ -1171,6 +1172,19 @@ public without sharing class DealerPortalController {
             
             Boolean isTireRimRequest = String.isNotBlank(recordType) && recordType.containsIgnoreCase('Tire_Rim');
 
+            // C-3 / D-15: for a Tire & Rim request resolve the vehicle's class
+            // schedule-authoritatively (native Model class as fallback). This
+            // value feeds ONLY the T&R term gate below — the warranty-tab
+            // package filter keeps using `vehicleClass` untouched.
+            String tireRimVehicleClass = vehicleClass;
+            if (isTireRimRequest && application.Vehicle__c != null) {
+                String resolvedTrClass =
+                    VehicleScheduleResolver.resolveTireRimClass(application.Vehicle__c, Date.today());
+                if (String.isNotBlank(resolvedTrClass)) {
+                    tireRimVehicleClass = resolvedTrClass;
+                }
+            }
+
             if (!isTireRimRequest) {
                 List<Dealer_Package__c> filteredPackages = new List<Dealer_Package__c>();
                 
@@ -1239,13 +1253,15 @@ public without sharing class DealerPortalController {
                 SELECT Id, Name, Package_Term__c,
                         Mileage_Restriction__c, Original_Package_Term_Cost__c,
                         Mileage__c, Mileage_Unit__c, Month__c, ByYear__c,
+                        Class__c,
                         Markup__c, Markup_Type__c,
                         Net_Cost__c, Retail_Price__c,
                         Included_Options_Price__c,
                         Additional_Options_Price__c, Discount_Type__c, Discount_Value__c,
-                        Expiry_Term__c, Odometer_KM__c,
+                        Expiry_Term__c, Odometer_KM__c, Restriction_Type__c,
                         Package_Term__r.Allow_Deferral__c,
                         Package_Term__r.Premium_Model_Fee__c,
+                        Package_Term__r.Class__c,
                         Package_Term__r.Vehicle_Sub_Type__c,
                         Package_Term__r.Per_Claim_Limit__c,
                         Dealer_Package_Tier__c, Dealer_Package__c,
@@ -1326,7 +1342,6 @@ public without sharing class DealerPortalController {
                     if (packageTerms != null && !packageTerms.isEmpty()) {
 
                         Integer totalTerms = packageTerms.size();
-                        Integer filteredByTier = 0;
                         Integer filteredByEligibility = 0;
                         Integer eligibleTerms = 0;
                         Integer debugCount = 0;
@@ -1348,17 +1363,20 @@ public without sharing class DealerPortalController {
                                 continue;
                             }
 
-                            if (!isTireRimRequest && term.Dealer_Package_Tier__c == null) {
-                                // Allow tier-less terms to proceed - they will be grouped under the package ID
-                                filteredByTier++;
-                            }
+                            // C3 (tier-opt-in): a tier-less WARRANTY term is a
+                            // standalone catalogue row. It is rendered on the flat
+                            // dto.terms list below (the LWC flat fallback), NOT
+                            // synthesised into a "Tier null" group. (The previous
+                            // comment here claimed such terms would be "grouped
+                            // under the package ID" — the code never did that for
+                            // warranty; it dropped them at the eligibility gate.)
 
                             Boolean isEligible = false;
 
                             if (isTireRimRequest) {
                                 String packageClass = dp.Class__c;
 
-                                isEligible = isTermEligibleForTireRim(term, vehicleYear, vehicleClass, packageClass);
+                                isEligible = isTermEligibleForTireRim(term, vehicleYear, tireRimVehicleClass, packageClass);
                                 if (!isEligible) {
                                     filteredByEligibility++;
                                     continue;
@@ -1386,7 +1404,19 @@ public without sharing class DealerPortalController {
                             if (tierId == null && isTireRimRequest) {
                                 tierId = dp.Id;
                             }
-                    
+
+                            // C3 (tier-opt-in): a tier-less WARRANTY term is a
+                            // standalone catalogue row. Render it on the flat
+                            // dto.terms list and move on — it must NOT enter
+                            // termsByTierId (an Apex Map rejects a null key), and a
+                            // synthetic "Tier null" group would suppress the LWC's
+                            // flat fallback. T&R tier-less terms are keyed by
+                            // dp.Id above, so this branch is warranty-only.
+                            if (tierId == null) {
+                                termList.add(buildDealerTermDto(term, dp, isPowersports, tierMultiplier));
+                                continue;
+                            }
+
                             if (!termsByTierId.containsKey(tierId)) {
                                 termsByTierId.put(tierId, new List<Dealer_Package_Term__c>());
                             }
@@ -1412,7 +1442,7 @@ public without sharing class DealerPortalController {
 
                             tierTerms.sort(new MileageComparator());
                             DealerPackageTierDTO tierDto = new DealerPackageTierDTO();
-                    
+
                             if (tierMap.containsKey(tierId)) {
                                 Dealer_Package_Tier__c tier = tierMap.get(tierId);
                                 tierDto.Id = tier.Id;
@@ -1432,74 +1462,11 @@ public without sharing class DealerPortalController {
                             List<DealerPackageTermDTO> tierTermList = new List<DealerPackageTermDTO>();
                             
                             for (Dealer_Package_Term__c term : tierTerms) {
-                                DealerPackageTermDTO termDto = new DealerPackageTermDTO();
-                                termDto.Id = term.Id;
-                                // For Powersports: use Package_Term__r.Per_Claim_Limit__c (per-term), 
-                                // else use Dealer_Package per-claim limit
-                                Decimal termPerClaimLimit = (isPowersports && term.Package_Term__r != null && term.Package_Term__r.Per_Claim_Limit__c != null)
-                                    ? term.Package_Term__r.Per_Claim_Limit__c
-                                    : dp.Per_Claim_Limit__c;
-                                termDto.perClaimLimit = termPerClaimLimit;
-                                
-                                termDto.originalPackageTermCost = term.Original_Package_Term_Cost__c != null ? term.Original_Package_Term_Cost__c : 0;
-                                termDto.includedOptionsPrice = term.Included_Options_Price__c != null ? term.Included_Options_Price__c : 0;
-                                termDto.additionalOptionsPrice = term.Additional_Options_Price__c != null ? term.Additional_Options_Price__c : 0;
-                                termDto.discountType = term.Discount_Type__c;
-                                termDto.discountValue = term.Discount_Value__c != null ? term.Discount_Value__c : 0;
-                                termDto.markup = term.Markup__c != null ? term.Markup__c : 0;
-                                termDto.markupType = term.Markup_Type__c != null ? term.Markup_Type__c : '';
-                                termDto.deductible = dp.Deductable__c;
-                        
-                                Decimal basePrice = termDto.originalPackageTermCost + termDto.includedOptionsPrice + termDto.additionalOptionsPrice;
-                                Decimal discountAmount = 0;
-
-                                if (termDto.discountType == '$' && termDto.discountValue > 0) {
-                                    discountAmount = termDto.discountValue;
-                                } else if (termDto.discountType == '%' && termDto.discountValue > 0) {
-                                    discountAmount = (basePrice * termDto.discountValue) / 100;
-                                }
-                        
-                                termDto.netCost = term.Net_Cost__c != null ? term.Net_Cost__c : (basePrice - discountAmount);
-                        
-                                Decimal priceWithMarkup = termDto.netCost;
-
-                                if (termDto.markupType == '%' && termDto.markup > 0) {
-                                    priceWithMarkup = termDto.netCost + (termDto.netCost * termDto.markup / 100);
-                                } else if (termDto.markupType == '$' && termDto.markup > 0) {
-                                    priceWithMarkup = termDto.netCost + termDto.markup;
-                                }
-                    
-                                Decimal totalTaxableAmount = priceWithMarkup + termDto.additionalOptionsPrice;
-                                Decimal taxRate = dp.Dealer__r != null && dp.Dealer__r.Tax_Region__r != null ? dp.Dealer__r.Tax_Region__r.Total_Tax_Rate__c : null;
-                                Decimal taxAmount = 0;
-
-                                if (taxRate != null && taxRate > 0) {
-                                    taxAmount = totalTaxableAmount * (taxRate / 100);
-                                }
-                        
-                                termDto.taxRate = taxRate != null ? taxRate : 0;
-                                termDto.taxAmount = taxAmount;
-                                termDto.totalPrice = priceWithMarkup;
-                                termDto.durationRestrictionInMonths = null;
-                                termDto.mileageRestriction = term.Mileage_Restriction__c;
-                                termDto.mileageUnit = term.Mileage_Unit__c;
-                                termDto.packageTermName = term.Name;
-                                termDto.expiryTerm = term.Expiry_Term__c;
-                                termDto.odometerKM = term.Odometer_KM__c;
-                                termDto.allowDeferral = term.Package_Term__r != null && term.Package_Term__r.Allow_Deferral__c == true;
-                                
-                                // Powersports brand-tier surcharge: override Premium_Model_Fee__c
-                                if (isPowersports && tierMultiplier != 1.0) {
-                                    Decimal baseForSurcharge = termDto.totalPrice != null ? termDto.totalPrice : 0;
-                                    termDto.premiumModelFee = (baseForSurcharge * (tierMultiplier - 1.0)).setScale(2);
-                                } else {
-                                    termDto.premiumModelFee = term.Package_Term__r != null && term.Package_Term__r.Premium_Model_Fee__c != null ? term.Package_Term__r.Premium_Model_Fee__c : 0;
-                                }
-
+                                DealerPackageTermDTO termDto = buildDealerTermDto(term, dp, isPowersports, tierMultiplier);
                                 tierTermList.add(termDto);
                                 termList.add(termDto); // Also add to flat list for backward compatibility
                             }
-                    
+
                             tierDto.terms = tierTermList;
                             tierList.add(tierDto);
                         }
@@ -1649,6 +1616,368 @@ public without sharing class DealerPortalController {
             response.data = null;
             logMethodExit(methodName, false, null);
             return response;
+        }
+    }
+
+    /**
+     * FEATURE A — live premium indication (read-only preview, pre-save).
+     *
+     * Returns ONLY { isPremiumVehicle, premiumFee, waived, overrideApplied }
+     * for the current selection: DML-free, cacheable, and deliberately free of
+     * schedule/member ids and wholesale cost (dealer-portal security posture —
+     * the portal profile carries no FLS on the pricing/schedule objects; this
+     * class is `without sharing` and reads them server-side exactly like the
+     * existing getDealerPackages path).
+     *
+     * ELIGIBILITY (user decision #1 — COMBINED rule): premium applies only when
+     * BOTH hold —
+     *   (a) the dealer's Account.Charge_Premium_Vehicle_Fee__c = true, AND
+     *   (b) the vehicle matches the active Premium_Tier schedule, resolved
+     *       through VehicleScheduleResolver / VehicleScheduleSelector (the same
+     *       path the engine save uses).
+     * Neither condition alone is sufficient. While the vehicle is still a raw
+     * entry (no draft Vehicle row / no Make/Model lookups) the schedule cannot
+     * be evaluated, so the make is matched against the Premium_Vehicle_Make__mdt
+     * metadata by name — the same source saveVehicleData uses to flag a make
+     * premium. Once the schedule IS evaluable it is authoritative.
+     *
+     * FEE (engine term-anchored rule): master term Package_Term__r.Premium_Model_Fee__c
+     * when > 0, else the matched schedule member-row amount. Then the dealer
+     * override (Account.Premium_Fee_Override_Amount__c) replaces the amount
+     * (user decision #2). A pre-tax Dealer_Price_Override__c suppresses premium
+     * entirely (user decision #3); the Powersports brand-tier surcharge is NOT
+     * surfaced here — it is a different charge (user decision #3).
+     *
+     * @param dealerTermId          selected Dealer_Package_Term__c id (nullable
+     *                              before a term is picked — badge only)
+     * @param vehicleId             draft Vehicle__c id when one exists
+     * @param vehicleMake           raw make (vehicle step, pre-lookup)
+     * @param vehicleModel          raw model (reserved: Premium_Vehicle_Make__mdt
+     *                              is make-level, so the model only matters once
+     *                              the schedule can be evaluated via vehicleId)
+     * @param applicationPackageId  active Application_Package__c id (waiver read)
+     * @param priceOverrideActive   true when a pre-tax Dealer_Price_Override__c
+     *                              is in force on the client (suppresses premium)
+     */
+    @AuraEnabled(cacheable=true)
+    public static PremiumPreviewDTO getPremiumPreview(
+            String dealerTermId,
+            Id vehicleId,
+            String vehicleMake,
+            String vehicleModel,
+            Id applicationPackageId,
+            Boolean priceOverrideActive) {
+        return resolvePremium(dealerTermId, vehicleId, vehicleMake, applicationPackageId, priceOverrideActive);
+    }
+
+    /**
+     * Shared premium resolution — the SINGLE implementation of the combined
+     * eligibility rule (dealer flag AND schedule/entry-time match) plus the
+     * term-anchored fee, the dealer override and the admin waiver used by BOTH
+     * the read-only preview (getPremiumPreview) and the vehicle-change re-price
+     * (repricePremiumAfterVehicleChange). One rule, so the live badge/fee and
+     * the stored Premium_Model_Fee__c can never diverge.
+     */
+    private static PremiumPreviewDTO resolvePremium(
+            String dealerTermId,
+            Id vehicleId,
+            String vehicleMake,
+            Id applicationPackageId,
+            Boolean priceOverrideActive) {
+
+        PremiumPreviewDTO dto = new PremiumPreviewDTO();
+
+        // (0) Pre-tax price override suppresses the premium entirely — identical
+        //     to the save path, which resolves NO fee lines under an override.
+        if (priceOverrideActive == true) {
+            return dto;
+        }
+
+        // (1) Selection context from the dealer term. Plain SOQL here runs in
+        //     system mode (this class is API v64 + `without sharing`), the same
+        //     mode every existing pricing read in this class relies on.
+        Dealer_Package_Term__c term = selectDealerTermForPremium(dealerTermId);
+        Id dealerId = (term != null && term.Dealer_Package__r != null)
+            ? term.Dealer_Package__r.Dealer__c : null;
+        Id masterPackageId = (term != null && term.Dealer_Package__r != null)
+            ? term.Dealer_Package__r.Package__c : null;
+
+        Account dealer = dealerId != null
+            ? VehicleScheduleSelector.selectDealerAccount(dealerId) : null;
+
+        // (2) COMBINED eligibility — dealer flag AND a schedule match. Dealer
+        //     flag alone is not sufficient.
+        if (dealer == null || dealer.Charge_Premium_Vehicle_Fee__c != true) {
+            return dto;
+        }
+
+        Vehicle__c vehicle = vehicleId != null ? selectVehicleForPremium(vehicleId) : null;
+        Boolean scheduleEvaluable = (vehicle != null
+            && (vehicle.Make_Lookup__c != null || vehicle.Model_Lookup__c != null));
+
+        Decimal scheduleRowAmount = null;
+        Boolean scheduleMatch = false;
+        if (scheduleEvaluable) {
+            // Schedule-authoritative match through the SAME resolver the engine
+            // save uses (R1-R6), keyed on the selected term's master package.
+            VehicleScheduleResolver.ResolverResult resolved = VehicleScheduleResolver.resolve(
+                new VehicleScheduleResolver.ResolveRequest(
+                    dealerId, vehicleId, masterPackageId, Date.today()));
+            if (resolved != null && resolved.lines != null) {
+                for (VehicleScheduleResolver.ResolvedFeeLine line : resolved.lines) {
+                    if (VehicleScheduleResolver.TYPE_PREMIUM_TIER.equals(line.scheduleType)) {
+                        scheduleMatch = true;
+                        scheduleRowAmount = line.amount;
+                        break;
+                    }
+                }
+            }
+        }
+        // Entry-time fallback: the schedule cannot be evaluated yet, so match
+        // the make against the Premium_Vehicle_Make__mdt metadata by name.
+        if (!scheduleMatch && !scheduleEvaluable) {
+            String makeName = vehicleMake;
+            if (vehicle != null) {
+                if (String.isNotBlank(vehicle.Make__c)) {
+                    makeName = vehicle.Make__c;
+                } else if (vehicle.Make_Lookup__r != null && String.isNotBlank(vehicle.Make_Lookup__r.Name)) {
+                    makeName = vehicle.Make_Lookup__r.Name;
+                }
+            }
+            scheduleMatch = isPremiumMakeMetadataMatch(makeName);
+        }
+        if (!scheduleMatch) {
+            return dto; // schedule match alone is not sufficient either
+        }
+
+        dto.isPremiumVehicle = true;
+
+        // (3) Term-anchored fee: master term Premium_Model_Fee__c when > 0, else
+        //     the matched schedule member-row amount.
+        Decimal fee = 0;
+        Decimal termPremium = (term != null && term.Package_Term__r != null)
+            ? term.Package_Term__r.Premium_Model_Fee__c : null;
+        if (termPremium != null && termPremium > 0) {
+            fee = termPremium;
+        } else if (scheduleRowAmount != null) {
+            fee = scheduleRowAmount;
+        }
+
+        // (4) R5 dealer override replaces the resolved premium amount.
+        if (dealer.Premium_Fee_Override_Amount__c != null) {
+            fee = dealer.Premium_Fee_Override_Amount__c;
+            dto.overrideApplied = true;
+        }
+
+        // (5) Admin waiver suppresses the premium (badge + fee), mirroring the
+        //     getDealerPackages waiver handling.
+        if (isPremiumFeeWaived(applicationPackageId)) {
+            dto.isPremiumVehicle = false;
+            dto.premiumFee = 0;
+            dto.waived = true;
+            return dto;
+        }
+
+        // (6) A resolved fee <= 0 means no premium CHARGE — the badge stays
+        //     (eligibility is independent of the amount), the fee line is zero.
+        dto.premiumFee = (fee != null && fee > 0) ? fee : 0;
+        return dto;
+    }
+
+    /** Dealer term context for the premium preview (id-safe, no DML). */
+    private static Dealer_Package_Term__c selectDealerTermForPremium(String dealerTermId) {
+        if (String.isBlank(dealerTermId)) {
+            return null;
+        }
+        List<Dealer_Package_Term__c> rows = [
+            SELECT Id, Dealer_Package__c, Package_Term__c,
+                   Dealer_Package__r.Dealer__c, Dealer_Package__r.Package__c,
+                   Package_Term__r.Premium_Model_Fee__c
+            FROM Dealer_Package_Term__c
+            WHERE Id = :dealerTermId
+            LIMIT 1
+        ];
+        return rows.isEmpty() ? null : rows[0];
+    }
+
+    /** Vehicle context for the premium preview (make/model lookups gate the schedule path). */
+    private static Vehicle__c selectVehicleForPremium(Id vehicleId) {
+        List<Vehicle__c> rows = [
+            SELECT Id, Name, Make__c, Model__c,
+                   Make_Lookup__c, Make_Lookup__r.Name,
+                   Model_Lookup__c, Model_Lookup__r.Name
+            FROM Vehicle__c
+            WHERE Id = :vehicleId
+            LIMIT 1
+        ];
+        return rows.isEmpty() ? null : rows[0];
+    }
+
+    /** Premium-make metadata match by name — the source saveVehicleData uses. */
+    private static Boolean isPremiumMakeMetadataMatch(String makeName) {
+        if (String.isBlank(makeName)) {
+            return false;
+        }
+        List<Premium_Vehicle_Make__mdt> rows = [
+            SELECT DeveloperName FROM Premium_Vehicle_Make__mdt
+            WHERE Make_Name__c = :makeName.trim() LIMIT 1
+        ];
+        return !rows.isEmpty();
+    }
+
+    /** Admin premium-fee waiver on the active application package, if any. */
+    private static Boolean isPremiumFeeWaived(Id applicationPackageId) {
+        if (applicationPackageId == null) {
+            return false;
+        }
+        List<Application_Package__c> rows = [
+            SELECT Id FROM Application_Package__c
+            WHERE Id = :applicationPackageId AND Waive_Premium_Fee__c = true
+            LIMIT 1
+        ];
+        return !rows.isEmpty();
+    }
+
+    /**
+     * LAYER 3 (durable) — re-price the stored premium after a vehicle change.
+     *
+     * The warranty tab keeps a term when the vehicle changes if the term is
+     * still offered; the stored Application_Package__c, however, still carries
+     * the Premium_Model_Fee__c booked when the vehicle WAS premium
+     * (Contract_Premium_Price__c / _Without_Tax__c fold it in). This method
+     * clears/re-prices that stored premium for the ONE active warranty package
+     * of the application in the dealer's flow when — and only when — the current
+     * vehicle is no longer premium/chargeable for that package's term.
+     *
+     * Scope / safety:
+     *  - only the active Extended_Limited_Warranty package of `applicationId`;
+     *  - only when a premium IS currently stored (Premium_Model_Fee__c > 0);
+     *  - only when the SHARED resolvePremium rule now yields no premium charge;
+     *  - a still-premium vehicle (valid retained term) is left untouched.
+     * Re-pricing goes through the existing engine save path when it is active
+     * (stamp + persisted line snapshot, so the stored total and the line set
+     * both drop the premium); otherwise it is a scoped field clear that the
+     * Application_Package__c formula totals follow automatically. Never throws —
+     * the vehicle save must not fail because of the premium re-price.
+     */
+    private static void repricePremiumAfterVehicleChange(String applicationId) {
+        if (String.isBlank(applicationId)) {
+            return;
+        }
+        try {
+            List<Application_Package__c> activeForType = [
+                SELECT Id, Premium_Model_Fee__c, Dealer__c, Dealer_Package__c,
+                       Dealer_Package__r.Dealer__c, Dealer_Package__r.Package__c,
+                       Dealer_Package_Term__c, Dealer_Price_Override__c, Waive_Premium_Fee__c
+                FROM Application_Package__c
+                WHERE Application__c = :applicationId
+                    AND RecordType.DeveloperName = 'Extended_Limited_Warranty'
+                    AND Active__c = true
+                LIMIT 1
+            ];
+            if (activeForType.isEmpty()) {
+                return;
+            }
+            Application_Package__c pkg = activeForType[0];
+
+            Decimal storedPremium = pkg.Premium_Model_Fee__c == null ? 0 : pkg.Premium_Model_Fee__c;
+            if (storedPremium <= 0) {
+                return; // nothing stale to clear
+            }
+
+            Id vehicleId = null;
+            for (Application__c app : [
+                SELECT Vehicle__c FROM Application__c WHERE Id = :applicationId LIMIT 1
+            ]) {
+                vehicleId = app.Vehicle__c;
+            }
+
+            // Same combined eligibility + term-anchored fee rule the tab shows.
+            PremiumPreviewDTO live = resolvePremium(
+                pkg.Dealer_Package_Term__c, vehicleId, null, pkg.Id,
+                pkg.Dealer_Price_Override__c != null);
+            Decimal liveFee = (live != null && live.isPremiumVehicle == true && live.premiumFee != null)
+                ? live.premiumFee : 0;
+            if (liveFee > 0) {
+                return; // vehicle is STILL premium for this package/term — keep it
+            }
+
+            // (4) Persist the cleared premium. Minimal blast radius: ONLY
+            //     Premium_Model_Fee__c is written; the Application_Package__c
+            //     formula totals (Contract_Premium_Price__c / _Without_Tax__c /
+            //     Tax_Amount__c) follow it automatically, so the stored total no
+            //     longer reflects the old premium.
+            pkg.Premium_Model_Fee__c = 0;
+            update pkg;
+
+            // (5) When this record is engine-priced, re-price through the existing
+            //     engine path and refresh the persisted line set so it too drops
+            //     the stale Premium_Fee line (the engine's own snapshot writer).
+            //     Inert when the engine is off or the record was not engine-priced.
+            try {
+                Map<String, Object> payload = new Map<String, Object>();
+                if (pkg.Dealer_Price_Override__c != null) {
+                    payload.put('dealerPriceOverride', pkg.Dealer_Price_Override__c);
+                }
+                if (pkg.Waive_Premium_Fee__c == true) {
+                    payload.put('waivedPremiumFee', true);
+                }
+                PricingEngineService.QuoteResult engineResult = applyEnginePricingIfEnabled(
+                    pkg, applicationId, pkg.Dealer_Package_Term__c, payload);
+                if (engineResult != null && engineResult.success == true
+                        && engineResult.lines != null && isEnginePriced(pkg.Id)) {
+                    ApplicationSnapshotService.writeSnapshot(pkg.Id, engineResult);
+                }
+            } catch (Exception engineEx) {
+                System.debug('Premium line refresh on vehicle change skipped for '
+                    + applicationId + ': ' + engineEx.getMessage());
+            }
+        } catch (Exception e) {
+            System.debug('Premium re-price on vehicle change skipped for '
+                + applicationId + ': ' + e.getMessage());
+        }
+    }
+
+    /**
+     * Priced_By_Engine__c is not statically visible at this class's API version
+     * (the engine fields were added in a later release) — read it with dynamic
+     * SOQL in SYSTEM_MODE, exactly like attachWarrantyEngineSnapshotIfActive.
+     */
+    private static Boolean isEnginePriced(Id applicationPackageId) {
+        if (applicationPackageId == null) {
+            return false;
+        }
+        try {
+            String idLiteral = '\'' + String.valueOf(applicationPackageId) + '\'';
+            for (SObject row : Database.query(
+                    'SELECT Id, Priced_By_Engine__c FROM Application_Package__c' +
+                    ' WHERE Id = ' + idLiteral + ' LIMIT 1',
+                    System.AccessLevel.SYSTEM_MODE)) {
+                if (row.get('Priced_By_Engine__c') == true) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            System.debug('isEnginePriced read skipped for ' + applicationPackageId + ': ' + e.getMessage());
+        }
+        return false;
+    }
+
+    /**
+     * FEATURE A — live premium preview payload. Return-only DTO: exactly the
+     * four keys the LWC needs — never schedule/member ids or wholesale cost.
+     */
+    public class PremiumPreviewDTO {
+        @AuraEnabled public Boolean isPremiumVehicle { get; set; }
+        @AuraEnabled public Decimal premiumFee { get; set; }
+        @AuraEnabled public Boolean waived { get; set; }
+        @AuraEnabled public Boolean overrideApplied { get; set; }
+
+        public PremiumPreviewDTO() {
+            this.isPremiumVehicle = false;
+            this.premiumFee = 0;
+            this.waived = false;
+            this.overrideApplied = false;
         }
     }
 
@@ -1858,6 +2187,57 @@ public without sharing class DealerPortalController {
     }
 
     /**
+     * P4 [L] warranty-tab viewer gate (change-implementation plan §11 P4 [L],
+     * §10.2 T5). The warranty LWC reads the engine state through Apex — never
+     * hardcoded client-side. Returns true only when the
+     * Line_Item_Snapshot_Enabled__c flag is on, i.e. the state in which an
+     * engine-priced Application_Package carries its persisted line-item
+     * snapshot and the warranty tab can render stored engine values. Org
+     * default (no setting rows) is false, so the legacy display path stays
+     * authoritative.
+     */
+    @AuraEnabled
+    public static Boolean isWarrantyEngineViewerActive() {
+        return PortalFeatureFlagService.isLineItemSnapshotEnabled();
+    }
+
+    /**
+     * P4 [L] T&R host-tab viewer gate (change-implementation plan §11 P4 [L],
+     * §10.2 T5) — the Tire & Rim host tab (the portal's moreProducts tab,
+     * lwc/dealerPortalMoreProducts) reads the engine state through Apex, never
+     * hardcoded client-side. Returns true only when the
+     * Line_Item_Snapshot_Enabled__c flag is on, i.e. the state in which an
+     * engine-priced Tire_Rim_Protection_Plan Application_Package carries its
+     * persisted line-item snapshot and the tab can render stored engine
+     * values. Org default (no setting rows) is false, so the legacy display
+     * path stays authoritative.
+     */
+    @AuraEnabled
+    public static Boolean isTireRimEngineViewerActive() {
+        return PortalFeatureFlagService.isLineItemSnapshotEnabled();
+    }
+
+    /**
+     * P4 [L] warranty-tab viewer cutover — one stored engine line item
+     * (Application_Package_Line_Item__c) attached to the active-package
+     * payload when the T5 gate is on and the package is engine-priced with a
+     * persisted line set. Plain values only; rows arrive in stored Sort_Order
+     * (tax line last). Flag-off payloads never carry lineItems /
+     * hasEngineLineItems — the legacy map shape is byte-identical.
+     */
+    public class WarrantyLineItemDTO {
+        @AuraEnabled public String lineType { get; set; }
+        @AuraEnabled public String description { get; set; }
+        @AuraEnabled public Decimal amount { get; set; }
+        @AuraEnabled public String formattedAmount { get; set; }
+        @AuraEnabled public Boolean taxable { get; set; }
+        @AuraEnabled public Decimal taxAmount { get; set; }
+        @AuraEnabled public Decimal quantity { get; set; }
+        @AuraEnabled public Integer sortOrder { get; set; }
+        @AuraEnabled public String key { get; set; } // stable LWC for:each key
+    }
+
+    /**
     * Get ACTIVE application package by record type (with Active__c = true filter)
     * This is a NEW method that doesn't replace getExistingApplicationPackageByRecordType
     * @param applicationId The Application record ID
@@ -1881,7 +2261,7 @@ public without sharing class DealerPortalController {
                         Dealer_Package_Retail_Price__c, Add_Ons_Price__c, Add_Ons_Markup__c,
                         Add_Ons_Retail_Price__c, Contract_Premium_Price_Without_Tax__c,
                         Tax_Percentage__c, Tax_Amount__c, Contract_Premium_Price__c,
-                        Dealer_Price_Override__c,
+                        Dealer_Price_Override__c, Premium_Model_Fee__c,
                         Lender_Lienholder__c, Month__c, Loan_Amount__c, Interest_Rate__c, Payment_Frequency__c,
                         Active__c, CreatedDate, LastModifiedDate, RecordType.DeveloperName
                 FROM Application_Package__c 
@@ -1944,6 +2324,26 @@ public without sharing class DealerPortalController {
             packageData.put('taxAmount', activePackage.Tax_Amount__c);
             packageData.put('contractPremiumPrice', activePackage.Contract_Premium_Price__c);
             packageData.put('dealerPriceOverride', activePackage.Dealer_Price_Override__c);
+            // Stored premium booked on this package (currency, read-only scalar —
+            // no schedule ids / wholesale cost). The warranty tab uses it to tell
+            // whether the STORED total already encodes a premium, so it can avoid
+            // re-stamping a stale, premium-inclusive total once the vehicle's live
+            // premium state has changed.
+            packageData.put('premiumModelFee', activePackage.Premium_Model_Fee__c);
+
+            // P4 [L] warranty-tab viewer cutover (engine snapshot). When the T5
+            // gate (Line_Item_Snapshot_Enabled__c) is on and this active
+            // package is engine-priced (Priced_By_Engine__c) with a persisted
+            // line set, the customer-facing money keys the warranty tab renders
+            // are rebuilt from the stored lines (stored = displayed, §07.3):
+            // contractPremiumPriceWithoutTax = sum(non-Tax lines),
+            // taxAmount = sum(Tax lines), contractPremiumPrice = sum(all). The
+            // P4 fields (Priced_By_Engine__c, Application_Package_Line_Item__c)
+            // carry no portal FLS yet, so they are read in SYSTEM_MODE — the
+            // same mode the engine writes use. Gate off / not engine-priced /
+            // no lines => the legacy stored-field build above is returned
+            // unchanged (payload byte-identical to the pre-cutover shape).
+            attachWarrantyEngineSnapshotIfActive(packageData, activePackage.Id);
 
             ApplicationPackageResponse response = new ApplicationPackageResponse();
             response.success = true;
@@ -2227,11 +2627,18 @@ public without sharing class DealerPortalController {
                 System.debug('Warning: Could not set Premium_Model_Fee__c: ' + premiumEx.getMessage());
             }
             
+            PricingEngineService.QuoteResult engineResult =
+                applyEnginePricingIfEnabled(packageToSave, applicationId, selectedTermId, packageDataMap);
+
             if (isNewPackage) {
                 insert packageToSave;
             } else {
                 update packageToSave;
             }
+
+            // P4 commit snapshot: persist the engine-resolved line set
+            // (idempotent, flag-gated, never throws).
+            ApplicationSnapshotService.snapshotEnginePriced(packageToSave, engineResult);
 
             // When the package or term changed, re-link any existing Invoice Line Items
             // from the old package to the new one so invoices reflect updated details.
@@ -2635,6 +3042,9 @@ public without sharing class DealerPortalController {
                 }
             }
             
+            PricingEngineService.QuoteResult engineResult =
+                applyEnginePricingIfEnabled(appPackage, applicationId, selectedTermId, packageDataMap);
+
             String recordId = null;
             try {
                 insert appPackage;
@@ -2650,6 +3060,12 @@ public without sharing class DealerPortalController {
                 } catch (Exception helperException) {
                     throw new CalloutException('Failed to create application package: ' + helperException.getMessage());
                 }
+            }
+
+            // P4 commit snapshot (only when the engine-priced primary insert
+            // succeeded; the fallback path is the legacy helper).
+            if (engineResult != null && recordId == appPackage.Id) {
+                ApplicationSnapshotService.snapshotEnginePriced(appPackage, engineResult);
             }
 
             ApplicationPackageResponse response = new ApplicationPackageResponse();
@@ -2761,8 +3177,14 @@ public without sharing class DealerPortalController {
             appPackage.Deductible__c = deductible;
             appPackage.Per_Claim_Limit__c = perClaimLimit;
             appPackage.RecordTypeId = Schema.SObjectType.Application_Package__c.getRecordTypeInfosByDeveloperName().get(recordType).getRecordTypeId();
+
+            PricingEngineService.QuoteResult engineResult =
+                applyEnginePricingIfEnabled(appPackage, applicationId, selectedTermId, null);
             
             insert appPackage;
+
+            // P4 commit snapshot: persist the engine-resolved line set.
+            ApplicationSnapshotService.snapshotEnginePriced(appPackage, engineResult);
 
             ApplicationPackageResponse response = new ApplicationPackageResponse();
             response.success = true;
@@ -2881,7 +3303,8 @@ public without sharing class DealerPortalController {
             
             List<Application_Package__c> existingPackages = [
                 SELECT Id, Application__c, Dealer__c, Dealer_Package__c, Dealer_Package_Term__c,
-                        Dealer_Package_Price__c, /* Dealer_Markup__c, */ Deductible__c
+                        Dealer_Package_Price__c, /* Dealer_Markup__c, */ Deductible__c,
+                        Waive_Premium_Fee__c
                 FROM Application_Package__c 
                 WHERE Id = :packageId 
                 LIMIT 1
@@ -2934,6 +3357,9 @@ public without sharing class DealerPortalController {
                 return response;
             }
 
+            PricingEngineService.QuoteResult engineResult =
+                applyEnginePricingIfEnabled(appPackage, appPackage.Application__c, selectedTermId, packageDataMap);
+
             String recordId = null;
             try {
                 update appPackage;
@@ -2950,6 +3376,12 @@ public without sharing class DealerPortalController {
                 } catch (Exception helperException) {
                     throw new CalloutException('Failed to update application package: ' + helperException.getMessage());
                 }
+            }
+
+            // P4 commit snapshot (only when the engine-priced primary update
+            // succeeded; the fallback path is the legacy helper).
+            if (engineResult != null && recordId == appPackage.Id) {
+                ApplicationSnapshotService.snapshotEnginePriced(appPackage, engineResult);
             }
             
             ApplicationPackageResponse response = new ApplicationPackageResponse();
@@ -3275,6 +3707,12 @@ throw new CalloutException('Failed to create Application: ' + e.getMessage());
             }
         }
 
+        // LAYER 3 (durable): the vehicle just changed. If the active warranty
+        // package still carries a premium booked for the OLD (premium) vehicle
+        // and the new vehicle is no longer premium for that package's term,
+        // clear/re-price that stored premium (scoped to this application only).
+        repricePremiumAfterVehicleChange(applicationId);
+
         result.put('success', true);
         result.put('recordId', vehicle.Id);
         result.put('applicationId', applicationId);
@@ -3354,6 +3792,63 @@ public static String updateSpecificOptionMarkups(Decimal defaultMarkup, String d
     return DealerPortalMarkupController.updateSpecificOptionMarkups(defaultMarkup, defaultMarkupType, optionIds);
 }
 
+    // -----------------------------------------------------------------
+    // P4 [S] option state selectors (Application_Package_Line_Item__c)
+    // -----------------------------------------------------------------
+
+    /** The package's priced Option line items (SYSTEM_MODE — the P4 line-item
+     *  fields carry no portal FLS yet; the same mode the engine writes use). */
+    private static List<Application_Package_Line_Item__c> selectOptionLines(Id applicationPackageId) {
+        List<Application_Package_Line_Item__c> lines = new List<Application_Package_Line_Item__c>();
+        if (applicationPackageId == null) {
+            return lines;
+        }
+        String idLit = '\'' + String.valueOf(applicationPackageId) + '\'';
+        for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.query(
+                'SELECT Id, Description__c, Amount__c, Package_Option__c' +
+                ' FROM Application_Package_Line_Item__c' +
+                ' WHERE Application_Package__c = ' + idLit +
+                ' AND Line_Type__c = \'Option\'' +
+                ' AND Package_Option__c != null' +
+                ' ORDER BY Sort_Order__c, Id',
+                System.AccessLevel.SYSTEM_MODE)) {
+            lines.add(line);
+        }
+        return lines;
+    }
+
+    /** The dealer-option mirrors (Dealer_Package_Option__c) of the masters for
+     *  the QUOTE's dealer package — the source the option flows copy from and
+     *  the id the removal contract resolves (empty map when none exist). */
+    private static Map<Id, Dealer_Package_Option__c> selectOptionMirrors(Id applicationPackageId, Set<Id> masterIds) {
+        Map<Id, Dealer_Package_Option__c> byMaster = new Map<Id, Dealer_Package_Option__c>();
+        if (applicationPackageId == null || masterIds == null || masterIds.isEmpty()) {
+            return byMaster;
+        }
+        Id dealerPackageId = null;
+        for (Application_Package__c pkg : [
+            SELECT Dealer_Package__c FROM Application_Package__c WHERE Id = :applicationPackageId LIMIT 1
+        ]) {
+            dealerPackageId = pkg.Dealer_Package__c;
+        }
+        if (dealerPackageId == null) {
+            return byMaster;
+        }
+        for (Dealer_Package_Option__c dpo : [
+            SELECT Id, Package_Option__c, Inclusion__c, Exclusion__c, Discount_Type__c,
+                   Discount_Value__c, Original_Package_Option_Price__c,
+                   Dealer_Markup__c, Markup_Type__c, Net_Cost__c, Retail_Price__c, Category__c
+            FROM Dealer_Package_Option__c
+            WHERE Dealer_Package__c = :dealerPackageId
+              AND Package_Option__c IN :masterIds
+        ]) {
+            if (!byMaster.containsKey(dpo.Package_Option__c)) {
+                byMaster.put(dpo.Package_Option__c, dpo);
+            }
+        }
+        return byMaster;
+    }
+
     /**
     * Get existing additional options for an application package
     * @param applicationPackageId The ID of the application package
@@ -3367,71 +3862,79 @@ public static String updateSpecificOptionMarkups(Decimal defaultMarkup, String d
                 throw new CalloutException('Application Package ID is required');
             }
 
-            List<Application_Package_Option__c> existingOptions = [
-                SELECT Id, Name, Application__c, Application_Package__c, Package_Option__c,
-                        Inclusion__c, Exclusion__c, Discount_Type__c, Discount_Value__c,
-                        Original_Package_Option_Price__c, Dealer_Markup__c, Markup_Type__c,
-                        Selection_Type__c, Option__c, CreatedDate
-                FROM Application_Package_Option__c
-                WHERE Application_Package__c = :applicationPackageId
-                AND Selection_Type__c = 'Optional'
-                ORDER BY CreatedDate ASC
-            ];
+            // P4 [S]: the quote's priced option state is its Option LINE ITEMS
+            // (written by the option writers on add and by the engine snapshot
+            // on every save); Application_Package_Option__c is retired. Display
+            // text resolves through the master Package_Option catalogue and the
+            // dealer-option mirror (the same sources the option flows copy from);
+            // the PRICED retail is the line Amount (the state the quote charges).
+            List<Application_Package_Line_Item__c> existingLines = selectOptionLines(applicationPackageId);
+            if (existingLines.isEmpty()) {
+                AdditionalOptionsResponse empty = new AdditionalOptionsResponse();
+                empty.success = true;
+                empty.message = 'Existing additional options retrieved successfully';
+                empty.data = new List<AdditionalOptionDTO>();
+                return empty;
+            }
 
-            Set<String> packageOptionIds = new Set<String>();
-            for (Application_Package_Option__c option : existingOptions) {
-                if (option.Package_Option__c != null) {
-                    packageOptionIds.add(option.Package_Option__c);
+            Set<Id> packageOptionIds = new Set<Id>();
+            for (Application_Package_Line_Item__c line : existingLines) {
+                if (line.Package_Option__c != null) {
+                    packageOptionIds.add(line.Package_Option__c);
                 }
             }
-            
-            Map<String, String> packageOptionToDealerOptionMap = new Map<String, String>();
-            if (!packageOptionIds.isEmpty()) {
-                List<Dealer_Package_Option__c> dealerOptions = [
-                    SELECT Id, Package_Option__c
+            Map<Id, Package_Option__c> mastersByName = new Map<Id, Package_Option__c>();
+            for (Package_Option__c master : [
+                SELECT Id, Option__r.Name FROM Package_Option__c WHERE Id IN :packageOptionIds
+            ]) {
+                mastersByName.put(master.Id, master);
+            }
+            Map<Id, Dealer_Package_Option__c> dealerMirrorById =
+                selectOptionMirrors(applicationPackageId, packageOptionIds);
+            Map<Id, Dealer_Package_Option__c> anyMirrorById = new Map<Id, Dealer_Package_Option__c>();
+            if (dealerMirrorById.isEmpty()) {
+                for (Dealer_Package_Option__c dpo : [
+                    SELECT Id, Package_Option__c, Inclusion__c, Exclusion__c, Discount_Type__c,
+                           Discount_Value__c, Original_Package_Option_Price__c,
+                           Dealer_Markup__c, Markup_Type__c
                     FROM Dealer_Package_Option__c
                     WHERE Package_Option__c IN :packageOptionIds
-                ];
-                
-                for (Dealer_Package_Option__c dealerOpt : dealerOptions) {
-                    packageOptionToDealerOptionMap.put(dealerOpt.Package_Option__c, dealerOpt.Id);
+                ]) {
+                    if (!anyMirrorById.containsKey(dpo.Package_Option__c)) {
+                        anyMirrorById.put(dpo.Package_Option__c, dpo);
+                    }
                 }
             }
 
             List<AdditionalOptionDTO> optionList = new List<AdditionalOptionDTO>();
-            for (Application_Package_Option__c option : existingOptions) {
+            for (Application_Package_Line_Item__c line : existingLines) {
                 AdditionalOptionDTO dto = new AdditionalOptionDTO();
+                Dealer_Package_Option__c mirror = dealerMirrorById.containsKey(line.Package_Option__c)
+                    ? dealerMirrorById.get(line.Package_Option__c)
+                    : anyMirrorById.get(line.Package_Option__c);
+                Package_Option__c master = mastersByName.get(line.Package_Option__c);
 
-                dto.Id = packageOptionToDealerOptionMap.get(option.Package_Option__c);
-                dto.Name = option.Name;
-                dto.optionName = option.Option__c;
-                dto.dealerMarkup = option.Dealer_Markup__c != null ? option.Dealer_Markup__c : 0;
-                dto.markupType = option.Markup_Type__c != null ? option.Markup_Type__c : '';
-                dto.originalPrice = option.Original_Package_Option_Price__c != null ? option.Original_Package_Option_Price__c : 0;
-                dto.discountType = option.Discount_Type__c;
-                dto.discountValue = option.Discount_Value__c != null ? option.Discount_Value__c : 0;
-                dto.inclusion = option.Inclusion__c;
-                dto.exclusion = option.Exclusion__c;
-
-                Decimal netCost = dto.originalPrice;
-                if (dto.discountType == '$') {
-                    netCost = dto.originalPrice - dto.discountValue;
-                } else if (dto.discountType == '%') {
-                    netCost = dto.originalPrice - (dto.originalPrice * dto.discountValue / 100);
-                }
-
-                Decimal markupAmount = 0;
-                if (dto.markupType == '%' && dto.dealerMarkup > 0) {
-                    markupAmount = netCost * dto.dealerMarkup / 100;
-                } else if (dto.markupType == '$' && dto.dealerMarkup > 0) {
-                    markupAmount = dto.dealerMarkup;
-                }
-                
-                dto.retailPrice = netCost + markupAmount;
+                dto.Id = mirror != null ? mirror.Id : null;
+                dto.Name = line.Description__c;
+                dto.optionName = (master != null && master.Option__r != null
+                        && String.isNotBlank(master.Option__r.Name))
+                    ? master.Option__r.Name : line.Description__c;
+                dto.dealerMarkup = mirror != null && mirror.Dealer_Markup__c != null ? mirror.Dealer_Markup__c : 0;
+                dto.markupType = mirror != null && mirror.Markup_Type__c != null ? mirror.Markup_Type__c : '';
+                dto.originalPrice = mirror != null && mirror.Original_Package_Option_Price__c != null
+                    ? mirror.Original_Package_Option_Price__c : 0;
+                dto.discountType = mirror != null ? mirror.Discount_Type__c : null;
+                dto.discountValue = mirror != null && mirror.Discount_Value__c != null ? mirror.Discount_Value__c : 0;
+                dto.inclusion = mirror != null ? mirror.Inclusion__c : null;
+                dto.exclusion = mirror != null ? mirror.Exclusion__c : null;
+                // The priced retail = the line Amount (the quote's charged
+                // state), byte-identical to the engine-priced child retail the
+                // legacy reader surfaced.
+                dto.retailPrice = line.Amount__c != null ? line.Amount__c : 0;
                 dto.price = dto.retailPrice;
                 optionList.add(dto);
             }
-            
+
             AdditionalOptionsResponse response = new AdditionalOptionsResponse();
             response.success = true;
             response.message = 'Existing additional options retrieved successfully';
@@ -3502,64 +4005,52 @@ public static AdditionalOptionsResponse updateAdditionalOptions(Map<String, Obje
         if (String.isBlank(applicationId)) {
             throw new CalloutException('Application ID is required');
         }
-        
 
-        List<Application_Package_Option__c> recordsToInsert = new List<Application_Package_Option__c>();
-        
+        // P4 [S]: option state lives on the package's Option LINE ITEMS (the
+        // engine snapshot contract); the writer creates priced Option lines
+        // from the dealer-option mirror instead of Application_Package_Option__c
+        // children (retired). The line Amount = the mirror's priced retail
+        // (Net_Cost/Retail_Price formulas) — the exact value the engine prices
+        // and carries forward, so the option-add flow prices byte-identically
+        // through the line-item state. Lines already present for a master are
+        // skipped (writer dedupe — the engine never double-prices).
+        List<Application_Package_Line_Item__c> recordsToInsert = new List<Application_Package_Line_Item__c>();
         if (optionsToAdd != null && !optionsToAdd.isEmpty()) {
-
-            
-
+            List<Application_Package_Line_Item__c> existingLines = selectOptionLines(applicationPackageId);
+            Set<Id> alreadyOnQuote = new Set<Id>();
+            for (Application_Package_Line_Item__c line : existingLines) {
+                if (line.Package_Option__c != null) {
+                    alreadyOnQuote.add(line.Package_Option__c);
+                }
+            }
             List<Dealer_Package_Option__c> dealerOptions = [
-                SELECT Id, Package_Option__c, Option__r.Name, Inclusion__c, Exclusion__c, 
-                        Discount_Type__c, Discount_Value__c, Original_Package_Option_Price__c,
-                        Dealer_Markup__c, Markup_Type__c
-                FROM Dealer_Package_Option__c 
+                SELECT Id, Package_Option__c, Option__r.Name, Retail_Price__c
+                FROM Dealer_Package_Option__c
                 WHERE Id IN :optionsToAdd
+                  AND Retail_Price__c != null
             ];
-            
-
-            
-
-
-
-
-
-
-
-
-            
-
             for (Dealer_Package_Option__c dealerOption : dealerOptions) {
-                if (dealerOption.Package_Option__c == null) {
-
+                if (dealerOption.Package_Option__c == null
+                        || alreadyOnQuote.contains(dealerOption.Package_Option__c)) {
                     continue;
                 }
-                
-                Application_Package_Option__c appOption = new Application_Package_Option__c();
-                appOption.Application__c = applicationId;
-                appOption.Application_Package__c = applicationPackageId;
-                appOption.Dealer_Package_Option__c = dealerOption.Id; // Populate the new lookup field (Package_Option__c is formula)
-                appOption.Package_Option__c = dealerOption.Package_Option__c; // Map Package_Option__c field
-                appOption.Inclusion__c = dealerOption.Inclusion__c;
-                appOption.Exclusion__c = dealerOption.Exclusion__c;
-                appOption.Discount_Type__c = dealerOption.Discount_Type__c;
-                appOption.Discount_Value__c = dealerOption.Discount_Value__c;
-                appOption.Original_Package_Option_Price__c = dealerOption.Original_Package_Option_Price__c;
-                appOption.Dealer_Markup__c = dealerOption.Dealer_Markup__c;
-                appOption.Markup_Type__c = dealerOption.Markup_Type__c;
-
-                
-                recordsToInsert.add(appOption);
-
+                Application_Package_Line_Item__c optionLine = new Application_Package_Line_Item__c();
+                optionLine.Application_Package__c = applicationPackageId;
+                optionLine.Package_Option__c = dealerOption.Package_Option__c;
+                optionLine.Line_Type__c = 'Option';
+                optionLine.Description__c = dealerOption.Option__r != null
+                    && String.isNotBlank(dealerOption.Option__r.Name)
+                    ? dealerOption.Option__r.Name : 'Option';
+                optionLine.Name = optionLine.Description__c.length() > 60
+                    ? optionLine.Description__c.substring(0, 60)
+                    : optionLine.Description__c;
+                optionLine.Amount__c = PricingEngineService.money(dealerOption.Retail_Price__c);
+                optionLine.Taxable__c = true;
+                optionLine.Quantity__c = 1;
+                alreadyOnQuote.add(dealerOption.Package_Option__c);
+                recordsToInsert.add(optionLine);
             }
         }
-        
-
-        for (Application_Package_Option__c record : recordsToInsert) {
-
-        }
-        
 
         String result = updateApplicationPackageOptionsWithoutSharing(
             applicationPackageId, recordsToInsert, optionsToRemove
@@ -4004,6 +4495,14 @@ return false;
                 }
             }
 
+            // C-6 (Rev 4): the T&R price is keyed to a CLASS. When the term
+            // carries a Class__c it must equal the vehicle's class. A blank-class
+            // term stays eligible (back-compat: all 18 legacy terms are blank).
+            if (String.isNotBlank(term.Class__c)
+                && (String.isBlank(vehicleClass) || !vehicleClass.equalsIgnoreCase(term.Class__c))) {
+                return false;
+            }
+
             if (term.ByYear__c != null && term.ByYear__c > 0) {
                 if (String.isBlank(vehicleYear)) {
                     return false;
@@ -4056,13 +4555,23 @@ return false;
                 return false;
             }
 
+            // C2 (tier-opt-in; R3 odometer precedence): the tier is an optional
+            // availability band, not a gate. When a tier is linked AND resolved
+            // AND carries a band, the band governs odometer eligibility
+            // (byte-for-byte as before) and the term's own cap is NOT consulted.
+            // When there is no tier, or the tier carries no band values, fall
+            // through to the term-level check. A tier linked but unresolved is
+            // still ineligible (unchanged).
+            Boolean tierBand = false;
             if (term.Dealer_Package_Tier__c != null) {
                 if (term.Dealer_Package_Tier__r != null) {
                     Decimal tierMileageStart = term.Dealer_Package_Tier__r.Minimum__c;
                     Decimal tierMileageEnd = term.Dealer_Package_Tier__r.Maximum__c;
                     String tierMileageUnit = term.Dealer_Package_Tier__r.Mileage_Unit__c;
 
-                    if (tierMileageStart != null || tierMileageEnd != null) {
+                    tierBand = (tierMileageStart != null || tierMileageEnd != null);
+
+                    if (tierBand) {
 
                         Decimal tierMileageStartKM = tierMileageStart;
                         Decimal tierMileageEndKM = tierMileageEnd;
@@ -4087,8 +4596,20 @@ return false;
                 } else {
                     return false;
                 }
-            } else {
-                return false;
+            }
+
+            // R3 fallback (R1): no tier, or a tier whose band is empty — judge
+            // the term on its OWN odometer cap. Odometer_KM__c is KM by
+            // definition (label "Odometer (KM)") — no term-side conversion.
+            // Skipped ONLY for Restriction_Type__c = 'Unlimited'; Rolling
+            // Odometer is validated like Fixed (owner-locked 2026-09-10).
+            if (!tierBand) {
+                Boolean odometerUnlimited = 'Unlimited'.equalsIgnoreCase(term.Restriction_Type__c);
+                if (!odometerUnlimited && term.Odometer_KM__c != null) {
+                    if (vehicleOdometerKM > term.Odometer_KM__c) {
+                        return false;
+                    }
+                }
             }
 
             if (term.Mileage__c != null) {
@@ -4126,6 +4647,82 @@ return false;
         } catch (Exception e) {
             return false;
         }
+    }
+
+
+    /**
+     * Build the dealer-term DTO the warranty tab renders from a dealer term
+     * row. Extracted verbatim from the tier-grouping loop (P7-f C3) so a
+     * tier-less warranty term can be built on the flat path without a
+     * synthetic tier group. Pricing/tax math is unchanged.
+     */
+    private static DealerPackageTermDTO buildDealerTermDto(
+        Dealer_Package_Term__c term, Dealer_Package__c dp, Boolean isPowersports, Decimal tierMultiplier
+    ) {
+        DealerPackageTermDTO termDto = new DealerPackageTermDTO();
+        termDto.Id = term.Id;
+        // For Powersports: use Package_Term__r.Per_Claim_Limit__c (per-term), 
+        // else use Dealer_Package per-claim limit
+        Decimal termPerClaimLimit = (isPowersports && term.Package_Term__r != null && term.Package_Term__r.Per_Claim_Limit__c != null)
+            ? term.Package_Term__r.Per_Claim_Limit__c
+            : dp.Per_Claim_Limit__c;
+        termDto.perClaimLimit = termPerClaimLimit;
+        
+        termDto.originalPackageTermCost = term.Original_Package_Term_Cost__c != null ? term.Original_Package_Term_Cost__c : 0;
+        termDto.includedOptionsPrice = term.Included_Options_Price__c != null ? term.Included_Options_Price__c : 0;
+        termDto.additionalOptionsPrice = term.Additional_Options_Price__c != null ? term.Additional_Options_Price__c : 0;
+        termDto.discountType = term.Discount_Type__c;
+        termDto.discountValue = term.Discount_Value__c != null ? term.Discount_Value__c : 0;
+        termDto.markup = term.Markup__c != null ? term.Markup__c : 0;
+        termDto.markupType = term.Markup_Type__c != null ? term.Markup_Type__c : '';
+        termDto.deductible = dp.Deductable__c;
+
+        Decimal basePrice = termDto.originalPackageTermCost + termDto.includedOptionsPrice + termDto.additionalOptionsPrice;
+        Decimal discountAmount = 0;
+
+        if (termDto.discountType == '$' && termDto.discountValue > 0) {
+            discountAmount = termDto.discountValue;
+        } else if (termDto.discountType == '%' && termDto.discountValue > 0) {
+            discountAmount = (basePrice * termDto.discountValue) / 100;
+        }
+
+        termDto.netCost = term.Net_Cost__c != null ? term.Net_Cost__c : (basePrice - discountAmount);
+
+        Decimal priceWithMarkup = termDto.netCost;
+
+        if (termDto.markupType == '%' && termDto.markup > 0) {
+            priceWithMarkup = termDto.netCost + (termDto.netCost * termDto.markup / 100);
+        } else if (termDto.markupType == '$' && termDto.markup > 0) {
+            priceWithMarkup = termDto.netCost + termDto.markup;
+        }
+                    
+        Decimal totalTaxableAmount = priceWithMarkup + termDto.additionalOptionsPrice;
+        Decimal taxRate = dp.Dealer__r != null && dp.Dealer__r.Tax_Region__r != null ? dp.Dealer__r.Tax_Region__r.Total_Tax_Rate__c : null;
+        Decimal taxAmount = 0;
+
+        if (taxRate != null && taxRate > 0) {
+            taxAmount = totalTaxableAmount * (taxRate / 100);
+        }
+
+        termDto.taxRate = taxRate != null ? taxRate : 0;
+        termDto.taxAmount = taxAmount;
+        termDto.totalPrice = priceWithMarkup;
+        termDto.durationRestrictionInMonths = null;
+        termDto.mileageRestriction = term.Mileage_Restriction__c;
+        termDto.mileageUnit = term.Mileage_Unit__c;
+        termDto.packageTermName = term.Name;
+        termDto.expiryTerm = term.Expiry_Term__c;
+        termDto.odometerKM = term.Odometer_KM__c;
+        termDto.allowDeferral = term.Package_Term__r != null && term.Package_Term__r.Allow_Deferral__c == true;
+        
+        // Powersports brand-tier surcharge: override Premium_Model_Fee__c
+        if (isPowersports && tierMultiplier != 1.0) {
+            Decimal baseForSurcharge = termDto.totalPrice != null ? termDto.totalPrice : 0;
+            termDto.premiumModelFee = (baseForSurcharge * (tierMultiplier - 1.0)).setScale(2);
+        } else {
+            termDto.premiumModelFee = term.Package_Term__r != null && term.Package_Term__r.Premium_Model_Fee__c != null ? term.Package_Term__r.Premium_Model_Fee__c : 0;
+        }
+        return termDto;
     }
 
 /**
@@ -4409,45 +5006,57 @@ return null;
 }
 
 /**
- * Update Application Package Options without sharing restrictions
- * This method bypasses sharing rules to allow partner users to manage additional options
+ * Update Application Package Options without sharing restrictions (P4 [S]:
+ * option state lives on the package's Option LINE ITEMS — the engine snapshot
+ * contract; Application_Package_Option__c is retired and never written here).
  * @param applicationPackageId The ID of the application package
- * @param recordsToInsert List of Application_Package_Option__c records to insert
+ * @param recordsToInsert List of Application_Package_Line_Item__c records to insert
  * @param optionsToRemove List of Dealer_Package_Option__c IDs to remove
  * @return String result message
  */
-public static String updateApplicationPackageOptionsWithoutSharing(String applicationPackageId, List<Application_Package_Option__c> recordsToInsert, List<String> optionsToRemove) {
+public static String updateApplicationPackageOptionsWithoutSharing(String applicationPackageId, List<Application_Package_Line_Item__c> recordsToInsert, List<String> optionsToRemove) {
     try {
 
-
-
-        
-        List<Application_Package_Option__c> recordsToDelete = new List<Application_Package_Option__c>();
-        
-
+        // P4 [S]: option removals resolve through the master Package_Option of
+        // the removed dealer options and delete the Option LINES (the only
+        // option state — Application_Package_Option__c is retired org-side).
         if (optionsToRemove != null && !optionsToRemove.isEmpty()) {
-            recordsToDelete = [
-                SELECT Id 
-                FROM Application_Package_Option__c 
-                WHERE Application_Package__c = :applicationPackageId 
-                AND Dealer_Package_Option__c IN :optionsToRemove
-            ];
-
+            Set<Id> mastersToRemove = new Set<Id>();
+            for (Dealer_Package_Option__c dpo : [
+                SELECT Package_Option__c FROM Dealer_Package_Option__c
+                WHERE Id IN :optionsToRemove AND Package_Option__c != null
+            ]) {
+                mastersToRemove.add(dpo.Package_Option__c);
+            }
+            if (!mastersToRemove.isEmpty()) {
+                List<Application_Package_Line_Item__c> linesToDelete =
+                    new List<Application_Package_Line_Item__c>();
+                for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.queryWithBinds(
+                        'SELECT Id FROM Application_Package_Line_Item__c' +
+                        ' WHERE Application_Package__c = :pkgId' +
+                        ' AND Line_Type__c = \'Option\'' +
+                        ' AND Package_Option__c IN :mastersToRemove',
+                        new Map<String, Object>{
+                            'pkgId' => applicationPackageId,
+                            'mastersToRemove' => mastersToRemove
+                        },
+                        System.AccessLevel.SYSTEM_MODE)) {
+                    linesToDelete.add(line);
+                }
+                if (!linesToDelete.isEmpty()) {
+                    delete linesToDelete;
+                }
+            }
         }
-        
 
         if (!recordsToInsert.isEmpty()) {
-
-            insert recordsToInsert;
-
+            // SYSTEM_MODE: the P4 line-item fields carry no portal FLS yet
+            // (the same mode the engine snapshot writes use).
+            Database.insert(recordsToInsert, System.AccessLevel.SYSTEM_MODE);
         }
-        
-        if (!recordsToDelete.isEmpty()) {
-            delete recordsToDelete;
 
-        }
-        
-        return 'Success: Processed ' + recordsToInsert.size() + ' additions and ' + recordsToDelete.size() + ' removals';
+        return 'Success: Processed ' + recordsToInsert.size() + ' additions and '
+            + (optionsToRemove != null ? optionsToRemove.size() : 0) + ' removals';
         
     } catch (Exception e) {
 
@@ -5519,41 +6128,53 @@ for (Integer i = 0; i < dmlEx.getNumDml(); i++) {
                 response.message = 'Application package ID is required';
                 return response;
             }
-                    
-            List<Application_Package_Option__c> existingOptions = [
-                SELECT Id, Name, Dealer_Package_Option__c, Dealer_Package_Option__r.Name,
-                        Dealer_Package_Option__r.Option__r.Name, Net_Cost__c, Dealer_Markup__c,
-                        Markup_Type__c, Retail_Price__c, Original_Package_Option_Price__c, Discount_Type__c,
-                        Discount_Value__c, Inclusion__c, Exclusion__c, Selection_Type__c,
-                        Dealer_Package_Option__r.Category__c
-                FROM Application_Package_Option__c
-                WHERE Application_Package__c = :applicationPackageId
-                AND Selection_Type__c = 'Optional'
-                ORDER BY Dealer_Package_Option__r.Option__r.Name
-            ];
+
+            // P4 [S]: priced option state = the package's Option LINE ITEMS
+            // (mirror of the warranty-tab reader); display text resolves
+            // through the master catalogue + dealer-option mirror.
+            List<Application_Package_Line_Item__c> existingLines = selectOptionLines(applicationPackageId);
+            Set<Id> packageOptionIds = new Set<Id>();
+            for (Application_Package_Line_Item__c line : existingLines) {
+                if (line.Package_Option__c != null) {
+                    packageOptionIds.add(line.Package_Option__c);
+                }
+            }
+            Map<Id, Package_Option__c> mastersByName = new Map<Id, Package_Option__c>();
+            for (Package_Option__c master : [
+                SELECT Id, Option__r.Name FROM Package_Option__c WHERE Id IN :packageOptionIds
+            ]) {
+                mastersByName.put(master.Id, master);
+            }
+            Map<Id, Dealer_Package_Option__c> dealerMirrorById =
+                selectOptionMirrors(applicationPackageId, packageOptionIds);
 
             List<AdditionalOptionDTO> optionDTOs = new List<AdditionalOptionDTO>();
 
-            for (Application_Package_Option__c option : existingOptions) {
+            for (Application_Package_Line_Item__c line : existingLines) {
                 AdditionalOptionDTO dto = new AdditionalOptionDTO();
-                dto.Id = option.Id;
-                dto.Name = option.Name;
-                dto.optionName = option.Dealer_Package_Option__r.Option__r.Name;
-                dto.price = option.Retail_Price__c != null ? option.Retail_Price__c : 0;
-                dto.originalPrice = option.Original_Package_Option_Price__c != null ? option.Original_Package_Option_Price__c : 0;
-                dto.netCost = option.Net_Cost__c != null ? option.Net_Cost__c : 0;
-                dto.dealerMarkup = option.Dealer_Markup__c != null ? option.Dealer_Markup__c : 0;
-                dto.markupType = option.Markup_Type__c != null ? option.Markup_Type__c : '';
-                dto.retailPrice = option.Retail_Price__c != null ? option.Retail_Price__c : 0;
-                dto.discountType = option.Discount_Type__c;
-                dto.discountValue = option.Discount_Value__c != null ? option.Discount_Value__c : 0;
-                dto.inclusion = option.Inclusion__c;
-                dto.exclusion = option.Exclusion__c;
-                dto.dealerPackageTermId = option.Dealer_Package_Option__c;
-                dto.category = option.Dealer_Package_Option__r.Category__c;
+                Dealer_Package_Option__c mirror = dealerMirrorById.get(line.Package_Option__c);
+                Package_Option__c master = mastersByName.get(line.Package_Option__c);
+                dto.Id = line.Id;
+                dto.Name = line.Description__c;
+                dto.optionName = (master != null && master.Option__r != null
+                        && String.isNotBlank(master.Option__r.Name))
+                    ? master.Option__r.Name : line.Description__c;
+                dto.price = line.Amount__c != null ? line.Amount__c : 0;
+                dto.originalPrice = mirror != null && mirror.Original_Package_Option_Price__c != null
+                    ? mirror.Original_Package_Option_Price__c : 0;
+                dto.netCost = mirror != null && mirror.Net_Cost__c != null ? mirror.Net_Cost__c : 0;
+                dto.dealerMarkup = mirror != null && mirror.Dealer_Markup__c != null ? mirror.Dealer_Markup__c : 0;
+                dto.markupType = mirror != null && mirror.Markup_Type__c != null ? mirror.Markup_Type__c : '';
+                dto.retailPrice = line.Amount__c != null ? line.Amount__c : 0;
+                dto.discountType = mirror != null ? mirror.Discount_Type__c : null;
+                dto.discountValue = mirror != null && mirror.Discount_Value__c != null ? mirror.Discount_Value__c : 0;
+                dto.inclusion = mirror != null ? mirror.Inclusion__c : null;
+                dto.exclusion = mirror != null ? mirror.Exclusion__c : null;
+                dto.dealerPackageTermId = mirror != null ? mirror.Id : null;
+                dto.category = mirror != null ? mirror.Category__c : null;
                 optionDTOs.add(dto);
             }
-            
+
             AdditionalOptionsResponse response = new AdditionalOptionsResponse();
             response.success = true;
             response.data = optionDTOs;
@@ -5610,52 +6231,66 @@ for (Integer i = 0; i < dmlEx.getNumDml(); i++) {
                 throw new CalloutException('Application package ID and application ID are required');
             }
                     
+            // P4 [S]: option state lives on the package's Option LINE ITEMS.
+            // Removals accept the ids the reader returned (Option line ids);
             if (optionsToRemove != null && !optionsToRemove.isEmpty()) {
-                List<Application_Package_Option__c> optionsToDelete = [
-                    SELECT Id FROM Application_Package_Option__c 
-                    WHERE Id IN :optionsToRemove
-                ];
-
-                if (!optionsToDelete.isEmpty()) {
-                    delete optionsToDelete;
+                List<Application_Package_Line_Item__c> linesToDelete =
+                    new List<Application_Package_Line_Item__c>();
+                for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.queryWithBinds(
+                        'SELECT Id FROM Application_Package_Line_Item__c' +
+                        ' WHERE Id IN :removedIds AND Line_Type__c = \'Option\'',
+                        new Map<String, Object>{ 'removedIds' => optionsToRemove },
+                        System.AccessLevel.SYSTEM_MODE)) {
+                    linesToDelete.add(line);
+                }
+                if (!linesToDelete.isEmpty()) {
+                    delete linesToDelete;
                 }
             }
-            
-            if (optionsToAdd != null && !optionsToAdd.isEmpty()) {
-                List<Application_Package_Option__c> newOptions = new List<Application_Package_Option__c>();
-                
-                for (String optionId : optionsToAdd) {
 
-                    List<Dealer_Package_Option__c> dealerOptions = [
-                        SELECT Id, Package_Option__c, Net_Cost__c, Dealer_Markup__c, Markup_Type__c, Retail_Price__c,
-                                Original_Package_Option_Price__c, Discount_Type__c, Discount_Value__c, Inclusion__c, Exclusion__c
-                        FROM Dealer_Package_Option__c
-                        WHERE Id = :optionId
-                        LIMIT 1
-                    ];
-                    
-                    if (!dealerOptions.isEmpty()) {
-                        Dealer_Package_Option__c dealerOption = dealerOptions[0];
-                        
-                        Application_Package_Option__c newOption = new Application_Package_Option__c();
-                        newOption.Application__c = applicationId;
-                        newOption.Application_Package__c = applicationPackageId;
-                        newOption.Dealer_Package_Option__c = optionId;
-                        newOption.Package_Option__c = dealerOption.Package_Option__c;
-                        newOption.Original_Package_Option_Price__c = dealerOption.Original_Package_Option_Price__c;
-                        newOption.Dealer_Markup__c = dealerOption.Dealer_Markup__c;
-                        newOption.Markup_Type__c = dealerOption.Markup_Type__c;
-                        newOption.Discount_Type__c = dealerOption.Discount_Type__c;
-                        newOption.Discount_Value__c = dealerOption.Discount_Value__c;
-                        newOption.Inclusion__c = dealerOption.Inclusion__c;
-                        newOption.Exclusion__c = dealerOption.Exclusion__c;
-                        
-                        newOptions.add(newOption);
+            if (optionsToAdd != null && !optionsToAdd.isEmpty()) {
+                List<Application_Package_Line_Item__c> existingLines = selectOptionLines(applicationPackageId);
+                Set<Id> alreadyOnQuote = new Set<Id>();
+                for (Application_Package_Line_Item__c line : existingLines) {
+                    if (line.Package_Option__c != null) {
+                        alreadyOnQuote.add(line.Package_Option__c);
                     }
                 }
-                
-                if (!newOptions.isEmpty()) {
-                    insert newOptions;
+                List<Application_Package_Line_Item__c> newLines =
+                    new List<Application_Package_Line_Item__c>();
+                for (String optionId : optionsToAdd) {
+                    List<Dealer_Package_Option__c> dealerOptions = [
+                        SELECT Id, Package_Option__c, Option__r.Name, Retail_Price__c
+                        FROM Dealer_Package_Option__c
+                        WHERE Id = :optionId AND Retail_Price__c != null
+                        LIMIT 1
+                    ];
+                    if (!dealerOptions.isEmpty()) {
+                        Dealer_Package_Option__c dealerOption = dealerOptions[0];
+                        if (dealerOption.Package_Option__c == null
+                                || alreadyOnQuote.contains(dealerOption.Package_Option__c)) {
+                            continue;
+                        }
+                        Application_Package_Line_Item__c optionLine =
+                            new Application_Package_Line_Item__c();
+                        optionLine.Application_Package__c = applicationPackageId;
+                        optionLine.Package_Option__c = dealerOption.Package_Option__c;
+                        optionLine.Line_Type__c = 'Option';
+                        optionLine.Description__c = dealerOption.Option__r != null
+                            && String.isNotBlank(dealerOption.Option__r.Name)
+                            ? dealerOption.Option__r.Name : 'Option';
+                        optionLine.Name = optionLine.Description__c.length() > 60
+                            ? optionLine.Description__c.substring(0, 60)
+                            : optionLine.Description__c;
+                        optionLine.Amount__c = PricingEngineService.money(dealerOption.Retail_Price__c);
+                        optionLine.Taxable__c = true;
+                        optionLine.Quantity__c = 1;
+                        alreadyOnQuote.add(dealerOption.Package_Option__c);
+                        newLines.add(optionLine);
+                    }
+                }
+                if (!newLines.isEmpty()) {
+                    Database.insert(newLines, System.AccessLevel.SYSTEM_MODE);
                 }
             }
             
@@ -6490,4 +7125,189 @@ for (Integer i = 0; i < dmlEx.getNumDml(); i++) {
         }
     }
 
+
+    // =========================================================================
+    // P3 engine delegation (change-plan §11 P3 [A] + safety §10.2 toggle T2)
+    // =========================================================================
+
+    /**
+     * Flag-gated engine pricing for the portal quote save paths.
+     *
+     * When Pricing_Engine_Enabled__c is true FOR THE RUNNING USER (hierarchy
+     * preview rows for internal/admin test users; dealer portal users have no
+     * row and never reach this branch), the server-side PricingEngineService
+     * computes the complete quote price (base from the dealer term wholesale +
+     * markup - discount, schedule-resolved fees, options, tax once over the
+     * taxable subset) and stamps the engine-owned STORED INPUTS on the record
+     * (Dealer_Package_Price__c, Dealer_Markup__c, Add_Ons_Price__c,
+     * Add_Ons_Markup__c, Premium_Model_Fee__c, Dealer_Price_Override__c,
+     * Tax_Percentage__c) + the Priced_By_Engine__c marker, which makes the
+     * create-time Flow skip its own math for this record (dual-writer guard).
+     *
+     * When the flag is off the method returns immediately — the legacy body of
+     * every caller stays authoritative and byte-identical (zero dealer-visible
+     * change at P3 exit).
+     */
+    private static PricingEngineService.QuoteResult applyEnginePricingIfEnabled(
+                                                    Application_Package__c pkg,
+                                                    String applicationId,
+                                                    String dealerTermId,
+                                                    Map<String, Object> payload) {
+        if (!PortalFeatureFlagService.isPricingEngineEnabled()) {
+            return null;
+        }
+        if (pkg == null) {
+            return null;
+        }
+        if (String.isBlank(dealerTermId) && pkg.Dealer_Package_Term__c != null) {
+            dealerTermId = pkg.Dealer_Package_Term__c;
+        }
+        if (String.isBlank(dealerTermId)) {
+            return null;
+        }
+
+        PricingEngineService.QuoteRequest req = new PricingEngineService.QuoteRequest();
+        req.dealerTermId = dealerTermId;
+        req.dealerPackageId = pkg.Dealer_Package__c;
+        req.dealerId = pkg.Dealer__c;
+        req.applicationId = applicationId;
+        req.applicationPackageId = pkg.Id;
+
+        // Vehicle context for schedule resolution (R1-R6 fee lines).
+        if (String.isNotBlank(applicationId)) {
+            try {
+                for (Application__c app : [
+                    SELECT Vehicle__c FROM Application__c WHERE Id = :applicationId LIMIT 1
+                ]) {
+                    req.vehicleId = app.Vehicle__c;
+                }
+            } catch (Exception vehicleEx) {
+                System.debug('Engine: could not resolve vehicle for ' + applicationId + ': ' + vehicleEx.getMessage());
+            }
+        }
+
+        // Pre-tax custom-price override + premium waiver (same payload keys the
+        // legacy LWC path already sends).
+        if (payload != null) {
+            Object ov = payload.get('dealerPriceOverride');
+            if (ov != null && String.valueOf(ov) != 'null' && String.valueOf(ov) != '') {
+                try {
+                    req.dealerPriceOverride = Decimal.valueOf(String.valueOf(ov));
+                } catch (Exception overrideEx) {
+                    System.debug('Engine: invalid dealerPriceOverride: ' + overrideEx.getMessage());
+                }
+            }
+            if (payload.containsKey('waivedPremiumFee')) {
+                req.waivePremiumFee = Boolean.valueOf(String.valueOf(payload.get('waivedPremiumFee')));
+            } else if (pkg.Waive_Premium_Fee__c == true) {
+                req.waivePremiumFee = true;
+            }
+        } else if (pkg.Waive_Premium_Fee__c == true) {
+            req.waivePremiumFee = true;
+        }
+
+        PricingEngineService.QuoteResult result =
+            PricingEngineService.applyEnginePricing(pkg, req);
+        return result;
+    }
+
+    /**
+     * P4 [L] warranty-tab viewer cutover (engine snapshot). When the T5 gate
+     * is ON and the active package is engine-priced with a persisted line set,
+     * the customer money keys on the active-package payload (the keys the
+     * warranty tab renders) are rebuilt from the stored lines — stored =
+     * displayed (§07.3, mirror of the summary-tab re-wire in
+     * ApplicationSummaryController): contractPremiumPriceWithoutTax =
+     * sum(non-Tax lines), taxAmount = sum(Tax lines), contractPremiumPrice =
+     * sum(all lines). The engine line set is also attached so the viewer can
+     * render it. The P4 fields (Priced_By_Engine__c,
+     * Application_Package_Line_Item__c) carry no portal FLS yet, so they are
+     * read in SYSTEM_MODE — the same mode the engine writes use. When the gate
+     * is off, or the package is not engine-priced, or it has no line set yet,
+     * nothing is attached or overridden: the legacy map built by the caller
+     * stays byte-identical to the pre-cutover shape.
+     */
+    private static void attachWarrantyEngineSnapshotIfActive(Map<String, Object> packageData, Id applicationPackageId) {
+        if (!PortalFeatureFlagService.isLineItemSnapshotEnabled()) {
+            return;
+        }
+        if (packageData == null || applicationPackageId == null) {
+            return;
+        }
+        try {
+            // Engine-priced marker (P4 field — SYSTEM_MODE read).
+            Boolean pricedByEngine = false;
+            String idLiteral = '\'' + String.valueOf(applicationPackageId) + '\'';
+            for (Application_Package__c enginePkg : (List<Application_Package__c>) Database.query(
+                    'SELECT Id, Priced_By_Engine__c FROM Application_Package__c' +
+                    ' WHERE Id = ' + idLiteral,
+                    System.AccessLevel.SYSTEM_MODE)) {
+                if (enginePkg.Priced_By_Engine__c == true) {
+                    pricedByEngine = true;
+                }
+            }
+            if (!pricedByEngine) {
+                return;
+            }
+
+            List<WarrantyLineItemDTO> lines = new List<WarrantyLineItemDTO>();
+            for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.query(
+                    'SELECT Line_Type__c, Description__c, Amount__c, Taxable__c,' +
+                    ' Tax_Amount__c, Quantity__c, Sort_Order__c' +
+                    ' FROM Application_Package_Line_Item__c' +
+                    ' WHERE Application_Package__c = ' + idLiteral +
+                    ' ORDER BY Sort_Order__c, Id',
+                    System.AccessLevel.SYSTEM_MODE)) {
+                WarrantyLineItemDTO dto = new WarrantyLineItemDTO();
+                dto.lineType = line.Line_Type__c;
+                dto.description = line.Description__c;
+                dto.amount = line.Amount__c;
+                dto.formattedAmount = formatWarrantyCurrency(line.Amount__c);
+                dto.taxable = line.Taxable__c == true;
+                dto.taxAmount = line.Tax_Amount__c;
+                dto.quantity = line.Quantity__c;
+                dto.sortOrder = line.Sort_Order__c != null ? line.Sort_Order__c.intValue() : 0;
+                dto.key = String.valueOf(dto.sortOrder) + '-' +
+                    (String.isNotBlank(dto.lineType) ? dto.lineType : 'Line');
+                lines.add(dto);
+            }
+            if (lines.isEmpty()) {
+                return;
+            }
+
+            // Rebuild the customer money keys from the stored lines
+            // (§07.3 invariant: sum(non-Tax) = no-tax total, sum(Tax) = tax,
+            // sum(all) = with-tax total — same rebuild the summary-tab payload
+            // uses, asserted for parity by DealerPortalWarrantyEngineParityTest).
+            Decimal noTaxTotal = 0;
+            Decimal taxTotal = 0;
+            Decimal grandTotal = 0;
+            for (WarrantyLineItemDTO li : lines) {
+                Decimal amt = li.amount != null ? PricingEngineService.money(li.amount) : 0;
+                grandTotal = PricingEngineService.money(grandTotal + amt);
+                if ('Tax'.equals(li.lineType)) {
+                    taxTotal = PricingEngineService.money(taxTotal + amt);
+                } else {
+                    noTaxTotal = PricingEngineService.money(noTaxTotal + amt);
+                }
+            }
+            packageData.put('contractPremiumPriceWithoutTax', noTaxTotal);
+            packageData.put('taxAmount', taxTotal);
+            packageData.put('contractPremiumPrice', grandTotal);
+            packageData.put('hasEngineLineItems', true);
+            packageData.put('lineItems', lines);
+        } catch (Exception snapshotEx) {
+            // Audit/display enrichment must never break the existing-package
+            // read — fall back to the legacy stored-field payload on error.
+            System.debug('Warranty engine snapshot attach skipped: ' + snapshotEx.getMessage());
+        }
+    }
+
+    /** Plain '$' + thousands currency for the engine line DTO display. */
+    private static String formatWarrantyCurrency(Decimal amount) {
+        if (amount == null) {
+            return '$0.00';
+        }
+        return '$' + amount.setScale(2).format();
+    }
 }

@@ -1,0 +1,324 @@
+<template>
+    <div class="slds-box slds-theme_default slds-m-around_x-small catalogue-admin">
+        <div class="slds-grid slds-grid_align-spread slds-m-bottom_small">
+            <div>
+                <h2 class="slds-text-heading_small">Package Options — Admin</h2>
+                <p class="slds-text-body_small slds-text-color_weak">
+                    Maintain the options included in cover and the additional options available for this package term.
+                    The two sections are independent — save either one on its own.
+                </p>
+            </div>
+        </div>
+
+        <template if:true={isLoading}>
+            <div class="slds-align_absolute-center slds-p-vertical_medium">
+                <lightning-spinner size="small"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:false={isLoading}>
+            <!-- Record context missing or unreadable — never an endless spinner (p7-j, wired in p8). -->
+            <template if:true={recordHasProblem}>
+                <div class="slds-m-bottom_small">
+                    <lightning-alert variant="warning" title="This screen needs a Package or Package Term"
+                        message={recordLoadMessage}>
+                    </lightning-alert>
+                </div>
+            </template>
+
+            <template if:false={recordHasProblem}>
+                <template if:true={showUnsupportedContextWarning}>
+                    <div class="slds-m-bottom_small">
+                        <lightning-alert variant="warning" title="Unsupported record"
+                            message={contextLabel}>
+                        </lightning-alert>
+                    </div>
+                </template>
+
+                <!-- ═══════════════ SECTION 1 — INCLUDED IN COVER ═══════════════ -->
+                <article class="slds-card slds-m-bottom_medium included-section">
+                    <div class="slds-card__header slds-grid slds-theme_info">
+                        <div class="slds-media slds-media_center slds-has-flexi-truncate">
+                            <div class="slds-media__figure">
+                                <lightning-icon icon-name="utility:check" size="small"
+                                    alternative-text="Included in Cover"></lightning-icon>
+                            </div>
+                            <div class="slds-media__body">
+                                <h3 class="slds-text-heading_small">Included in Cover</h3>
+                                <p class="slds-text-body_small">
+                                    Standard cover options. Inclusion/exclusion text is shown to the dealer.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="slds-no-flex">
+                            <span class="slds-badge">{includedCountLabel}</span>
+                        </div>
+                    </div>
+                    <div class="slds-card__body slds-card__body_inner">
+                        <template if:true={includedError}>
+                            <div class="slds-m-bottom_small">
+                                <lightning-alert variant="error" title={includedErrorTitle}
+                                    message={includedError}></lightning-alert>
+                            </div>
+                        </template>
+                        <template if:true={includedLastResult}>
+                            <div class="slds-m-bottom_small">
+                                <lightning-alert variant="success" title="Options saved"
+                                    message={includedLastResult}></lightning-alert>
+                            </div>
+                        </template>
+
+                        <template if:true={includedRows.length}>
+                            <div class="slds-scrollable_x rows-scroll">
+                                <table class="slds-table slds-table_bordered slds-table_cell-buffer slds-max-medium-table_stacked-horizontal">
+                                    <thead>
+                                        <tr class="slds-line-height_reset">
+                                            <th scope="col">Type</th>
+                                            <th scope="col">#</th>
+                                            <th scope="col">Option</th>
+                                            <th scope="col">Included in Cover (inclusions)</th>
+                                            <th scope="col">Not Covered (exclusions)</th>
+                                            <th scope="col"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template for:each={includedRows} for:item="row" for:index="idx">
+                                            <tr key={row.rowId}>
+                                                <td data-label="Type">
+                                                    <span class="slds-badge slds-theme_info">Included</span>
+                                                </td>
+                                                <td data-label="#"><span class="slds-text-body_small">{idx}</span></td>
+                                                <td data-label="Option" class={row.optionCellClass}>
+                                                    <template if:true={row.existing}>
+                                                        <span class="slds-text-body_regular">{row.optionName}</span>
+                                                    </template>
+                                                    <template if:false={row.existing}>
+                                                        <lightning-record-picker
+                                                            object-api-name="Option__c"
+                                                            data-section="included"
+                                                            data-rowid={row.rowId}
+                                                            label="Option"
+                                                            placeholder="Select Option…"
+                                                            onchange={handleOptionChange}>
+                                                        </lightning-record-picker>
+                                                        <template if:true={row.optionMissing}>
+                                                            <div class="slds-text-color_error slds-text-body_small">
+                                                                Select an option for this row.
+                                                            </div>
+                                                        </template>
+                                                    </template>
+                                                </td>
+                                                <td data-label="Included in Cover (inclusions)">
+                                                    <template if:true={row.existing}>
+                                                        <span class="slds-text-body_regular">{row.inclusionText}</span>
+                                                    </template>
+                                                    <template if:false={row.existing}>
+                                                        <lightning-input data-section="included" data-rowid={row.rowId}
+                                                            data-field="inclusionText"
+                                                            value={row.inclusionText} onchange={handleInput}
+                                                            aria-label="Included in Cover (inclusions)"
+                                                            placeholder="Enter inclusion text"></lightning-input>
+                                                    </template>
+                                                </td>
+                                                <td data-label="Not Covered (exclusions)">
+                                                    <template if:true={row.existing}>
+                                                        <span class="slds-text-body_regular">{row.exclusionText}</span>
+                                                    </template>
+                                                    <template if:false={row.existing}>
+                                                        <lightning-input data-section="included" data-rowid={row.rowId}
+                                                            data-field="exclusionText"
+                                                            value={row.exclusionText} onchange={handleInput}
+                                                            aria-label="Not Covered (exclusions)"
+                                                            placeholder="Enter exclusion text"></lightning-input>
+                                                    </template>
+                                                </td>
+                                                <td data-label="">
+                                                    <lightning-button-icon icon-name="utility:delete" size="small"
+                                                        alternative-text="Remove row" data-rowid={row.rowId}
+                                                        onclick={removeIncludedRow}></lightning-button-icon>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </template>
+
+                        <div class="slds-m-top_small">
+                            <lightning-button label="Add Included Row" variant="neutral" icon-name="utility:add"
+                                onclick={addIncludedRow}></lightning-button>
+                            <lightning-button label={includedSaveLabel} variant="brand"
+                                class="slds-m-left_x-small" onclick={handleSaveIncluded}
+                                disabled={includedSaveDisabled}></lightning-button>
+                            <span class="slds-text-body_small slds-text-color_weak slds-m-left_small">
+                                {includedCountLabel}
+                            </span>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- ═══════════════ SECTION 2 — ADDITIONAL OPTIONS ═══════════════ -->
+                <article class="slds-card slds-m-bottom_medium additional-section">
+                    <div class="slds-card__header slds-grid slds-theme_warning">
+                        <div class="slds-media slds-media_center slds-has-flexi-truncate">
+                            <div class="slds-media__figure">
+                                <lightning-icon icon-name="utility:dollar" size="small"
+                                    alternative-text="Additional Options"></lightning-icon>
+                            </div>
+                            <div class="slds-media__body">
+                                <h3 class="slds-text-heading_small">Additional Options</h3>
+                                <p class="slds-text-body_small">
+                                    Priced add-ons the dealer can buy for this term. Category and value limits
+                                    apply only when editing from the package.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="slds-no-flex">
+                            <span class="slds-badge">{additionalCountLabel}</span>
+                        </div>
+                    </div>
+                    <div class="slds-card__body slds-card__body_inner">
+                        <template if:true={additionalError}>
+                            <div class="slds-m-bottom_small">
+                                <lightning-alert variant="error" title={additionalErrorTitle}
+                                    message={additionalError}></lightning-alert>
+                            </div>
+                        </template>
+                        <template if:true={additionalLastResult}>
+                            <div class="slds-m-bottom_small">
+                                <lightning-alert variant="success" title="Options saved"
+                                    message={additionalLastResult}></lightning-alert>
+                            </div>
+                        </template>
+
+                        <template if:true={additionalRows.length}>
+                            <div class="slds-scrollable_x rows-scroll">
+                                <table class="slds-table slds-table_bordered slds-table_cell-buffer slds-max-medium-table_stacked-horizontal">
+                                    <thead>
+                                        <tr class="slds-line-height_reset">
+                                            <th scope="col">Type</th>
+                                            <th scope="col">#</th>
+                                            <th scope="col">Option</th>
+                                            <th scope="col">Price</th>
+                                            <template if:true={showCategoryColumns}>
+                                                <th scope="col">Category</th>
+                                                <th scope="col">Minimum Value</th>
+                                                <th scope="col">Maximum Value</th>
+                                            </template>
+                                            <th scope="col"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template for:each={additionalRows} for:item="row" for:index="idx">
+                                            <tr key={row.rowId}>
+                                                <td data-label="Type">
+                                                    <span class="slds-badge slds-theme_warning">Additional</span>
+                                                </td>
+                                                <td data-label="#"><span class="slds-text-body_small">{idx}</span></td>
+                                                <td data-label="Option" class={row.optionCellClass}>
+                                                    <template if:true={row.existing}>
+                                                        <span class="slds-text-body_regular">{row.optionName}</span>
+                                                    </template>
+                                                    <template if:false={row.existing}>
+                                                        <lightning-record-picker
+                                                            object-api-name="Option__c"
+                                                            data-section="additional"
+                                                            data-rowid={row.rowId}
+                                                            label="Option"
+                                                            placeholder="Select Option…"
+                                                            onchange={handleOptionChange}>
+                                                        </lightning-record-picker>
+                                                        <template if:true={row.optionMissing}>
+                                                            <div class="slds-text-color_error slds-text-body_small">
+                                                                Select an option for this row.
+                                                            </div>
+                                                        </template>
+                                                    </template>
+                                                </td>
+                                                <td data-label="Price" class={row.priceCellClass}>
+                                                    <lightning-input type="number" min="0" step="0.01"
+                                                        data-section="additional" data-rowid={row.rowId}
+                                                        data-field="price" value={row.price} onchange={handleInput}
+                                                        data-existing={row.existing}
+                                                        aria-label="Price (required)"
+                                                        placeholder="0.00"></lightning-input>
+                                                    <template if:true={row.priceInvalid}>
+                                                        <div class="slds-text-color_error slds-text-body_small">
+                                                            Enter a price of 0 or more.
+                                                        </div>
+                                                    </template>
+                                                    <template if:true={row.existing}>
+                                                        <template if:true={row.priceDirty}>
+                                                            <div class="slds-text-body_small slds-text-color_weak">
+                                                                Unsaved price change
+                                                            </div>
+                                                        </template>
+                                                    </template>
+                                                </td>
+                                                <template if:true={showCategoryColumns}>
+                                                    <td data-label="Category">
+                                                        <template if:true={row.existing}>
+                                                            <span class="slds-text-body_regular">{row.category}</span>
+                                                        </template>
+                                                        <template if:false={row.existing}>
+                                                            <lightning-combobox data-section="additional"
+                                                                data-rowid={row.rowId} data-field="category"
+                                                                value={row.category} options={categoryValues}
+                                                                aria-label="Category"
+                                                                placeholder="Select Category"
+                                                                onchange={handleInput}></lightning-combobox>
+                                                        </template>
+                                                    </td>
+                                                    <td data-label="Minimum Value">
+                                                        <template if:true={row.existing}>
+                                                            <span class="slds-text-body_regular">{row.minimumValue}</span>
+                                                        </template>
+                                                        <template if:false={row.existing}>
+                                                            <lightning-input type="number" min="0" step="any"
+                                                                data-section="additional" data-rowid={row.rowId}
+                                                                data-field="minimumValue" value={row.minimumValue}
+                                                                onchange={handleInput} aria-label="Minimum Value"
+                                                                placeholder="0"></lightning-input>
+                                                        </template>
+                                                    </td>
+                                                    <td data-label="Maximum Value">
+                                                        <template if:true={row.existing}>
+                                                            <span class="slds-text-body_regular">{row.maximumValue}</span>
+                                                        </template>
+                                                        <template if:false={row.existing}>
+                                                            <lightning-input type="number" min="0" step="any"
+                                                                data-section="additional" data-rowid={row.rowId}
+                                                                data-field="maximumValue" value={row.maximumValue}
+                                                                onchange={handleInput} aria-label="Maximum Value"
+                                                                placeholder="0"></lightning-input>
+                                                        </template>
+                                                    </td>
+                                                </template>
+                                                <td data-label="">
+                                                    <lightning-button-icon icon-name="utility:delete" size="small"
+                                                        alternative-text="Remove row" data-rowid={row.rowId}
+                                                        onclick={removeAdditionalRow}></lightning-button-icon>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </template>
+
+                        <div class="slds-m-top_small">
+                            <lightning-button label="Add Additional Row" variant="neutral" icon-name="utility:add"
+                                onclick={addAdditionalRow}></lightning-button>
+                            <lightning-button label={additionalSaveLabel} variant="brand"
+                                class="slds-m-left_x-small" onclick={handleSaveAdditional}
+                                disabled={additionalSaveDisabled}></lightning-button>
+                            <span class="slds-text-body_small slds-text-color_weak slds-m-left_small">
+                                {additionalCountLabel}
+                            </span>
+                        </div>
+                    </div>
+                </article>
+            </template>
+        </template>
+    </div>
+</template>

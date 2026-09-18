@@ -29,6 +29,7 @@ private class QuotePDFExtensionTest {
 
         // Create Application linked to dealer
         Application__c app = new Application__c(
+            RecordTypeId          = TestDataFactory.getRecordTypeId('Application__c', 'Quote'),
             Dealer_Name__c = dealer.Id,
             Application_Status__c = 'Quote'
         );
@@ -49,6 +50,7 @@ private class QuotePDFExtensionTest {
         Account dealer = [SELECT Id FROM Account WHERE Name = 'No Logo Dealer' LIMIT 1];
 
         Application__c app = new Application__c(
+            RecordTypeId          = TestDataFactory.getRecordTypeId('Application__c', 'Quote'),
             Dealer_Name__c = dealer.Id,
             Application_Status__c = 'Quote'
         );
@@ -66,6 +68,7 @@ private class QuotePDFExtensionTest {
     @isTest
     static void testQuotePDFExtension_NoDealer() {
         Application__c app = new Application__c(
+            RecordTypeId          = TestDataFactory.getRecordTypeId('Application__c', 'Quote'),
             Application_Status__c = 'Quote'
         );
         insert app;
@@ -84,6 +87,7 @@ private class QuotePDFExtensionTest {
         Account dealer = [SELECT Id FROM Account WHERE Name = 'Test Dealer' LIMIT 1];
 
         Application__c app = new Application__c(
+            RecordTypeId          = TestDataFactory.getRecordTypeId('Application__c', 'Quote'),
             Dealer_Name__c = dealer.Id,
             Application_Status__c = 'Quote'
         );
@@ -100,6 +104,7 @@ private class QuotePDFExtensionTest {
     @isTest
     static void testGenerateQuotePDF_NoPackages() {
         Application__c app = new Application__c(
+            RecordTypeId          = TestDataFactory.getRecordTypeId('Application__c', 'Quote'),
             Application_Status__c = 'Quote'
         );
         insert app;

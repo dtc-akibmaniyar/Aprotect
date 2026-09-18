@@ -1,0 +1,31 @@
+.catalogue-admin {
+    border-radius: 0.25rem;
+}
+
+.catalogue-admin h2,
+.catalogue-admin h3 {
+    margin: 0;
+}
+
+.rows-scroll {
+    max-height: 24rem;
+    overflow-y: auto;
+}
+
+.rows-scroll lightning-record-picker {
+    min-width: 14rem;
+}
+
+/* Per-row invalid highlighting (p7-j fix 1; token-first colour per p7-k). */
+.cell-invalid {
+    outline: 1px solid var(--lwc-colorTextError, #ba0517);
+    border-radius: 0.25rem;
+    padding: 0.25rem;
+}
+
+/* The two section cards reuse SLDS card/theme utilities for colour; only the
+   chip wrapping needs a hint of whitespace control. */
+.included-section .slds-badge,
+.additional-section .slds-badge {
+    white-space: nowrap;
+}

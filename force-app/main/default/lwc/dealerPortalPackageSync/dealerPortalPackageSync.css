@@ -1,0 +1,159 @@
+:host {
+    display: block;
+}
+
+/* The modal can get tall — keep the console scrollable and the list bounded. */
+.console {
+    max-height: 78vh;
+    overflow-y: auto;
+}
+
+.console__header {
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e5e5e4;
+}
+
+.console__header h2 {
+    margin: 0;
+}
+
+/* ── Header count chips ─────────────────────────────────────────────── */
+.counts {
+    gap: 0.5rem;
+}
+
+.count-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid #dddbda;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    white-space: nowrap;
+}
+
+.count-chip__num {
+    font-weight: 700;
+    font-size: 0.875rem;
+}
+
+.count-chip_attention { background: #fdf3e3; border-color: #f0c36d; color: #6b4e00; }
+.count-chip_new       { background: #eaf5fe; border-color: #9fc9e9; color: #0b5cab; }
+.count-chip_ok        { background: #f3f3f2; border-color: #dddbda; color: #514f4d; }
+
+/* ── Quick filter ───────────────────────────────────────────────────── */
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.filter-btn:focus-visible {
+    outline: 2px solid #0b5cab;
+    outline-offset: 1px;
+}
+
+/* ── Unified package list ───────────────────────────────────────────── */
+.section-title {
+    margin: 0.25rem 0 0;
+}
+
+.pkg-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 26rem;
+    overflow-y: auto;
+}
+
+.pkg-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.75rem 0.875rem;
+    margin-top: 0.5rem;
+    background: #ffffff;
+    border: 1px solid #e5e5e4;
+    border-left: 3px solid transparent;
+    border-radius: 0.25rem;
+    transition: box-shadow 0.1s ease, border-color 0.1s ease;
+}
+
+.pkg-row:hover {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.pkg-row:focus-within {
+    box-shadow: 0 0 0 2px #0b5cab;
+}
+
+.pkg-row_attention {
+    background: #fffdf9;
+    border-left-color: #dd7a01;
+}
+
+.pkg-row_muted {
+    background: #fafaf9;
+}
+
+.pkg-row__body {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.pkg-row__head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.pkg-row__name {
+    font-weight: 600;
+}
+
+.pkg-row__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.meta-text {
+    font-size: 0.75rem;
+    color: #514f4d;
+}
+
+.pkg-row__reason {
+    margin: 0.375rem 0 0;
+    color: #514f4d;
+}
+
+.pkg-row__action {
+    flex: 0 0 auto;
+    align-self: center;
+}
+
+.empty-state {
+    padding: 0.75rem 0;
+}
+
+.console__footer {
+    padding-top: 0.5rem;
+    border-top: 1px solid #e5e5e4;
+}
+
+/* ── Narrow modal: stack the action under the row ───────────────────── */
+@media (max-width: 30rem) {
+    .pkg-row {
+        flex-direction: column;
+    }
+
+    .pkg-row__action {
+        align-self: flex-start;
+    }
+}

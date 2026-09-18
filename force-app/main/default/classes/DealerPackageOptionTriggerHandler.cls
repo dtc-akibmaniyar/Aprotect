@@ -1,6 +1,27 @@
 public class DealerPackageOptionTriggerHandler {
+    /**
+     * Re-entrancy guard (P2): the term included/additional price sums are a pure
+     * recompute of the option children's Retail_Price__c, so the operation is
+     * idempotent by construction — re-running (trigger re-fire, sync-driven
+     * option updates, concurrent-style double invoke) can never duplicate rows.
+     * The guard keeps DealerPackageSyncService updates + the option trigger from
+     * ping-ponging within one transaction.
+     */
+    @TestVisible
+    private static Boolean termsUpdateRunning = false;
+
     public static void updateTermsForOptions(Set<Id> packageIds) {
         if(packageIds == null || packageIds.isEmpty()) return;
+        if (termsUpdateRunning) return;
+        termsUpdateRunning = true;
+        try {
+            updateTermsForOptionsInternal(packageIds);
+        } finally {
+            termsUpdateRunning = false;
+        }
+    }
+
+    private static void updateTermsForOptionsInternal(Set<Id> packageIds) {
 
         // Query all options for these packages
         List<Dealer_Package_Option__c> options = [

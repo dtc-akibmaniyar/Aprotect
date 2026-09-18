@@ -11,7 +11,7 @@ public without sharing class CancellationModalController {
         
         List<Application_Package__c> packages = [
             SELECT Id, Name, Coverage_Plan__c, Coverage_Term__c, 
-                   Total_Package_Price__c, Dealer_Package_Retail_Price__c,
+                   Contract_Premium_Price__c, Dealer_Package_Retail_Price__c,
                    Active__c, Package_Record_Type__c
             FROM Application_Package__c
             WHERE Application__c = :applicationId AND Active__c = true
@@ -25,7 +25,7 @@ public without sharing class CancellationModalController {
             svc.put('name', pkg.Name);
             svc.put('coveragePlan', pkg.Coverage_Plan__c);
             svc.put('coverageTerm', pkg.Coverage_Term__c);
-            svc.put('price', pkg.Total_Package_Price__c != null ? pkg.Total_Package_Price__c : 0);
+            svc.put('price', pkg.Contract_Premium_Price__c != null ? pkg.Contract_Premium_Price__c : 0);
             svc.put('retailPrice', pkg.Dealer_Package_Retail_Price__c != null ? pkg.Dealer_Package_Retail_Price__c : 0);
             svc.put('active', pkg.Active__c);
             svc.put('packageType', pkg.Package_Record_Type__c);
@@ -90,7 +90,7 @@ public without sharing class CancellationModalController {
         Boolean isUnpaid = appStatus == 'Draft' || appStatus == 'Quote' || (appStatus != null && appStatus.containsIgnoreCase('Pending'));
         
         List<Application_Package__c> selectedPackages = [
-            SELECT Id, Total_Package_Price__c
+            SELECT Id, Contract_Premium_Price__c
             FROM Application_Package__c
             WHERE Id IN :serviceIds
         ];
@@ -98,8 +98,8 @@ public without sharing class CancellationModalController {
         Decimal totalRefund = 0;
         if (!isUnpaid) {
             for (Application_Package__c pkg : selectedPackages) {
-                if (pkg.Total_Package_Price__c != null) {
-                    totalRefund += pkg.Total_Package_Price__c;
+                if (pkg.Contract_Premium_Price__c != null) {
+                    totalRefund += pkg.Contract_Premium_Price__c;
                 }
             }
         }
@@ -121,7 +121,7 @@ public without sharing class CancellationModalController {
             Cancellation_Service__c cs = new Cancellation_Service__c();
             cs.App_Cancellation_Request__c = request.Id;
             cs.Application_Package__c = pkg.Id;
-            cs.Refund_Amount__c = isUnpaid ? 0 : (pkg.Total_Package_Price__c != null ? pkg.Total_Package_Price__c : 0);
+            cs.Refund_Amount__c = isUnpaid ? 0 : (pkg.Contract_Premium_Price__c != null ? pkg.Contract_Premium_Price__c : 0);
             cancServices.add(cs);
         }
         if (!cancServices.isEmpty()) {

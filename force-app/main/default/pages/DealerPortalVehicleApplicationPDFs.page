@@ -332,8 +332,8 @@
                         <tr>
                             <td class="plan-label-td">Additional Options:</td>
                             <td class="plan-value-td">
-                                <apex:repeat value="{!wrapper.includedOptions}" var="option">
-                                    <apex:outputText value="{!option.Option__c}, "/>
+                                <apex:repeat value="{!wrapper.includedOptionNames}" var="optionName">
+                                    <apex:outputText value="{!optionName}, "/>
                                 </apex:repeat>
                             </td>
                         </tr>
@@ -347,9 +347,9 @@
         <table style="width:100%; border-collapse:collapse; margin-top:2px;">
             <tr>
                 <td style="text-align:right; padding:4px 10px 5px 0; font-size:6pt;">
-                    Warranty Cost: $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!wrapper.pkg.Contract_Premium_Price_Without_Tax__c}"/></apex:outputText>
-                    &#160;&#160;Tax ({!wrapper.pkg.Tax_Percentage__c}%): $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!wrapper.pkg.Tax_Amount__c}"/></apex:outputText>
-                    &#160;&#160;Total: $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!wrapper.pkg.Contract_Premium_Price__c}"/></apex:outputText>
+                    Warranty Cost: $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!wrapper.renderedContractPremiumWithoutTax}"/></apex:outputText>
+                    &#160;&#160;Tax ({!wrapper.pkg.Tax_Percentage__c}%): $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!wrapper.renderedTaxAmount}"/></apex:outputText>
+                    &#160;&#160;Total: $<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!wrapper.renderedContractPremium}"/></apex:outputText>
                 </td>
             </tr>
         </table>

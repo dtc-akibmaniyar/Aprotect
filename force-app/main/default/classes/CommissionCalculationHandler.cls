@@ -1,5 +1,11 @@
 public class CommissionCalculationHandler {
 
+    // P4 [A/T] (plan 04.3): inputs re-wired to engine-owned fields for
+    // engine-priced quotes (Priced_By_Engine__c = true): wholesale anchor from
+    // Dealer_Package_Term.Original_Package_Term_Cost__c, package config via the
+    // dealer package link. Legacy path (marker absent) unchanged. Numeric
+    // parity evidenced by CommissionCalculationHandlerTest engine/legacy pair.
+
     // Default config values if Package fields are null
     private static final Decimal DEFAULT_THRESHOLD = 0.15;
     private static final Decimal DEFAULT_RESERVE_PCT = 0.50;
@@ -35,7 +41,9 @@ public class CommissionCalculationHandler {
         );
 
         Map<Id, Dealer_Package_Term__c> dptMap = new Map<Id, Dealer_Package_Term__c>(
-            [SELECT Id, Discount_Value__c, Discount_Type__c, Markup__c, Markup_Type__c, Sales_Rep_Incentive__c
+            [SELECT Id, Discount_Value__c, Discount_Type__c, Markup__c, Markup_Type__c,
+                    Sales_Rep_Incentive__c, Original_Package_Term_Cost__c,
+                    Dealer_Package__r.Package__c
              FROM Dealer_Package_Term__c WHERE Id IN :dealerPkgTermIds]
         );
 
@@ -44,9 +52,27 @@ public class CommissionCalculationHandler {
             // Get related records
             Package_Term__c pt = ap.Package_Term__c != null ? packageTermMap.get(ap.Package_Term__c) : null;
             Dealer_Package_Term__c dpt = ap.Dealer_Package_Term__c != null ? dptMap.get(ap.Dealer_Package_Term__c) : null;
+            Boolean enginePriced = ap.Priced_By_Engine__c == true;
 
             // Get wholesale price
-            Decimal wholesalePrice = (pt != null && pt.Price__c != null) ? pt.Price__c : 0;
+            // P4 [A/T] re-wire (plan 04.3): engine-priced records read the
+            // wholesale anchor from the dealer term's sync-written
+            // Original_Package_Term_Cost__c — the same field the pricing engine
+            // prices from (DealerPackageSyncService mirrors master
+            // Package_Term.Price__c onto it). Engine-created quotes carry
+            // Dealer_Package_Term__c but not the master Package_Term__c link,
+            // so the historic master-term lookup would zero their ledger.
+            // Legacy records keep the historic master-term path unchanged.
+            Decimal wholesalePrice = 0;
+            if (enginePriced) {
+                if (dpt != null && dpt.Original_Package_Term_Cost__c != null) {
+                    wholesalePrice = dpt.Original_Package_Term_Cost__c;
+                } else if (pt != null && pt.Price__c != null) {
+                    wholesalePrice = pt.Price__c;
+                }
+            } else if (pt != null && pt.Price__c != null) {
+                wholesalePrice = pt.Price__c;
+            }
             ap.Wholesale_Price__c = wholesalePrice;
 
             if (wholesalePrice == 0) {
@@ -67,6 +93,12 @@ public class CommissionCalculationHandler {
 
             // Get Package config
             Id pkgId = (pt != null && pt.Package__c != null) ? pt.Package__c : ap.Package__c;
+            // P4 [A/T]: engine-priced records reach the Package__c config
+            // through the dealer package (the engine's own lookup chain) when
+            // no master links are populated on the quote.
+            if (pkgId == null && enginePriced && dpt != null && dpt.Dealer_Package__r != null) {
+                pkgId = dpt.Dealer_Package__r.Package__c;
+            }
             Package__c pkg = (pkgId != null) ? packageMap.get(pkgId) : null;
 
             // Percent fields in Salesforce are stored as e.g. 15.0 for 15%, so divide by 100

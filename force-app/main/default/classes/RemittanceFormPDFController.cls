@@ -211,6 +211,7 @@ public class RemittanceFormPDFController {
                 List<Application_Package__c> packages = Database.query(
                     'SELECT Id, Application__c, Package__r.Name, Package_Term__r.Name, ' +
                     '       Odometer_Start__c, Odometer_End__c, Contract_Start_Date__c, Contract_End_Date__c, ' +
+                    '       Dealer_Package__c, Dealer_Package_Term__r.Dealer_Package__c, ' +
                     '       RecordType.Name, Dealer_Package_Price__c, ' +
                     '       Contract_Premium_Price__c, Contract_Premium_Price_Without_Tax__c, ' +
                     '       Dealer_Price_Override__c, Tax_Amount__c, Tax_Percentage__c, ' +
@@ -232,20 +233,60 @@ public class RemittanceFormPDFController {
                 }
             }
 
-            // -- 5. Query Package Options --
-            Map<Id, List<Application_Package_Option__c>> packageToOptions = new Map<Id, List<Application_Package_Option__c>>();
+            // -- 5. Query Option LINE ITEMS (P4 [S]: option state lives on the
+            // package's priced Option lines — the engine snapshot contract;
+            // Application_Package_Option__c children are retired). The line
+            // carries the priced retail; the cost side is re-derived from the
+            // dealer-option mirror (the Net_Cost formula the legacy Optional
+            // child copied).
+            Map<Id, List<RemittanceOption>> packageToOptions = new Map<Id, List<RemittanceOption>>();
             if (!packageIds.isEmpty()) {
-                for (Application_Package_Option__c opt : [
-                    SELECT Id, Application_Package__c, Option__c, Retail_Price__c, Net_Cost__c, Selection_Type__c
-                    FROM Application_Package_Option__c
-                    WHERE Application_Package__c IN :packageIds
-                    AND Selection_Type__c = 'Optional'
-                    LIMIT 10000
-                ]) {
-                    if (!packageToOptions.containsKey(opt.Application_Package__c)) {
-                        packageToOptions.put(opt.Application_Package__c, new List<Application_Package_Option__c>());
+                Map<Id, Id> dealerPkgByPkg = new Map<Id, Id>();
+                for (Application_Package__c p : packageById.values()) {
+                    Id dpId = (p.Dealer_Package_Term__r != null && p.Dealer_Package_Term__r.Dealer_Package__c != null)
+                        ? p.Dealer_Package_Term__r.Dealer_Package__c : p.Dealer_Package__c;
+                    if (dpId != null) {
+                        dealerPkgByPkg.put(p.Id, dpId);
                     }
-                    packageToOptions.get(opt.Application_Package__c).add(opt);
+                }
+                Map<Id, Dealer_Package_Option__c> mirrorByMaster = new Map<Id, Dealer_Package_Option__c>();
+                Set<Id> dealerPkgIds = new Set<Id>(dealerPkgByPkg.values());
+                if (!dealerPkgIds.isEmpty()) {
+                    for (Dealer_Package_Option__c dpo : [
+                        SELECT Id, Package_Option__c, Net_Cost__c
+                        FROM Dealer_Package_Option__c
+                        WHERE Dealer_Package__c IN :dealerPkgIds
+                          AND Package_Option__c != null
+                          AND Net_Cost__c != null AND Net_Cost__c != 0
+                    ]) {
+                        if (!mirrorByMaster.containsKey(dpo.Package_Option__c)) {
+                            mirrorByMaster.put(dpo.Package_Option__c, dpo);
+                        }
+                    }
+                }
+                for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.queryWithBinds(
+                        'SELECT Application_Package__c, Description__c, Amount__c, Package_Option__c' +
+                        ' FROM Application_Package_Line_Item__c' +
+                        ' WHERE Application_Package__c IN :packageIds' +
+                        ' AND Line_Type__c = \'Option\'' +
+                        ' ORDER BY Package_Option__c, Id',
+                        new Map<String, Object>{ 'packageIds' => packageIds },
+                        System.AccessLevel.SYSTEM_MODE)) {
+                    if (line.Application_Package__c == null) {
+                        continue;
+                    }
+                    List<RemittanceOption> rows = packageToOptions.get(line.Application_Package__c);
+                    if (rows == null) {
+                        rows = new List<RemittanceOption>();
+                        packageToOptions.put(line.Application_Package__c, rows);
+                    }
+                    Dealer_Package_Option__c mirror = line.Package_Option__c != null
+                        ? mirrorByMaster.get(line.Package_Option__c) : null;
+                    RemittanceOption ro = new RemittanceOption();
+                    ro.optionName = String.isNotBlank(line.Description__c) ? line.Description__c : 'Additional Option';
+                    ro.costPrice  = mirror != null && mirror.Net_Cost__c != null
+                        ? mirror.Net_Cost__c : (line.Amount__c != null ? line.Amount__c : 0);
+                    rows.add(ro);
                 }
             }
 
@@ -299,7 +340,7 @@ public class RemittanceFormPDFController {
                         pkgWithOpts.applicationPackage = pkg;
                         pkgWithOpts.additionalOptions  = packageToOptions.containsKey(pkg.Id)
                             ? packageToOptions.get(pkg.Id)
-                            : new List<Application_Package_Option__c>();
+                            : new List<RemittanceOption>();
 
                         // Duration and display name
                         pkgWithOpts.duration    = getDurationString(pkg);
@@ -388,9 +429,16 @@ public class RemittanceFormPDFController {
         public String  invoiceName                  { get; set; }
     }
 
+    /** P4 [S]: one optional add-on row on a remittance package — plain
+     *  display values from the package's Option LINE ITEMS (see section 5). */
+    public class RemittanceOption {
+        public String  optionName { get; set; }
+        public Decimal costPrice  { get; set; }
+    }
+
     public class PackageWithOptions {
         public Application_Package__c applicationPackage          { get; set; }
-        public List<Application_Package_Option__c> additionalOptions { get; set; }
+        public List<RemittanceOption> additionalOptions { get; set; }
         public List<Invoice_Line_Item__c> packageLineItems        { get; set; }
         public List<LineItemDisplay> displayLineItems             { get; set; }
         public String  duration    { get; set; }

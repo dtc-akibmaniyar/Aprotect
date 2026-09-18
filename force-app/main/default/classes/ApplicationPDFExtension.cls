@@ -12,16 +12,243 @@ public without sharing class ApplicationPDFExtension {
     public String  dealerAddress   { get; set; }
 
     public List<Application_Package__c> applicationPackages { get; private set; }
-    private Map<Id, List<Application_Package_Option__c>>     packageOptions;
     private Map<Id, String>  packageLogoUrls;
     private Map<Id, Boolean> packageHasLogo;
 
+    /**
+     * P4 [S]: one optional add-on rendered on the application PDFs / summary
+     * package data. Plain display values (no SObject) sourced from the
+     * package's priced Option LINE ITEMS (Line_Type__c = 'Option' — the
+     * engine snapshot contract the S5 option writers create on add;
+     * Application_Package_Option__c children are retired). A package with no
+     * Option lines carries no optional options.
+     */
+    public class OptionDisplay {
+        public String  optionName   { get; set; }
+        public Decimal retailPrice  { get; set; }
+        public OptionDisplay(String name, Decimal retail) {
+            this.optionName = name;
+            this.retailPrice = retail;
+        }
+    }
+
+    /**
+     * P4 [T] stored-snapshot money (change-implementation plan §11 P4 [T],
+     * §07.3): per-package totals reduced from the persisted engine line set so
+     * these PDFs render the stored snapshot for engine-priced packages
+     * (rendered* keys on PackageWrapper) — contract PDF, portal and invoice
+     * agree on mixed-fee deals. Packages without a line set keep the
+     * stored/formula fields byte-for-byte (flag-off state unchanged).
+     */
+    public class StoredLineMoney {
+        public Boolean hasLines   { get; set; }
+        public Decimal noTaxTotal { get; set; }
+        public Decimal taxTotal   { get; set; }
+    }
+    private Map<Id, StoredLineMoney> storedLineMoneyByPkg = new Map<Id, StoredLineMoney>();
+
+    /**
+     * P4 flip [T]-follow-up + P4 [S]: Included-option NAME list for the
+     * application PDFs / summary package data. The legacy create-time flow
+     * copies the dealer package's Included Dealer_Package_Option__c rows into
+     * Application_Package_Option__c children; those children are RETIRED in
+     * P4 [S] (object deleted org-side), so the name list renders from the
+     * dealer mirror directly — the SAME rows the flow copied from — on every
+     * shape: for each package this map holds the NAMES of the dealer
+     * package's Included Dealer_Package_Option__c rows (via the master Option
+     * each points at — the identical text APO.Option__c's formula rendered
+     * for legacy children). Packages without a resolvable dealer package (no
+     * Dealer_Package__c / Dealer_Package_Term__c chain) render no names —
+     * the same empty state such records show today (children only ever came
+     * from those dealer rows).
+     */
+    private Map<Id, List<String>> dealerIncludedOptionNamesByPkg =
+        new Map<Id, List<String>>();
+
+    /** Engine shape = an engine-priced package carrying its persisted line set. */
+    private Boolean isEngineSnapshotShape(Application_Package__c pkg) {
+        StoredLineMoney m = storedLineMoneyByPkg.get(pkg.Id);
+        return m != null && m.hasLines == true;
+    }
+
+    /**
+     * P4 flip [T]-follow-up + P4 [S]: load the Included Dealer_Package_Option__c
+     * row NAMES per package (the rows the legacy create-time flow copies into
+     * APO children — flow filter: Dealer_Package__c = the term's dealer
+     * package, Selection_Type = Included). Display-only: never DMLs. Names
+     * come from the master Option reachable via the dealer option's
+     * Package_Option__c master (the same text APO.Option__c's formula
+     * rendered for legacy children).
+     */
+    private void loadDealerIncludedOptionNames() {
+        if (applicationPackages == null || applicationPackages.isEmpty()) {
+            return;
+        }
+        Map<Id, Id> dealerPackageIdByPkg = new Map<Id, Id>();
+        for (Application_Package__c p : applicationPackages) {
+            Id dpId = (p.Dealer_Package_Term__r != null && p.Dealer_Package_Term__r.Dealer_Package__c != null)
+                ? p.Dealer_Package_Term__r.Dealer_Package__c
+                : p.Dealer_Package__c;
+            if (dpId != null) {
+                dealerPackageIdByPkg.put(p.Id, dpId);
+            }
+        }
+        if (dealerPackageIdByPkg.isEmpty()) {
+            return;
+        }
+        try {
+            Map<Id, List<String>> namesByDp = new Map<Id, List<String>>();
+            for (Dealer_Package_Option__c dpo : [
+                SELECT Id, Dealer_Package__c,
+                       Package_Option__r.Option__r.Name
+                FROM Dealer_Package_Option__c
+                WHERE Dealer_Package__c IN :dealerPackageIdByPkg.values()
+                  AND Selection_Type__c = 'Included'
+                ORDER BY Id
+            ]) {
+                if (dpo.Dealer_Package__c == null
+                        || dpo.Package_Option__r == null
+                        || dpo.Package_Option__r.Option__r == null
+                        || String.isBlank(dpo.Package_Option__r.Option__r.Name)) {
+                    continue;
+                }
+                List<String> names = namesByDp.get(dpo.Dealer_Package__c);
+                if (names == null) {
+                    names = new List<String>();
+                    namesByDp.put(dpo.Dealer_Package__c, names);
+                }
+                names.add(dpo.Package_Option__r.Option__r.Name);
+            }
+            for (Id pkgId : dealerPackageIdByPkg.keySet()) {
+                Id dpId = dealerPackageIdByPkg.get(pkgId);
+                if (namesByDp.containsKey(dpId)) {
+                    dealerIncludedOptionNamesByPkg.put(pkgId, namesByDp.get(dpId));
+                }
+            }
+        } catch (Exception e) {
+            System.debug('ApplicationPDFExtension: dealer included option names unavailable: ' + e.getMessage());
+            dealerIncludedOptionNamesByPkg.clear();
+        }
+    }
+
+    /**
+     * P4 [T]: load the persisted engine line set (SYSTEM_MODE — the P4
+     * line-item fields carry no portal FLS yet) and reduce it to per-package
+     * money; packages without lines never enter the map.
+     */
+    private void loadStoredLineMoney() {
+        if (applicationPackages == null || applicationPackages.isEmpty()) {
+            return;
+        }
+        Set<Id> pkgIds = new Set<Id>();
+        for (Application_Package__c p : applicationPackages) {
+            pkgIds.add(p.Id);
+        }
+        String idIn = '(';
+        for (Id i : pkgIds) {
+            idIn += '\'' + String.valueOf(i) + '\',';
+        }
+        idIn = idIn.removeEnd(',') + ')';
+        Map<Id, StoredLineMoney> totals = new Map<Id, StoredLineMoney>();
+        try {
+            for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.query(
+                    'SELECT Application_Package__c, Line_Type__c, Amount__c' +
+                    ' FROM Application_Package_Line_Item__c' +
+                    ' WHERE Application_Package__c IN ' + idIn +
+                    ' ORDER BY Application_Package__c, Sort_Order__c, Id',
+                    System.AccessLevel.SYSTEM_MODE)) {
+                if (line.Application_Package__c == null || line.Amount__c == null) {
+                    continue;
+                }
+                StoredLineMoney m = totals.get(line.Application_Package__c);
+                if (m == null) {
+                    m = new StoredLineMoney();
+                    m.noTaxTotal = 0;
+                    m.taxTotal = 0;
+                    totals.put(line.Application_Package__c, m);
+                }
+                if ('Tax'.equals(line.Line_Type__c)) {
+                    m.taxTotal = money(m.taxTotal + line.Amount__c);
+                } else {
+                    m.noTaxTotal = money(m.noTaxTotal + line.Amount__c);
+                }
+                m.hasLines = true;
+            }
+        } catch (Exception e) {
+            System.debug('ApplicationPDFExtension: stored line money unavailable: ' + e.getMessage());
+            totals.clear();
+        }
+        storedLineMoneyByPkg = totals;
+    }
+
+    private static Decimal money(Decimal value) {
+        return value == null ? 0 : value.setScale(2, System.RoundingMode.HALF_UP);
+    }
+
+    /**
+     * P4 [S]: the application PDFs / summary package-data optional add-ons
+     * come from the package's priced Option LINE ITEMS (the engine snapshot
+     * contract — the S5 option writers create these on add with Amount = the
+     * priced retail, Description = the option name). Packages without Option
+     * lines carry no optional options. SYSTEM_MODE read: the P4 line-item
+     * fields carry no portal FLS yet (the same mode the engine writes and
+     * every line reader uses).
+     */
+    private Map<Id, List<OptionDisplay>> loadOptionalOptionDisplays() {
+        Map<Id, List<OptionDisplay>> byPkg = new Map<Id, List<OptionDisplay>>();
+        if (applicationPackages == null || applicationPackages.isEmpty()) {
+            return byPkg;
+        }
+        Set<Id> pkgIds = new Set<Id>();
+        for (Application_Package__c p : applicationPackages) {
+            pkgIds.add(p.Id);
+        }
+        String idIn = '(';
+        for (Id i : pkgIds) {
+            idIn += '\'' + String.valueOf(i) + '\',';
+        }
+        idIn = idIn.removeEnd(',') + ')';
+        try {
+            for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.query(
+                    'SELECT Application_Package__c, Description__c, Amount__c,' +
+                    ' Package_Option__r.Option__r.Name' +
+                    ' FROM Application_Package_Line_Item__c' +
+                    ' WHERE Application_Package__c IN ' + idIn +
+                    ' AND Line_Type__c = \'Option\'' +
+                    ' ORDER BY Application_Package__c, Sort_Order__c, Id',
+                    System.AccessLevel.SYSTEM_MODE)) {
+                if (line.Application_Package__c == null) {
+                    continue;
+                }
+                List<OptionDisplay> rows = byPkg.get(line.Application_Package__c);
+                if (rows == null) {
+                    rows = new List<OptionDisplay>();
+                    byPkg.put(line.Application_Package__c, rows);
+                }
+                String name = String.isNotBlank(line.Description__c)
+                    ? line.Description__c
+                    : (line.Package_Option__r != null && line.Package_Option__r.Option__r != null
+                        && String.isNotBlank(line.Package_Option__r.Option__r.Name)
+                        ? line.Package_Option__r.Option__r.Name : 'Option');
+                rows.add(new OptionDisplay(name, line.Amount__c));
+            }
+        } catch (Exception e) {
+            System.debug('ApplicationPDFExtension: optional option lines unavailable: ' + e.getMessage());
+            byPkg.clear();
+        }
+        return byPkg;
+    }
+
     public class PackageWrapper {
         public Application_Package__c              pkg              { get; set; }
-        public List<Application_Package_Option__c> includedOptions  { get; set; }
-        public List<Application_Package_Option__c> optionalOptions  { get; set; }
-        public List<String>                        inclusionsList   { get; set; }
-        public List<String>                        exclusionsList   { get; set; }
+        // P4 flip [T]-follow-up + P4 [S]: rendered "Additional Options" name
+        // list — the names of the dealer package's Included
+        // Dealer_Package_Option__c rows (the rows the legacy create-time flow
+        // copied into APO children; the children are retired in P4 [S]).
+        public List<String>                       includedOptionNames { get; set; }
+        // P4 [S]: optional add-ons with their priced retail, read from the
+        // package's Option LINE ITEMS (see OptionDisplay).
+        public List<OptionDisplay>                optionalOptions  { get; set; }
         public String                              packageLogoUrl   { get; set; }
         public Boolean                             hasPackageLogo   { get; set; }
         public String                              contractStartDate{ get; set; }
@@ -34,6 +261,57 @@ public without sharing class ApplicationPDFExtension {
         // Flattened relationship fields for PDF renderer compatibility
         public String                              planName         { get; set; }
         public String                              termName         { get; set; }
+        // P4 [T]: when true the package carries a persisted engine line set and
+        // the rendered* money keys below come from the stored lines (§07.3
+        // rebuild — sum(non-Tax lines), sum(Tax lines), sum(all)); otherwise
+        // they fall back to the stored/formula fields (legacy byte-identical).
+        public Boolean                             hasStoredLineMoney { get; set; }
+        public Decimal                             storedNoTaxTotal   { get; set; }
+        public Decimal                             storedTaxTotal     { get; set; }
+        public Decimal renderedContractPremiumWithoutTax {
+            get { return hasStoredLineMoney == true ? storedNoTaxTotal : pkg.Contract_Premium_Price_Without_Tax__c; }
+        }
+        public Decimal renderedTaxAmount {
+            get { return hasStoredLineMoney == true ? storedTaxTotal : pkg.Tax_Amount__c; }
+        }
+        public Decimal renderedContractPremium {
+            get {
+                return hasStoredLineMoney == true
+                    ? (storedNoTaxTotal == null ? 0 : storedNoTaxTotal)
+                        + (storedTaxTotal == null ? 0 : storedTaxTotal)
+                    : pkg.Contract_Premium_Price__c;
+            }
+        }
+        // P4 flip [T]-follow-up: master-first plan/term display for the
+        // CarLoanProtection page merges. Legacy master-linked records render
+        // the master names exactly as before; engine-priced records (no master
+        // links — the create-time flow that wrote them is engine-guarded off)
+        // resolve through the dealer copy links the engine path carries, so
+        // the PDF term/plan never render blank/'N/A' on engine quotes.
+        public String renderedPlanName {
+            get {
+                if (pkg.Package__r != null && String.isNotBlank(pkg.Package__r.Name)) {
+                    return pkg.Package__r.Name;
+                }
+                if (pkg.Dealer_Package__r != null && pkg.Dealer_Package__r.Package__r != null
+                        && String.isNotBlank(pkg.Dealer_Package__r.Package__r.Name)) {
+                    return pkg.Dealer_Package__r.Package__r.Name;
+                }
+                return planName;
+            }
+        }
+        public String renderedTermName {
+            get {
+                if (pkg.Package_Term__r != null && String.isNotBlank(pkg.Package_Term__r.Name)) {
+                    return pkg.Package_Term__r.Name;
+                }
+                if (pkg.Dealer_Package_Term__r != null && pkg.Dealer_Package_Term__r.Package_Term__r != null
+                        && String.isNotBlank(pkg.Dealer_Package_Term__r.Package_Term__r.Name)) {
+                    return pkg.Dealer_Package_Term__r.Package_Term__r.Name;
+                }
+                return termName;
+            }
+        }
     }
 
     public class RecordTypeWrapper {
@@ -54,7 +332,6 @@ public without sharing class ApplicationPDFExtension {
         loadDealerBranding();  // sets dealer branding + logo
         getDealerLogoUrl();    // sets dealerLogoUrl / hasDealerLogo
 
-        packageOptions         = new Map<Id, List<Application_Package_Option__c>>();
         packageLogoUrls        = new Map<Id, String>();
         packageHasLogo         = new Map<Id, Boolean>();
         recordTypeWrappers     = new Map<String, RecordTypeWrapper>();
@@ -62,19 +339,25 @@ public without sharing class ApplicationPDFExtension {
 
         getLatestPackagesFromEachRecordType();
         getPackageLogos();
+        loadStoredLineMoney();
+        loadDealerIncludedOptionNames();
+        // P4 [S]: optional add-on display state — priced Option line items of
+        // the package (the engine snapshot contract); APO children retired.
+        Map<Id, List<OptionDisplay>> optionalOptionDisplaysByPkg = loadOptionalOptionDisplays();
 
         // Pre-load T&C for all packages
         Map<Id, String> termsMap = loadTermsAndConditions();
 
         for (Application_Package__c pkg : applicationPackages) {
-            packageOptions.put(pkg.Id, pkg.Application_Package_Options__r);
-        }
-
-        for (Application_Package__c pkg : applicationPackages) {
             PackageWrapper wrapper  = new PackageWrapper();
             wrapper.pkg             = pkg;
-            wrapper.includedOptions = getIncludedOptionsImpl(pkg.Id);
-            wrapper.optionalOptions = getOptionalOptionsImpl(pkg.Id);
+            // P4 [S]: Included-option names render from the dealer mirror (the
+            // rows the legacy create-time flow copied into the now-retired APO
+            // children) on every shape — no children exist org-side.
+            wrapper.includedOptionNames = dealerIncludedOptionNamesByPkg.containsKey(pkg.Id)
+                ? dealerIncludedOptionNamesByPkg.get(pkg.Id) : new List<String>();
+            wrapper.optionalOptions = optionalOptionDisplaysByPkg.containsKey(pkg.Id)
+                ? optionalOptionDisplaysByPkg.get(pkg.Id) : new List<OptionDisplay>();
             wrapper.packageLogoUrl  = packageLogoUrls.get(pkg.Id);
             wrapper.hasPackageLogo  = packageHasLogo.containsKey(pkg.Id) ? packageHasLogo.get(pkg.Id) : false;
 
@@ -99,17 +382,21 @@ public without sharing class ApplicationPDFExtension {
             // T&C resolution
             wrapper.termsAndConditions = termsMap.containsKey(pkg.Id) ? termsMap.get(pkg.Id) : '';
             wrapper.hasTermsAndConditions = String.isNotBlank(wrapper.termsAndConditions);
+
+            // P4 [T]: engine-priced package with a persisted line set — the
+            // rendered* money keys (the fields the PDF pages merge) rebuild
+            // from the stored lines (§07.3); otherwise legacy fields stand.
+            StoredLineMoney lineMoney = storedLineMoneyByPkg.get(pkg.Id);
+            if (lineMoney != null && lineMoney.hasLines) {
+                wrapper.hasStoredLineMoney = true;
+                wrapper.storedNoTaxTotal = lineMoney.noTaxTotal;
+                wrapper.storedTaxTotal = lineMoney.taxTotal;
+            }
             
             // Record type info
             String rt = String.isBlank(pkg.Package_Record_Type__c) ? 'Other' : pkg.Package_Record_Type__c;
             wrapper.recordTypeName = rt;
             wrapper.isTireRim = rt.containsIgnoreCase('Tire') && rt.containsIgnoreCase('Rim');
-
-            String inclusionsStr = getPackageInclusionsImpl(pkg.Id);
-            String exclusionsStr = getPackageExclusionsImpl(pkg.Id);
-
-            wrapper.inclusionsList = String.isBlank(inclusionsStr) ? new List<String>() : inclusionsStr.split('\\n');
-            wrapper.exclusionsList = String.isBlank(exclusionsStr) ? new List<String>() : exclusionsStr.split('\\n');
 
             if (!recordTypeWrappers.containsKey(rt)) {
                 RecordTypeWrapper rtw = new RecordTypeWrapper(rt);
@@ -233,6 +520,16 @@ public without sharing class ApplicationPDFExtension {
                 if (appPkg.Package__r != null && appPkg.Package__r.Id != null) {
                     packageIds.add(appPkg.Package__r.Id);
                     appPkgToPackage.put(appPkg.Id, appPkg.Package__r.Id);
+                } else if (isEngineSnapshotShape(appPkg)
+                        && appPkg.Dealer_Package__r != null
+                        && appPkg.Dealer_Package__r.Package__c != null) {
+                    // P4 flip [T]-follow-up: engine-priced packages carry no
+                    // master Package__c link (the create-time flow that wrote
+                    // it is engine-guarded off) — resolve the T&C through the
+                    // dealer copy's master link so the contract PDF shows the
+                    // same dealer-override/default T&C the legacy path would.
+                    packageIds.add(appPkg.Dealer_Package__r.Package__c);
+                    appPkgToPackage.put(appPkg.Id, appPkg.Dealer_Package__r.Package__c);
                 }
             }
 
@@ -325,6 +622,9 @@ public without sharing class ApplicationPDFExtension {
                        Package_Tier__r.Name,
                        Package_Term__r.Name,
                        Dealer_Package_Term__r.Name,
+                       Dealer_Package__r.Package__r.Name,
+                       Dealer_Package_Term__r.Package_Term__r.Name,
+                       Dealer_Package_Term__r.Dealer_Package__c,
                        Coverage_Plan__c,
                        Package_Record_Type__c,
                        Disclaimer_Heading__c,
@@ -341,7 +641,6 @@ public without sharing class ApplicationPDFExtension {
                        Tax_Percentage__c,
                        Contract_Premium_Price_Without_Tax__c,
                        Tax_Amount__c,
-                       Total_Package_Price__c,
                        Dealer_Package__c,
                        Dealer_Package__r.Package__c,
                        Tire_Brand__c,
@@ -352,10 +651,7 @@ public without sharing class ApplicationPDFExtension {
                        Rim_Type__c,
                        Rim_Size__c,
                        Rim_Size_Unit__c,
-                       CreatedDate,
-                       (SELECT Id, Name, Option__c, Selection_Type__c, Inclusion__c, Exclusion__c
-                        FROM Application_Package_Options__r
-                        ORDER BY Selection_Type__c)
+                       CreatedDate
                 FROM Application_Package__c
                 WHERE Application__c = :application.Id
                   AND Active__c = true
@@ -552,68 +848,4 @@ public without sharing class ApplicationPDFExtension {
         return 'Application_' + app.Name + '.pdf';
     }
 
-    public List<Application_Package_Option__c> getIncludedOptions(Id packageId) {
-        return getIncludedOptionsImpl(packageId);
-    }
-    public List<Application_Package_Option__c> getOptionalOptions(Id packageId) {
-        return getOptionalOptionsImpl(packageId);
-    }
-    public String getPackageInclusions(Id packageId) {
-        return getPackageInclusionsImpl(packageId);
-    }
-    public String getPackageExclusions(Id packageId) {
-        return getPackageExclusionsImpl(packageId);
-    }
-
-    private List<Application_Package_Option__c> getIncludedOptionsImpl(Id packageId) {
-        List<Application_Package_Option__c> result = new List<Application_Package_Option__c>();
-        List<Application_Package_Option__c> allOptions = packageOptions.get(packageId);
-        if (allOptions != null) {
-            for (Application_Package_Option__c opt : allOptions) {
-                if (opt.Selection_Type__c == 'Included') result.add(opt);
-            }
-        }
-        return result;
-    }
-
-    private List<Application_Package_Option__c> getOptionalOptionsImpl(Id packageId) {
-        List<Application_Package_Option__c> result = new List<Application_Package_Option__c>();
-        List<Application_Package_Option__c> allOptions = packageOptions.get(packageId);
-        if (allOptions != null) {
-            for (Application_Package_Option__c opt : allOptions) {
-                if (opt.Selection_Type__c == 'Optional') result.add(opt);
-            }
-        }
-        return result;
-    }
-
-    private String getPackageInclusionsImpl(Id packageId) {
-        String result = '';
-        List<Application_Package_Option__c> allOptions = packageOptions.get(packageId);
-        if (allOptions != null) {
-            List<String> inclusions = new List<String>();
-            for (Application_Package_Option__c opt : allOptions) {
-                if (opt.Selection_Type__c == 'Included' && String.isNotBlank(opt.Inclusion__c)) {
-                    inclusions.add(opt.Inclusion__c);
-                }
-            }
-            result = String.join(inclusions, '\n');
-        }
-        return result;
-    }
-
-    private String getPackageExclusionsImpl(Id packageId) {
-        String result = '';
-        List<Application_Package_Option__c> allOptions = packageOptions.get(packageId);
-        if (allOptions != null) {
-            List<String> exclusions = new List<String>();
-            for (Application_Package_Option__c opt : allOptions) {
-                if (opt.Selection_Type__c == 'Included' && String.isNotBlank(opt.Exclusion__c)) {
-                    exclusions.add(opt.Exclusion__c);
-                }
-            }
-            result = String.join(exclusions, '\n');
-        }
-        return result;
-    }
 }

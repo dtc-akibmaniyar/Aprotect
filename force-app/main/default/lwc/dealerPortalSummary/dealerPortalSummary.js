@@ -16,6 +16,9 @@ import createInvoiceOnApplicationSubmit from '@salesforce/apex/ApplicationSummar
 // Update application status
 import updateApplicationStatus from '@salesforce/apex/DealerPortalController.updateApplicationStatus';
 import getInvoiceForApplication from '@salesforce/apex/ApplicationSummaryController.getInvoiceForApplication';
+// P4 [L] summary viewer cutover: read the engine-snapshot gate through Apex
+// (Aprotect_Portal_Settings__c flags — never hardcoded client-side).
+import isSummaryEngineViewerActive from '@salesforce/apex/ApplicationSummaryController.isSummaryEngineViewerActive';
 export default class DealerPortalSummary extends NavigationMixin(LightningElement) {
     @api recordId;
     @api applicationId = '';
@@ -64,6 +67,11 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     @track totalPrice = 0;
     @track taxAmount = 0;
     @track contractPremium = 0;
+
+    // P4 [L] engine-snapshot viewer gate (read from Apex on every loadData).
+    // False in the current org (zero Aprotect_Portal_Settings rows) — the
+    // legacy display path stays authoritative while every engine flag is off.
+    @track engineViewerActive = false;
     
     @track invoiceId = null;
     @track invoiceName = null;
@@ -162,11 +170,13 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
         }
 
         try {
-            // Load both sets of data in parallel
-            const [summaryResult, packageResult] = await Promise.all([
+            // Load the engine-snapshot gate plus both data sets in parallel
+            const [engineViewerActive, summaryResult, packageResult] = await Promise.all([
+                isSummaryEngineViewerActive(),
                 getApplicationSummaryData({ applicationId: this.effectiveApplicationId }),
                 getApplicationPackageData({ applicationId: this.effectiveApplicationId })
             ]);
+            this.engineViewerActive = engineViewerActive === true;
             
             // Merge summaryResult with default structure to ensure all properties exist
             this.summaryData = {
@@ -188,8 +198,22 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
             
             this.packageData = packageResult;
             
-            // Post-process applicationPackages to remove Premium Vehicle Fee from customer-facing totals
+            // Legacy display-only recalc (preserved byte-for-byte): recompute
+            // customer totals from the stored fields. It runs for every package
+            // first; in engine-snapshot mode packages that carry a stored line
+            // set are then re-stamped from the server payload below
+            // (stored = displayed) — the legacy recalc must not run on engine
+            // payloads alone because it would double-count fees the engine has
+            // already taxed (P4 [L] viewer cutover, plan §10.4 summary row).
             this._recalculateCustomerTotals();
+            // Display-only transform for the Tire & Rim section (odometer rows + coverage term)
+            this._applyTireRimDisplayTransform();
+            // P4 [L] engine-snapshot render. Gate read through Apex
+            // (isSummaryEngineViewerActive); false in the current org, so this
+            // block is inert and cannot execute while the flags are off.
+            if (this.engineViewerActive) {
+                this._applyStoredSnapshotRender();
+            }
             console.log('🔄 loadData - packageResult received', packageResult);
             const clonedPackageData = { ...this.packageData }; // Shallow copy of packageData
             clonedPackageData.recordTypeWrappers = clonedPackageData.recordTypeWrappers.map(rtWrapper => {
@@ -364,15 +388,50 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
                 const matched = pkgId ? pkgDataMap.get(pkgId) : null;
                 const opts = matched && matched.optionalOptions ? matched.optionalOptions : [];
                 pw.optionalOptionsList = opts.map(opt => ({
-                    label: opt.Option__c
-                        || (opt.Package_Option__r && opt.Package_Option__r.Name)
-                        || 'Unknown',
-                    price: opt.Package_Option__r && opt.Package_Option__r.Price__c != null
-                        ? fmt(opt.Package_Option__r.Price__c)
-                        : ''
+                    // P4 [S]: optionalOptions are OptionDisplay values (plain
+                    // name + priced retail from the package's Option lines).
+                    label: opt.optionName || 'Unknown',
+                    price: opt.retailPrice != null ? fmt(opt.retailPrice) : ''
                 }));
             }
         }
+    }
+
+    /**
+     * Display-only transform for the Tire & Rim Protection Plan section.
+     * - Marks each package wrapper with isTireRim (used by the HTML to hide
+     *   the odometer rows for tire & rim packages only).
+     * - Computes coverageTermDisplay: for tire & rim packages the km portion
+     *   is stripped so only the month portion shows (e.g.
+     *   "36 Months/70,000 km" -> "36 Months"); all other sections keep the
+     *   full coverage term. Stored data is never modified.
+     */
+    _applyTireRimDisplayTransform() {
+        if (!this.summaryData.applicationPackages) return;
+        this.summaryData.applicationPackages.forEach(rtWrapper => {
+            const isTireRim = /tire|rim/i.test(rtWrapper.recordTypeName || '');
+            if (!rtWrapper.packages) return;
+            rtWrapper.packages.forEach(pkgWrapper => {
+                pkgWrapper.isTireRim = isTireRim;
+                pkgWrapper.coverageTermDisplay = isTireRim
+                    ? this._stripKmFromCoverageTerm(pkgWrapper.coverageTerm)
+                    : (pkgWrapper.coverageTerm || '');
+            });
+        });
+    }
+
+    /**
+     * Keep only the month portion of a coverage term string.
+     * Handles the varying separators ("/" or "-"), e.g.
+     * "36 Months/70,000 km" or "12 Months - 20000.00 KM" -> "12 Months".
+     * If the string has no km part (nothing to strip), it is returned unchanged.
+     */
+    _stripKmFromCoverageTerm(term) {
+        if (!term) return '';
+        const parts = String(term).split(/[/-]/);
+        if (parts.length < 2) return term;
+        const monthPart = parts.find(p => /month/i.test(p));
+        return monthPart ? monthPart.trim() : term;
     }
 
     /**
@@ -399,6 +458,29 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
                     pkgWrapper.customerFormattedTotal = this._formatCurrency(customerTotal);
                 });
             }
+        });
+    }
+
+    /**
+     * P4 [L] engine-snapshot render (summary viewer cutover). Packages that
+     * carry the stored engine line set (server-attached hasEngineLineItems)
+     * display the stored with-tax total and tax exactly as the engine
+     * persisted them — no client-side recalc. The legacy
+     * _recalculateCustomerTotals already ran for packages without a line set;
+     * this pass only re-stamps packages whose server payload includes the
+     * engine snapshot (stored = displayed, plan §07.3/§10.4 summary row).
+     * Line items themselves are rendered by the template block guarded on
+     * hasEngineLineItems — absent from flag-off payloads, so inert.
+     */
+    _applyStoredSnapshotRender() {
+        if (!this.summaryData.applicationPackages) return;
+        this.summaryData.applicationPackages.forEach(rtWrapper => {
+            if (!rtWrapper.packages) return;
+            rtWrapper.packages.forEach(pkgWrapper => {
+                if (!pkgWrapper.hasEngineLineItems) return;
+                pkgWrapper.customerFormattedTotal = pkgWrapper.formattedTotal;
+                pkgWrapper.customerFormattedTax = pkgWrapper.formattedTax;
+            });
         });
     }
 

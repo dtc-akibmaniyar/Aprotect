@@ -487,33 +487,6 @@ public class TestDataFactory {
     }
 
     /**
-     * Creates an Application_Package_Option__c.
-     * Use doInsert=false to build an in-memory record for passing to
-     * DealerPackageAccessHelper.updateApplicationPackageOptionsWithRecords().
-     *
-     * dealerPackageOptionId — links the option back to its Dealer_Package_Option__c
-     *                          (used by the removal path in the handler)
-     * packageOptionId       — required; maps to Package_Option__c on the record
-     * selectionType         — typically 'Optional' (removal query filters on this)
-     */
-    public static Application_Package_Option__c createApplicationPackageOption(
-        Id      applicationId,
-        Id      applicationPackageId,
-        Id      dealerPackageOptionId,
-        Id      packageOptionId,
-        Boolean doInsert
-    ) {
-        Application_Package_Option__c opt = new Application_Package_Option__c(
-            Application__c           = applicationId,
-            Application_Package__c   = applicationPackageId,
-            Dealer_Package_Option__c = dealerPackageOptionId,
-            Package_Option__c        = packageOptionId
-        );
-        if (doInsert) insert opt;
-        return opt;
-    }
-
-    /**
      * Creates an Invoice__c pre-linked to a Remittance_Form__c with a custom Name.
      * Use this when tests need the Invoice.Remittance_Form__c lookup set at creation
      * time (e.g. Dealer_Remittance breakdown tests, deleteInvoice tests) or when a

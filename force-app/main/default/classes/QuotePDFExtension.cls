@@ -52,18 +52,54 @@ public without sharing class QuotePDFExtension {
     public Boolean useAprotectBranding { get; set; }
 
     public List<Application_Package__c> applicationPackages { get; private set; }
-    private Map<Id, List<Application_Package_Option__c>>     packageOptions;
     private Map<Id, String>  packageLogoUrls;
     private Map<Id, Boolean> packageHasLogo;
+
+    /**
+     * P4 [S]: one optional add-on rendered on the quote PDF. Plain display
+     * values (no SObject) sourced from the package's priced Option LINE ITEMS
+     * (Line_Type__c = 'Option' — the engine snapshot contract the S5 option
+     * writers create on add; Application_Package_Option__c children are
+     * retired). A package with no Option lines renders no additional options
+     * (the same empty state every real quote renders today).
+     */
+    public class OptionDisplay {
+        public String  optionName   { get; set; }
+        public Decimal retailPrice  { get; set; }
+        public OptionDisplay(String name, Decimal retail) {
+            this.optionName = name;
+            this.retailPrice = retail;
+        }
+    }
+
+    /**
+     * P4 [T] stored-snapshot money (change-implementation plan §11 P4 [T],
+     * §07.3): when an engine-priced Application_Package carries its persisted
+     * line-item snapshot, the PDF's package price / quote totals render from
+     * the stored lines (sum(non-Tax lines) = no-tax total, sum(Tax lines) =
+     * tax, sum(all) = with-tax total — the exact rebuild the per-tab payloads
+     * use), so contract PDF, portal and invoice agree on mixed-fee deals
+     * (P4 exit criteria). Fee lines with no stored carrier on
+     * Application_Package__c (diesel / commercial / powersports) and the
+     * premium fee otherwise fall out of the legacy formula surface; the line
+     * set carries them. Packages WITHOUT a line set keep the legacy
+     * stored/formula build byte-for-byte (the flag-off state renders exactly
+     * as before this change).
+     */
+    public class StoredLineMoney {
+        public Boolean hasLines   { get; set; }
+        public Decimal noTaxTotal { get; set; }
+        public Decimal taxTotal   { get; set; }
+    }
+    private Map<Id, StoredLineMoney> storedLineMoneyByPkg = new Map<Id, StoredLineMoney>();
 
     public class PackageWrapper {
         public Application_Package__c              pkg              { get; set; }
         public String                              packageName      { get; set; }
         public String                              termName         { get; set; }
-        public List<Application_Package_Option__c> includedOptions  { get; set; }
-        public List<Application_Package_Option__c> optionalOptions  { get; set; }
-        public List<String>                        inclusionsList   { get; set; }
-        public List<String>                        exclusionsList   { get; set; }
+        // P4 [S]: optional add-ons rendered with their priced retail, read
+        // from the package's Option LINE ITEMS (see OptionDisplay).
+        public List<OptionDisplay>                 optionalOptions  { get; set; }
         public String                              packageLogoUrl   { get; set; }
         public Boolean                             hasPackageLogo   { get; set; }
         public String                              contractStartDate{ get; set; }
@@ -73,6 +109,9 @@ public without sharing class QuotePDFExtension {
         public String                              recordTypeName   { get; set; }
         public Boolean                             isTireRim        { get; set; }
         public Decimal                             retailPriceTotal { get; set; }
+        // P4 [T]: when true the wrapper's money comes from the stored line set.
+        public Boolean                             hasStoredLineMoney { get; set; }
+        public Decimal                             storedTaxTotal     { get; set; }
     }
 
     // Single flat list (no record-type grouping needed for quote)
@@ -110,28 +149,47 @@ public without sharing class QuotePDFExtension {
 
         loadVehicleAndCustomerFields();
 
-        packageOptions         = new Map<Id, List<Application_Package_Option__c>>();
         packageLogoUrls        = new Map<Id, String>();
         packageHasLogo         = new Map<Id, Boolean>();
         packageWrappersList    = new List<PackageWrapper>();
 
         getAllActivePackages();
         getPackageLogos();
+        loadStoredLineMoney();
+        // P4 [S]: optional add-on display state — priced Option line items of
+        // the package (the engine snapshot contract); APO children retired.
+        Map<Id, List<OptionDisplay>> optionDisplaysByPkg = loadOptionalOptionDisplays();
 
         // Pre-load T&C for all packages
         Map<Id, String> termsMap = loadTermsAndConditions();
 
         for (Application_Package__c pkg : applicationPackages) {
-            packageOptions.put(pkg.Id, pkg.Application_Package_Options__r);
-        }
-
-        for (Application_Package__c pkg : applicationPackages) {
             PackageWrapper wrapper  = new PackageWrapper();
             wrapper.pkg             = pkg;
-            wrapper.packageName     = pkg.Package__r != null ? pkg.Package__r.Name : '';
-            wrapper.termName        = pkg.Package_Term__r != null ? pkg.Package_Term__r.Name : 'N/A';
-            wrapper.includedOptions = getIncludedOptionsImpl(pkg.Id);
-            wrapper.optionalOptions = getOptionalOptionsImpl(pkg.Id);
+            // P4 flip [T]-follow-up: engine-priced Application_Package records
+            // carry NO master Package__c / Package_Term__c links (the
+            // create-time flow that wrote them backs off at its engine guard),
+            // so the plan header would render blank and the term 'N/A' on
+            // engine-quote PDFs. Resolve the display through the dealer copy
+            // links the engine path DOES carry (Dealer_Package__c /
+            // Dealer_Package_Term__c -> their masters, then the copy names),
+            // master-first so the legacy path stays byte-identical.
+            wrapper.packageName = pkg.Package__r != null && String.isNotBlank(pkg.Package__r.Name)
+                ? pkg.Package__r.Name
+                : (pkg.Dealer_Package__r != null && pkg.Dealer_Package__r.Package__r != null
+                        && String.isNotBlank(pkg.Dealer_Package__r.Package__r.Name)
+                    ? pkg.Dealer_Package__r.Package__r.Name
+                    : (pkg.Dealer_Package__r != null && String.isNotBlank(pkg.Dealer_Package__r.Name)
+                        ? pkg.Dealer_Package__r.Name : ''));
+            wrapper.termName = pkg.Package_Term__r != null && String.isNotBlank(pkg.Package_Term__r.Name)
+                ? pkg.Package_Term__r.Name
+                : (pkg.Dealer_Package_Term__r != null && pkg.Dealer_Package_Term__r.Package_Term__r != null
+                        && String.isNotBlank(pkg.Dealer_Package_Term__r.Package_Term__r.Name)
+                    ? pkg.Dealer_Package_Term__r.Package_Term__r.Name
+                    : (pkg.Dealer_Package_Term__r != null && String.isNotBlank(pkg.Dealer_Package_Term__r.Name)
+                        ? pkg.Dealer_Package_Term__r.Name : 'N/A'));
+            wrapper.optionalOptions = optionDisplaysByPkg.containsKey(pkg.Id)
+                ? optionDisplaysByPkg.get(pkg.Id) : new List<OptionDisplay>();
             wrapper.packageLogoUrl  = packageLogoUrls.get(pkg.Id);
             wrapper.hasPackageLogo  = packageHasLogo.containsKey(pkg.Id) ? packageHasLogo.get(pkg.Id) : false;
 
@@ -151,13 +209,16 @@ public without sharing class QuotePDFExtension {
 
             Decimal retailBase = pkg.Dealer_Package_Retail_Price__c != null ? pkg.Dealer_Package_Retail_Price__c : 0;
             Decimal retailAddons = pkg.Add_Ons_Retail_Price__c != null ? pkg.Add_Ons_Retail_Price__c : 0;
-            wrapper.retailPriceTotal = retailBase + retailAddons;
-
-            String inclusionsStr = getPackageInclusionsImpl(pkg.Id);
-            String exclusionsStr = getPackageExclusionsImpl(pkg.Id);
-
-            wrapper.inclusionsList = String.isBlank(inclusionsStr) ? new List<String>() : inclusionsStr.split('\\n');
-            wrapper.exclusionsList = String.isBlank(exclusionsStr) ? new List<String>() : exclusionsStr.split('\\n');
+            StoredLineMoney lineMoney = storedLineMoneyByPkg.get(pkg.Id);
+            if (lineMoney != null && lineMoney.hasLines) {
+                // Engine-priced package with a persisted line set: PDF money
+                // renders from the stored snapshot (§07.3 rebuild).
+                wrapper.hasStoredLineMoney = true;
+                wrapper.retailPriceTotal = lineMoney.noTaxTotal;
+                wrapper.storedTaxTotal = lineMoney.taxTotal;
+            } else {
+                wrapper.retailPriceTotal = retailBase + retailAddons;
+            }
 
             packageWrappersList.add(wrapper);
         }
@@ -407,11 +468,14 @@ public without sharing class QuotePDFExtension {
                        Tax_Percentage__c,
                        Contract_Premium_Price_Without_Tax__c,
                        Tax_Amount__c,
-                       Total_Package_Price__c,
                        Dealer_Package_Retail_Price__c,
                        Add_Ons_Retail_Price__c,
                        Dealer_Package__c,
                        Dealer_Package__r.Package__c,
+                       Dealer_Package__r.Name,
+                       Dealer_Package__r.Package__r.Name,
+                       Dealer_Package_Term__r.Name,
+                       Dealer_Package_Term__r.Package_Term__r.Name,
                        Tire_Brand__c,
                        Tire_Type__c,
                        Tread_Depth__c,
@@ -420,10 +484,7 @@ public without sharing class QuotePDFExtension {
                        Rim_Type__c,
                        Rim_Size__c,
                        Rim_Size_Unit__c,
-                       CreatedDate,
-                       (SELECT Id, Name, Option__c, Selection_Type__c, Inclusion__c, Exclusion__c
-                        FROM Application_Package_Options__r
-                        ORDER BY Selection_Type__c)
+                       CreatedDate
                 FROM Application_Package__c
                 WHERE Application__c = :application.Id
                   AND Active__c = true
@@ -601,66 +662,127 @@ public without sharing class QuotePDFExtension {
         }
     }
 
-    private List<Application_Package_Option__c> getIncludedOptionsImpl(Id packageId) {
-        List<Application_Package_Option__c> result = new List<Application_Package_Option__c>();
-        List<Application_Package_Option__c> allOptions = packageOptions.get(packageId);
-        if (allOptions != null) {
-            for (Application_Package_Option__c opt : allOptions) {
-                if (opt.Selection_Type__c == 'Included') result.add(opt);
-            }
+    /**
+     * P4 [S]: the quote PDF's optional add-ons come from the package's priced
+     * Option LINE ITEMS (the engine snapshot contract — the S5 option writers
+     * create these on add with Amount = the priced retail, Description = the
+     * option name). Packages without Option lines render no additional
+     * options. SYSTEM_MODE read: the P4 line-item fields carry no portal FLS
+     * yet (the same mode the engine writes and every line reader uses).
+     */
+    private Map<Id, List<OptionDisplay>> loadOptionalOptionDisplays() {
+        Map<Id, List<OptionDisplay>> byPkg = new Map<Id, List<OptionDisplay>>();
+        if (applicationPackages == null || applicationPackages.isEmpty()) {
+            return byPkg;
         }
-        return result;
-    }
-
-    private List<Application_Package_Option__c> getOptionalOptionsImpl(Id packageId) {
-        List<Application_Package_Option__c> result = new List<Application_Package_Option__c>();
-        List<Application_Package_Option__c> allOptions = packageOptions.get(packageId);
-        if (allOptions != null) {
-            for (Application_Package_Option__c opt : allOptions) {
-                if (opt.Selection_Type__c == 'Optional') result.add(opt);
-            }
+        Set<Id> pkgIds = new Set<Id>();
+        for (Application_Package__c p : applicationPackages) {
+            pkgIds.add(p.Id);
         }
-        return result;
-    }
-
-    private String getPackageInclusionsImpl(Id packageId) {
-        String result = '';
-        List<Application_Package_Option__c> allOptions = packageOptions.get(packageId);
-        if (allOptions != null) {
-            List<String> inclusions = new List<String>();
-            for (Application_Package_Option__c opt : allOptions) {
-                if (opt.Selection_Type__c == 'Included' && String.isNotBlank(opt.Inclusion__c)) {
-                    inclusions.add(opt.Inclusion__c);
+        String idIn = '(';
+        for (Id i : pkgIds) {
+            idIn += '\'' + String.valueOf(i) + '\',';
+        }
+        idIn = idIn.removeEnd(',') + ')';
+        try {
+            for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.query(
+                    'SELECT Application_Package__c, Description__c, Amount__c,' +
+                    ' Package_Option__r.Option__r.Name' +
+                    ' FROM Application_Package_Line_Item__c' +
+                    ' WHERE Application_Package__c IN ' + idIn +
+                    ' AND Line_Type__c = \'Option\'' +
+                    ' ORDER BY Application_Package__c, Sort_Order__c, Id',
+                    System.AccessLevel.SYSTEM_MODE)) {
+                if (line.Application_Package__c == null) {
+                    continue;
                 }
-            }
-            result = String.join(inclusions, '\n');
-        }
-        return result;
-    }
-
-    private String getPackageExclusionsImpl(Id packageId) {
-        String result = '';
-        List<Application_Package_Option__c> allOptions = packageOptions.get(packageId);
-        if (allOptions != null) {
-            List<String> exclusions = new List<String>();
-            for (Application_Package_Option__c opt : allOptions) {
-                if (opt.Selection_Type__c == 'Included' && String.isNotBlank(opt.Exclusion__c)) {
-                    exclusions.add(opt.Exclusion__c);
+                List<OptionDisplay> rows = byPkg.get(line.Application_Package__c);
+                if (rows == null) {
+                    rows = new List<OptionDisplay>();
+                    byPkg.put(line.Application_Package__c, rows);
                 }
+                String name = String.isNotBlank(line.Description__c)
+                    ? line.Description__c
+                    : (line.Package_Option__r != null && line.Package_Option__r.Option__r != null
+                        && String.isNotBlank(line.Package_Option__r.Option__r.Name)
+                        ? line.Package_Option__r.Option__r.Name : 'Option');
+                rows.add(new OptionDisplay(name, line.Amount__c));
             }
-            result = String.join(exclusions, '\n');
+        } catch (Exception e) {
+            System.debug('QuotePDFExtension: optional option lines unavailable: ' + e.getMessage());
+            byPkg.clear();
         }
-        return result;
+        return byPkg;
     }
     
+    /**
+     * P4 [T]: load the persisted engine line set (SYSTEM_MODE — the P4
+     * line-item fields carry no portal FLS yet, same mode the engine writes
+     * use) and reduce it to per-package money. Only packages that actually
+     * carry a line set enter the map; everything else keeps the legacy build.
+     */
+    private void loadStoredLineMoney() {
+        if (applicationPackages == null || applicationPackages.isEmpty()) {
+            return;
+        }
+        Set<Id> pkgIds = new Set<Id>();
+        for (Application_Package__c p : applicationPackages) {
+            pkgIds.add(p.Id);
+        }
+        String idIn = '(';
+        for (Id i : pkgIds) {
+            idIn += '\'' + String.valueOf(i) + '\',';
+        }
+        idIn = idIn.removeEnd(',') + ')';
+        Map<Id, StoredLineMoney> totals = new Map<Id, StoredLineMoney>();
+        try {
+            for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.query(
+                    'SELECT Application_Package__c, Line_Type__c, Amount__c' +
+                    ' FROM Application_Package_Line_Item__c' +
+                    ' WHERE Application_Package__c IN ' + idIn +
+                    ' ORDER BY Application_Package__c, Sort_Order__c, Id',
+                    System.AccessLevel.SYSTEM_MODE)) {
+                if (line.Application_Package__c == null || line.Amount__c == null) {
+                    continue;
+                }
+                StoredLineMoney m = totals.get(line.Application_Package__c);
+                if (m == null) {
+                    m = new StoredLineMoney();
+                    m.noTaxTotal = 0;
+                    m.taxTotal = 0;
+                    totals.put(line.Application_Package__c, m);
+                }
+                if ('Tax'.equals(line.Line_Type__c)) {
+                    m.taxTotal = money(m.taxTotal + line.Amount__c);
+                } else {
+                    m.noTaxTotal = money(m.noTaxTotal + line.Amount__c);
+                }
+                m.hasLines = true;
+            }
+        } catch (Exception e) {
+            System.debug('QuotePDFExtension: stored line money unavailable: ' + e.getMessage());
+            totals.clear();
+        }
+        storedLineMoneyByPkg = totals;
+    }
+
+    private static Decimal money(Decimal value) {
+        return value == null ? 0 : value.setScale(2, System.RoundingMode.HALF_UP);
+    }
+
+    private Decimal wrapperTaxAmount(PackageWrapper wrapper) {
+        if (wrapper.hasStoredLineMoney == true) {
+            return wrapper.storedTaxTotal != null ? wrapper.storedTaxTotal : 0;
+        }
+        return wrapper.pkg.Tax_Amount__c != null ? wrapper.pkg.Tax_Amount__c : 0;
+    }
+
     public Decimal taxTotal {
         get {
             Decimal total = 0;
             if (packageWrappersList != null) {
                 for (PackageWrapper wrapper : packageWrappersList) {
-                    if (wrapper.pkg.Tax_Amount__c != null) {
-                        total += wrapper.pkg.Tax_Amount__c;
-                    }
+                    total += wrapperTaxAmount(wrapper);
                 }
             }
             return total;
@@ -673,9 +795,7 @@ public without sharing class QuotePDFExtension {
             grandTotal = 0;
                 for (PackageWrapper wrapper : packageWrappersList) {
                     grandTotal += wrapper.retailPriceTotal;
-                    if (wrapper.pkg.Tax_Amount__c != null) {
-                        grandTotal += wrapper.pkg.Tax_Amount__c;
-                    }
+                    grandTotal += wrapperTaxAmount(wrapper);
                 }
             }
             return grandTotal;

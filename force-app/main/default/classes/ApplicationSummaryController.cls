@@ -175,8 +175,6 @@ public without sharing class ApplicationSummaryController {
         @AuraEnabled public FinancedVehicleLoanDetails financedVehicleLoans { get; set; }
         @AuraEnabled public VehicleInformation vehicle { get; set; }
         @AuraEnabled public List<ApplicationPackageRecordTypeWrapper> applicationPackages { get; set; }
-        @AuraEnabled public List<Application_Package_Option__c> includedOptions { get; set; }
-        @AuraEnabled public List<Application_Package_Option__c> optionalOptions { get; set; }
         
         // Constructor to initialize application with salesPersonName
         public ApplicationSummaryData() {
@@ -215,6 +213,30 @@ public without sharing class ApplicationSummaryController {
         // Fix 2 — Powersports per-package fields
         @AuraEnabled public Decimal perClaimLimit { get; set; }
         @AuraEnabled public String formattedSurcharge { get; set; }
+        // P4 [L] engine snapshot (summary viewer cutover): stored engine line
+        // items attached only when the snapshot gate is on and the package is
+        // engine-priced with a persisted line set (see getApplicationPackagesForSummary).
+        // Flag-off payloads never carry these two fields — the legacy viewer
+        // layout is untouched.
+        @AuraEnabled public List<LineItemDTO> lineItems { get; set; }
+        @AuraEnabled public Boolean hasEngineLineItems { get; set; }
+    }
+
+    /**
+     * One stored engine line item (Application_Package_Line_Item__c) rendered
+     * by the summary viewer in engine-snapshot mode. Plain values only —
+     * LWC-serialisable; rows arrive in stored Sort_Order (tax line last).
+     */
+    public class LineItemDTO {
+        @AuraEnabled public String lineType { get; set; }
+        @AuraEnabled public String description { get; set; }
+        @AuraEnabled public Decimal amount { get; set; }
+        @AuraEnabled public String formattedAmount { get; set; }
+        @AuraEnabled public Boolean taxable { get; set; }
+        @AuraEnabled public Decimal taxAmount { get; set; }
+        @AuraEnabled public Decimal quantity { get; set; }
+        @AuraEnabled public Integer sortOrder { get; set; }
+        @AuraEnabled public String key { get; set; } // stable LWC for:each key
     }
 
     /**
@@ -253,18 +275,14 @@ public without sharing class ApplicationSummaryController {
 
     public class PackageWrapperDTO {
         @AuraEnabled public Application_Package__c pkg { get; set; }
-        @AuraEnabled public List<Application_Package_Option__c> includedOptions { get; set; }
-        @AuraEnabled public List<Application_Package_Option__c> optionalOptions { get; set; }
-        @AuraEnabled public List<String> inclusionsList { get; set; }
-        @AuraEnabled public List<String> exclusionsList { get; set; }
+        // P4 [S]: optional add-ons with their priced retail (the summary LWC
+        // enrichment source) — mirror of ApplicationPDFExtension.PackageWrapper.
+        @AuraEnabled public List<ApplicationPDFExtension.OptionDisplay> optionalOptions { get; set; }
         @AuraEnabled public String packageLogoUrl { get; set; }
         @AuraEnabled public Boolean hasPackageLogo { get; set; }
         
         public PackageWrapperDTO() {
-            this.includedOptions = new List<Application_Package_Option__c>();
-            this.optionalOptions = new List<Application_Package_Option__c>();
-            this.inclusionsList = new List<String>();
-            this.exclusionsList = new List<String>();
+            this.optionalOptions = new List<ApplicationPDFExtension.OptionDisplay>();
         }
     }
 
@@ -535,6 +553,20 @@ public without sharing class ApplicationSummaryController {
             throw new AuraHandledException('Error retrieving application summary: ' + e.getMessage());
         }
     }
+
+    /**
+     * P4 [L] summary-tab viewer gate (change-implementation plan §11 P4 [L],
+     * §10.2 T5). The LWC reads the engine state through Apex — never hardcoded
+     * client-side. Returns true only when the Line_Item_Snapshot_Enabled__c
+     * flag is on, i.e. the state in which engine-priced packages carry their
+     * persisted line-item snapshot and the summary viewer renders stored
+     * payload values + line items. Org default (no setting rows) is false, so
+     * the legacy display path stays authoritative.
+     */
+    @AuraEnabled
+    public static Boolean isSummaryEngineViewerActive() {
+        return PortalFeatureFlagService.isLineItemSnapshotEnabled();
+    }
     
     /**
      * @description Get Application Packages for Summary Display
@@ -549,11 +581,13 @@ public without sharing class ApplicationSummaryController {
                 SELECT Id, Name, RecordType.Name, Coverage_Plan__c, Coverage_Term__c,
                         Package__r.Name,
                         Dealer_Package__r.Name,
+                        Dealer_Package__c, Dealer_Package_Term__c,
+                        Dealer_Package_Term__r.Dealer_Package__c,
                         Dealer_Package_Term__r.Name, Dealer_Package_Term__r.Restriction_Type__c, Dealer_Package_Term__r.Odometer_KM__c,
                         Package_Term__r.Name, Package_Term__r.Odometer_KM__c,
                         Package_Term__r.Restriction_Type__c,
                         Package_Term__r.Per_Claim_Limit__c,
-                        Deductible__c, Tax_Amount__c,Tax_Amount_Cost__c, Total_Package_Price__c, Contract_Premium_Price__c,Contract_Premium_Price_Without_Tax__c,
+                        Deductible__c, Tax_Amount__c,Tax_Amount_Cost__c, Contract_Premium_Price__c,Contract_Premium_Price_Without_Tax__c,
                         Contract_Cost_Price_Without_Tax__c, Contract_Cost_Price__c,
                         Dealer_Price_Override__c, Tax_Percentage__c, Premium_Model_Fee__c,
                        Contract_Start_Date__c, Contract_End_Date__c, 
@@ -568,24 +602,108 @@ public without sharing class ApplicationSummaryController {
                 packageIds.add(pkg.Id);
             }
             
+            // P4 [S]: the summary's Included-option names
+            // (additionalOptionsPurchased) come from the dealer-option mirror
+            // — the same Dealer_Package_Option__c Included rows the legacy
+            // create-time flow copied into Application_Package_Option__c
+            // children (the children are retired org-side in P4 [S]), so the
+            // rendered names are identical on every shape. The dealer package
+            // resolves through the term link first, then the package link.
             Map<Id, List<String>> packageOptionsMap = new Map<Id, List<String>>();
             if (!packageIds.isEmpty()) {
-                List<Application_Package_Option__c> options = [
-                    SELECT Id, Option__c, Application_Package__c
-                    FROM Application_Package_Option__c 
-                    WHERE Selection_Type__c = 'Included' AND Application_Package__c IN :packageIds
-                ];
-                
-                for (Application_Package_Option__c option : options) {
-                    if (!packageOptionsMap.containsKey(option.Application_Package__c)) {
-                        packageOptionsMap.put(option.Application_Package__c, new List<String>());
+                Map<Id, Id> dealerPackageIdByPkg = new Map<Id, Id>();
+                for (Application_Package__c pkg : packages) {
+                    Id dpId = (pkg.Dealer_Package_Term__r != null && pkg.Dealer_Package_Term__r.Dealer_Package__c != null)
+                        ? pkg.Dealer_Package_Term__r.Dealer_Package__c
+                        : pkg.Dealer_Package__c;
+                    if (dpId != null) {
+                        dealerPackageIdByPkg.put(pkg.Id, dpId);
                     }
-                    packageOptionsMap.get(option.Application_Package__c).add(option.Option__c);
+                }
+                if (!dealerPackageIdByPkg.isEmpty()) {
+                    Map<Id, List<String>> namesByDp = new Map<Id, List<String>>();
+                    for (Dealer_Package_Option__c dpo : [
+                        SELECT Id, Dealer_Package__c,
+                               Package_Option__r.Option__r.Name
+                        FROM Dealer_Package_Option__c
+                        WHERE Dealer_Package__c IN :dealerPackageIdByPkg.values()
+                          AND Selection_Type__c = 'Included'
+                        ORDER BY Id
+                    ]) {
+                        if (dpo.Dealer_Package__c == null
+                                || dpo.Package_Option__r == null
+                                || dpo.Package_Option__r.Option__r == null
+                                || String.isBlank(dpo.Package_Option__r.Option__r.Name)) {
+                            continue;
+                        }
+                        List<String> names = namesByDp.get(dpo.Dealer_Package__c);
+                        if (names == null) {
+                            names = new List<String>();
+                            namesByDp.put(dpo.Dealer_Package__c, names);
+                        }
+                        names.add(dpo.Package_Option__r.Option__r.Name);
+                    }
+                    for (Id pkgId : dealerPackageIdByPkg.keySet()) {
+                        Id dpId = dealerPackageIdByPkg.get(pkgId);
+                        if (namesByDp.containsKey(dpId)) {
+                            packageOptionsMap.put(pkgId, namesByDp.get(dpId));
+                        }
+                    }
                 }
             }
             
             // Vehicle odometer for Rolling Odometer calculation
             Decimal vehicleOdometer = (vehicle != null) ? vehicle.Odometer__c : null;
+
+            // P4 [L] summary viewer cutover (engine snapshot). When the T5 gate
+            // (Line_Item_Snapshot_Enabled__c) is on, engine-priced packages
+            // with a persisted line set return their line items and money
+            // fields rebuilt from the lines (stored = displayed, §07.3). The
+            // P4 fields (Priced_By_Engine__c, Application_Package_Line_Item__c)
+            // carry no portal FLS yet, so they are read in SYSTEM_MODE — the
+            // same mode the engine writes use. When the gate is off nothing
+            // here runs and no new field is ever referenced: the legacy
+            // stored-field build below is returned unchanged.
+            Boolean engineSnapshotMode = PortalFeatureFlagService.isLineItemSnapshotEnabled();
+            Set<Id> enginePricedPkgIds = new Set<Id>();
+            Map<Id, List<LineItemDTO>> engineLineItemsByPkg = new Map<Id, List<LineItemDTO>>();
+            if (engineSnapshotMode && !packageIds.isEmpty()) {
+                String idList = joinIdList(packageIds);
+                for (Application_Package__c enginePkg : (List<Application_Package__c>) Database.query(
+                        'SELECT Id, Priced_By_Engine__c FROM Application_Package__c' +
+                        ' WHERE Id IN (' + idList + ')',
+                        System.AccessLevel.SYSTEM_MODE)) {
+                    if (enginePkg.Priced_By_Engine__c == true) {
+                        enginePricedPkgIds.add(enginePkg.Id);
+                    }
+                }
+                if (!enginePricedPkgIds.isEmpty()) {
+                    String engineIdList = joinIdList(enginePricedPkgIds);
+                    for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.query(
+                            'SELECT Application_Package__c, Line_Type__c, Description__c, Amount__c,' +
+                            ' Taxable__c, Tax_Amount__c, Quantity__c, Sort_Order__c' +
+                            ' FROM Application_Package_Line_Item__c' +
+                            ' WHERE Application_Package__c IN (' + engineIdList + ')' +
+                            ' ORDER BY Sort_Order__c, Id',
+                            System.AccessLevel.SYSTEM_MODE)) {
+                        LineItemDTO dto = new LineItemDTO();
+                        dto.lineType = line.Line_Type__c;
+                        dto.description = line.Description__c;
+                        dto.amount = line.Amount__c;
+                        dto.formattedAmount = formatCurrency(line.Amount__c);
+                        dto.taxable = line.Taxable__c == true;
+                        dto.taxAmount = line.Tax_Amount__c;
+                        dto.quantity = line.Quantity__c;
+                        dto.sortOrder = line.Sort_Order__c != null ? line.Sort_Order__c.intValue() : 0;
+                        dto.key = String.valueOf(dto.sortOrder) + '-' +
+                            (String.isNotBlank(dto.lineType) ? dto.lineType : 'Line');
+                        if (!engineLineItemsByPkg.containsKey(line.Application_Package__c)) {
+                            engineLineItemsByPkg.put(line.Application_Package__c, new List<LineItemDTO>());
+                        }
+                        engineLineItemsByPkg.get(line.Application_Package__c).add(dto);
+                    }
+                }
+            }
 
             for (Application_Package__c pkg : packages) {
                 String recordTypeName = pkg.RecordType.Name;
@@ -608,6 +726,14 @@ public without sharing class ApplicationSummaryController {
                     ? pkg.Dealer_Package_Term__r.Name
                     : (pkg.Package_Term__r != null && String.isNotBlank(pkg.Package_Term__r.Name) ? pkg.Package_Term__r.Name : null);
                 pkgWrapper.coverageTerm = rawTerm != null ? rawTerm.replace('null', '0') : '0 Months/0 km';
+                
+                // P4 [L]: engine-snapshot packages (gate on + engine-priced +
+                // persisted line set) get their money fields rebuilt from the
+                // stored lines after the legacy build below; every other
+                // package keeps the legacy stored-field build unchanged.
+                Boolean useEngineSnapshot = engineSnapshotMode
+                    && enginePricedPkgIds.contains(pkg.Id)
+                    && engineLineItemsByPkg.containsKey(pkg.Id);
                 
                 if (pkg.Dealer_Price_Override__c != null) {
                     pkgWrapper.retailCost = pkg.Dealer_Price_Override__c;
@@ -641,6 +767,21 @@ public without sharing class ApplicationSummaryController {
                     pkgWrapper.formattedPremiumModelFee = '$0.00';
                     pkgWrapper.hasPremiumModelFee = false;
                     pkgWrapper.formattedSurcharge = '$0.00';
+                }
+
+                // P4 [L] engine snapshot: override the money display fields
+                // with the persisted engine line set and attach the lines for
+                // the viewer. Invariant (§07.3, asserted by
+                // ApplicationSummaryEngineParityTest): for every mix the stored
+                // formula fields express (base-only, base+premium, override)
+                // the line rebuild equals the stored-field build above; fee
+                // lines without a stored carrier (diesel/commercial/
+                // powersports) are exactly the delta the snapshot render makes
+                // visible — stored = displayed.
+                if (useEngineSnapshot) {
+                    overrideMoneyFieldsFromLines(pkgWrapper, engineLineItemsByPkg.get(pkg.Id));
+                    pkgWrapper.lineItems = engineLineItemsByPkg.get(pkg.Id);
+                    pkgWrapper.hasEngineLineItems = true;
                 }
 
                 pkgWrapper.deductible = pkg.Deductible__c;
@@ -692,7 +833,67 @@ public without sharing class ApplicationSummaryController {
             result.add(recordTypeMap.get(key));
         }
         return result;
-    }    
+    }
+
+    /** Comma-joined, quote-wrapped Id list for the SYSTEM_MODE snapshot reads. */
+    private static String joinIdList(Set<Id> ids) {
+        List<String> parts = new List<String>();
+        for (Id id : ids) {
+            parts.add('\'' + String.valueOf(id) + '\'');
+        }
+        return String.join(parts, ',');
+    }
+
+    /**
+     * P4 [L]: rebuild the customer-facing money fields on the summary wrapper
+     * from the persisted engine line set. The engine commits with
+     * sum(non-Tax lines) = no-tax total, sum(Tax lines) = the single tax
+     * amount and sum(all lines) = with-tax total (§07.3 / D5), so for every
+     * fee mix the stored formula fields express this rebuild equals the legacy
+     * stored-field build — the payload-parity rows
+     * ApplicationSummaryEngineParityTest asserts. Fee lines without a stored
+     * carrier (diesel/commercial/powersports surcharges) are carried by this
+     * rebuild alone: that is the stored = displayed fix. Tax rate is not a
+     * line — it stays the stored engine Tax_Percentage__c set above.
+     */
+    private static void overrideMoneyFieldsFromLines(ApplicationPackageWrapper w, List<LineItemDTO> lines) {
+        Decimal retail = 0;
+        Decimal taxAmount = 0;
+        Decimal total = 0;
+        Decimal premiumFee = 0;
+        for (LineItemDTO li : lines) {
+            Decimal amt = li.amount != null ? li.amount : 0;
+            total = PricingEngineService.money(total + amt);
+            if (li.lineType == null || li.lineType != 'Tax') {
+                retail = PricingEngineService.money(retail + amt);
+            } else {
+                taxAmount = PricingEngineService.money(taxAmount + amt);
+            }
+            if (li.lineType == PricingEngineService.LT_PREMIUM_FEE) {
+                premiumFee = PricingEngineService.money(premiumFee + amt);
+            }
+        }
+        w.retailCost = retail;
+        w.formattedRetailCost = formatCurrency(retail);
+        w.tax = taxAmount;
+        w.formattedTax = formatCurrency(taxAmount);
+        w.total = total;
+        w.formattedTotal = formatCurrency(total);
+        // Premium-fee display mirrors the stored audit value: the engine writes
+        // Premium_Model_Fee__c = the Premium_Fee line amount at commit, so the
+        // line-sourced value below equals the stored field (asserted in parity).
+        if (premiumFee > 0) {
+            w.premiumModelFee = premiumFee;
+            w.formattedPremiumModelFee = formatCurrency(premiumFee);
+            w.hasPremiumModelFee = true;
+            w.formattedSurcharge = formatCurrency(premiumFee);
+        } else {
+            w.premiumModelFee = 0;
+            w.formattedPremiumModelFee = '$0.00';
+            w.hasPremiumModelFee = false;
+            w.formattedSurcharge = '$0.00';
+        }
+    }
 
     @AuraEnabled
     public static ApplicationPackageData getApplicationPackageData(Id applicationId) {
@@ -712,10 +913,7 @@ public without sharing class ApplicationSummaryController {
                 for (ApplicationPDFExtension.PackageWrapper pkgWrapper : rtWrapper.packages) {
                     PackageWrapperDTO pkgDTO = new PackageWrapperDTO();
                     pkgDTO.pkg = pkgWrapper.pkg;
-                    pkgDTO.includedOptions = pkgWrapper.includedOptions;
                     pkgDTO.optionalOptions = pkgWrapper.optionalOptions;
-                    pkgDTO.inclusionsList = pkgWrapper.inclusionsList;
-                    pkgDTO.exclusionsList = pkgWrapper.exclusionsList;
                     pkgDTO.packageLogoUrl = pkgWrapper.packageLogoUrl;
                     pkgDTO.hasPackageLogo = pkgWrapper.hasPackageLogo;
                     
@@ -730,26 +928,6 @@ public without sharing class ApplicationSummaryController {
         } catch (Exception e) {
             throw new AuraHandledException('Error retrieving application package data: ' + e.getMessage());
         }
-    }
-
-    @AuraEnabled(cacheable=true)
-    public static List<Application_Package_Option__c> getIncludedOptions(Id applicationId) {
-        return [
-            SELECT Id, Option__c, Package_Option__r.Name, Package_Option__r.Price__c
-            FROM Application_Package_Option__c 
-            WHERE Application__c = :applicationId 
-            AND Selection_Type__c = 'Included'
-        ];
-    }
-
-    @AuraEnabled(cacheable=true)
-    public static List<Application_Package_Option__c> getOptionalOptions(Id applicationId) {
-        return [
-            SELECT Id, Option__c, Package_Option__r.Name, Package_Option__r.Price__c
-            FROM Application_Package_Option__c 
-            WHERE Application__c = :applicationId 
-            AND Selection_Type__c = 'Optional'
-        ];
     }
 
     /**
@@ -1289,7 +1467,10 @@ public without sharing class ApplicationSummaryController {
             }
             List<Application__c> applicationsWithDealer = [
                 SELECT Id, Name, Dealer_Name__r.Name, Dealer_Name__c,
-                       (SELECT Id, Name FROM Application_Packages__r WHERE Active__c = true)
+                       (SELECT Id, Name, Priced_By_Engine__c, Application__c,
+                               Dealer__c, Dealer_Package__c, Dealer_Package_Term__c,
+                               Dealer_Price_Override__c, Waive_Premium_Fee__c
+                        FROM Application_Packages__r WHERE Active__c = true)
                 FROM Application__c
                 WHERE Id = :applicationId
                 LIMIT 1
@@ -1301,6 +1482,18 @@ public without sharing class ApplicationSummaryController {
             List<Application_Package__c> activePackages = application.Application_Packages__r;
             if (activePackages.isEmpty()) {
                 return new InvoiceOperationResult(false, 'No active packages found for this application');
+            }
+
+            // P4 [L] server half: before invoicing, backfill line-item
+            // snapshots for engine-priced packages (idempotent, flag-gated,
+            // never throws; legacy packages untouched) so stored = displayed =
+            // invoiced holds for quotes created before the snapshot flag.
+            try {
+                for (Application_Package__c pkg : activePackages) {
+                    ApplicationSnapshotService.backfillIfMissing(pkg);
+                }
+            } catch (Exception snapshotEx) {
+                System.debug('Invoice submit: snapshot backfill skipped: ' + snapshotEx.getMessage());
             }
             Invoice__c newInvoice = new Invoice__c();
             newInvoice.Application__c = applicationId;
