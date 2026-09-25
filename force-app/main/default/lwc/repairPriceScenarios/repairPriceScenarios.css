@@ -1,0 +1,167 @@
+/* Column Compare design tokens, replicated from Claims Management/Option 1 -
+   Column Compare/Main.dc.html (Osama's Sep 22 reference) around the standard
+   lightning-input/-combobox/-record-picker base components. */
+
+.rp-settings {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: linear-gradient(135deg, #0f2742, #16365c);
+    border-radius: 9px;
+    padding: 14px 18px;
+    flex-wrap: wrap;
+}
+.rp-set-field {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    color: #fff;
+}
+.rp-set-field span {
+    font-size: 13px;
+    color: #d3e0ec;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    white-space: nowrap;
+}
+.rp-set-field lightning-formatted-number {
+    font-size: 17px;
+    font-weight: 800;
+    color: #fff;
+}
+.rp-set-field.wide {
+    flex: 1;
+}
+.rp-claim-ref {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+}
+.rp-set-note {
+    font-size: 12px;
+    color: #c0d2e2;
+    flex: none;
+}
+.rp-add {
+    flex: none;
+}
+
+.cmp-wrap {
+    max-width: 100%;
+    overflow: auto;
+    border: 1px solid #e3e8ef;
+    border-radius: 12px;
+    background: #fff;
+}
+.cmp-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(23, min-content);
+    width: max-content;
+    min-width: 100%;
+}
+.cmp-col {
+    display: contents;
+}
+.cmp-label {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #fff;
+    border-right: 1px solid #d3dbe5;
+    border-bottom: 1px solid #eef1f5;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: #45536a;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.cmp-label.corner {
+    background: #f4f6f9;
+    border-radius: 10px 0 0 0;
+}
+.cmp-label.total {
+    color: #16243a;
+    font-weight: 800;
+    background: #f4f6f9;
+    font-size: 14px;
+}
+.cmp-label.total.tstart {
+    border-top: 2px solid #ccd6e0;
+}
+.cmp-label.total:last-child {
+    border-radius: 0 0 0 10px;
+    border-bottom: none;
+}
+.cmp-cell {
+    border-right: 1px solid #d3dbe5;
+    border-bottom: 1px solid #eef1f5;
+    padding: 4px 6px;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+.cmp-cell.total {
+    background: #f8fafb;
+}
+.cmp-cell.total.tstart {
+    border-top: 2px solid #ccd6e0;
+}
+.cmp-cell.plcell {
+    padding: 6px 8px;
+}
+.cmp-cell.plcell:last-child {
+    border-radius: 0 0 10px 0;
+}
+.cmp-cell lightning-formatted-number {
+    font-size: 15px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+.cmp-cell .pl-val {
+    font-size: 17px;
+}
+.cmp-cell lightning-input,
+.cmp-cell lightning-combobox,
+.cmp-cell lightning-record-picker {
+    width: 100%;
+    font-size: 14px;
+    font-weight: 600;
+}
+.cmp-head {
+    border-right: 1px solid #d3dbe5;
+    border-bottom: 1px solid #eef1f5;
+    padding: 6px 7px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 10px 10px 0 0;
+}
+.cmp-head-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+}
+.cmp-use {
+    flex: none;
+}
+.badge {
+    background: #1f9e8f;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 9px;
+    border-radius: 8px;
+    letter-spacing: .2px;
+}
+.pos {
+    color: #1f9d57;
+}
+.neg {
+    color: #d64545;
+}

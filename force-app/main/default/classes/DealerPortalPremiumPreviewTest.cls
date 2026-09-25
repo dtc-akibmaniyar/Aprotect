@@ -8,8 +8,9 @@
  * when the dealer flag (Account.Charge_Premium_Vehicle_Fee__c) AND a matching
  * vehicle schedule (active Premium_Tier, resolved through
  * VehicleScheduleResolver) are BOTH true — neither alone is sufficient — plus
- * the fee rule (master term Premium_Model_Fee__c when > 0, else the matched
- * schedule member-row amount), the dealer override (decision #2), the
+ * the fee rule (dealer-first: the dealer term Premium_Model_Fee__c when > 0,
+ * else master term Package_Term__r.Premium_Model_Fee__c when > 0, else the
+ * matched schedule member-row amount), the dealer override (decision #2), the
  * pre-tax price-override suppression (decision #3) and the exclusion of the
  * Powersports brand-tier surcharge from the premium line (decision #3).
  *
@@ -116,6 +117,14 @@ private class DealerPortalPremiumPreviewTest {
             c.dealerTerm.Id, c.vehicle.Id, null, null, null, priceOverrideActive);
     }
 
+    /** Seed the dealer term's own premium fee — the dealer-first fee source. */
+    private static Ctx withDealerTermPremium(Ctx c, Decimal dealerPremiumFee) {
+        update new Dealer_Package_Term__c(
+            Id = c.dealerTerm.Id, Premium_Model_Fee__c = dealerPremiumFee);
+        c.dealerTerm.Premium_Model_Fee__c = dealerPremiumFee;
+        return c;
+    }
+
     private static void assertKeysOnly(DealerPortalController.PremiumPreviewDTO dto) {
         // The DTO is a fixed four-field payload: no ids, no wholesale cost.
         System.assertNotEquals(null, dto);
@@ -131,16 +140,37 @@ private class DealerPortalPremiumPreviewTest {
 
     @isTest
     static void dealerFlagAndScheduleMatch_isPremium() {
-        Ctx c = build('A', true, null, 350.00, true, 299.00);
+        // Dealer-first fee source: the DEALER term carries its own premium fee
+        // (seeded once from the master, edited locally thereafter).
+        Ctx c = withDealerTermPremium(build('A', true, null, 350.00, true, 299.00), 375.00);
         Test.startTest();
         DealerPortalController.PremiumPreviewDTO dto = preview(c, false);
         Test.stopTest();
         assertKeysOnly(dto);
         System.assertEquals(true, dto.isPremiumVehicle, 'dealer flag + schedule match => premium');
-        // Term-anchored: master term fee (350) beats the schedule row (299).
-        System.assertEquals(350.00, dto.premiumFee, 'fee from master term when > 0');
+        // Dealer-first: the dealer term fee (375) beats the master term (350)
+        // and the schedule row (299).
+        System.assertEquals(375.00, dto.premiumFee, 'fee from the dealer term when populated > 0');
         System.assertEquals(false, dto.overrideApplied, 'no dealer override');
         System.assertEquals(false, dto.waived, 'not waived');
+    }
+
+    @isTest
+    static void feeChain_dealerThenMasterThenScheduleRow() {
+        // (1) dealer term populated => dealer value wins.
+        Ctx a = withDealerTermPremium(build('A2', true, null, 350.00, true, 299.00), 410.00);
+        // (2) dealer term empty, master term populated => master value.
+        Ctx b = build('A3', true, null, 350.00, true, 299.00);
+        // (3) dealer AND master empty => the matched schedule member-row amount.
+        Ctx d = build('A4', true, null, null, true, 299.00);
+        Test.startTest();
+        Decimal feeA = preview(a, false).premiumFee;
+        Decimal feeB = preview(b, false).premiumFee;
+        Decimal feeD = preview(d, false).premiumFee;
+        Test.stopTest();
+        System.assertEquals(410.00, feeA, 'dealer term value wins when populated and > 0');
+        System.assertEquals(350.00, feeB, 'dealer empty => master term Package_Term__r value');
+        System.assertEquals(299.00, feeD, 'dealer and master both empty => schedule member-row amount');
     }
 
     @isTest

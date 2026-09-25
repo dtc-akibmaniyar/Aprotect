@@ -380,12 +380,13 @@
                     </div>
                   </div>
 
-                  <!-- Additional Options: only shown when the package has user-selected add-ons -->
+                  <!-- Additional Options: only shown when the package has user-selected priced add-ons
+                       (distinct colour from the Included Options group above) -->
                   <template if:true={packageWrapper.optionalOptionsList.length}>
                     <div class="options-section">
                       <div class="options-header options-header--additional">
                         <lightning-icon icon-name="utility:add" size="x-small" class="options-icon-additional"></lightning-icon>
-                        Additional Options Purchased
+                        Additional Options
                       </div>
                       <div class="options-pills-container">
                         <template for:each={packageWrapper.optionalOptionsList} for:item="opt">

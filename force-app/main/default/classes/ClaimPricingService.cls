@@ -1,20 +1,36 @@
 /**
  * Centralized Claims pricing service. Direct port of calc() from
- * warranty_claims_dashboard.html, which is the pricing source of truth
- * (decision Sep 18). One Estimate__c = one HTML scenario row.
+ * warranty_claims_dashboard (2).html, which superseded the original
+ * warranty_claims_dashboard.html as the pricing source of truth (Osama,
+ * Sep 22) when the Repair Price Scenarios screen was redesigned into a
+ * multi-row grid. One Estimate__c = one scenario row.
+ *
+ * Sep 22 deviation from the original baseline, flagged deliberately: file
+ * (2) drops Core Charge entirely (no coreOn/core, no netParts - wholesale
+ * cost is simply parts + labour + supplies + insurance). The original
+ * $200-core-charge LKQ baseline (wsTotal=2170) no longer applies; the same
+ * inputs now total 2370. Core_Charge_Applies__c/Core_Charge__c/
+ * Net_Parts__c stay deployed on Estimate__c (deleting is riskier than
+ * leaving an unused field, same precedent as Part__c.Net_Parts__c) but are
+ * no longer read or written here.
  *
  * Two entry points:
  *  - calculateLive: pure math on raw inputs, no DML, for an LWC to call on
  *    every keystroke so nothing has to be saved first.
  *  - recalculateAndStamp: reads an Estimate__c, computes, and writes the
  *    results onto its Calculated Totals fields.
+ *
+ * FLS/CRUD hardening (Sep 22, Osama's explicit request): every SOQL query
+ * here uses WITH USER_MODE, and the stamp in recalculateAndStamp goes
+ * through Database.update(records, AccessLevel.USER_MODE) rather than a
+ * bare update, throwing System.NoAccessException (caught and rethrown as an
+ * AuraHandledException) instead of silently saving a partial record if the
+ * running user lacks permission on one of the stamped fields.
  */
 public with sharing class ClaimPricingService {
 
     public class PricingInput {
         @AuraEnabled public Decimal parts        { get; set; }
-        @AuraEnabled public Boolean coreOn       { get; set; }
-        @AuraEnabled public Decimal core         { get; set; }
         @AuraEnabled public Decimal hrs          { get; set; }
         @AuraEnabled public Decimal rate         { get; set; }
         @AuraEnabled public Decimal ins          { get; set; }
@@ -28,8 +44,6 @@ public with sharing class ClaimPricingService {
 
     public class PricingResult {
         @AuraEnabled public Decimal labour       { get; set; }
-        @AuraEnabled public Decimal core         { get; set; }
-        @AuraEnabled public Decimal netParts     { get; set; }
         @AuraEnabled public Decimal wsTotal      { get; set; }
         @AuraEnabled public Decimal coverage     { get; set; }
         @AuraEnabled public Decimal custPre      { get; set; }
@@ -38,13 +52,11 @@ public with sharing class ClaimPricingService {
         @AuraEnabled public Decimal retailTotal  { get; set; }
     }
 
-    /** calc(s) from the HTML, line for line. */
+    /** calc(s) from warranty_claims_dashboard (2).html, line for line. */
     public static PricingResult calculate(PricingInput i) {
         Decimal parts  = nz(i.parts);
-        Decimal core   = (i.coreOn == true) ? nz(i.core) : 0;
         Decimal labour = nz(i.hrs) * nz(i.rate);
-        Decimal netParts = parts - core;
-        Decimal wsTotal  = netParts + labour + nz(i.supC) + nz(i.ins);
+        Decimal wsTotal  = parts + labour + nz(i.supC) + nz(i.ins);
         Decimal retail   = nz(i.retail);
         Decimal coverage = Math.max(0, Math.min(nz(i.cap), retail) - nz(i.ded));
         Decimal custPre  = Math.max(0, retail - coverage) + nz(i.supR);
@@ -54,8 +66,6 @@ public with sharing class ClaimPricingService {
 
         PricingResult r = new PricingResult();
         r.labour      = money(labour);
-        r.core        = money(core);
-        r.netParts    = money(netParts);
         r.wsTotal     = money(wsTotal);
         r.coverage    = money(coverage);
         r.custPre     = money(custPre);
@@ -70,51 +80,128 @@ public with sharing class ClaimPricingService {
         return calculate(input);
     }
 
+    public class PricingDefaults {
+        @AuraEnabled public Decimal cap              { get; set; }
+        @AuraEnabled public Decimal ded              { get; set; }
+        @AuraEnabled public Decimal taxPercent       { get; set; }
+        @AuraEnabled public Decimal labourRateOnFile { get; set; }
+        @AuraEnabled public String  claimRef         { get; set; }
+    }
+
+    /**
+     * Read-only preview of the same defaults recalculateAndStamp resolves at
+     * save time (claim's Application_Package__c for cap/deductible, shop's
+     * region-synced percentage for tax), so the Repair Price Scenarios LWC's
+     * live total matches what actually gets saved instead of guessing.
+     * claimRef is a compact display string (claim number + vehicle) for the
+     * grid's header bar, not used in any calculation.
+     */
+    @AuraEnabled(cacheable=true)
+    public static PricingDefaults getDefaults(Id claimId, Id repairShopId) {
+        PricingDefaults d = new PricingDefaults();
+        if (claimId != null) {
+            Claim__c c = [
+                SELECT Name, Vehicle_Year__c, Vehicle_Make__c, Vehicle_Model__c,
+                       Application_Package__r.Per_Claim_Limit__c, Application_Package__r.Deductible__c
+                FROM Claim__c WHERE Id = :claimId
+                WITH USER_MODE
+            ];
+            d.cap = c.Application_Package__r?.Per_Claim_Limit__c;
+            d.ded = c.Application_Package__r?.Deductible__c;
+            d.claimRef = buildClaimRef(c);
+        }
+        if (repairShopId != null) {
+            Repair_Shop__c s = [
+                SELECT Tax_Percentage__c, Labour_Rate_On_File__c
+                FROM Repair_Shop__c WHERE Id = :repairShopId
+                WITH USER_MODE
+            ];
+            d.taxPercent = s.Tax_Percentage__c;
+            d.labourRateOnFile = s.Labour_Rate_On_File__c;
+        }
+        return d;
+    }
+
     /**
      * Reads the Estimate and its shop, computes, stamps the totals, saves.
-     * cap is passed in because the per-claim limit lives on Package_Term__c
-     * (the other team's object); resolving it through the Claim ->
-     * Application_Package chain is a follow-up, not guessed here.
+     * cap (per-claim limit) and the deductible come from the claim's
+     * Application_Package__c (Per_Claim_Limit__c / Deductible__c), the
+     * customer's actual purchased contract. A non-null cap parameter, or a
+     * Deductable__c entered on the estimate itself, overrides that - the
+     * HTML calculator lets the agent adjust both. If neither source has a
+     * cap, it is treated as 0, which yields zero coverage rather than
+     * silently unlimited coverage.
      */
     @AuraEnabled
     public static PricingResult recalculateAndStamp(Id estimateId, Decimal cap) {
         Estimate__c e = [
-            SELECT Id, Parts_Cost__c, Core_Charge_Applies__c, Core_Charge__c,
+            SELECT Id, Parts_Cost__c,
                    Labour_Hours__c, Labour_Rate__c, Insurance_Amount__c,
                    Shop_Supplies__c, Shop_Supplies_Retail__c, Retail_Price__c,
                    Deductable__c, Repair_Shop__r.Tax_Percentage__c,
-                   Repair_Shop__r.Labour_Rate_On_File__c
-            FROM Estimate__c WHERE Id = :estimateId LIMIT 1
+                   Repair_Shop__r.Labour_Rate_On_File__c,
+                   Claim__r.Application_Package__r.Per_Claim_Limit__c,
+                   Claim__r.Application_Package__r.Deductible__c
+            FROM Estimate__c WHERE Id = :estimateId
+            WITH USER_MODE
+            LIMIT 1
         ];
+        if (cap == null) cap = e.Claim__r?.Application_Package__r?.Per_Claim_Limit__c;
+        Decimal ded = e.Deductable__c != null ? e.Deductable__c : e.Claim__r?.Application_Package__r?.Deductible__c;
 
         PricingInput i = new PricingInput();
         i.parts      = e.Parts_Cost__c;
-        i.coreOn     = e.Core_Charge_Applies__c;
-        i.core       = e.Core_Charge__c;
         i.hrs        = e.Labour_Hours__c;
         i.rate       = e.Labour_Rate__c != null ? e.Labour_Rate__c : e.Repair_Shop__r?.Labour_Rate_On_File__c;
         i.ins        = e.Insurance_Amount__c;
         i.supC       = e.Shop_Supplies__c;
         i.supR       = e.Shop_Supplies_Retail__c;
         i.retail     = e.Retail_Price__c;
-        i.ded        = e.Deductable__c;
+        i.ded        = ded;
         i.taxPercent = e.Repair_Shop__r?.Tax_Percentage__c;
         i.cap        = cap;
 
         PricingResult r = calculate(i);
 
-        e.Labour_Cost__c            = r.labour;
-        e.Net_Parts__c              = r.netParts;
-        e.Wholesale_Cost__c         = r.wsTotal;
-        e.Coverage_Applied__c       = r.coverage;
-        e.Customer_Pays__c          = r.custPre;
-        e.Customer_Pays_With_Tax__c = r.custTax;
-        e.Profit_Loss__c            = r.pl;
-        e.Retail_Total__c           = r.retailTotal;
-        update e;
+        // Stamp onto a fresh record, not the queried one: the query above pulls
+        // Claim__r.* which populates the non-reparentable master-detail Claim__c,
+        // and an update carrying that field is rejected by the platform.
+        List<Estimate__c> toStamp = new List<Estimate__c>{ new Estimate__c(
+            Id                        = e.Id,
+            Labour_Cost__c            = r.labour,
+            Wholesale_Cost__c         = r.wsTotal,
+            Coverage_Applied__c       = r.coverage,
+            Customer_Pays__c          = r.custPre,
+            Customer_Pays_With_Tax__c = r.custTax,
+            Profit_Loss__c            = r.pl,
+            Retail_Total__c           = r.retailTotal,
+            // Sep 22 (Osama): write back the deductible actually used (the
+            // estimate's own override if set, else the claim's), so the
+            // record shows the real number instead of staying blank -
+            // same fix as ClaimEstimateService.saveEstimates.
+            Deductable__c             = ded
+        ) };
+        try {
+            Database.update(toStamp, AccessLevel.USER_MODE);
+        } catch (System.NoAccessException ex) {
+            throw new AuraHandledException(
+                'You do not have permission to update one or more calculated total fields. Contact your administrator.'
+            );
+        }
         return r;
     }
 
     private static Decimal nz(Decimal d) { return d == null ? 0 : d; }
     private static Decimal money(Decimal d) { return d.setScale(2, RoundingMode.HALF_UP); }
+
+    /** "CL ID - 00043 · 2015 BMW 6-Series", skipping any blank vehicle part. */
+    private static String buildClaimRef(Claim__c c) {
+        List<String> vehicleParts = new List<String>();
+        if (String.isNotBlank(c.Vehicle_Year__c)) vehicleParts.add(c.Vehicle_Year__c);
+        if (String.isNotBlank(c.Vehicle_Make__c)) vehicleParts.add(c.Vehicle_Make__c);
+        if (String.isNotBlank(c.Vehicle_Model__c)) vehicleParts.add(c.Vehicle_Model__c);
+        String vehicle = String.join(vehicleParts, ' ');
+        if (String.isBlank(vehicle)) return c.Name;
+        return c.Name + ' · ' + vehicle;
+    }
 }

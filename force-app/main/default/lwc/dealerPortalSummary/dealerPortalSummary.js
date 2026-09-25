@@ -364,35 +364,38 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     }
 
     /**
-     * Cross-reference packageData (which has the clean included/optional split)
-     * into summaryData packages so the HTML can render two distinct sections.
-     * summaryData.additionalOptionsPurchased = Included option names (cost in package price).
-     * packageData.optionalOptions = user-selected add-ons with their own price.
+     * Build the per-package "Additional Options" list for the summary page.
+     *
+     * The selected additional (priced) add-ons are carried by the summary
+     * payload ITSELF: getApplicationSummaryData attaches the package's engine
+     * line set (hasEngineLineItems + lineItems) whenever the line-item
+     * snapshot gate is on, and every user-selected add-on is one line with
+     * lineType === 'Option' — description = the option label, amount = its
+     * priced retail (the exact value the engine folds into Retail Cost and
+     * Total, so this is display-only and never re-prices).
+     *
+     * The previous build read a SEPARATE payload (getApplicationPackageData)
+     * and matched it by `pkg.Id`, but the summary package wrapper carries no
+     * `pkg` property, so nothing ever matched and the group never rendered
+     * (the reported defect). Keying off the package's own line set fixes that
+     * and keeps the group scoped per package/term.
      */
     _enrichPackageOptions() {
-        if (!this.summaryData.applicationPackages || !this.packageData.recordTypeWrappers) return;
-        const pkgDataMap = new Map();
-        for (const rtw of this.packageData.recordTypeWrappers) {
-            for (const pw of (rtw.packages || [])) {
-                if (pw.pkg && pw.pkg.Id) {
-                    pkgDataMap.set(pw.pkg.Id, pw);
-                }
-            }
-        }
+        if (!this.summaryData.applicationPackages) return;
         const fmt = v => v != null
             ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v)
             : '';
         for (const rtw of this.summaryData.applicationPackages) {
             for (const pw of (rtw.packages || [])) {
-                const pkgId = pw.pkg && pw.pkg.Id ? pw.pkg.Id : null;
-                const matched = pkgId ? pkgDataMap.get(pkgId) : null;
-                const opts = matched && matched.optionalOptions ? matched.optionalOptions : [];
-                pw.optionalOptionsList = opts.map(opt => ({
-                    // P4 [S]: optionalOptions are OptionDisplay values (plain
-                    // name + priced retail from the package's Option lines).
-                    label: opt.optionName || 'Unknown',
-                    price: opt.retailPrice != null ? fmt(opt.retailPrice) : ''
-                }));
+                const lines = Array.isArray(pw.lineItems) ? pw.lineItems : [];
+                pw.optionalOptionsList = lines
+                    .filter(li => li && li.lineType === 'Option')
+                    .map(li => ({
+                        label: li.description || 'Additional Option',
+                        price: li.formattedAmount != null
+                            ? li.formattedAmount
+                            : (li.amount != null ? fmt(li.amount) : '')
+                    }));
             }
         }
     }

@@ -1,0 +1,28 @@
+<template>
+    <lightning-card title="Estimates" icon-name="standard:opportunity">
+        <lightning-button
+            slot="actions"
+            label="Manage Estimates"
+            icon-name="utility:edit"
+            onclick={handleNewEstimate}
+        ></lightning-button>
+        <div class="slds-p-horizontal_small slds-p-bottom_small">
+            <template lwc:if={isLoading}>
+                <lightning-spinner alternative-text="Loading estimates" size="small"></lightning-spinner>
+            </template>
+            <template lwc:elseif={hasEstimates}>
+                <lightning-datatable
+                    key-field="id"
+                    data={estimates}
+                    columns={columns}
+                    hide-checkbox-column
+                ></lightning-datatable>
+            </template>
+            <template lwc:else>
+                <div class="slds-text-body_small slds-text-color_weak slds-p-around_small">
+                    No estimates yet. Click Manage Estimates to open Repair Price Scenarios.
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

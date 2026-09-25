@@ -1755,10 +1755,13 @@ public without sharing class DealerPortalController {
         // (3) Term-anchored fee: master term Premium_Model_Fee__c when > 0, else
         //     the matched schedule member-row amount.
         Decimal fee = 0;
-        Decimal termPremium = (term != null && term.Package_Term__r != null)
+        Decimal dealerTermPremium = (term != null) ? term.Premium_Model_Fee__c : null;
+        Decimal masterTermPremium = (term != null && term.Package_Term__r != null)
             ? term.Package_Term__r.Premium_Model_Fee__c : null;
-        if (termPremium != null && termPremium > 0) {
-            fee = termPremium;
+        if (dealerTermPremium != null && dealerTermPremium > 0) {
+            fee = dealerTermPremium;
+        } else if (masterTermPremium != null && masterTermPremium > 0) {
+            fee = masterTermPremium;
         } else if (scheduleRowAmount != null) {
             fee = scheduleRowAmount;
         }
@@ -1790,7 +1793,7 @@ public without sharing class DealerPortalController {
             return null;
         }
         List<Dealer_Package_Term__c> rows = [
-            SELECT Id, Dealer_Package__c, Package_Term__c,
+            SELECT Id, Dealer_Package__c, Package_Term__c, Premium_Model_Fee__c,
                    Dealer_Package__r.Dealer__c, Dealer_Package__r.Package__c,
                    Package_Term__r.Premium_Model_Fee__c
             FROM Dealer_Package_Term__c

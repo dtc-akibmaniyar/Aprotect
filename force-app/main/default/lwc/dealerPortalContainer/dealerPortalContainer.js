@@ -468,10 +468,12 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
     }
 
     scrollToTop() {
-        // Verified: this app's content flows in normal document layout (container
-        // .tab-content is overflow:visible), so the viewport/document is the
-        // scroller — the standard Experience Cloud (Aura) shell behavior.
-        window.scrollTo(0, 0);
+        // Content flows in normal document layout (container .tab-content is
+        // overflow:visible), so in a standard Experience Cloud (Aura) shell the
+        // viewport/document is the scroller - reset it first.
+        if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+            window.scrollTo(0, 0);
+        }
         const scroller = document.scrollingElement || document.documentElement;
         if (scroller) {
             scroller.scrollTop = 0;
@@ -479,6 +481,40 @@ export default class DealerPortalContainer extends NavigationMixin(LightningElem
         if (document.body) {
             document.body.scrollTop = 0;
         }
+        // Some communities wrap the page in their own scroll container (a div
+        // with overflow:auto) instead of scrolling the document. In that case
+        // window.scrollTo is a no-op, so also reset the nearest scrollable
+        // ancestor of this component. Scrolling an already-at-top ancestor is a
+        // harmless no-op, so this is safe in the document-scroller case too.
+        const ancestor = this._nearestScrollableAncestor();
+        if (ancestor) {
+            ancestor.scrollTop = 0;
+        }
+    }
+
+    // Walk up from this component's host and return the first ancestor that is
+    // actually a scroll container (overflow-y: auto/scroll/overlay), or null.
+    _nearestScrollableAncestor() {
+        let node = this.template && this.template.host ? this.template.host : null;
+        while (node && node.nodeType === 1) {
+            if (this._isScrollable(node)) {
+                return node;
+            }
+            node = node.parentElement;
+        }
+        return null;
+    }
+
+    _isScrollable(el) {
+        if (!el || el.nodeType !== 1 || typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') {
+            return false;
+        }
+        const style = window.getComputedStyle(el);
+        if (!style) {
+            return false;
+        }
+        const overflowY = (style.overflowY || '').toLowerCase();
+        return overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay';
     }
 
     // Handle direct tab click navigation

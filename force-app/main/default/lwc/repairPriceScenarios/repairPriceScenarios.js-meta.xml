@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <isExposed>false</isExposed>
+    <masterLabel>Repair Price Scenarios</masterLabel>
+    <description>Multi-row estimate-entry grid, opened by the Estimates tab's New Estimate button. Enter several scenarios with live totals; highest P&amp;L is auto-flagged Best for A-Protect. Invoked as a lightning/modal, not placed on a page.</description>
+</LightningComponentBundle>

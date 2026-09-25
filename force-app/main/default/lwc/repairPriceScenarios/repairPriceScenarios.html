@@ -1,0 +1,177 @@
+<template>
+    <lightning-modal-header label="Repair Price Scenarios"></lightning-modal-header>
+    <lightning-modal-body>
+        <template lwc:if={errorMessage}>
+            <div class="slds-p-bottom_small">
+                <div class="slds-notify slds-notify_alert slds-theme_alert-texture slds-theme_error" role="alert">
+                    {errorMessage}
+                </div>
+            </div>
+        </template>
+
+        <div class="rp-settings slds-m-bottom_small">
+            <div class="rp-set-field">
+                <span>Coverage Cap</span>
+                <lightning-formatted-number value={capDisplay} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
+            </div>
+            <div class="rp-set-field">
+                <span>Deductible</span>
+                <lightning-formatted-number value={deductibleDisplay} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
+            </div>
+            <div class="rp-set-field wide">
+                <span>Claim / Vehicle</span>
+                <span class="rp-claim-ref">{claimRefDisplay}</span>
+            </div>
+            <div class="rp-set-note">applies to every estimate below; tax is per repair shop</div>
+            <lightning-button label="+ Add Estimate" icon-name="utility:add" variant="brand" class="rp-add" onclick={handleAddRow}></lightning-button>
+        </div>
+
+        <template lwc:if={isLoading}>
+            <lightning-spinner alternative-text="Loading estimates" size="small"></lightning-spinner>
+        </template>
+        <template lwc:else>
+        <div class="cmp-wrap">
+            <div class="cmp-grid" style={gridStyle}>
+
+                <div class="cmp-label corner"></div>
+                <div class="cmp-label">Estimate Name</div>
+                <div class="cmp-label">Repair Shop</div>
+                <div class="cmp-label">Source</div>
+                <div class="cmp-label">Part / Component</div>
+                <div class="cmp-label">Job Type</div>
+                <div class="cmp-label">Parts Supplier</div>
+                <div class="cmp-label">Part #</div>
+                <div class="cmp-label">Stock # (Ordered)</div>
+                <div class="cmp-label">Condition</div>
+                <div class="cmp-label">KMs</div>
+                <div class="cmp-label">Warranty Source</div>
+                <div class="cmp-label">Warranty $</div>
+                <div class="cmp-label">Parts (Wholesale $)</div>
+                <div class="cmp-label">Labour Hours</div>
+                <div class="cmp-label">Rate ($/hr)</div>
+                <div class="cmp-label">Labour $</div>
+                <div class="cmp-label">Supplies (Retail)</div>
+                <div class="cmp-label">Supplies (Cost)</div>
+                <div class="cmp-label">Retail Work Order</div>
+                <div class="cmp-label total tstart">Wholesale Cost</div>
+                <div class="cmp-label total">Customer Pays (+tax)</div>
+                <div class="cmp-label total">A-Protect P&amp;L</div>
+
+                <template for:each={rows} for:item="row">
+                <div key={row.id} class="cmp-col">
+
+                    <div class="cmp-head" style={row.headerStyle}>
+                        <lightning-input type="radio" name="scnsel" label="Use" class="cmp-use"
+                            checked={row.isUse} data-row-id={row.id} onchange={handleUseChange}></lightning-input>
+                        <div class="cmp-head-right">
+                            <template lwc:if={row.isBest}>
+                                <span class="badge">BEST</span>
+                            </template>
+                            <lightning-button-icon icon-name="utility:close" variant="bare" size="small"
+                                alternative-text="Remove this estimate" class="cmp-del"
+                                data-row-id={row.id} onclick={handleRemoveRow} disabled={removeRowDisabled}></lightning-button-icon>
+                        </div>
+                    </div>
+
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-input label="Estimate Name" variant="label-hidden" value={row.estimateName}
+                            placeholder="Estimate name" data-row-id={row.id} data-field="estimateName" onchange={handleRowFieldChange}></lightning-input>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-record-picker label="Repair Shop" variant="label-hidden" object-api-name="Repair_Shop__c"
+                            value={row.repairShopId} data-row-id={row.id} onchange={handleRowShopChange}></lightning-record-picker>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-combobox label="Source" variant="label-hidden" placeholder="Source"
+                            value={row.source} options={sourceOptions}
+                            data-row-id={row.id} data-field="source" onchange={handleRowComboChange}></lightning-combobox>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-combobox label="Part / Component" variant="label-hidden" placeholder="Part / Component"
+                            value={row.partComponent} options={partComponentOptions}
+                            data-row-id={row.id} data-field="partComponent" onchange={handleRowComboChange}></lightning-combobox>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-combobox label="Job Type" variant="label-hidden" value={row.jobType} options={jobTypeOptions}
+                            data-row-id={row.id} data-field="jobType" onchange={handleRowComboChange}></lightning-combobox>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-record-picker label="Parts Supplier" variant="label-hidden" object-api-name="Account"
+                            value={row.partsSupplierId} data-row-id={row.id} onchange={handleRowPartsSupplierChange}></lightning-record-picker>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-input label="Part #" variant="label-hidden" value={row.partCode}
+                            data-row-id={row.id} data-field="partCode" onchange={handleRowFieldChange}></lightning-input>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-input label="Stock # (Ordered)" variant="label-hidden" value={row.stockNumber}
+                            data-row-id={row.id} data-field="stockNumber" onchange={handleRowFieldChange}></lightning-input>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-combobox label="Condition" variant="label-hidden" value={row.condition} options={conditionOptions}
+                            data-row-id={row.id} data-field="condition" onchange={handleRowComboChange}></lightning-combobox>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-input type="number" label="KMs" variant="label-hidden" value={row.kms}
+                            data-row-id={row.id} data-field="kms" onchange={handleRowFieldChange}></lightning-input>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-combobox label="Warranty Source" variant="label-hidden" value={row.insuranceSource} options={insuranceSourceOptions}
+                            data-row-id={row.id} data-field="insuranceSource" onchange={handleRowComboChange}></lightning-combobox>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-input type="number" step="0.01" label="Warranty $" variant="label-hidden" value={row.ins}
+                            data-row-id={row.id} data-field="ins" onchange={handleRowFieldChange}></lightning-input>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-input type="number" step="0.01" label="Parts (Wholesale $)" variant="label-hidden" value={row.partsCost}
+                            data-row-id={row.id} data-field="partsCost" onchange={handleRowFieldChange}></lightning-input>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-input type="number" step="0.1" label="Labour Hours" variant="label-hidden" value={row.hrs}
+                            data-row-id={row.id} data-field="hrs" onchange={handleRowFieldChange}></lightning-input>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-input type="number" step="0.01" label="Rate ($/hr)" variant="label-hidden" value={row.rate}
+                            data-row-id={row.id} data-field="rate" onchange={handleRowFieldChange}></lightning-input>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-formatted-number value={row.result.labour} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-input type="number" step="0.01" label="Supplies (Retail)" variant="label-hidden" value={row.supR}
+                            data-row-id={row.id} data-field="supR" onchange={handleRowFieldChange}></lightning-input>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-input type="number" step="0.01" label="Supplies (Cost)" variant="label-hidden" value={row.supC}
+                            data-row-id={row.id} data-field="supC" onchange={handleRowFieldChange}></lightning-input>
+                    </div>
+                    <div class="cmp-cell" style={row.cellStyle}>
+                        <lightning-input type="number" step="0.01" label="Retail Work Order" variant="label-hidden" value={row.retail}
+                            data-row-id={row.id} data-field="retail" onchange={handleRowFieldChange}></lightning-input>
+                    </div>
+
+                    <div class="cmp-cell total tstart" style={row.cellStyle}>
+                        <lightning-formatted-number class="v" value={row.result.wsTotal} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
+                    </div>
+                    <div class="cmp-cell total" style={row.cellStyle}>
+                        <lightning-formatted-number class="v" value={row.result.custTax} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
+                    </div>
+                    <div class="cmp-cell total plcell" style={row.plStyle}>
+                        <lightning-formatted-number class={row.plClass} value={row.result.pl} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
+                    </div>
+
+                </div>
+                </template>
+            </div>
+        </div>
+        </template>
+    </lightning-modal-body>
+    <lightning-modal-footer>
+        <lightning-button label="Cancel" onclick={handleCancel} class="slds-m-right_x-small"></lightning-button>
+        <lightning-button variant="brand" label="Save All Estimates" onclick={handleSaveAll} disabled={isSaveDisabled}></lightning-button>
+        <template lwc:if={isSaving}>
+            <lightning-spinner alternative-text="Saving" size="small"></lightning-spinner>
+        </template>
+    </lightning-modal-footer>
+</template>

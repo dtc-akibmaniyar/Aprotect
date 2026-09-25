@@ -1,0 +1,14 @@
+<template>
+    <div class="slds-p-bottom_small">
+        <lightning-button
+            variant="brand"
+            label="Create Work Order"
+            icon-name="utility:file"
+            disabled={isDisabled}
+            onclick={handleCreateWorkOrder}
+        ></lightning-button>
+        <template lwc:if={isCreating}>
+            <lightning-spinner alternative-text="Creating work order" size="small"></lightning-spinner>
+        </template>
+    </div>
+</template>

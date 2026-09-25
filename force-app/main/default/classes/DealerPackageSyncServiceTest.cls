@@ -474,4 +474,131 @@ private class DealerPackageSyncServiceTest {
             WHERE Dealer_Package__c = :dp.Id AND Package_Option__c = :anchored.Id
         ], 'Re-run must not duplicate the term-anchored mirror');
     }
+
+    // ---------------------------------------------------------------------
+    // Premium fee is WRITE-ONCE on the dealer term. A dealer's edited premium
+    // survives every later reconcile; a head-office change reaches the dealers
+    // only through the explicit on-demand re-push (and that is gated by the
+    // Dealer_Sync_Enabled__c kill switch).
+    // ---------------------------------------------------------------------
+
+    /** The single dealer term mirroring the fixture package's one master term. */
+    private static Dealer_Package_Term__c soleDealerTerm(Id dealerPackageId) {
+        return [
+            SELECT Id, Dealer_Package__c, Package_Term__c, Premium_Model_Fee__c
+            FROM Dealer_Package_Term__c WHERE Dealer_Package__c = :dealerPackageId LIMIT 1
+        ];
+    }
+
+    /** The single master term of the fixture package. */
+    private static Package_Term__c soleMasterTerm(Id packageId) {
+        return [
+            SELECT Id, Premium_Model_Fee__c FROM Package_Term__c
+            WHERE Package__c = :packageId LIMIT 1
+        ];
+    }
+
+    @isTest
+    static void test_dealerTermPremiumSurvivesReconcile_writeOnce() {
+        Account dealer = createDistinctDealer(2);
+        Package__c pkg = getMasterPackage();
+        Dealer_Package__c dp = TestDataFactory.createDealerPackage(
+            dealer.Id, pkg.Id, 'Extended_Limited_Warranty', true);
+
+        Dealer_Package_Term__c dealerTerm = soleDealerTerm(dp.Id);
+        // Dealer edits the premium locally (the row seeded at creation).
+        update new Dealer_Package_Term__c(Id = dealerTerm.Id, Premium_Model_Fee__c = 425.00);
+
+        // Head office later changes the master premium AND its wholesale price.
+        Package_Term__c masterTerm = soleMasterTerm(pkg.Id);
+        update new Package_Term__c(Id = masterTerm.Id, Premium_Model_Fee__c = 610.00, Price__c = 1900);
+
+        Test.startTest();
+        DealerPackageSyncService.reconcileForMasterTerm(new Set<Id>{ masterTerm.Id });
+        Test.stopTest();
+
+        Dealer_Package_Term__c after = [
+            SELECT Id, Premium_Model_Fee__c, Original_Package_Term_Cost__c
+            FROM Dealer_Package_Term__c WHERE Id = :dealerTerm.Id
+        ];
+        System.assertEquals(425.00, after.Premium_Model_Fee__c,
+            'write-once: the dealer term premium is never overwritten by a reconcile');
+        System.assertEquals(1900, after.Original_Package_Term_Cost__c,
+            'the same reconcile still refreshes the other mirrored fields from the master');
+    }
+
+    @isTest
+    static void test_repushPremiumPushesMasterValueDown() {
+        Account dealer = createDistinctDealer(3);
+        Package__c pkg = getMasterPackage();
+        Dealer_Package__c dp = TestDataFactory.createDealerPackage(
+            dealer.Id, pkg.Id, 'Extended_Limited_Warranty', true);
+
+        // Real writes honour the kill switch, so enable it for this user first.
+        insert new Aprotect_Portal_Settings__c(
+            SetupOwnerId = UserInfo.getUserId(),
+            Dealer_Sync_Enabled__c = true
+        );
+
+        Dealer_Package_Term__c dealerTerm = soleDealerTerm(dp.Id);
+        update new Dealer_Package_Term__c(Id = dealerTerm.Id, Premium_Model_Fee__c = 425.00);
+
+        Package_Term__c masterTerm = soleMasterTerm(pkg.Id);
+        update new Package_Term__c(Id = masterTerm.Id, Premium_Model_Fee__c = 610.00);
+
+        // Dry run: counts only, no DML.
+        DealerPackageSyncService.RepushResult dry =
+            DealerPackageSyncService.repushPremiumFees(pkg.Id, true);
+        System.assertEquals(true, dry.success, 'dry run succeeds: ' + dry.message);
+        System.assertEquals(true, dry.dryRun);
+        System.assertEquals(1, dry.dealerTermsConsidered, 'one dealer term mirrors the one master term');
+        System.assertEquals(1, dry.dealerTermsToUpdate, 'the dealer value differs from the master');
+        System.assertEquals(425.00,
+            [SELECT Premium_Model_Fee__c FROM Dealer_Package_Term__c WHERE Id = :dealerTerm.Id].Premium_Model_Fee__c,
+            'a dry run must not write');
+
+        Test.startTest();
+        DealerPackageSyncService.RepushResult run =
+            DealerPackageSyncService.repushPremiumFees(pkg.Id, false);
+        Test.stopTest();
+
+        System.assertEquals(true, run.success, 're-push succeeds: ' + run.message);
+        System.assertEquals(1, run.dealerTermsUpdated, 'one dealer term updated');
+        System.assertEquals(610.00,
+            [SELECT Premium_Model_Fee__c FROM Dealer_Package_Term__c WHERE Id = :dealerTerm.Id].Premium_Model_Fee__c,
+            'the on-demand re-push carries the new master premium down to the dealer term');
+    }
+
+    @isTest
+    static void test_repushHonoursDealerSyncKillSwitch() {
+        Account dealer = createDistinctDealer(4);
+        Package__c pkg = getMasterPackage();
+        Dealer_Package__c dp = TestDataFactory.createDealerPackage(
+            dealer.Id, pkg.Id, 'Extended_Limited_Warranty', true);
+
+        Dealer_Package_Term__c dealerTerm = soleDealerTerm(dp.Id);
+        update new Dealer_Package_Term__c(Id = dealerTerm.Id, Premium_Model_Fee__c = 425.00);
+
+        Package_Term__c masterTerm = soleMasterTerm(pkg.Id);
+        update new Package_Term__c(Id = masterTerm.Id, Premium_Model_Fee__c = 610.00);
+
+        // Kill switch OFF for this user (a user row wins over the org default).
+        insert new Aprotect_Portal_Settings__c(
+            SetupOwnerId = UserInfo.getUserId(),
+            Dealer_Sync_Enabled__c = false
+        );
+
+        Test.startTest();
+        DealerPackageSyncService.RepushResult run =
+            DealerPackageSyncService.repushPremiumFees(pkg.Id, false);
+        Test.stopTest();
+
+        System.assertEquals(false, run.success, 'a real re-push is refused while sync is off');
+        System.assertEquals(610.00,
+            [SELECT Premium_Model_Fee__c FROM Package_Term__c WHERE Id = :masterTerm.Id].Premium_Model_Fee__c,
+            'fixture sanity: the master carries the new fee');
+        System.assertEquals(425.00,
+            [SELECT Premium_Model_Fee__c FROM Dealer_Package_Term__c WHERE Id = :dealerTerm.Id].Premium_Model_Fee__c,
+            'the kill switch blocks the re-push write');
+    }
 }

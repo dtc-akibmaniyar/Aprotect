@@ -282,6 +282,168 @@ public without sharing class DealerPackageSyncService {
     }
 
     // =========================================================================
+    // Premium re-push — on-demand head-office propagation (admin tool)
+    // =========================================================================
+
+    /** Outcome of an on-demand premium re-push (mirrors BulkAssignResult). */
+    public class RepushResult {
+        @AuraEnabled public Boolean success;
+        @AuraEnabled public String message;
+        @AuraEnabled public Boolean dryRun;
+        @AuraEnabled public Integer dealerTermsConsidered; // dealer terms mirroring this master package's terms
+        @AuraEnabled public Integer dealerTermsToUpdate;   // rows whose value differs from the master
+        @AuraEnabled public Integer dealerTermsUpdated;    // populated on a real (non-dry) inline run
+        @AuraEnabled public String batchJobId;             // set when the run was enqueued as a batch
+
+        public RepushResult() {
+            success = false;
+            dryRun = false;
+            dealerTermsConsidered = 0;
+            dealerTermsToUpdate = 0;
+            dealerTermsUpdated = 0;
+        }
+    }
+
+    /**
+     * Head-office premium re-push (admin tool, internal app only — no
+     * dealer-portal path calls this).
+     *
+     * The routine reconcile seeds Premium_Model_Fee__c once on the dealer term
+     * (write-once — see applyTermMirror) and therefore never carries a LATER
+     * head-office change onto the dealers. This is the explicit, on-demand
+     * replacement: it pushes the master Package_Term__c.Premium_Model_Fee__c
+     * onto every corresponding Dealer_Package_Term__c row of one master
+     * package, deliberately overwriting whatever the dealer has there (that is
+     * the point of the re-push).
+     *
+     * @param packageId master Package__c id whose terms carry the premium fees
+     * @param dryRun    true → return counts only, no DML
+     *
+     * Small row sets run inline; large sets enqueue
+     * DealerPackagePremiumRepushBatch (Database.Batchable) and return the job
+     * id. Real runs honour the dealer-sync kill switch
+     * (Dealer_Sync_Enabled__c), exactly like the console's other real writes.
+     */
+    @AuraEnabled
+    public static RepushResult repushPremiumFees(Id packageId, Boolean dryRun) {
+        RepushResult result = new RepushResult();
+        result.dryRun = dryRun == true;
+
+        try {
+            if (packageId == null) {
+                result.message = 'A master Package is required.';
+                return result;
+            }
+            List<Package__c> masters = [
+                SELECT Id, Name FROM Package__c WHERE Id = :packageId LIMIT 1
+            ];
+            if (masters.isEmpty()) {
+                result.message = 'Master package not found.';
+                return result;
+            }
+            Package__c master = masters[0];
+
+            // Master premium fees keyed by master term id (tiered + tier-less).
+            Map<Id, Decimal> masterFeeByTermId = masterPremiumFees(packageId);
+
+            List<Dealer_Package_Term__c> dealerTerms = new List<Dealer_Package_Term__c>();
+            if (!masterFeeByTermId.isEmpty()) {
+                dealerTerms = [
+                    SELECT Id, Premium_Model_Fee__c, Package_Term__c
+                    FROM Dealer_Package_Term__c
+                    WHERE Package_Term__c IN :masterFeeByTermId.keySet()
+                ];
+            }
+            result.dealerTermsConsidered = dealerTerms.size();
+
+            List<Dealer_Package_Term__c> updates = new List<Dealer_Package_Term__c>();
+            for (Dealer_Package_Term__c dt : dealerTerms) {
+                Decimal masterFee = masterFeeByTermId.get(dt.Package_Term__c);
+                if (dt.Premium_Model_Fee__c != masterFee) {
+                    updates.add(new Dealer_Package_Term__c(
+                        Id = dt.Id,
+                        Premium_Model_Fee__c = masterFee
+                    ));
+                }
+            }
+            result.dealerTermsToUpdate = updates.size();
+
+            if (result.dryRun || updates.isEmpty()) {
+                result.success = true;
+                result.message = result.dryRun
+                    ? 'Dry run: ' + updates.size() + ' dealer term(s) would be re-pushed.'
+                    : 'Nothing to re-push for ' + master.Name + '.';
+                return result;
+            }
+
+            // Real run — a write, so it honours the package-sync kill switch
+            // (the same gate every other console write uses).
+            if (!PortalFeatureFlagService.isDealerSyncEnabled()) {
+                result.success = false;
+                result.message = 'Package sync is switched off, so the premium re-push is '
+                    + 'unavailable. An administrator can turn it back on in portal settings.';
+                return result;
+            }
+
+            if (updates.size() <= 200) {
+                Database.SaveResult[] saved = Database.update(updates, false);
+                Integer ok = 0;
+                for (Database.SaveResult sr : saved) {
+                    if (sr.isSuccess()) ok++;
+                }
+                result.dealerTermsUpdated = ok;
+                result.success = ok == updates.size();
+                result.message = 'Re-pushed the premium fee onto ' + ok + ' dealer term(s).';
+            } else {
+                result.batchJobId = Database.executeBatch(
+                    new DealerPackagePremiumRepushBatch(master.Id), 200
+                );
+                result.success = true;
+                result.message = 'Premium re-push enqueued for ' + updates.size()
+                    + ' dealer term(s) (job ' + result.batchJobId + ').';
+            }
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = 'Error: ' + e.getMessage();
+            return result;
+        }
+    }
+
+    /**
+     * The premium fee of every master term belonging to one master package,
+     * keyed by master term id — tiered terms (via the package's tiers) plus
+     * tier-less terms (direct Package__c link). Mirrors the term resolution the
+     * reconcile uses, so the re-push touches exactly the rows the sync seeds.
+     */
+    private static Map<Id, Decimal> masterPremiumFees(Id masterPackageId) {
+        Map<Id, Decimal> fees = new Map<Id, Decimal>();
+        if (masterPackageId == null) return fees;
+
+        Set<Id> tierIds = new Set<Id>();
+        for (Package_Tier__c t : [
+            SELECT Id FROM Package_Tier__c WHERE Package__c = :masterPackageId
+        ]) {
+            tierIds.add(t.Id);
+        }
+        if (!tierIds.isEmpty()) {
+            for (Package_Term__c t : [
+                SELECT Id, Premium_Model_Fee__c FROM Package_Term__c
+                WHERE Package_Tier__c IN :tierIds
+            ]) {
+                fees.put(t.Id, t.Premium_Model_Fee__c);
+            }
+        }
+        for (Package_Term__c t : [
+            SELECT Id, Premium_Model_Fee__c FROM Package_Term__c
+            WHERE Package__c = :masterPackageId
+        ]) {
+            fees.put(t.Id, t.Premium_Model_Fee__c);
+        }
+        return fees;
+    }
+
+    // =========================================================================
     // Internals
     // =========================================================================
 
@@ -874,6 +1036,14 @@ public without sharing class DealerPackageSyncService {
      * Structure mirrors + derived prices from master wholesale + dealer markup.
      * Markup__c / Markup_Type__c / Discount_Type__c / Discount_Value__c /
      * Sales_Rep_Incentive__c are NEVER written here (dealer-local).
+     *
+     * PREMIUM FEE IS WRITE-ONCE (head-office decision): Premium_Model_Fee__c is
+     * seeded here — and ONLY here — i.e. when the dealer term row is first
+     * created from its master. Every later reconcile runs through
+     * applyTermMirrorCompared, which deliberately does not touch
+     * Premium_Model_Fee__c, so a dealer's edited premium survives every sync.
+     * A head-office change is propagated on demand by
+     * repushPremiumFees(...) instead.
      */
     private static void applyTermMirror(Dealer_Package_Term__c target, Package_Term__c master) {
         target.Month__c = master.Month__c;
@@ -903,7 +1073,10 @@ public without sharing class DealerPackageSyncService {
         if (existing.Mileage_Unit__c != master.Mileage_Unit__c) { upd.Mileage_Unit__c = master.Mileage_Unit__c; dirty = true; }
         if (existing.ByYear__c != master.ByYear__c) { upd.ByYear__c = master.ByYear__c; dirty = true; }
         if (existing.Class__c != master.Class__c) { upd.Class__c = master.Class__c; dirty = true; }
-        if (existing.Premium_Model_Fee__c != master.Premium_Model_Fee__c) { upd.Premium_Model_Fee__c = master.Premium_Model_Fee__c; dirty = true; }
+        // Premium_Model_Fee__c is WRITE-ONCE: seeded by applyTermMirror when the
+        // dealer term row is first created, and deliberately NOT reconciled here
+        // so a dealer's edited premium survives every later sync. Head-office
+        // changes propagate on demand through repushPremiumFees(...).
         if (existing.Mileage_Restriction__c != master.Mileage_Restriction__c) { upd.Mileage_Restriction__c = master.Mileage_Restriction__c; dirty = true; }
         if (existing.Mileage_Restriction_Start__c != master.Mileage_Restriction_Start__c) { upd.Mileage_Restriction_Start__c = master.Mileage_Restriction_Start__c; dirty = true; }
         if (existing.Mileage_Restriction_End__c != master.Mileage_Restriction_End__c) { upd.Mileage_Restriction_End__c = master.Mileage_Restriction_End__c; dirty = true; }

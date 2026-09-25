@@ -1006,34 +1006,18 @@ lightning-accordion-section[data-package-id].selected {
     font-style: italic;
 }
 
-/* Scrollable Terms Container */
+/* Terms container — NO inner scroll (warranty tab).
+   Previously this "package window" pinned a fixed height (max-height: 400px)
+   with overflow-y: auto, so the package/plan list scrolled inside a nested
+   scroll container and trapped the page scroll. It now grows with its content
+   and the surrounding page scrolls normally; the visual frame (padding,
+   border, radius, background) is unchanged. */
 .terms-scroll-container {
-    max-height: 400px; /* Fixed height for terms section — re-enabled (mirrors dealerPortalMoreProducts.css) */
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: visible;
     padding: 5px;
     border: 1px solid #e9ecef;
     border-radius: 6px;
     background: #fafbfc;
-}
-
-/* Custom scrollbar styling for terms */
-.terms-scroll-container::-webkit-scrollbar {
-    width: 6px;
-}
-
-.terms-scroll-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-}
-
-.terms-scroll-container::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
-}
-
-.terms-scroll-container::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
 }
 
 /* Ensure modals appear above scroll content */

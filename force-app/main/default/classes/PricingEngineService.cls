@@ -274,14 +274,23 @@ public without sharing class PricingEngineService {
                         if (premiumWaived) {
                             continue;
                         }
-                        // P-4 (Design P-B): the premium fee is term-anchored. Use
-                        // the master term's Premium_Model_Fee__c when positive;
-                        // else fall back to the member-row amount (transition
-                        // back-compat — today's seeds still price from the row).
-                        Decimal termPremium = term.Package_Term__r != null
+                        // P-4 (Design P-B), dealer-first: the premium fee is
+                        // anchored on the DEALER term's Premium_Model_Fee__c
+                        // when populated and > 0 (seeded once from the master
+                        // at dealer-package creation; a dealer edit survives
+                        // every later sync). Fall back to the master term's
+                        // Package_Term__r.Premium_Model_Fee__c when the dealer
+                        // value is blank, else keep the member-row amount.
+                        // Identical rule (and order) to
+                        // DealerPortalController.resolvePremium step 3 — their
+                        // parity tests exist to catch any divergence.
+                        Decimal dealerTermPremium = term.Premium_Model_Fee__c;
+                        Decimal masterTermPremium = term.Package_Term__r != null
                             ? term.Package_Term__r.Premium_Model_Fee__c : null;
-                        if (termPremium != null && termPremium > 0) {
-                            line.amount = money(termPremium);
+                        if (dealerTermPremium != null && dealerTermPremium > 0) {
+                            line.amount = money(dealerTermPremium);
+                        } else if (masterTermPremium != null && masterTermPremium > 0) {
+                            line.amount = money(masterTermPremium);
                         }
                         // A premium table that prices $0 (or a make whose term
                         // carries no fee) emits no premium line, matching the
@@ -407,6 +416,7 @@ public without sharing class PricingEngineService {
             SELECT Id, Name, Dealer_Package__c, Package_Term__c,
                    Dealer_Package__r.Dealer__c, Dealer_Package__r.Package__c,
                    Original_Package_Term_Cost__c,
+                   Premium_Model_Fee__c,
                    Discount_Type__c, Discount_Value__c,
                    Markup__c, Markup_Type__c,
                    Package_Term__r.Premium_Model_Fee__c

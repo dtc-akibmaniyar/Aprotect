@@ -1,0 +1,87 @@
+<template>
+    <lightning-card title="Ancillary Benefits — Capped per Term" icon-name="standard:benefit_action">
+        <template lwc:if={isLoading}>
+            <div class="slds-p-around_medium slds-align_absolute-center">
+                <lightning-spinner alternative-text="Loading ancillary benefits" size="small"></lightning-spinner>
+            </div>
+        </template>
+        <template lwc:elseif={hasRows}>
+            <div class="slds-p-horizontal_medium slds-p-bottom_small slds-scrollable_x">
+                <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                    <thead>
+                        <tr class="slds-line-height_reset">
+                            <th scope="col">Include</th>
+                            <th scope="col">Benefit</th>
+                            <th scope="col">Cap</th>
+                            <th scope="col">Used to Date</th>
+                            <th scope="col">Remaining</th>
+                            <th scope="col">Use This Claim</th>
+                            <th scope="col">Approved</th>
+                            <th scope="col">Remaining After</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={rows} for:item="row">
+                            <tr key={row.balanceId}>
+                                <td>
+                                    <lightning-input
+                                        type="checkbox"
+                                        label="Include"
+                                        variant="label-hidden"
+                                        checked={row.include}
+                                        data-id={row.balanceId}
+                                        onchange={handleIncludeChange}
+                                    ></lightning-input>
+                                </td>
+                                <td>{row.benefitType}</td>
+                                <td>
+                                    <lightning-formatted-number value={row.capAmount} format-style="currency"></lightning-formatted-number>
+                                </td>
+                                <td>
+                                    <lightning-formatted-number value={row.usedToDate} format-style="currency"></lightning-formatted-number>
+                                </td>
+                                <td>
+                                    <lightning-formatted-number value={row.remaining} format-style="currency"></lightning-formatted-number>
+                                </td>
+                                <td>
+                                    <lightning-input
+                                        type="number"
+                                        step="0.01"
+                                        label="Use This Claim"
+                                        variant="label-hidden"
+                                        value={row.useThisClaim}
+                                        disabled={row.excluded}
+                                        data-id={row.balanceId}
+                                        onchange={handleUseAmountChange}
+                                    ></lightning-input>
+                                </td>
+                                <td>
+                                    <lightning-formatted-number value={row.approved} format-style="currency"></lightning-formatted-number>
+                                </td>
+                                <td>
+                                    <lightning-formatted-number value={row.remainingAfter} format-style="currency"></lightning-formatted-number>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div class="slds-p-horizontal_medium slds-p-bottom_medium slds-p-top_x-small">
+                <lightning-button
+                    variant="brand"
+                    label="Save Ancillary Benefits"
+                    disabled={isDisabled}
+                    onclick={handleSave}
+                ></lightning-button>
+                <template lwc:if={isSaving}>
+                    <lightning-spinner alternative-text="Saving" size="small"></lightning-spinner>
+                </template>
+            </div>
+        </template>
+        <template lwc:else>
+            <div class="slds-p-around_medium slds-text-color_weak">
+                No ancillary benefits are provisioned on this claim's contract.
+            </div>
+        </template>
+    </lightning-card>
+</template>
