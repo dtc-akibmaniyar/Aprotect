@@ -1952,6 +1952,59 @@ public static Application_Package__c createTireRimApplicationPackage(
 }
 
     // ─────────────────────────────────────────────────────────────────────────────
+    // SECTION 20 — PART ORDER / ORDERED PART
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    /** Creates an Account with the Supplier_Account record type. */
+    public static Account createSupplierAccount(Boolean doInsert) {
+        Account acc = new Account(
+            Name         = unique('Test Supplier'),
+            RecordTypeId = getRecordTypeId('Account', 'Supplier_Account')
+        );
+        if (doInsert) insert acc;
+        return acc;
+    }
+
+    /** Creates a Part_Order__c (Master-Detail to Claim__c) under an existing claim. */
+    public static Part_Order__c createPartOrder(Id claimId, Id supplierId, Boolean doInsert) {
+        Part_Order__c po = new Part_Order__c(
+            Claim__c             = claimId,
+            Supplier__c          = supplierId,
+            PO_Number__c         = unique('PO'),
+            Expected_Delivery__c = Date.today().addDays(7)
+        );
+        if (doInsert) insert po;
+        return po;
+    }
+
+    /** Creates an Ordered_Part__c under a Part Order, with the Claim__c shortcut lookup also set. */
+    public static Ordered_Part__c createOrderedPart(Id partOrderId, Id claimId, Boolean doInsert) {
+        Ordered_Part__c op = new Ordered_Part__c(
+            Part_Order__c = partOrderId,
+            Claim__c      = claimId,
+            Part_Name__c  = unique('Test Part'),
+            Quantity__c   = 1,
+            Status__c     = 'Ordered'
+        );
+        if (doInsert) insert op;
+        return op;
+    }
+
+    /** Same as createOrderedPart, with the Part__c source link also set - for testing the one-click order flow. */
+    public static Ordered_Part__c createOrderedPartForPart(Id partOrderId, Id claimId, Id partId, Boolean doInsert) {
+        Ordered_Part__c op = new Ordered_Part__c(
+            Part_Order__c = partOrderId,
+            Claim__c      = claimId,
+            Part__c       = partId,
+            Part_Name__c  = unique('Test Part'),
+            Quantity__c   = 1,
+            Status__c     = 'Ordered'
+        );
+        if (doInsert) insert op;
+        return op;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
     // INNER EXCEPTION
     // ─────────────────────────────────────────────────────────────────────────────
 

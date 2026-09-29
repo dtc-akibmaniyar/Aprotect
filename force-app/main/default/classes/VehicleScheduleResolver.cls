@@ -186,9 +186,10 @@ public without sharing class VehicleScheduleResolver {
         for (String winnerType : winnerByType.keySet()) {
             Vehicle_Schedule_Assignment__c a = winnerByType.get(winnerType);
             winnerScheduleIds.add(a.Vehicle_Schedule__c);
-            // C-C5: the vehicle's commercial type is threaded in; the key is
-            // type-qualified ONLY for a Commercial_Surcharge schedule with a
-            // non-blank type (C-C4), so every other family's keys are unchanged.
+            // C-C5 + C-C6: the vehicle's commercial type is threaded in and the
+            // key is type-qualified WHENEVER that type is non-blank (C-C4/C-C6),
+            // mirroring the member-row side; a blank type emits the five plain
+            // keys exactly as before.
             memberKeys.addAll(buildMemberKeys(a.Vehicle_Schedule__c, makeName, modelName,
                 vehicle.Commercial_Vehicle_Type__c, winnerType));
         }
@@ -338,20 +339,27 @@ public without sharing class VehicleScheduleResolver {
     }
 
     /**
-     * C-C4 (Rev 7 commercial): type-qualified variant of the five key shapes.
-     * A sixth pipe-segment (`|<CommercialVehicleType>`) is appended ONLY when
-     * the schedule type is Commercial_Surcharge AND the vehicle's commercial
-     * type is non-blank. For every other family (and any blank type) the five
-     * plain keys above are returned => byte-identical to today. The plain keys
-     * are still emitted for the commercial schedule (harmless: no member row
-     * carries a plain key in that schedule).
+     * C-C4 (Rev 7 commercial) + C-C6 (typed-key symmetry fix): type-qualified
+     * variant of the five key shapes. A sixth pipe-segment
+     * (`|<CommercialVehicleType>`) is appended whenever the vehicle's commercial
+     * type is non-blank — for EVERY schedule family — mirroring
+     * VehicleScheduleMemberKeyHandler.buildKey, which appends that segment
+     * whenever the ROW's Commercial_Vehicle_Type__c is non-blank. Previously the
+     * segment was emitted only for a Commercial_Surcharge schedule, so a typed
+     * member row in any other family (e.g. Commercial_Eligibility) could never
+     * match. For a blank type the five plain keys above are returned
+     * => byte-identical to today. The plain keys are still emitted alongside
+     * (harmless: a typed row never carries a plain key, and an untyped row never
+     * carries a typed one).
+     *
+     * scheduleType is retained for call-site/API stability but no longer gates
+     * the type segment — the row side was never family-aware.
      */
     @TestVisible
     static List<String> buildMemberKeys(Id scheduleId, String makeName, String modelName,
                                         String commercialVehicleType, String scheduleType) {
         List<String> keys = new List<String>(buildMemberKeys(scheduleId, makeName, modelName));
-        if (TYPE_COMMERCIAL_SURCHARGE.equals(scheduleType)
-            && String.isNotBlank(commercialVehicleType)) {
+        if (String.isNotBlank(commercialVehicleType)) {
             String mk = String.isBlank(makeName) ? VehicleScheduleMemberKeyHandler.WILDCARD : makeName.trim();
             String mo = String.isBlank(modelName) ? VehicleScheduleMemberKeyHandler.WILDCARD : modelName.trim();
             String prefix = String.valueOf(scheduleId) + '|';

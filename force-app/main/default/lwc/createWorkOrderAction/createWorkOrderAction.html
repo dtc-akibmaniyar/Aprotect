@@ -1,14 +1,102 @@
 <template>
-    <div class="slds-p-bottom_small">
-        <lightning-button
-            variant="brand"
-            label="Create Work Order"
-            icon-name="utility:file"
-            disabled={isDisabled}
-            onclick={handleCreateWorkOrder}
-        ></lightning-button>
-        <template lwc:if={isCreating}>
-            <lightning-spinner alternative-text="Creating work order" size="small"></lightning-spinner>
-        </template>
-    </div>
+    <template lwc:if={isLoading}>
+        <div class="slds-p-around_small">
+            <lightning-spinner alternative-text="Loading work order" size="small"></lightning-spinner>
+        </div>
+    </template>
+    <template lwc:elseif={hasActiveWorkOrder}>
+        <lightning-card title="Work Order" icon-name="standard:work_order">
+            <div class="slds-p-horizontal_medium slds-p-bottom_small">
+                <div class="slds-grid slds-wrap slds-gutters">
+                    <div class="slds-col slds-size_1-of-3">
+                        <div class="slds-text-title_caps slds-text-color_weak">Work Order</div>
+                        <a href="javascript:void(0);" data-id={workOrderDetail.workOrderId} onclick={handleWorkOrderClick}>{workOrderDetail.workOrderName}</a>
+                    </div>
+                    <div class="slds-col slds-size_1-of-3">
+                        <div class="slds-text-title_caps slds-text-color_weak">Deductible</div>
+                        <lightning-formatted-number value={workOrderDetail.deductible} format-style="currency"></lightning-formatted-number>
+                    </div>
+                    <div class="slds-col slds-size_1-of-3">
+                        <div class="slds-text-title_caps slds-text-color_weak">Balance Amount Due</div>
+                        <lightning-formatted-number value={workOrderDetail.balanceAmountDue} format-style="currency"></lightning-formatted-number>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+                <div class="slds-grid slds-wrap slds-gutters scn-grid">
+                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                        <div class="scn-col-head">Customer Work Order (What the Client Sees)</div>
+                        <div class="ln"><span>Retail work order (repair job)</span><lightning-formatted-number value={workOrderDetail.retailPrice} format-style="currency"></lightning-formatted-number></div>
+                        <div class="ln"><span>{coverageLabel}</span><span>− <lightning-formatted-number value={workOrderDetail.coverageApplied} format-style="currency"></lightning-formatted-number></span></div>
+                        <div class="ln"><span>Customer portion of repair</span><lightning-formatted-number value={workOrderDetail.customerRepairPortion} format-style="currency"></lightning-formatted-number></div>
+                        <div class="ln"><span>Plus shop supplies (after coverage, not covered)</span><span>+ <lightning-formatted-number value={workOrderDetail.shopSuppliesRetail} format-style="currency"></lightning-formatted-number></span></div>
+                        <div class="ln ln-tot"><span>Customer subtotal (pre-tax)</span><lightning-formatted-number value={workOrderDetail.customerPaysPreTax} format-style="currency"></lightning-formatted-number></div>
+                        <div class="ln"><span>{taxLabel}</span><lightning-formatted-number value={workOrderDetail.taxAmount} format-style="currency"></lightning-formatted-number></div>
+                        <div class="ln ln-tot"><span>Customer pays A-Protect (with tax)</span><lightning-formatted-number value={workOrderDetail.customerPaysWithTax} format-style="currency"></lightning-formatted-number></div>
+                    </div>
+                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                        <div class="scn-col-head">A-Protect Internal Cost (What It Costs Us)</div>
+                        <div class="ln ln-desc"><span>{partSummary}</span></div>
+                        <div class="ln ln-desc"><span>{supplierSummary}</span></div>
+                        <div class="ln"><span>Parts (wholesale)</span><lightning-formatted-number value={workOrderDetail.partsCost} format-style="currency"></lightning-formatted-number></div>
+                        <div class="ln"><span>{labourLabel}</span><lightning-formatted-number value={workOrderDetail.labourCost} format-style="currency"></lightning-formatted-number></div>
+                        <div class="ln"><span>Shop supplies (our cost)</span><lightning-formatted-number value={workOrderDetail.shopSuppliesCost} format-style="currency"></lightning-formatted-number></div>
+                        <div class="ln"><span>{insuranceLabel}</span><lightning-formatted-number value={workOrderDetail.insuranceAmount} format-style="currency"></lightning-formatted-number></div>
+                        <div class="ln ln-tot"><span>Repair wholesale subtotal</span><lightning-formatted-number value={workOrderDetail.wholesaleCost} format-style="currency"></lightning-formatted-number></div>
+                        <div class="ln"><span>Ancillary benefits paid (rental, roadside, towing, trip)</span><span>+ <lightning-formatted-number value={workOrderDetail.benefitsUsed} format-style="currency"></lightning-formatted-number></span></div>
+                        <div class="ln ln-tot"><span>Total claim cost</span><lightning-formatted-number value={workOrderDetail.totalClaimCost} format-style="currency"></lightning-formatted-number></div>
+                        <div class="ln"><span>Customer collected (pre-tax)</span><span>+ <lightning-formatted-number value={workOrderDetail.customerPaysPreTax} format-style="currency"></lightning-formatted-number></span></div>
+                    </div>
+                </div>
+
+                <div class={plClass}>
+                    <span>{plLabel}</span>
+                    <lightning-formatted-number value={workOrderDetail.finalProfitLoss} format-style="currency"></lightning-formatted-number>
+                </div>
+            </div>
+
+            <div class="slds-p-horizontal_medium slds-p-bottom_medium slds-scrollable_x">
+                <h3 class="scn-title">Work Order - Approved Repairs</h3>
+                <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                    <thead>
+                        <tr class="slds-line-height_reset">
+                            <th scope="col">Item</th>
+                            <th scope="col">Covered</th>
+                            <th scope="col">Customer Pay</th>
+                            <th scope="col">Ordered</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={workOrderDetail.lines} for:item="line">
+                            <tr key={line.id}>
+                                <td><a href="javascript:void(0);" data-id={line.id} onclick={handleLineClick}>{line.description}</a></td>
+                                <td><lightning-formatted-number value={line.covered} format-style="currency"></lightning-formatted-number></td>
+                                <td><lightning-formatted-number value={line.customerPay} format-style="currency"></lightning-formatted-number></td>
+                                <td>
+                                    <template lwc:if={line.orderedPartStatus}>
+                                        <lightning-badge label={line.orderedPartStatus}></lightning-badge>
+                                    </template>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </lightning-card>
+    </template>
+    <template lwc:else>
+        <div class="slds-p-bottom_small">
+            <lightning-button
+                variant="brand"
+                label="Create Work Order"
+                icon-name="utility:file"
+                disabled={isDisabled}
+                onclick={handleCreateWorkOrder}
+            ></lightning-button>
+            <template lwc:if={isCreating}>
+                <lightning-spinner alternative-text="Creating work order" size="small"></lightning-spinner>
+            </template>
+        </div>
+    </template>
 </template>

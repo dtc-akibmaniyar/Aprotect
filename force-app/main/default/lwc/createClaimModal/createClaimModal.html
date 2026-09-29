@@ -1,0 +1,125 @@
+<template>
+    <template if:true={isLoading}>
+        <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+    </template>
+
+    <template if:false={isLoading}>
+        <div class="slds-modal__header ci-head">
+            <h2 class="slds-modal__title slds-hyphenate">Create Claim</h2>
+            <p class="ci-meta">
+                Application <b>{left.applicationName}</b>
+                <span class="pill active">{left.applicationStatus}</span>
+            </p>
+        </div>
+
+        <div class="ci-alerts">
+            <div class={warrantyAlertClass}>
+                <template if:true={isWarrantyValid}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                </template>
+                <template if:false={isWarrantyValid}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 1 21h22L12 3z" stroke-linejoin="round"></path><path d="M12 9.5v5" stroke-linecap="round"></path><circle cx="12" cy="17.3" r="0.9" fill="currentColor" stroke="none"></circle></svg>
+                </template>
+                <span>{warrantyAlertMessage}</span>
+            </div>
+            <div class={coverageAlertClass}>
+                <template if:true={isCoverageActive}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                </template>
+                <template if:false={isCoverageActive}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 1 21h22L12 3z" stroke-linejoin="round"></path><path d="M12 9.5v5" stroke-linecap="round"></path><circle cx="12" cy="17.3" r="0.9" fill="currentColor" stroke="none"></circle></svg>
+                </template>
+                <span>{coverageAlertMessage}</span>
+            </div>
+        </div>
+
+        <div class="slds-modal__content ci-body">
+            <!-- LEFT: read-only, auto-populated from the Application -->
+            <div class="ci-col">
+                <div class="icard">
+                    <div class="ih">
+                        <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V6l8-3 8 3v15" stroke-linejoin="round"></path><path d="M9 21v-6h6v6M9 10h1M14 10h1M9 14h1M14 14h1"></path></svg></span>
+                        <span>Dealership Information</span>
+                    </div>
+                    <template for:each={dealershipRows} for:item="row">
+                        <div class="kv" key={row.key}><div class="k">{row.label}</div><div class={row.valueClass}>{row.value}</div></div>
+                    </template>
+                </div>
+
+                <div class="icard">
+                    <div class="ih">
+                        <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" stroke-linejoin="round"></path><path d="M8 12h8M8 16h8M8 8h4"></path></svg></span>
+                        <span>Application Information</span>
+                    </div>
+                    <template for:each={applicationRows} for:item="row">
+                        <div class="kv" key={row.key}><div class="k">{row.label}</div><div class={row.valueClass}>{row.value}</div></div>
+                    </template>
+                </div>
+
+                <div class="icard">
+                    <div class="ih">
+                        <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17h14M5 17l1.5-6.5A2 2 0 0 1 8.44 9h7.12a2 2 0 0 1 1.94 1.5L19 17M5 17v3M19 17v3" stroke-linejoin="round" stroke-linecap="round"></path><circle cx="8" cy="17" r="1.6"></circle><circle cx="16" cy="17" r="1.6"></circle></svg></span>
+                        <span>Vehicle Information</span>
+                    </div>
+                    <template for:each={vehicleRows} for:item="row">
+                        <div class="kv" key={row.key}><div class="k">{row.label}</div><div class={row.valueClass}>{row.value}</div></div>
+                    </template>
+                </div>
+
+                <div class="icard">
+                    <div class="ih">
+                        <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke-linejoin="round"></path><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+                        <span>Plan Information</span>
+                    </div>
+                    <template for:each={planRows} for:item="row">
+                        <div class="kv" key={row.key}><div class="k">{row.label}</div><div class={row.valueClass}>{row.value}</div></div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- RIGHT: editable Claim Details -->
+            <div class="ci-col">
+                <div class="ecard">
+                    <div class="ih">
+                        <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2v3M15 2v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" stroke-linejoin="round"></path></svg></span>
+                        <span>Claim Details</span>
+                    </div>
+
+                    <div class="fld">
+                        <lightning-input type="date" label="Date Filed" data-field="dateFiled"
+                            value={form.dateFiled} onchange={handleFieldChange}></lightning-input>
+                    </div>
+
+                    <div class="fld">
+                        <lightning-textarea label="Claim Description" data-field="claimDescription"
+                            value={form.claimDescription} onchange={handleFieldChange}></lightning-textarea>
+                    </div>
+
+                    <div class="fld">
+                        <lightning-textarea label="Customer Location" data-field="customerLocation"
+                            placeholder="Enter where the vehicle currently is&hellip;"
+                            value={form.customerLocation} onchange={handleFieldChange}></lightning-textarea>
+                    </div>
+
+                    <div class="row2">
+                        <div class="fld fld-odometer">
+                            <lightning-input type="number" label="Current Odometer" data-field="currentOdometer"
+                                value={form.currentOdometer} onchange={handleFieldChange}></lightning-input>
+                        </div>
+                        <div class="fld fld-unit">
+                            <lightning-combobox label="Unit" data-field="currentOdometerUnit"
+                                value={form.currentOdometerUnit} options={odometerUnitOptions}
+                                onchange={handleFieldChange}></lightning-combobox>
+                        </div>
+                    </div>
+                    <div class="hint">Odometer is required to confirm the claim falls within the coverage term.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="slds-modal__footer ci-foot">
+            <button class="btn ghost" onclick={handleClose}>Cancel</button>
+            <button class="btn primary" onclick={handleSave} disabled={isSaving}>Create Claim</button>
+        </div>
+    </template>
+</template>

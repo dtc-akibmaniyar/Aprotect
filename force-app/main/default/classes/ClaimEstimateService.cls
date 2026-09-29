@@ -101,6 +101,7 @@ public with sharing class ClaimEstimateService {
             e.Labour_Rate__c = shop.Labour_Rate_On_File__c;
         }
         insertSecured(new List<Estimate__c>{ e });
+        syncEstimateChildren(new List<Estimate__c>{ e });
         return e;
     }
 
@@ -108,7 +109,9 @@ public with sharing class ClaimEstimateService {
     @AuraEnabled
     public static ClaimPricingService.PricingResult updateEstimate(Estimate__c estimate, Decimal cap) {
         updateSecured(new List<Estimate__c>{ estimate });
-        return ClaimPricingService.recalculateAndStamp(estimate.Id, cap);
+        ClaimPricingService.PricingResult r = ClaimPricingService.recalculateAndStamp(estimate.Id, cap);
+        syncEstimateChildren(new List<Estimate__c>{ estimate });
+        return r;
     }
 
     /**
@@ -265,10 +268,168 @@ public with sharing class ClaimEstimateService {
             Id selectedId = null;
             for (Estimate__c e : estimates) if (e.Is_Selected__c == true) selectedId = e.Id;
             if (selectedId != null) markSelected(selectedId, claimId);
+
+            syncEstimateChildren(estimates);
         } catch (Exception ex) {
             Database.rollback(sp);
             throw new AuraHandledException('Could not save estimates: ' + ex.getMessage());
         }
+    }
+
+    /**
+     * Keeps Part__c/Service__c/Shop_Supply__c in sync with their parent
+     * Estimate__c's own scalar fields (Sep 25 - closes the gap Osama
+     * flagged: the Repair Price Scenarios grid has only ever written
+     * scalar fields onto Estimate__c since the Sep 16 architecture
+     * decision, never actually creating the real Part/Service/Shop_Supply
+     * children those scalars represent). One child of each type per
+     * Estimate__c - mirrors buildClaimLineItems' own "3 lines max, one per
+     * type, only when non-zero" pattern exactly, since there is no
+     * per-estimate multi-part itemization in this model. Upserts by the
+     * existing Estimate__c lookup (never duplicates on re-save); deletes
+     * (not just blanks) a child whose triggering amount goes to zero, so
+     * an estimate edited down to $0 doesn't leave a stray zero-dollar
+     * child behind.
+     *
+     * Resolves Claim__c itself via a fresh query rather than trusting
+     * estimate.Claim__c to be populated on the incoming objects - the grid's
+     * save payload only sets Claim__c for brand-new (toInsert) rows, never
+     * for edits to existing ones, so reading it off the caller's object
+     * would silently null out Part__c.Claim__c on every edit-only save.
+     *
+     * HARD RULE: Export_to_Work_Order__c is never set true here (stays at
+     * its schema default, false). Setting it true would let the dormant
+     * legacy WorkOrderCreatorController.createWorkOrders() pick these
+     * records up and generate a second, conflicting Work_Order__c - that
+     * legacy path's own filter (Export_to_Work_Order__c = true AND
+     * Repair_Shop__c != null) is the only thing keeping it inert, and this
+     * rule keeps it that way.
+     *
+     * Bulk-safe: one query per child type plus one Claim__c-resolution
+     * query across the whole batch, one insert list + one update list per
+     * child type - 7 DML statements total regardless of how many estimates
+     * are being saved.
+     */
+    private static void syncEstimateChildren(List<Estimate__c> estimates) {
+        Set<Id> estimateIds = new Set<Id>();
+        for (Estimate__c e : estimates) if (e.Id != null) estimateIds.add(e.Id);
+        if (estimateIds.isEmpty()) return;
+
+        // Re-query every field fresh by Id rather than trusting the caller's
+        // objects to carry them - createEstimate/saveEstimates' payloads
+        // always do, but updateEstimate's single-record callers (including
+        // this class's own tests) can pass a partially-selected SOQL result,
+        // and Apex throws reading an unqueried field even for one this
+        // method never changes (e.g. Repair_Shop__c). Self-sufficient here
+        // means this never breaks regardless of what the caller populated.
+        Map<Id, Estimate__c> freshById = new Map<Id, Estimate__c>([
+            SELECT Id, Claim__c, Repair_Shop__c, Part_Component__c, Part_Code__c, Condition__c,
+                   KMs__c, Parts_Supplier__c, Parts_Cost__c, Retail_Price__c, Job_Type__c,
+                   Labour_Hours__c, Labour_Rate__c, Shop_Supplies__c, Shop_Supplies_Retail__c
+            FROM Estimate__c WHERE Id IN :estimateIds
+            WITH USER_MODE
+        ]);
+
+        Map<Id, Part__c> partByEstimate = new Map<Id, Part__c>();
+        for (Part__c p : [SELECT Id, Estimate__c FROM Part__c WHERE Estimate__c IN :estimateIds WITH USER_MODE]) {
+            partByEstimate.put(p.Estimate__c, p);
+        }
+        Map<Id, Service__c> serviceByEstimate = new Map<Id, Service__c>();
+        for (Service__c s : [SELECT Id, Estimate__c FROM Service__c WHERE Estimate__c IN :estimateIds WITH USER_MODE]) {
+            serviceByEstimate.put(s.Estimate__c, s);
+        }
+        Map<Id, Shop_Supply__c> supplyByEstimate = new Map<Id, Shop_Supply__c>();
+        for (Shop_Supply__c sp : [SELECT Id, Estimate__c FROM Shop_Supply__c WHERE Estimate__c IN :estimateIds WITH USER_MODE]) {
+            supplyByEstimate.put(sp.Estimate__c, sp);
+        }
+
+        List<Part__c> partsToInsert = new List<Part__c>();
+        List<Part__c> partsToUpdate = new List<Part__c>();
+        List<Service__c> servicesToInsert = new List<Service__c>();
+        List<Service__c> servicesToUpdate = new List<Service__c>();
+        List<Shop_Supply__c> suppliesToInsert = new List<Shop_Supply__c>();
+        List<Shop_Supply__c> suppliesToUpdate = new List<Shop_Supply__c>();
+        List<SObject> toDelete = new List<SObject>();
+
+        for (Estimate__c e : freshById.values()) {
+            Id claimId = e.Claim__c;
+
+            // Same proportional split buildClaimLineItems already uses, so
+            // Part__c/Service__c's retail figures agree with the eventual
+            // Claim_Line_Item__c/Work_Order_Line_Item__c retail split.
+            Decimal partsWholesale  = nz(e.Parts_Cost__c);
+            Decimal labourWholesale = nz(e.Labour_Hours__c) * nz(e.Labour_Rate__c);
+            Decimal repairWholesale = partsWholesale + labourWholesale;
+            Decimal jobRetail       = nz(e.Retail_Price__c);
+            Decimal partsShare = repairWholesale > 0
+                ? (partsWholesale / repairWholesale).setScale(10, RoundingMode.HALF_UP)
+                : 0;
+            Decimal partsRetail  = (jobRetail * partsShare).setScale(2, RoundingMode.HALF_UP);
+            Decimal labourRetail = jobRetail - partsRetail;
+
+            // Part__c
+            Part__c existingPart = partByEstimate.get(e.Id);
+            if (partsWholesale != 0) {
+                Part__c p = existingPart != null ? new Part__c(Id = existingPart.Id) : new Part__c();
+                p.Estimate__c    = e.Id;
+                p.Claim__c       = claimId;
+                p.Repair_Shop__c = e.Repair_Shop__c;
+                p.Part_Name__c   = e.Part_Component__c;
+                p.Part_Code__c   = e.Part_Code__c;
+                p.Part_Type__c   = e.Condition__c;
+                p.Part_Cost__c   = partsWholesale;
+                p.Price__c       = partsRetail;
+                p.KMS__c         = e.KMs__c;
+                p.Supplier__c    = e.Parts_Supplier__c;
+                if (existingPart == null) { p.Quantity__c = 1; partsToInsert.add(p); }
+                else partsToUpdate.add(p);
+            } else if (existingPart != null) {
+                toDelete.add(existingPart);
+            }
+
+            // Service__c
+            Service__c existingService = serviceByEstimate.get(e.Id);
+            if (labourWholesale != 0) {
+                Service__c s = existingService != null ? new Service__c(Id = existingService.Id) : new Service__c();
+                s.Estimate__c    = e.Id;
+                s.Repair_Shop__c = e.Repair_Shop__c;
+                s.Job_Type__c    = e.Job_Type__c;
+                s.Time__c        = e.Labour_Hours__c != null ? String.valueOf(e.Labour_Hours__c) : null;
+                s.Repair_Time_Adj__c = e.Labour_Hours__c != null
+                    ? e.Labour_Hours__c.setScale(0, RoundingMode.HALF_UP) : null;
+                s.Wholesale_Labour_Rate_HR__c = e.Labour_Rate__c;
+                s.Wholesale__c   = labourWholesale;
+                s.Retail__c      = labourRetail;
+                if (existingService == null) servicesToInsert.add(s);
+                else servicesToUpdate.add(s);
+            } else if (existingService != null) {
+                toDelete.add(existingService);
+            }
+
+            // Shop_Supply__c
+            Shop_Supply__c existingSupply = supplyByEstimate.get(e.Id);
+            Decimal suppliesWholesale = nz(e.Shop_Supplies__c);
+            Decimal suppliesRetail    = nz(e.Shop_Supplies_Retail__c);
+            if (suppliesWholesale != 0 || suppliesRetail != 0) {
+                Shop_Supply__c sup = existingSupply != null ? new Shop_Supply__c(Id = existingSupply.Id) : new Shop_Supply__c();
+                sup.Estimate__c    = e.Id;
+                sup.Repair_Shop__c = e.Repair_Shop__c;
+                sup.Cost__c        = suppliesWholesale;
+                sup.Price__c       = suppliesRetail;
+                if (existingSupply == null) { sup.Item_Name__c = 'Shop Supplies'; suppliesToInsert.add(sup); }
+                else suppliesToUpdate.add(sup);
+            } else if (existingSupply != null) {
+                toDelete.add(existingSupply);
+            }
+        }
+
+        insertSecured(partsToInsert);
+        updateSecured(partsToUpdate);
+        insertSecured(servicesToInsert);
+        updateSecured(servicesToUpdate);
+        insertSecured(suppliesToInsert);
+        updateSecured(suppliesToUpdate);
+        if (!toDelete.isEmpty()) deleteSecured(toDelete);
     }
 
     // ───────────────────────── Create Work Order ──────────────────────────
@@ -311,7 +472,7 @@ public with sharing class ClaimEstimateService {
                    Repair_Shop__r.Tax_Percentage__c,
                    Part_Component__c, Job_Type__c, Part_Code__c, Parts_Supplier__c,
                    Parts_Cost__c, Labour_Hours__c, Labour_Rate__c,
-                   Shop_Supplies__c, Shop_Supplies_Retail__c, Retail_Price__c,
+                   Shop_Supplies__c, Shop_Supplies_Retail__c, Retail_Price__c, Coverage_Applied__c,
                    (SELECT Id FROM Work_Orders__r LIMIT 1)
             FROM Estimate__c WHERE Id = :estimateId
             WITH USER_MODE
@@ -375,9 +536,39 @@ public with sharing class ClaimEstimateService {
             //    rolls it up and the work order is the customer-facing document; the
             //    vendor cost sits in Wholesale__c. Falls back to wholesale only when a
             //    child had no retail figure at all.
+            //    Covered_Amount__c/Customer_Pay_Amount__c (Sep 24, "Work Order - Approved
+            //    Repairs" table): the Estimate's Coverage_Applied__c is split proportionally
+            //    across the non-Supplies lines by their own retail share of Retail_Price__c
+            //    (same technique already used to split retail between Part/Labour above) -
+            //    the LAST non-Supplies line absorbs the rounding remainder so the lines
+            //    always sum back to exactly Coverage_Applied__c. Supplies is never covered,
+            //    matching the pricing formula (shop supplies retail is added AFTER coverage).
+            Decimal coverageApplied = nz(est.Coverage_Applied__c);
+            Decimal jobRetail       = nz(est.Retail_Price__c);
+            Integer nonSuppliesCount = 0;
+            for (Claim_Line_Item__c cli : lines) {
+                if (cli.Line_Type__c != 'Supplies') nonSuppliesCount++;
+            }
+
             List<Work_Order_Line_Item__c> woLines = new List<Work_Order_Line_Item__c>();
+            Integer nonSuppliesSeen  = 0;
+            Decimal coverageAssigned = 0;
             for (Claim_Line_Item__c cli : lines) {
                 Decimal retail = cli.Retail_Amount__c != null ? cli.Retail_Amount__c : cli.Amount__c;
+
+                Decimal covered = 0;
+                if (cli.Line_Type__c != 'Supplies' && jobRetail > 0) {
+                    nonSuppliesSeen++;
+                    if (nonSuppliesSeen == nonSuppliesCount) {
+                        covered = coverageApplied - coverageAssigned;
+                    } else {
+                        Decimal share = (retail / jobRetail).setScale(10, RoundingMode.HALF_UP);
+                        covered = (coverageApplied * share).setScale(2, RoundingMode.HALF_UP);
+                    }
+                    coverageAssigned += covered;
+                }
+                Decimal customerPay = retail - covered;
+
                 Work_Order_Line_Item__c wl = new Work_Order_Line_Item__c(
                     Customer_Work_Order__c        = wo.Id,
                     Claim_Line_Item__c            = cli.Id,
@@ -386,7 +577,9 @@ public with sharing class ClaimEstimateService {
                     Repair_Shop__c                = cli.Repair_Shop__c,
                     Price__c                      = retail,
                     Retail__c                     = retail,
-                    Wholesale__c                  = cli.Amount__c
+                    Wholesale__c                  = cli.Amount__c,
+                    Covered_Amount__c             = covered,
+                    Customer_Pay_Amount__c        = customerPay
                 );
                 if (cli.Line_Type__c == 'Labour') {
                     wl.Wholesale_Labour_Rate_HR__c = cli.Rate__c;
@@ -655,8 +848,443 @@ public with sharing class ClaimEstimateService {
         Decimal benefitsUsed = agg.isEmpty() ? 0 : (Decimal) agg[0].get('total');
 
         updateSecured(new List<Claim__c>{
-            new Claim__c(Id = claimId, Total_Profit__c = nz(selected[0].Profit_Loss__c) - nz(benefitsUsed))
+            new Claim__c(
+                Id = claimId,
+                Total_Profit__c = nz(selected[0].Profit_Loss__c) - nz(benefitsUsed),
+                Total_Benefits_Used__c = nz(benefitsUsed)
+            )
         });
+    }
+
+    // ──────────────── Work Order detail (Work Order tab) ────────────────
+    // Backs createWorkOrderAction's detail view, shown once the claim has an
+    // active work order instead of the Create Work Order button.
+
+    public class WorkOrderDetail {
+        @AuraEnabled public Id workOrderId;
+        @AuraEnabled public String workOrderName;
+        @AuraEnabled public Decimal deductible;        // Deductable__c
+        @AuraEnabled public Decimal balanceAmountDue;  // Total_Amount_Due__c
+        @AuraEnabled public List<WorkOrderLineRow> lines;
+
+        // Selected Scenario breakdown (warranty_claims_dashboard (2).html),
+        // added Sep 24. Descriptive fields read straight through Estimate__r
+        // (display-only, not worth mirroring onto Work_Order__c as their own
+        // fields); dollar figures read from Work_Order__c's own mirrored
+        // formula fields, so this LWC and the record page always agree.
+        @AuraEnabled public String partComponent;
+        @AuraEnabled public String jobType;
+        @AuraEnabled public String condition;
+        @AuraEnabled public Decimal kms;
+        @AuraEnabled public String partsSupplierName;
+        @AuraEnabled public String partCode;
+        @AuraEnabled public String stockNumber;
+        @AuraEnabled public String repairShopName;
+        @AuraEnabled public Decimal labourHours;
+        @AuraEnabled public Decimal labourRate;
+        @AuraEnabled public String insuranceSource;
+        @AuraEnabled public Decimal capAmount; // Claim__r.Application_Package__r.Per_Claim_Limit__c, display only
+
+        @AuraEnabled public Decimal retailPrice;           // Retail_Price__c
+        @AuraEnabled public Decimal coverageApplied;       // Coverage_Applied__c
+        @AuraEnabled public Decimal customerRepairPortion; // Customer_Repair_Portion__c
+        @AuraEnabled public Decimal shopSuppliesRetail;    // Shop_Supplies_Retail__c
+        @AuraEnabled public Decimal customerPaysPreTax;    // Customer_Pays__c
+        @AuraEnabled public Decimal taxAmount;             // Tax_Amount__c
+        @AuraEnabled public Decimal customerPaysWithTax;   // Total_Amount_Due__c (same field as balanceAmountDue)
+
+        @AuraEnabled public Decimal partsCost;        // Parts_Cost__c
+        @AuraEnabled public Decimal labourCost;       // Labour_Cost__c
+        @AuraEnabled public Decimal shopSuppliesCost; // Shop_Supplies__c
+        @AuraEnabled public Decimal insuranceAmount;  // Insurance_Amount__c
+        @AuraEnabled public Decimal wholesaleCost;    // Wholesale_Cost__c
+        @AuraEnabled public Decimal benefitsUsed;     // Benefits_Used__c
+        @AuraEnabled public Decimal totalClaimCost;   // Total_Claim_Cost__c
+        @AuraEnabled public Decimal finalProfitLoss;  // Final_Profit_Loss__c
+    }
+
+    public class WorkOrderLineRow {
+        @AuraEnabled public Id id;
+        @AuraEnabled public String name;
+        @AuraEnabled public String description; // Service_Repair_Description__c
+        @AuraEnabled public Decimal price;       // Price__c
+        @AuraEnabled public Decimal covered;     // Covered_Amount__c
+        @AuraEnabled public Decimal customerPay; // Customer_Pay_Amount__c
+        @AuraEnabled public String orderedPartStatus; // Ordered_Part_Status__c
+    }
+
+    /**
+     * The claim's one active (non-Voided) work order and its line items, or
+     * null if none exists yet - same "one active work order per claim" rule
+     * already enforced in createWorkOrder.
+     */
+    @AuraEnabled
+    public static WorkOrderDetail getActiveWorkOrderDetailsForClaim(Id claimId) {
+        List<Work_Order__c> active = [
+            SELECT Id, Name, Deductable__c, Total_Amount_Due__c,
+                   Retail_Price__c, Coverage_Applied__c, Customer_Repair_Portion__c, Shop_Supplies_Retail__c,
+                   Customer_Pays__c, Tax_Amount__c,
+                   Parts_Cost__c, Labour_Cost__c, Shop_Supplies__c, Insurance_Amount__c, Wholesale_Cost__c,
+                   Benefits_Used__c, Total_Claim_Cost__c, Final_Profit_Loss__c,
+                   Estimate__r.Part_Component__c, Estimate__r.Job_Type__c, Estimate__r.Condition__c,
+                   Estimate__r.KMs__c, Estimate__r.Parts_Supplier__r.Name, Estimate__r.Part_Code__c,
+                   Estimate__r.Stock_Number__c, Estimate__r.Repair_Shop__r.Name,
+                   Estimate__r.Labour_Hours__c, Estimate__r.Labour_Rate__c, Estimate__r.Insurance_Source__c,
+                   Claim__r.Application_Package__r.Per_Claim_Limit__c,
+                   (SELECT Id, Name, Service_Repair_Description__c, Price__c, Covered_Amount__c, Customer_Pay_Amount__c,
+                           Ordered_Part_Status__c
+                    FROM Customer_Work_Order_Line_Items__r)
+            FROM Work_Order__c
+            WHERE Claim__c = :claimId AND Status__c != 'Voided'
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (active.isEmpty()) return null;
+
+        Work_Order__c wo = active[0];
+        WorkOrderDetail detail = new WorkOrderDetail();
+        detail.workOrderId      = wo.Id;
+        detail.workOrderName    = wo.Name;
+        detail.deductible       = wo.Deductable__c;
+        detail.balanceAmountDue = wo.Total_Amount_Due__c;
+        detail.lines            = new List<WorkOrderLineRow>();
+        for (Work_Order_Line_Item__c wl : wo.Customer_Work_Order_Line_Items__r) {
+            WorkOrderLineRow row = new WorkOrderLineRow();
+            row.id          = wl.Id;
+            row.name        = wl.Name;
+            row.description = wl.Service_Repair_Description__c;
+            row.price        = wl.Price__c;
+            row.covered      = wl.Covered_Amount__c;
+            row.customerPay  = wl.Customer_Pay_Amount__c;
+            row.orderedPartStatus = wl.Ordered_Part_Status__c;
+            detail.lines.add(row);
+        }
+
+        detail.partComponent    = wo.Estimate__r.Part_Component__c;
+        detail.jobType          = wo.Estimate__r.Job_Type__c;
+        detail.condition        = wo.Estimate__r.Condition__c;
+        detail.kms              = wo.Estimate__r.KMs__c;
+        detail.partsSupplierName = wo.Estimate__r.Parts_Supplier__r?.Name;
+        detail.partCode          = wo.Estimate__r.Part_Code__c;
+        detail.stockNumber       = wo.Estimate__r.Stock_Number__c;
+        detail.repairShopName    = wo.Estimate__r.Repair_Shop__r?.Name;
+        detail.labourHours       = wo.Estimate__r.Labour_Hours__c;
+        detail.labourRate        = wo.Estimate__r.Labour_Rate__c;
+        detail.insuranceSource   = wo.Estimate__r.Insurance_Source__c;
+        detail.capAmount         = wo.Claim__r.Application_Package__r?.Per_Claim_Limit__c;
+
+        detail.retailPrice           = wo.Retail_Price__c;
+        detail.coverageApplied       = wo.Coverage_Applied__c;
+        detail.customerRepairPortion = wo.Customer_Repair_Portion__c;
+        detail.shopSuppliesRetail    = wo.Shop_Supplies_Retail__c;
+        detail.customerPaysPreTax    = wo.Customer_Pays__c;
+        detail.taxAmount             = wo.Tax_Amount__c;
+        detail.customerPaysWithTax   = wo.Total_Amount_Due__c;
+
+        detail.partsCost        = wo.Parts_Cost__c;
+        detail.labourCost       = wo.Labour_Cost__c;
+        detail.shopSuppliesCost = wo.Shop_Supplies__c;
+        detail.insuranceAmount  = wo.Insurance_Amount__c;
+        detail.wholesaleCost    = wo.Wholesale_Cost__c;
+        detail.benefitsUsed     = wo.Benefits_Used__c;
+        detail.totalClaimCost   = wo.Total_Claim_Cost__c;
+        detail.finalProfitLoss  = wo.Final_Profit_Loss__c;
+
+        return detail;
+    }
+
+    // ──────────────── Repair Progress (Repairs In Progress tab) ────────────────
+    // Backs repairProgressTimeline - a claim has only one active work order, so
+    // this shows that single record's milestone timeline directly, not a list.
+
+    public class RepairProgress {
+        @AuraEnabled public Id workOrderId;
+        @AuraEnabled public String workOrderName;
+        @AuraEnabled public String currentMilestone;    // Repair_Milestone__c
+        @AuraEnabled public Date vehicleReceivedDate;
+        @AuraEnabled public Date repairStartedDate;
+        @AuraEnabled public Date qualityCheckDate;
+        @AuraEnabled public Date readyForPickupDate;
+    }
+
+    /**
+     * The claim's one active (non-Voided) work order's repair milestone and
+     * per-stage dates, or null if none exists yet.
+     */
+    @AuraEnabled
+    public static RepairProgress getRepairProgressForClaim(Id claimId) {
+        List<Work_Order__c> active = [
+            SELECT Id, Name, Repair_Milestone__c, Vehicle_Received_Date__c,
+                   Repair_Started_Date__c, Quality_Check_Date__c, Ready_For_Pickup_Date__c
+            FROM Work_Order__c
+            WHERE Claim__c = :claimId AND Status__c != 'Voided'
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        if (active.isEmpty()) return null;
+
+        Work_Order__c wo = active[0];
+        RepairProgress rp = new RepairProgress();
+        rp.workOrderId         = wo.Id;
+        rp.workOrderName       = wo.Name;
+        rp.currentMilestone    = wo.Repair_Milestone__c;
+        rp.vehicleReceivedDate = wo.Vehicle_Received_Date__c;
+        rp.repairStartedDate   = wo.Repair_Started_Date__c;
+        rp.qualityCheckDate    = wo.Quality_Check_Date__c;
+        rp.readyForPickupDate  = wo.Ready_For_Pickup_Date__c;
+        return rp;
+    }
+
+    /**
+     * Saves the Repair Milestone and/or its per-stage dates from the
+     * Repairs In Progress tab - the caller passes only the Work_Order__c
+     * fields it wants changed, keyed by the same Id returned by
+     * getRepairProgressForClaim.
+     */
+    @AuraEnabled
+    public static void saveRepairProgress(Work_Order__c progressUpdate) {
+        updateSecured(new List<Work_Order__c>{ progressUpdate });
+    }
+
+    // ──────────────── Part Orders (Order The Parts tab) ────────────────
+    // Backs the partOrderManager LWC. A claim can have more than one
+    // Part_Order__c; each carries its own Ordered_Part__c lines.
+
+    public class PartOrderGroup {
+        @AuraEnabled public Id id;
+        @AuraEnabled public String name;          // PORD-#### autonumber
+        @AuraEnabled public String poNumber;
+        @AuraEnabled public Date expectedDelivery;
+        @AuraEnabled public Id supplierId;
+        @AuraEnabled public String supplierName;
+        @AuraEnabled public List<OrderedPartRow> lines;
+    }
+
+    public class OrderedPartRow {
+        @AuraEnabled public Id id;
+        @AuraEnabled public String name;
+        @AuraEnabled public String partName;
+        @AuraEnabled public Decimal quantity;
+        @AuraEnabled public String status;
+        @AuraEnabled public String description; // Part_Description__c
+        @AuraEnabled public String brand;        // Brand__c
+        @AuraEnabled public String condition;    // Condition__c
+    }
+
+    /** Every Part_Order__c on the claim, each with its own lines - one query, no N+1. */
+    @AuraEnabled
+    public static List<PartOrderGroup> getPartOrdersForClaim(Id claimId) {
+        List<PartOrderGroup> groups = new List<PartOrderGroup>();
+        for (Part_Order__c po : [
+            SELECT Id, Name, PO_Number__c, Expected_Delivery__c, Supplier__c, Supplier__r.Name,
+                   (SELECT Id, Name, Part_Name__c, Quantity__c, Status__c,
+                           Part_Description__c, Brand__c, Condition__c
+                    FROM Ordered_Parts__r ORDER BY CreatedDate ASC)
+            FROM Part_Order__c
+            WHERE Claim__c = :claimId
+            WITH USER_MODE
+            ORDER BY CreatedDate ASC
+        ]) {
+            PartOrderGroup grp = new PartOrderGroup();
+            grp.id               = po.Id;
+            grp.name             = po.Name;
+            grp.poNumber         = po.PO_Number__c;
+            grp.expectedDelivery = po.Expected_Delivery__c;
+            grp.supplierId       = po.Supplier__c;
+            grp.supplierName     = po.Supplier__r?.Name;
+            grp.lines            = new List<OrderedPartRow>();
+            for (Ordered_Part__c op : po.Ordered_Parts__r) {
+                OrderedPartRow row = new OrderedPartRow();
+                row.id          = op.Id;
+                row.name        = op.Name;
+                row.partName    = op.Part_Name__c;
+                row.quantity    = op.Quantity__c;
+                row.status      = op.Status__c;
+                row.description = op.Part_Description__c;
+                row.brand       = op.Brand__c;
+                row.condition   = op.Condition__c;
+                grp.lines.add(row);
+            }
+            groups.add(grp);
+        }
+        return groups;
+    }
+
+    @AuraEnabled
+    public static Id createPartOrder(Id claimId, Part_Order__c partOrder) {
+        partOrder.Claim__c = claimId;
+        insertSecured(new List<Part_Order__c>{ partOrder });
+        return partOrder.Id;
+    }
+
+    /** Claim__c is a direct shortcut alongside Part_Order__c, matching the field's own built-in intent. */
+    @AuraEnabled
+    public static void addOrderedPart(Id partOrderId, Id claimId, Ordered_Part__c part) {
+        part.Part_Order__c = partOrderId;
+        part.Claim__c       = claimId;
+        insertSecured(new List<Ordered_Part__c>{ part });
+    }
+
+    @AuraEnabled
+    public static void saveOrderedPartStatuses(List<Ordered_Part__c> statusUpdates) {
+        updateSecured(statusUpdates);
+    }
+
+    /**
+     * Commits the Edit-mode Save on one Part Order card in partOrderManager:
+     * the card's own PO_Number__c/Expected_Delivery__c plus every line's
+     * Part_Description__c/Brand__c/Condition__c, in one call and one
+     * transaction - same "single call for the whole unit" principle as
+     * saveEstimates. Callers must pass only Id plus the field(s) actually
+     * edited on each record.
+     */
+    @AuraEnabled
+    public static void savePartOrderEdits(Part_Order__c poUpdate, List<Ordered_Part__c> lineUpdates) {
+        Savepoint sp = Database.setSavepoint();
+        try {
+            updateSecured(new List<Part_Order__c>{ poUpdate });
+            if (lineUpdates != null && !lineUpdates.isEmpty()) updateSecured(lineUpdates);
+        } catch (Exception ex) {
+            Database.rollback(sp);
+            if (ex instanceof AuraHandledException) throw ex;
+            throw new AuraHandledException('Could not save part order changes: ' + ex.getMessage());
+        }
+    }
+
+    /** Feeds the Supplier dropdown - Account's own lookup filter on Part_Order__c.Supplier__c is UI-only, so this enforces it server-side instead. */
+    @AuraEnabled
+    public static List<Account> getSupplierAccounts() {
+        return [
+            SELECT Id, Name
+            FROM Account
+            WHERE RecordType.DeveloperName = 'Supplier_Account'
+            WITH USER_MODE
+            ORDER BY Name
+        ];
+    }
+
+    // ───────────────── One-click part ordering (Sep 25) ─────────────────
+    // Now that syncEstimateChildren keeps a real Part__c under every
+    // estimate with a non-zero Parts_Cost__c, the Order The Parts tab can
+    // suggest ordering that exact part instead of the agent typing
+    // everything by hand. Replaces the old "+ New Part Order"/"+ Add Part"
+    // manual forms entirely (Osama's explicit call).
+
+    public class OrderableSuggestion {
+        @AuraEnabled public Id partId;
+        @AuraEnabled public String partName;      // Part_Name__c
+        @AuraEnabled public String partType;      // Part_Type__c
+        @AuraEnabled public Decimal quantity;     // Quantity__c
+        @AuraEnabled public Decimal partCost;     // Part_Cost__c, display only
+        @AuraEnabled public Id supplierId;        // Supplier__c
+        @AuraEnabled public String supplierName;
+        @AuraEnabled public String estimateName;  // Estimate__r.Estimate_Name__c, for context
+    }
+
+    /**
+     * Part__c records on this claim's SELECTED estimate (Is_Selected__c)
+     * not yet linked to any NON-cancelled Ordered_Part__c - the suggestion
+     * queue for the Order The Parts tab's one-click flow. Every estimate on
+     * the claim gets its own synced Part__c (see syncEstimateChildren), but
+     * only the winning scenario's part should ever be orderable, so
+     * non-selected estimates' parts are excluded here. A cancelled order
+     * frees its source part back up for re-ordering (a cancelled order
+     * didn't happen), but any other status (Ordered/Backordered/Received)
+     * keeps it off this list.
+     */
+    @AuraEnabled
+    public static List<OrderableSuggestion> getOrderableParts(Id claimId) {
+        Set<Id> alreadyOrderedPartIds = new Set<Id>();
+        for (Ordered_Part__c op : [
+            SELECT Part__c FROM Ordered_Part__c
+            WHERE Claim__c = :claimId AND Part__c != null AND Status__c != 'Cancelled'
+            WITH USER_MODE
+        ]) alreadyOrderedPartIds.add(op.Part__c);
+
+        List<OrderableSuggestion> out = new List<OrderableSuggestion>();
+        for (Part__c p : [
+            SELECT Id, Part_Name__c, Part_Type__c, Quantity__c, Part_Cost__c,
+                   Supplier__c, Supplier__r.Name, Estimate__r.Estimate_Name__c
+            FROM Part__c
+            WHERE Estimate__r.Claim__c = :claimId
+              AND Estimate__r.Is_Selected__c = true
+            WITH USER_MODE
+        ]) {
+            if (alreadyOrderedPartIds.contains(p.Id)) continue;
+            OrderableSuggestion s = new OrderableSuggestion();
+            s.partId       = p.Id;
+            s.partName     = p.Part_Name__c;
+            s.partType     = p.Part_Type__c;
+            s.quantity     = p.Quantity__c;
+            s.partCost     = p.Part_Cost__c;
+            s.supplierId   = p.Supplier__c;
+            s.supplierName = p.Supplier__r?.Name;
+            s.estimateName = p.Estimate__r?.Estimate_Name__c;
+            out.add(s);
+        }
+        return out;
+    }
+
+    /**
+     * One-click "order this part": in one transaction, creates a
+     * Part_Order__c (Supplier__c defaulted from the Part's own Supplier__c;
+     * PO_Number__c/Expected_Delivery__c left blank, filled in later), one
+     * Ordered_Part__c linked back to the source Part__c (Brand__c/
+     * Condition__c deliberately left blank - Part__c.Part_Type__c's
+     * NEW/USED/AFTERMARKET doesn't map cleanly onto Ordered_Part__c's
+     * different value sets, and guessing wrong on a real purchase order is
+     * worse than leaving it for the agent to set), and - closing the loop
+     * back to the work order - points the claim's active work order's
+     * "Part" line (Work_Order_Line_Item__c via Claim_Line_Item__r.Line_Type__c
+     * = 'Part') at the new Ordered_Part__c so Ordered_Part_Status__c shows
+     * live. A no-op, not an error, if no Part line exists yet (e.g. the
+     * winning estimate had $0 Parts_Cost__c).
+     */
+    @AuraEnabled
+    public static Id orderSuggestedPart(Id claimId, Id partId) {
+        Part__c part = [
+            SELECT Id, Part_Name__c, Quantity__c, Supplier__c
+            FROM Part__c WHERE Id = :partId
+            WITH USER_MODE
+        ];
+
+        Savepoint sp = Database.setSavepoint();
+        try {
+            Part_Order__c po = new Part_Order__c(
+                Claim__c    = claimId,
+                Supplier__c = part.Supplier__c
+            );
+            insertSecured(new List<Part_Order__c>{ po });
+
+            Ordered_Part__c op = new Ordered_Part__c(
+                Part_Order__c = po.Id,
+                Claim__c      = claimId,
+                Part__c       = part.Id,
+                Part_Name__c  = part.Part_Name__c,
+                Quantity__c   = part.Quantity__c != null ? part.Quantity__c : 1,
+                Status__c     = 'Ordered'
+            );
+            insertSecured(new List<Ordered_Part__c>{ op });
+
+            List<Work_Order_Line_Item__c> partLines = [
+                SELECT Id
+                FROM Work_Order_Line_Item__c
+                WHERE Customer_Work_Order__r.Claim__c = :claimId
+                  AND Customer_Work_Order__r.Status__c != 'Voided'
+                  AND Claim_Line_Item__r.Line_Type__c = 'Part'
+                WITH USER_MODE
+                LIMIT 1
+            ];
+            if (!partLines.isEmpty()) {
+                updateSecured(new List<Work_Order_Line_Item__c>{
+                    new Work_Order_Line_Item__c(Id = partLines[0].Id, Ordered_Part__c = op.Id)
+                });
+            }
+            return op.Id;
+        } catch (Exception ex) {
+            Database.rollback(sp);
+            throw new AuraHandledException('Could not order this part: ' + ex.getMessage());
+        }
     }
 
     // ───────────────── FLS/CRUD-secured DML helpers ─────────────────

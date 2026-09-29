@@ -1,0 +1,258 @@
+/*
+ * Color/spacing/typography tokens ported from the "Claim Intake — Edit
+ * Claim" design reference (Claims Management/Claim Intake — Edit
+ * Claim-html.zip). The reference's own outer overlay/rounded-modal/shadow
+ * chrome is NOT replicated here - Salesforce's own quick-action dialog
+ * already provides that wrapper, so this only skins what lives inside
+ * slds-modal__header/__content/__footer.
+ *
+ * Note: lightning-input/lightning-textarea/lightning-combobox render their
+ * actual <input>/<textarea>/<select> inside their own shadow DOM, so the
+ * reference's raw border/focus-glow rules can't be applied to them
+ * directly the way they could to plain HTML form elements - only the
+ * handful of SLDS custom properties below (--slds-c-input-*) are honored
+ * across the shadow boundary. Kept lightning-* base components rather than
+ * raw HTML form elements to stay consistent with every other LWC built
+ * this engagement (repairPriceScenarios, ancillaryBenefits,
+ * createWorkOrderAction, partOrderManager all use them).
+ */
+
+:host {
+    --slds-c-input-color-border-focus: #1f9e8f;
+    --slds-c-input-shadow-focus: 0 0 0 3px rgba(31, 158, 143, .15);
+}
+
+.ci-head {
+    display: block;
+}
+
+.ci-meta {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: #6b7c93;
+}
+
+.ci-meta b {
+    color: #16243a;
+    font-weight: 700;
+}
+
+.pill {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .2px;
+    background: #eef1f5;
+    color: #425064;
+}
+
+.pill.active {
+    background: #e3f6ea;
+    color: #147a43;
+}
+
+.ci-alerts {
+    padding: 14px 1.5rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.alertbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fdebeb;
+    border: 1px solid #f3c4c4;
+    color: #a4282f;
+    border-radius: 9px;
+    padding: 9px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.alertbox svg {
+    flex: none;
+    color: #d64545;
+}
+
+.alertbox.success {
+    background: #e6f5ec;
+    border-color: #b8e3c8;
+    color: #147a43;
+}
+
+.alertbox.success svg {
+    color: #1f9e58;
+}
+
+.ci-body {
+    display: grid;
+    grid-template-columns: 1fr 1.05fr;
+    gap: 20px;
+    padding: 18px 30px 22px;
+}
+
+.ci-col {
+    min-width: 0;
+}
+
+.icard {
+    background: #f7f9fb;
+    border: 1px solid #e9edf2;
+    border-radius: 12px;
+    padding: 12px 14px 14px;
+    margin-bottom: 12px;
+}
+
+.icard:last-child {
+    margin-bottom: 0;
+}
+
+.ecard {
+    background: #fff;
+    border: 1px solid #e3e8ef;
+    border-radius: 12px;
+    padding: 22px 26px 26px;
+    box-shadow: 0 1px 3px rgba(16, 38, 68, .05);
+}
+
+.ih {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 10px;
+}
+
+.ecard .ih {
+    margin-bottom: 14px;
+}
+
+.ih .ic {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #e7f6f3;
+    color: #1f9e8f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+
+.ecard .ih .ic {
+    background: #eaf1fb;
+    color: #2f6fed;
+}
+
+.ih span {
+    font-size: 13px;
+    font-weight: 750;
+    color: #16243a;
+}
+
+.kv {
+    display: flex;
+    gap: 10px;
+    padding: 4px 0;
+    border-bottom: 1px dashed #e3e8ef;
+    font-size: 12.5px;
+}
+
+.kv:last-child {
+    border-bottom: none;
+}
+
+.k {
+    width: 132px;
+    flex: none;
+    color: #8592a3;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    padding-top: 1px;
+}
+
+.v {
+    color: #16243a;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: pre-line;
+}
+
+.v.empty {
+    color: #b6bfc9;
+    font-weight: 500;
+    font-style: italic;
+}
+
+.fld {
+    margin-bottom: 14px;
+}
+
+.fld:last-child {
+    margin-bottom: 0;
+}
+
+.row2 {
+    display: flex;
+    gap: 12px;
+}
+
+.fld-odometer {
+    flex: 1;
+}
+
+.fld-unit {
+    flex: none;
+    width: 130px;
+}
+
+.hint {
+    font-size: 11px;
+    color: #8592a3;
+    margin-top: 5px;
+}
+
+.ci-foot {
+    background: #fafbfc;
+}
+
+.btn {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 650;
+    cursor: pointer;
+    font-family: inherit;
+    margin-left: 10px;
+}
+
+.btn.ghost {
+    background: #fff;
+    border: 1px solid #d8dfe8;
+    color: #425064;
+}
+
+.btn.ghost:hover {
+    background: #f4f6f9;
+}
+
+.btn.primary {
+    background: #1f9e8f;
+    color: #fff;
+}
+
+.btn.primary:hover {
+    background: #178878;
+}
+
+.btn.primary[disabled] {
+    background: #9fd2cb;
+    cursor: not-allowed;
+}

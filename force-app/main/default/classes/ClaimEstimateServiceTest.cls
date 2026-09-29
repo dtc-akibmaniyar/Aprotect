@@ -195,6 +195,233 @@ private class ClaimEstimateServiceTest {
         System.assertEquals(true, created[0].Is_Selected__c, 'the row marked Is_Selected__c=true in the batch wins');
     }
 
+    // ──────────────── Estimate -> Part/Service/Shop_Supply child sync (Sep 25) ────────────────
+
+    @IsTest
+    static void saveEstimatesCreatesChildRecordsFromScalarFields() {
+        Estimate__c seed = TestDataFactory.createEstimateWithClaim('Warranty_Claim', true);
+        Estimate__c payload = new Estimate__c(
+            Id = seed.Id,
+            Repair_Shop__c          = seed.Repair_Shop__c,
+            Part_Component__c       = 'Engine',
+            Part_Code__c             = 'ENG-1',
+            Condition__c              = 'USED',
+            Parts_Cost__c             = 1500,
+            Retail_Price__c           = 4000,
+            Job_Type__c               = 'REPLACEMENT',
+            Labour_Hours__c           = 8,
+            Labour_Rate__c            = 75,
+            Shop_Supplies__c          = 150,
+            Shop_Supplies_Retail__c   = 300
+        );
+
+        Test.startTest();
+        ClaimEstimateService.saveEstimates(seed.Claim__c, new List<Estimate__c>{ payload }, null);
+        Test.stopTest();
+
+        Part__c part = [
+            SELECT Part_Name__c, Part_Code__c, Part_Type__c, Part_Cost__c, Price__c,
+                   Claim__c, Repair_Shop__c, Export_to_Work_Order__c, Quantity__c
+            FROM Part__c WHERE Estimate__c = :seed.Id
+        ];
+        System.assertEquals('Engine', part.Part_Name__c);
+        System.assertEquals('ENG-1', part.Part_Code__c);
+        System.assertEquals('USED', part.Part_Type__c, 'Condition__c and Part_Type__c share identical value sets');
+        System.assertEquals(1500, part.Part_Cost__c);
+        System.assertEquals(seed.Claim__c, part.Claim__c);
+        System.assertEquals(seed.Repair_Shop__c, part.Repair_Shop__c);
+        System.assertEquals(false, part.Export_to_Work_Order__c, 'hard rule: never set true (checkbox defaults false)');
+        System.assertEquals(1, part.Quantity__c);
+
+        Service__c service = [
+            SELECT Job_Type__c, Time__c, Repair_Time_Adj__c, Wholesale_Labour_Rate_HR__c, Wholesale__c
+            FROM Service__c WHERE Estimate__c = :seed.Id
+        ];
+        System.assertEquals('REPLACEMENT', service.Job_Type__c);
+        System.assertEquals('8.00', service.Time__c, 'Service__c.Time__c is Text, not Number - Labour_Hours__c is scale 2');
+        System.assertEquals(8, service.Repair_Time_Adj__c);
+        System.assertEquals(75, service.Wholesale_Labour_Rate_HR__c);
+        System.assertEquals(600, service.Wholesale__c);
+
+        Shop_Supply__c supply = [SELECT Item_Name__c, Cost__c, Price__c FROM Shop_Supply__c WHERE Estimate__c = :seed.Id];
+        System.assertEquals('Shop Supplies', supply.Item_Name__c);
+        System.assertEquals(150, supply.Cost__c);
+        System.assertEquals(300, supply.Price__c);
+    }
+
+    @IsTest
+    static void saveEstimatesUpsertsNotDuplicatesChildrenOnResave() {
+        Estimate__c seed = TestDataFactory.createEstimateWithClaim('Warranty_Claim', true);
+        Estimate__c first = new Estimate__c(Id = seed.Id, Parts_Cost__c = 1000, Retail_Price__c = 2000);
+        ClaimEstimateService.saveEstimates(seed.Claim__c, new List<Estimate__c>{ first }, null);
+
+        Test.startTest();
+        Estimate__c second = new Estimate__c(Id = seed.Id, Parts_Cost__c = 1800, Retail_Price__c = 3000);
+        ClaimEstimateService.saveEstimates(seed.Claim__c, new List<Estimate__c>{ second }, null);
+        Test.stopTest();
+
+        List<Part__c> parts = [SELECT Part_Cost__c FROM Part__c WHERE Estimate__c = :seed.Id];
+        System.assertEquals(1, parts.size(), 'updated in place, not duplicated');
+        System.assertEquals(1800, parts[0].Part_Cost__c);
+    }
+
+    @IsTest
+    static void saveEstimatesDeletesChildWhenAmountZeroedOut() {
+        Estimate__c seed = TestDataFactory.createEstimateWithClaim('Warranty_Claim', true);
+        Estimate__c withSupplies = new Estimate__c(Id = seed.Id, Shop_Supplies__c = 150, Shop_Supplies_Retail__c = 300);
+        ClaimEstimateService.saveEstimates(seed.Claim__c, new List<Estimate__c>{ withSupplies }, null);
+        System.assertEquals(1, [SELECT COUNT() FROM Shop_Supply__c WHERE Estimate__c = :seed.Id]);
+
+        Test.startTest();
+        Estimate__c zeroed = new Estimate__c(Id = seed.Id, Shop_Supplies__c = 0, Shop_Supplies_Retail__c = 0);
+        ClaimEstimateService.saveEstimates(seed.Claim__c, new List<Estimate__c>{ zeroed }, null);
+        Test.stopTest();
+
+        System.assertEquals(0, [SELECT COUNT() FROM Shop_Supply__c WHERE Estimate__c = :seed.Id],
+            'deleted, not left behind as a stray zero-dollar record');
+    }
+
+    @IsTest
+    static void saveEstimatesSkipsChildCreationWhenAmountIsZero() {
+        // TestDataFactory.createEstimate defaults Shop_Supplies__c = 25.00 -
+        // zero it explicitly, since syncEstimateChildren re-queries the
+        // estimate's real persisted state rather than trusting this payload
+        // alone (a deliberate design choice, see its own comment).
+        Estimate__c seed = TestDataFactory.createEstimateWithClaim('Warranty_Claim', true);
+        Estimate__c blank = new Estimate__c(
+            Id = seed.Id,
+            Estimate_Name__c = 'No parts needed',
+            Parts_Cost__c = 0,
+            Labour_Hours__c = 0,
+            Shop_Supplies__c = 0,
+            Shop_Supplies_Retail__c = 0
+        );
+
+        Test.startTest();
+        ClaimEstimateService.saveEstimates(seed.Claim__c, new List<Estimate__c>{ blank }, null);
+        Test.stopTest();
+
+        System.assertEquals(0, [SELECT COUNT() FROM Part__c WHERE Estimate__c = :seed.Id]);
+        System.assertEquals(0, [SELECT COUNT() FROM Service__c WHERE Estimate__c = :seed.Id]);
+        System.assertEquals(0, [SELECT COUNT() FROM Shop_Supply__c WHERE Estimate__c = :seed.Id]);
+    }
+
+    // ──────────────── One-click part ordering (Sep 25) ────────────────
+
+    @IsTest
+    static void getOrderablePartsExcludesAlreadyOrderedParts() {
+        Estimate__c seed = TestDataFactory.createEstimateWithClaim('Warranty_Claim', true);
+        update new Estimate__c(Id = seed.Id, Is_Selected__c = true);
+        Part__c part = TestDataFactory.createPart(seed.Id, true);
+
+        List<ClaimEstimateService.OrderableSuggestion> before =
+            ClaimEstimateService.getOrderableParts(seed.Claim__c);
+        System.assertEquals(1, before.size());
+        System.assertEquals(part.Id, before[0].partId);
+
+        Account supplier = TestDataFactory.createSupplierAccount(true);
+        Part_Order__c po = TestDataFactory.createPartOrder(seed.Claim__c, supplier.Id, true);
+        TestDataFactory.createOrderedPartForPart(po.Id, seed.Claim__c, part.Id, true);
+
+        Test.startTest();
+        List<ClaimEstimateService.OrderableSuggestion> after =
+            ClaimEstimateService.getOrderableParts(seed.Claim__c);
+        Test.stopTest();
+
+        System.assertEquals(0, after.size(), 'already ordered, no longer suggested');
+    }
+
+    @IsTest
+    static void getOrderablePartsResurfacesPartAfterOrderIsCancelled() {
+        Estimate__c seed = TestDataFactory.createEstimateWithClaim('Warranty_Claim', true);
+        update new Estimate__c(Id = seed.Id, Is_Selected__c = true);
+        Part__c part = TestDataFactory.createPart(seed.Id, true);
+        Account supplier = TestDataFactory.createSupplierAccount(true);
+        Part_Order__c po = TestDataFactory.createPartOrder(seed.Claim__c, supplier.Id, true);
+        Ordered_Part__c op = TestDataFactory.createOrderedPartForPart(po.Id, seed.Claim__c, part.Id, true);
+        update new Ordered_Part__c(Id = op.Id, Status__c = 'Cancelled');
+
+        Test.startTest();
+        List<ClaimEstimateService.OrderableSuggestion> suggestions =
+            ClaimEstimateService.getOrderableParts(seed.Claim__c);
+        Test.stopTest();
+
+        System.assertEquals(1, suggestions.size(), 'a cancelled order frees the part back up');
+    }
+
+    @IsTest
+    static void getOrderablePartsExcludesPartsFromNonSelectedEstimates() {
+        Estimate__c selected = TestDataFactory.createEstimateWithClaim('Warranty_Claim', true);
+        update new Estimate__c(Id = selected.Id, Is_Selected__c = true);
+        Part__c selectedPart = TestDataFactory.createPart(selected.Id, true);
+
+        Estimate__c other = TestDataFactory.createEstimate(selected.Claim__c, selected.Repair_Shop__c, true);
+        TestDataFactory.createPart(other.Id, true);
+
+        Test.startTest();
+        List<ClaimEstimateService.OrderableSuggestion> suggestions =
+            ClaimEstimateService.getOrderableParts(selected.Claim__c);
+        Test.stopTest();
+
+        System.assertEquals(1, suggestions.size(), 'only the selected estimate\'s part is suggested');
+        System.assertEquals(selectedPart.Id, suggestions[0].partId);
+    }
+
+    @IsTest
+    static void orderSuggestedPartCreatesPartOrderAndOrderedPartAndLinksWorkOrderLine() {
+        Estimate__c chosen = seedEstimateWithLineData();
+        // seedEstimateWithLineData's own raw `update` sets the scalar fields directly
+        // in the database, not on the in-memory `chosen` it returns - re-query so
+        // updateEstimate actually sees them (it reads straight off the object passed
+        // in, not a fresh query).
+        Estimate__c fresh = [
+            SELECT Id, Parts_Cost__c, Retail_Price__c, Labour_Hours__c, Labour_Rate__c,
+                   Shop_Supplies__c, Shop_Supplies_Retail__c, Part_Component__c, Part_Code__c,
+                   Job_Type__c, Condition__c, Repair_Shop__c
+            FROM Estimate__c WHERE Id = :chosen.Id
+        ];
+        ClaimEstimateService.updateEstimate(fresh, 3000); // triggers syncEstimateChildren
+        Account supplier = TestDataFactory.createSupplierAccount(true);
+        Part__c part = [SELECT Id, Supplier__c FROM Part__c WHERE Estimate__c = :chosen.Id];
+        part.Supplier__c = supplier.Id; // set explicitly - seedEstimateWithLineData never sets Parts_Supplier__c
+        update part;
+
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(chosen.Id);
+
+        Test.startTest();
+        Id orderedPartId = ClaimEstimateService.orderSuggestedPart(chosen.Claim__c, part.Id);
+        Test.stopTest();
+
+        Ordered_Part__c op = [SELECT Part__c, Status__c, Part_Order__r.Supplier__c, Part_Order__r.Claim__c
+                               FROM Ordered_Part__c WHERE Id = :orderedPartId];
+        System.assertEquals(part.Id, op.Part__c);
+        System.assertEquals('Ordered', op.Status__c);
+        System.assertEquals(part.Supplier__c, op.Part_Order__r.Supplier__c, 'PO supplier defaulted from the part');
+        System.assertEquals(chosen.Claim__c, op.Part_Order__r.Claim__c);
+
+        Work_Order_Line_Item__c partLine = [
+            SELECT Ordered_Part__c, Ordered_Part_Status__c
+            FROM Work_Order_Line_Item__c
+            WHERE Customer_Work_Order__c = :r.workOrderId AND Claim_Line_Item__r.Line_Type__c = 'Part'
+        ];
+        System.assertEquals(orderedPartId, partLine.Ordered_Part__c, 'work order Part line linked to the new order');
+        System.assertEquals('Ordered', partLine.Ordered_Part_Status__c, 'live formula reads the linked status');
+    }
+
+    @IsTest
+    static void orderSuggestedPartNoOpsWorkOrderLinkWhenNoPartLineExists() {
+        Estimate__c seed = TestDataFactory.createEstimateWithClaim('Warranty_Claim', true);
+        Part__c part = TestDataFactory.createPart(seed.Id, true);
+        // No createWorkOrder call at all - no Work_Order_Line_Item__c exists for this claim.
+
+        Test.startTest();
+        Id orderedPartId = ClaimEstimateService.orderSuggestedPart(seed.Claim__c, part.Id);
+        Test.stopTest();
+
+        System.assertNotEquals(null, orderedPartId, 'still succeeds without a work order to link');
+        System.assertEquals(1, [SELECT COUNT() FROM Part_Order__c WHERE Claim__c = :seed.Claim__c]);
+    }
+
     @IsTest
     static void createWorkOrderGeneratesLinesAndSelectsEstimate() {
         Estimate__c chosen = seedEstimateWithLineData();
@@ -261,6 +488,57 @@ private class ClaimEstimateServiceTest {
         System.assertEquals(true,  [SELECT Is_Selected__c FROM Estimate__c WHERE Id = :chosen.Id].Is_Selected__c);
         System.assertEquals(false, [SELECT Is_Selected__c FROM Estimate__c WHERE Id = :sibling.Id].Is_Selected__c,
             'selecting one estimate clears its sibling on the same claim');
+    }
+
+    @IsTest
+    static void createWorkOrderSplitsCoverageAcrossLinesByRetailShare() {
+        // "Work Order - Approved Repairs" table (Sep 24, Claim Review Record Page -
+        // From Noelle.html): Coverage_Applied__c (2900, from cap 3000 - ded 100 on
+        // retail 4000) is split proportionally across the Part/Labour lines by their
+        // own retail share (2857.14 / 1142.86, from the existing wholesale-share
+        // split), with the Labour line (the last non-Supplies line) absorbing the
+        // rounding remainder so the lines sum back to exactly 2900. Supplies is
+        // never covered.
+        Estimate__c created = TestDataFactory.createEstimateWithClaim('Warranty_Claim', true);
+        Estimate__c e = [SELECT Id FROM Estimate__c WHERE Id = :created.Id];
+        e.Parts_Cost__c          = 1500;
+        e.Labour_Hours__c        = 8;
+        e.Labour_Rate__c         = 75;
+        e.Shop_Supplies__c       = 150;
+        e.Shop_Supplies_Retail__c = 300;
+        e.Retail_Price__c        = 4000;
+        e.Deductable__c          = 100;
+        update e;
+        ClaimEstimateService.updateEstimate(e, 3000);
+
+        Test.startTest();
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(e.Id);
+        Test.stopTest();
+
+        Map<String, Work_Order_Line_Item__c> byType = new Map<String, Work_Order_Line_Item__c>();
+        for (Work_Order_Line_Item__c wl : [
+            SELECT Claim_Line_Item__r.Line_Type__c, Retail__c, Covered_Amount__c, Customer_Pay_Amount__c
+            FROM Work_Order_Line_Item__c WHERE Customer_Work_Order__c = :r.workOrderId
+        ]) {
+            byType.put(wl.Claim_Line_Item__r.Line_Type__c, wl);
+        }
+
+        System.assertEquals(2857.14, byType.get('Part').Retail__c);
+        System.assertEquals(2071.43, byType.get('Part').Covered_Amount__c);
+        System.assertEquals(785.71,  byType.get('Part').Customer_Pay_Amount__c);
+
+        System.assertEquals(1142.86, byType.get('Labour').Retail__c);
+        System.assertEquals(828.57,  byType.get('Labour').Covered_Amount__c, 'absorbs the rounding remainder');
+        System.assertEquals(314.29,  byType.get('Labour').Customer_Pay_Amount__c);
+
+        System.assertEquals(300, byType.get('Supplies').Retail__c);
+        System.assertEquals(0,   byType.get('Supplies').Covered_Amount__c, 'shop supplies are never covered');
+        System.assertEquals(300, byType.get('Supplies').Customer_Pay_Amount__c);
+
+        Decimal totalCovered = byType.get('Part').Covered_Amount__c
+            + byType.get('Labour').Covered_Amount__c
+            + byType.get('Supplies').Covered_Amount__c;
+        System.assertEquals(2900, totalCovered, 'sums back to exactly Coverage_Applied__c, no rounding drift');
     }
 
     @IsTest
@@ -672,5 +950,318 @@ private class ClaimEstimateServiceTest {
 
         System.assertEquals(null, [SELECT Total_Profit__c FROM Claim__c WHERE Id = :e.Claim__c].Total_Profit__c,
             'nothing to base the P&L on yet without a selected estimate - must not throw or stamp a bogus number');
+    }
+
+    // ──────────────── Work Order detail (createWorkOrderAction detail view) ────────────────
+
+    @IsTest
+    static void getActiveWorkOrderDetailsForClaimReturnsNullWithNoActiveWorkOrder() {
+        Estimate__c e = seedEstimateWithLineData(); // no work order created yet
+
+        Test.startTest();
+        ClaimEstimateService.WorkOrderDetail detail =
+            ClaimEstimateService.getActiveWorkOrderDetailsForClaim(e.Claim__c);
+        Test.stopTest();
+
+        System.assertEquals(null, detail);
+    }
+
+    @IsTest
+    static void getActiveWorkOrderDetailsForClaimReturnsHeaderAndLines() {
+        Estimate__c e = seedEstimateWithLineData();
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(e.Id);
+
+        Test.startTest();
+        ClaimEstimateService.WorkOrderDetail detail =
+            ClaimEstimateService.getActiveWorkOrderDetailsForClaim(e.Claim__c);
+        Test.stopTest();
+
+        Work_Order__c wo = [SELECT Deductable__c, Total_Amount_Due__c FROM Work_Order__c WHERE Id = :r.workOrderId];
+        System.assertEquals(r.workOrderId, detail.workOrderId);
+        System.assertEquals(wo.Deductable__c, detail.deductible);
+        System.assertEquals(wo.Total_Amount_Due__c, detail.balanceAmountDue);
+        System.assertEquals(3, detail.lines.size(), 'one per Part/Labour/Supplies');
+        for (ClaimEstimateService.WorkOrderLineRow row : detail.lines) {
+            System.assertNotEquals(null, row.description);
+            System.assertNotEquals(null, row.price);
+        }
+    }
+
+    @IsTest
+    static void getActiveWorkOrderDetailsForClaimIgnoresVoidedWorkOrder() {
+        Estimate__c first = seedEstimateWithLineData();
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(first.Id);
+        update new Work_Order__c(Id = r.workOrderId, Status__c = 'Voided');
+
+        Test.startTest();
+        ClaimEstimateService.WorkOrderDetail detail =
+            ClaimEstimateService.getActiveWorkOrderDetailsForClaim(first.Claim__c);
+        Test.stopTest();
+
+        System.assertEquals(null, detail, 'a Voided work order does not count as active');
+    }
+
+    @IsTest
+    static void getActiveWorkOrderDetailsForClaimIncludesSelectedScenarioBreakdown() {
+        Estimate__c created = TestDataFactory.createEstimateWithClaim('Warranty_Claim', true);
+        Estimate__c e = [SELECT Id FROM Estimate__c WHERE Id = :created.Id];
+        e.Part_Component__c    = 'Engine';
+        e.Job_Type__c           = 'REPLACEMENT';
+        e.Condition__c          = 'USED';
+        e.KMs__c                = 85000;
+        e.Part_Code__c          = 'ENG-2010-LKQ';
+        e.Stock_Number__c       = 'STK-44821';
+        e.Parts_Cost__c         = 1500;
+        e.Labour_Hours__c       = 8;
+        e.Labour_Rate__c        = 75;
+        e.Insurance_Amount__c   = 120;
+        e.Insurance_Source__c   = 'From Parts Supplier';
+        e.Shop_Supplies__c      = 150;
+        e.Shop_Supplies_Retail__c = 300;
+        e.Retail_Price__c       = 4000;
+        e.Deductable__c         = 100;
+        update e;
+
+        Application_Package__c pkg = new Application_Package__c(
+            Application__c = [SELECT Application__c FROM Claim__c WHERE Id = :created.Claim__c].Application__c,
+            Payment_Status__c = 'Not Paid',
+            Per_Claim_Limit__c = 3000
+        );
+        insert pkg;
+        update new Claim__c(Id = created.Claim__c, Application_Package__c = pkg.Id);
+
+        ClaimEstimateService.updateEstimate(e, 3000);
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(e.Id);
+
+        Test.startTest();
+        ClaimEstimateService.WorkOrderDetail detail =
+            ClaimEstimateService.getActiveWorkOrderDetailsForClaim(created.Claim__c);
+        Test.stopTest();
+
+        System.assertEquals('Engine', detail.partComponent);
+        System.assertEquals('REPLACEMENT', detail.jobType);
+        System.assertEquals('USED', detail.condition);
+        System.assertEquals(85000, detail.kms);
+        System.assertEquals('ENG-2010-LKQ', detail.partCode);
+        System.assertEquals('STK-44821', detail.stockNumber);
+        System.assertEquals(8, detail.labourHours);
+        System.assertEquals(75, detail.labourRate);
+        System.assertEquals('From Parts Supplier', detail.insuranceSource);
+        System.assertEquals(3000, detail.capAmount, 'resolved live from the claim\'s Application_Package__c');
+
+        System.assertEquals(4000, detail.retailPrice);
+        System.assertEquals(2900, detail.coverageApplied);
+        System.assertEquals(1100, detail.customerRepairPortion);
+        System.assertEquals(300, detail.shopSuppliesRetail);
+        System.assertEquals(1400, detail.customerPaysPreTax);
+        System.assertEquals(1500, detail.partsCost);
+        System.assertEquals(600, detail.labourCost);
+        System.assertEquals(150, detail.shopSuppliesCost);
+        System.assertEquals(120, detail.insuranceAmount);
+        System.assertEquals(2370, detail.wholesaleCost, 'no core charge in the Sep 22 formula');
+        System.assertEquals(0, detail.benefitsUsed, 'no Ancillary Benefits used on this claim');
+        System.assertEquals(2370, detail.totalClaimCost, 'wholesale cost plus zero benefits used');
+        System.assertEquals(detail.customerPaysWithTax, detail.balanceAmountDue,
+            'same field (Total_Amount_Due__c), exposed under both names');
+    }
+
+    // ──────────────── Repair Progress (repairProgressTimeline LWC) ────────────────
+
+    @IsTest
+    static void getRepairProgressForClaimReturnsNullWithNoActiveWorkOrder() {
+        Estimate__c e = seedEstimateWithLineData(); // no work order created yet
+
+        Test.startTest();
+        ClaimEstimateService.RepairProgress progress =
+            ClaimEstimateService.getRepairProgressForClaim(e.Claim__c);
+        Test.stopTest();
+
+        System.assertEquals(null, progress);
+    }
+
+    @IsTest
+    static void getRepairProgressForClaimReturnsMilestoneAndDates() {
+        Estimate__c e = seedEstimateWithLineData();
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(e.Id);
+        update new Work_Order__c(
+            Id = r.workOrderId,
+            Repair_Milestone__c = 'Repair In Progress',
+            Vehicle_Received_Date__c = Date.newInstance(2026, 9, 25),
+            Repair_Started_Date__c = Date.newInstance(2026, 9, 29)
+        );
+
+        Test.startTest();
+        ClaimEstimateService.RepairProgress progress =
+            ClaimEstimateService.getRepairProgressForClaim(e.Claim__c);
+        Test.stopTest();
+
+        System.assertEquals(r.workOrderId, progress.workOrderId);
+        System.assertEquals('Repair In Progress', progress.currentMilestone);
+        System.assertEquals(Date.newInstance(2026, 9, 25), progress.vehicleReceivedDate);
+        System.assertEquals(Date.newInstance(2026, 9, 29), progress.repairStartedDate);
+        System.assertEquals(null, progress.qualityCheckDate);
+        System.assertEquals(null, progress.readyForPickupDate);
+    }
+
+    @IsTest
+    static void getRepairProgressForClaimIgnoresVoidedWorkOrder() {
+        Estimate__c first = seedEstimateWithLineData();
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(first.Id);
+        update new Work_Order__c(Id = r.workOrderId, Status__c = 'Voided');
+
+        Test.startTest();
+        ClaimEstimateService.RepairProgress progress =
+            ClaimEstimateService.getRepairProgressForClaim(first.Claim__c);
+        Test.stopTest();
+
+        System.assertEquals(null, progress, 'a Voided work order does not count as active');
+    }
+
+    @IsTest
+    static void saveRepairProgressUpdatesMilestoneAndStageDate() {
+        Estimate__c e = seedEstimateWithLineData();
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(e.Id);
+
+        Test.startTest();
+        ClaimEstimateService.saveRepairProgress(new Work_Order__c(
+            Id = r.workOrderId,
+            Repair_Milestone__c = 'Quality Check',
+            Quality_Check_Date__c = Date.newInstance(2026, 9, 30)
+        ));
+        Test.stopTest();
+
+        Work_Order__c saved = [SELECT Repair_Milestone__c, Quality_Check_Date__c FROM Work_Order__c WHERE Id = :r.workOrderId];
+        System.assertEquals('Quality Check', saved.Repair_Milestone__c);
+        System.assertEquals(Date.newInstance(2026, 9, 30), saved.Quality_Check_Date__c);
+    }
+
+    // ──────────────── Part Orders (partOrderManager LWC) ────────────────
+
+    @IsTest
+    static void getPartOrdersForClaimReturnsEmptyListForClaimWithNoPartOrders() {
+        Estimate__c e = seedEstimateWithLineData();
+
+        Test.startTest();
+        List<ClaimEstimateService.PartOrderGroup> groups =
+            ClaimEstimateService.getPartOrdersForClaim(e.Claim__c);
+        Test.stopTest();
+
+        System.assertEquals(0, groups.size());
+    }
+
+    @IsTest
+    static void getPartOrdersForClaimReturnsGroupsWithNestedLines() {
+        Estimate__c e = seedEstimateWithLineData();
+        Account supplier = TestDataFactory.createSupplierAccount(true);
+        Part_Order__c po1 = TestDataFactory.createPartOrder(e.Claim__c, supplier.Id, true);
+        Part_Order__c po2 = TestDataFactory.createPartOrder(e.Claim__c, supplier.Id, true);
+        TestDataFactory.createOrderedPart(po1.Id, e.Claim__c, true);
+        TestDataFactory.createOrderedPart(po1.Id, e.Claim__c, true);
+        TestDataFactory.createOrderedPart(po2.Id, e.Claim__c, true);
+
+        Test.startTest();
+        List<ClaimEstimateService.PartOrderGroup> groups =
+            ClaimEstimateService.getPartOrdersForClaim(e.Claim__c);
+        Test.stopTest();
+
+        System.assertEquals(2, groups.size(), 'a claim can have more than one Part Order');
+        Map<Id, ClaimEstimateService.PartOrderGroup> byId = new Map<Id, ClaimEstimateService.PartOrderGroup>();
+        for (ClaimEstimateService.PartOrderGroup g : groups) byId.put(g.id, g);
+        System.assertEquals(2, byId.get(po1.Id).lines.size());
+        System.assertEquals(1, byId.get(po2.Id).lines.size());
+        System.assertEquals(supplier.Name, byId.get(po1.Id).supplierName, 'Supplier__r.Name resolves');
+    }
+
+    @IsTest
+    static void createPartOrderInsertsUnderClaim() {
+        Estimate__c e = seedEstimateWithLineData();
+        Account supplier = TestDataFactory.createSupplierAccount(true);
+
+        Test.startTest();
+        Id newId = ClaimEstimateService.createPartOrder(e.Claim__c, new Part_Order__c(
+            Supplier__c = supplier.Id, PO_Number__c = 'PO-9001', Expected_Delivery__c = Date.today().addDays(5)
+        ));
+        Test.stopTest();
+
+        Part_Order__c saved = [SELECT Claim__c, PO_Number__c FROM Part_Order__c WHERE Id = :newId];
+        System.assertEquals(e.Claim__c, saved.Claim__c);
+        System.assertEquals('PO-9001', saved.PO_Number__c);
+    }
+
+    @IsTest
+    static void addOrderedPartSetsPartOrderAndClaimBothLookups() {
+        Estimate__c e = seedEstimateWithLineData();
+        Account supplier = TestDataFactory.createSupplierAccount(true);
+        Part_Order__c po = TestDataFactory.createPartOrder(e.Claim__c, supplier.Id, true);
+
+        Test.startTest();
+        ClaimEstimateService.addOrderedPart(po.Id, e.Claim__c, new Ordered_Part__c(
+            Part_Name__c = 'Alternator', Quantity__c = 2, Status__c = 'Ordered'
+        ));
+        Test.stopTest();
+
+        Ordered_Part__c saved = [SELECT Part_Order__c, Claim__c, Part_Name__c FROM Ordered_Part__c WHERE Part_Order__c = :po.Id];
+        System.assertEquals(po.Id, saved.Part_Order__c);
+        System.assertEquals(e.Claim__c, saved.Claim__c, 'the direct shortcut lookup is also populated');
+    }
+
+    @IsTest
+    static void saveOrderedPartStatusesUpdatesInPlace() {
+        Estimate__c e = seedEstimateWithLineData();
+        Account supplier = TestDataFactory.createSupplierAccount(true);
+        Part_Order__c po = TestDataFactory.createPartOrder(e.Claim__c, supplier.Id, true);
+        Ordered_Part__c op1 = TestDataFactory.createOrderedPart(po.Id, e.Claim__c, true);
+        Ordered_Part__c op2 = TestDataFactory.createOrderedPart(po.Id, e.Claim__c, true);
+
+        Test.startTest();
+        ClaimEstimateService.saveOrderedPartStatuses(new List<Ordered_Part__c>{
+            new Ordered_Part__c(Id = op1.Id, Status__c = 'Received'),
+            new Ordered_Part__c(Id = op2.Id, Status__c = 'Backordered')
+        });
+        Test.stopTest();
+
+        System.assertEquals('Received', [SELECT Status__c FROM Ordered_Part__c WHERE Id = :op1.Id].Status__c);
+        System.assertEquals('Backordered', [SELECT Status__c FROM Ordered_Part__c WHERE Id = :op2.Id].Status__c);
+        System.assertEquals(2, [SELECT COUNT() FROM Ordered_Part__c WHERE Part_Order__c = :po.Id],
+            'updated in place, not duplicated');
+    }
+
+    @IsTest
+    static void savePartOrderEditsUpdatesPoAndLines() {
+        Estimate__c e = seedEstimateWithLineData();
+        Account supplier = TestDataFactory.createSupplierAccount(true);
+        Part_Order__c po = TestDataFactory.createPartOrder(e.Claim__c, supplier.Id, true);
+        Ordered_Part__c op = TestDataFactory.createOrderedPart(po.Id, e.Claim__c, true);
+
+        Test.startTest();
+        ClaimEstimateService.savePartOrderEdits(
+            new Part_Order__c(Id = po.Id, PO_Number__c = 'PO-9999', Expected_Delivery__c = Date.today().addDays(14)),
+            new List<Ordered_Part__c>{
+                new Ordered_Part__c(Id = op.Id, Part_Description__c = 'Front bumper cover',
+                    Brand__c = 'Aftermarket', Condition__c = 'New')
+            }
+        );
+        Test.stopTest();
+
+        Part_Order__c savedPo = [SELECT PO_Number__c, Expected_Delivery__c FROM Part_Order__c WHERE Id = :po.Id];
+        System.assertEquals('PO-9999', savedPo.PO_Number__c);
+        System.assertEquals(Date.today().addDays(14), savedPo.Expected_Delivery__c);
+        Ordered_Part__c savedOp = [SELECT Part_Description__c, Brand__c, Condition__c FROM Ordered_Part__c WHERE Id = :op.Id];
+        System.assertEquals('Front bumper cover', savedOp.Part_Description__c);
+        System.assertEquals('Aftermarket', savedOp.Brand__c);
+        System.assertEquals('New', savedOp.Condition__c);
+    }
+
+    @IsTest
+    static void getSupplierAccountsReturnsOnlySupplierAccountRecordType() {
+        Account supplier = TestDataFactory.createSupplierAccount(true);
+        TestDataFactory.createDealer(true); // a non-supplier Account, must not appear
+
+        Test.startTest();
+        List<Account> suppliers = ClaimEstimateService.getSupplierAccounts();
+        Test.stopTest();
+
+        System.assertEquals(1, suppliers.size());
+        System.assertEquals(supplier.Id, suppliers[0].Id);
     }
 }

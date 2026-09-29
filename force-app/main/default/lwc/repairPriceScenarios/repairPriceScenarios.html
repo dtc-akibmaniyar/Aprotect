@@ -1,5 +1,5 @@
 <template>
-    <lightning-modal-header label="Repair Price Scenarios"></lightning-modal-header>
+    <lightning-modal-header label="Manage Estimates"></lightning-modal-header>
     <lightning-modal-body>
         <template lwc:if={errorMessage}>
             <div class="slds-p-bottom_small">
@@ -18,10 +18,16 @@
                 <span>Deductible</span>
                 <lightning-formatted-number value={deductibleDisplay} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
             </div>
-            <div class="rp-set-field wide">
-                <span>Claim / Vehicle</span>
-                <span class="rp-claim-ref">{claimRefDisplay}</span>
+            <div class="rp-set-field">
+                <span>Claim</span>
+                <span class="rp-claim-ref">{claimNumberDisplay}</span>
             </div>
+            <template lwc:if={vehicleDisplay}>
+                <div class="rp-set-field wide">
+                    <span>Vehicle</span>
+                    <span class="rp-claim-ref">{vehicleDisplay}</span>
+                </div>
+            </template>
             <div class="rp-set-note">applies to every estimate below; tax is per repair shop</div>
             <lightning-button label="+ Add Estimate" icon-name="utility:add" variant="brand" class="rp-add" onclick={handleAddRow}></lightning-button>
         </div>
@@ -169,7 +175,7 @@
     </lightning-modal-body>
     <lightning-modal-footer>
         <lightning-button label="Cancel" onclick={handleCancel} class="slds-m-right_x-small"></lightning-button>
-        <lightning-button variant="brand" label="Save All Estimates" onclick={handleSaveAll} disabled={isSaveDisabled}></lightning-button>
+        <lightning-button variant="brand" label="Save" onclick={handleSaveAll} disabled={isSaveDisabled}></lightning-button>
         <template lwc:if={isSaving}>
             <lightning-spinner alternative-text="Saving" size="small"></lightning-spinner>
         </template>

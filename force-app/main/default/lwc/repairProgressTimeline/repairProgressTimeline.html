@@ -1,0 +1,71 @@
+<template>
+    <lightning-card title="Repair Progress" icon-name="standard:maintenance_plan">
+        <template lwc:if={isLoading}>
+            <div class="slds-p-around_medium slds-align_absolute-center">
+                <lightning-spinner alternative-text="Loading repair progress" size="small"></lightning-spinner>
+            </div>
+        </template>
+        <template lwc:else>
+            <template lwc:if={hasActiveWorkOrder}>
+                <div class="slds-p-horizontal_medium slds-p-top_small slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                    <div>
+                        <div class="slds-text-title_caps slds-text-color_weak">Work Order</div>
+                        <a href="javascript:void(0);" onclick={handleWorkOrderClick}>{progress.workOrderName}</a>
+                    </div>
+                    <div>
+                        <template lwc:if={isEditing}>
+                            <lightning-button label="Cancel" onclick={handleCancelEdit} class="slds-m-right_x-small" disabled={isSaving}></lightning-button>
+                            <lightning-button variant="brand" label="Save" onclick={handleSaveEdit} disabled={isSaving}></lightning-button>
+                        </template>
+                        <template lwc:else>
+                            <lightning-button label="Edit" onclick={handleEdit}></lightning-button>
+                        </template>
+                    </div>
+                </div>
+
+                <template lwc:if={isEditing}>
+                    <div class="slds-p-around_medium slds-p-horizontal_large">
+                        <lightning-combobox
+                            label="Repair Milestone"
+                            value={draftMilestone}
+                            options={milestoneOptions}
+                            onchange={handleMilestoneChange}
+                            class="slds-p-bottom_small"
+                        ></lightning-combobox>
+                        <template for:each={editableStages} for:item="stage">
+                            <lightning-input
+                                key={stage.key}
+                                type="date"
+                                label={stage.label}
+                                value={stage.value}
+                                data-field={stage.apiField}
+                                onchange={handleDateChange}
+                                class="slds-p-bottom_small"
+                            ></lightning-input>
+                        </template>
+                    </div>
+                </template>
+                <template lwc:else>
+                    <div class="slds-p-around_medium slds-p-horizontal_large">
+                        <ul class="tl">
+                            <template for:each={stages} for:item="stage">
+                                <li key={stage.key} class={stage.itemClass}>
+                                    <div class={stage.dotClass}></div>
+                                    <div class="tl-body">
+                                        <div class="tl-title">{stage.label}</div>
+                                        <div class="tl-sub">{stage.subtext}</div>
+                                    </div>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
+            </template>
+            <template lwc:else>
+                <div class="slds-p-around_medium slds-text-color_weak">
+                    No active work order yet for this claim.
+                </div>
+            </template>
+        </template>
+    </lightning-card>
+</template>

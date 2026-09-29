@@ -73,6 +73,16 @@
                                     <p>There are no Extended Warranty plans configured for this dealer. You may continue to the next section.</p>
                                 </div>
                             </template>
+                            <!-- B1: no vehicle (or blank year / null odometer) - Apex
+                                 fails term eligibility closed, so there is nothing to
+                                 list yet. Plain wording, no jargon. -->
+                            <template if:true={showVehicleDataIncomplete}>
+                                <div class="no-packages-message">
+                                    <lightning-icon icon-name="utility:warning" size="medium" variant="warning"></lightning-icon>
+                                    <h3>Select a vehicle to see eligible packages</h3>
+                                    <p>Enter the vehicle's year and odometer first - the warranty plans that apply are calculated from them.</p>
+                                </div>
+                            </template>
                             <template if:true={showVehicleNotEligibleDisclaimer}>
                                 <div class="no-packages-message">
                                     <lightning-icon icon-name="utility:warning" size="medium" variant="warning"></lightning-icon>
@@ -139,7 +149,12 @@
                                                             </lightning-accordion>
                                                         </template>
                                                         
-                                                        <!-- Fallback: Show terms directly if no tiers (backward compatibility) -->
+                                                        <!-- EXPLICIT FALLBACK (demoted): the flat term list is
+                                                             rendered ONLY when the package has no tiers, so the
+                                                             same terms are never shown twice. Tiers are the
+                                                             primary grouped view above; this branch keeps
+                                                             tier-less catalogue packages (a legitimate org case)
+                                                             selectable. -->
                                                         <template if:false={pkg.hasTiers}>
                                                             <template if:true={pkg.hasTerms}>
                                                                 <div class="term-group term-group-two-column">

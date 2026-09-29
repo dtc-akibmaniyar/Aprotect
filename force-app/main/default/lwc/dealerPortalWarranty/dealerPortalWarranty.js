@@ -100,6 +100,12 @@ export default class DealerPortalWarranty extends LightningElement {
     @track showDeclineModal = false;
     @track dealerPackages = [];
     @track dealerHasPackages = false;
+    // B1 gate: true when the application has no vehicle, or the vehicle's year
+    // is blank / odometer is null. Apex now fails TERM eligibility closed in
+    // that state (getDealerPackages returns vehicleDataIncomplete = true and no
+    // terms), so the tab shows an explicit "select a vehicle" state instead of
+    // an empty list or a misleading "vehicle not eligible" message.
+    @track vehicleDataIncomplete = false;
     @track selectedDealerPackage = null;
     @track selectedWarrantyTerm = null;
     @track selectedWarrantyTierId = null;
@@ -455,6 +461,25 @@ export default class DealerPortalWarranty extends LightningElement {
                     this.dealerHasPackages = !!(result.data && result.data.length > 0);
                 }
 
+                // B1 gate: vehicle data is incomplete (no vehicle / blank year /
+                // null odometer). Apex fails closed and returns no terms, so do
+                // NOT fall through to the (empty) package list or to the
+                // "vehicle not eligible" message - render the explicit
+                // "select a vehicle" state instead and clear any stale selection.
+                this.vehicleDataIncomplete = result.vehicleDataIncomplete === true;
+                if (this.vehicleDataIncomplete) {
+                    this.dealerPackages = [];
+                    this.allDealerPackages = [];
+                    this.selectedDealerPackage = null;
+                    this.selectedWarrantyTerm = null;
+                    this.selectedWarrantyTierId = null;
+                    this.selectedPlanTypeKey = null;
+                    this.selectedPlanType = null;
+                    this.currentView = 'packageDetails';
+                    this.loading = false;
+                    return;
+                }
+
                 if (!result.data || result.data.length === 0) {
                     this.dealerPackages = [];
                     this.allDealerPackages = [];
@@ -470,8 +495,8 @@ export default class DealerPortalWarranty extends LightningElement {
                     
                     return {
                         ...pkg,
-                        warrantyTerms: this._sortTerms(pkg.terms || []), // Keep for backward compatibility - sorted by km then months
-                        tiers: pkg.tiers || [], // NEW: Grouped by tiers
+                        warrantyTerms: this._sortTerms(pkg.terms || []), // Flat fallback list - ordered by amount, then months, then KM
+                        tiers: this._sortTiers(pkg.tiers || []), // Primary grouped structure - tiers ordered by mileage band
                         options: pkg.options || []
                     };
                 });
@@ -792,29 +817,62 @@ export default class DealerPortalWarranty extends LightningElement {
     
     // Get warranty terms for display
 
-    // Sort terms by km ascending, then months ascending
-    _parseKmFromName(name) {
-        if (!name) return 0;
-        var m = name.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:KM|km|Km)/i);
-        if (m) return parseFloat(m[1].replace(/,/g, ""));
-        return 0;
+    // Deterministic term ordering - data fields only, NEVER parsed from the
+    // term name (the previous _parseKmFromName/_parseMonthsFromName fallbacks
+    // were fragile: they silently produced 0 for any unexpected name shape).
+    //
+    // Order key: AMOUNT, then MONTHS, then KM. Values come straight from the
+    // Apex DTO fields:
+    //   amount : totalPrice (retail incl. markup)   -> fallback netCost
+    //   months : expiryTerm (term duration, months) -> fallback durationRestrictionInMonths
+    //   km     : odometerKM (odometer cap, KM)      -> fallback mileageRestriction
+    // A value that is genuinely absent sorts LAST; ties break on Id so the
+    // order is fully stable across renders.
+    _sortValue(value) {
+        const n = Number(value);
+        return (value == null || value === '' || isNaN(n)) ? null : n;
     }
 
-    _parseMonthsFromName(name) {
-        if (!name) return 0;
-        var m = name.match(/(\d+)\s*(?:Month|Months|month|months|Mo)/i);
-        if (m) return parseInt(m[1], 10);
-        return 0;
+    _termAmount(term) {
+        return this._sortValue(term.totalPrice != null ? term.totalPrice : term.netCost);
+    }
+
+    _termMonths(term) {
+        return this._sortValue(term.expiryTerm != null ? term.expiryTerm : term.durationRestrictionInMonths);
+    }
+
+    _termKm(term) {
+        return this._sortValue(term.odometerKM != null ? term.odometerKM : term.mileageRestriction);
+    }
+
+    _compareNullable(a, b) {
+        if (a === null && b === null) return 0;
+        if (a === null) return 1;   // nulls last
+        if (b === null) return -1;
+        return a - b;
     }
 
     _sortTerms(terms) {
-        return [...terms].sort((a, b) => {
-            var kmA = Number(a.mileageRestriction) || this._parseKmFromName(a.packageTermName || a.Name || a.name);
-            var kmB = Number(b.mileageRestriction) || this._parseKmFromName(b.packageTermName || b.Name || b.name);
-            if (kmA !== kmB) return kmA - kmB;
-            var moA = Number(a.durationRestrictionInMonths) || this._parseMonthsFromName(a.packageTermName || a.Name || a.name);
-            var moB = Number(b.durationRestrictionInMonths) || this._parseMonthsFromName(b.packageTermName || b.Name || b.name);
-            return moA - moB;
+        return [...(terms || [])].sort((a, b) => {
+            let cmp = this._compareNullable(this._termAmount(a), this._termAmount(b));
+            if (cmp !== 0) return cmp;
+            cmp = this._compareNullable(this._termMonths(a), this._termMonths(b));
+            if (cmp !== 0) return cmp;
+            cmp = this._compareNullable(this._termKm(a), this._termKm(b));
+            if (cmp !== 0) return cmp;
+            return String(a.Id || '').localeCompare(String(b.Id || ''));
+        });
+    }
+
+    // Tiers are the PRIMARY grouped structure; order them by their own mileage
+    // band (start, then end) - the tier row carries no amount/duration fields.
+    _sortTiers(tiers) {
+        return [...(tiers || [])].sort((a, b) => {
+            let cmp = this._compareNullable(this._sortValue(a.mileageRestrictionStart), this._sortValue(b.mileageRestrictionStart));
+            if (cmp !== 0) return cmp;
+            cmp = this._compareNullable(this._sortValue(a.mileageRestrictionEnd), this._sortValue(b.mileageRestrictionEnd));
+            if (cmp !== 0) return cmp;
+            return String(a.Id || '').localeCompare(String(b.Id || ''));
         });
     }
 
@@ -2291,12 +2349,21 @@ export default class DealerPortalWarranty extends LightningElement {
         return !this.dealerHasPackages;
     }
 
+    // B1: the application has no vehicle (or the vehicle's year / odometer is
+    // missing). Apex now fails term eligibility closed, so there is nothing to
+    // list yet - say so plainly rather than showing an empty package list or
+    // the "vehicle does not qualify" message (which would be misleading: the
+    // vehicle is simply not entered yet).
+    get showVehicleDataIncomplete() {
+        return this.dealerHasPackages && this.vehicleDataIncomplete === true;
+    }
+
     get showVehicleNotEligibleDisclaimer() {
-        return this.dealerHasPackages && !this.hasPackages;
+        return this.dealerHasPackages && !this.showVehicleDataIncomplete && !this.hasPackages;
     }
 
     get showPackageList() {
-        return !this.showNoPackageDisclaimer && !this.showVehicleNotEligibleDisclaimer;
+        return !this.showNoPackageDisclaimer && !this.showVehicleDataIncomplete && !this.showVehicleNotEligibleDisclaimer;
     }
 
     get hasSelectedTerm() {

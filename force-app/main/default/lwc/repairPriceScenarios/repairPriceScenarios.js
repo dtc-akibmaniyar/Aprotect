@@ -163,8 +163,18 @@ export default class RepairPriceScenarios extends LightningModal {
         return this.rows.length <= 1;
     }
 
-    get claimRefDisplay() {
-        return this.defaults.claimRef || '';
+    /** Splits ClaimPricingService.buildClaimRef's "<claim> · <vehicle>" on the
+     * same middle-dot separator it uses - keep this literal in sync with
+     * ClaimPricingService.buildClaimRef if that format ever changes. */
+    get claimNumberDisplay() {
+        const ref = this.defaults.claimRef || '';
+        const idx = ref.indexOf(' · ');
+        return idx === -1 ? ref : ref.substring(0, idx);
+    }
+    get vehicleDisplay() {
+        const ref = this.defaults.claimRef || '';
+        const idx = ref.indexOf(' · ');
+        return idx === -1 ? '' : ref.substring(idx + 3);
     }
 
     handleAddRow() {

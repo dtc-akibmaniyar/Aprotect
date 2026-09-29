@@ -22,7 +22,7 @@ private class QuotePDFGeneratorServiceTest {
         Application__c app = [SELECT Id FROM Application__c LIMIT 1];
 
         Test.startTest();
-        String cvId = QuotePDFGeneratorService.generateQuotePDF(app.Id);
+        String cvId = QuotePDFGeneratorService.generateQuotePDF(app.Id).contentVersionId;
         Test.stopTest();
 
         System.assertNotEquals(null, cvId, 'ContentVersion Id should be returned');

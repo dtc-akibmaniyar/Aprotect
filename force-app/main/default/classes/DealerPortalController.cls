@@ -530,10 +530,12 @@ public without sharing class DealerPortalController {
         @AuraEnabled public Map<String, Object> debugInfo; // Debug information for troubleshooting
         @AuraEnabled public Boolean isPremiumVehicle; // Whether vehicle qualifies for premium model fee
         @AuraEnabled public Boolean isCommercialVehicle; // Whether vehicle is commercial/business use
-        
+        @AuraEnabled public Boolean vehicleDataIncomplete; // True when the application has no vehicle, or the vehicle's Year__c is blank / Odometer__c is null
+
         public DealerPackagesResponse() {
             this.isPremiumVehicle = false;
             this.isCommercialVehicle = false;
+            this.vehicleDataIncomplete = false;
         }
     }
 
@@ -1060,16 +1062,17 @@ public without sharing class DealerPortalController {
     public static DealerPackagesResponse getDealerPackages(String applicationId, String recordType) {
         String methodName = 'getDealerPackages';
         Map<String, Object> params = new Map<String, Object>{'applicationId' => applicationId, 'recordType' => recordType};
-        logMethodEntry(methodName, params);
+        
         try {
 
             List<String> missingParams = validateRequiredParams(params);
+
             if (!missingParams.isEmpty()) {
                 DealerPackagesResponse response = new DealerPackagesResponse();
                 response.success = false;
                 response.message = 'Missing required parameters: ' + String.join(missingParams, ', ');
                 response.data = null;
-                logMethodExit(methodName, false, null);
+                //logMethodExit(methodName, false, null);
                 return response;
             }
 
@@ -1094,7 +1097,7 @@ public without sharing class DealerPortalController {
                 response.success = false;
                 response.message = 'No application found with ID: ' + applicationId;
                 response.data = null;
-                logMethodExit(methodName, false, null);
+                //logMethodExit(methodName, false, null);
                 return response;
             }
             
@@ -1105,7 +1108,7 @@ public without sharing class DealerPortalController {
                 response.success = false;
                 response.message = 'No dealer specified for this application';
                 response.data = null;
-                logMethodExit(methodName, false, null);
+                //logMethodExit(methodName, false, null);
                 return response;
             }
             
@@ -1131,6 +1134,7 @@ public without sharing class DealerPortalController {
                     response.success = false;
                     response.message = 'No packages available for this dealer with record type: ' + recordType;
                     response.data = null;
+                    //logMethodExit(methodName, false, null);
                     return response;
                 } else {
                     dealerPackages = allPackages;
@@ -1149,6 +1153,7 @@ public without sharing class DealerPortalController {
             Double vehicleIntakeHours = null;
             String vehicleBrandTier = null;
             Boolean isPowersports = false;
+            
             if (application.Vehicle__r != null) {
                 vehicleYear = application.Vehicle__r.Year__c;
                 vehicleOdometer = application.Vehicle__r.Odometer__c;
@@ -1184,6 +1189,14 @@ public without sharing class DealerPortalController {
                     tireRimVehicleClass = resolvedTrClass;
                 }
             }
+
+            // ------------------------------------------------------------------
+            // Vehicle-schedule eligibility gate (feature-flagged, default OFF).
+            // Read ONCE per call. When the flag is false — or the setting/field
+            // cannot be read — `scheduleGateEnabled` is false and the warranty
+            // filter loop below is byte-identical to the legacy path.
+            // ------------------------------------------------------------------
+            Boolean scheduleGateEnabled = isVehicleScheduleGateEnabled();
 
             if (!isTireRimRequest) {
                 List<Dealer_Package__c> filteredPackages = new List<Dealer_Package__c>();
@@ -1237,7 +1250,47 @@ public without sharing class DealerPortalController {
                             continue;
                         }
                     }
-                
+
+                    // ---- Vehicle-schedule eligibility gate (feature-flagged) ----
+                    // When the flag is TRUE, a warranty package is kept only if
+                    // BOTH its own designation AND the vehicle's live schedule
+                    // membership agree. Fail-closed on every uncertainty: no
+                    // assignment, inactive schedule, expired effectivity window,
+                    // no matching member row, an exclusion row, or any resolver
+                    // error/null. When the flag is FALSE this block is skipped
+                    // entirely, leaving the legacy filter byte-identical.
+                    if (scheduleGateEnabled) {
+
+                        // (a) Powersports package: the vehicle MUST be a
+                        // Powersports vehicle AND an active member of a
+                        // Powersports_Program schedule for this dealer/package.
+                        if (isPackagePowersports) {
+                            if (!isPowersports) {
+                                continue;
+                            }
+                            if (!isVehicleActiveScheduleMember(
+                                    application.Vehicle__c, (Id) dealerId, dp.Package__c,
+                                    SCHEDULE_TYPE_POWERSPORTS, Date.today())) {
+                                continue;
+                            }
+                        }
+
+                        // (b) Commercial package (master flag of record lives on
+                        // the Package): the vehicle MUST be a commercial/business
+                        // -use vehicle AND an active member of a
+                        // Commercial_Eligibility schedule for this dealer/package.
+                        if (dp.Package__r != null && dp.Package__r.Commercial_Business_Use__c == true) {
+                            if (!isCommercialVehicle) {
+                                continue;
+                            }
+                            if (!isVehicleActiveScheduleMember(
+                                    application.Vehicle__c, (Id) dealerId, dp.Package__c,
+                                    SCHEDULE_TYPE_COMMERCIAL_ELIGIBILITY, Date.today())) {
+                                continue;
+                            }
+                        }
+                    }
+
                     filteredPackages.add(dp);
                 }
 
@@ -1582,12 +1635,17 @@ public without sharing class DealerPortalController {
                 }
             }
 
+            Boolean vehicleDataIncomplete = (application.Vehicle__r == null)
+                || String.isBlank(vehicleYear)
+                || vehicleOdometer == null;
+
             DealerPackagesResponse response = new DealerPackagesResponse();
             response.success = true;
             response.message = responseMessage;
             response.data = packageList;
             response.isPremiumVehicle = isPremiumVehicle;
             response.isCommercialVehicle = isCommercialVehicle;
+            response.vehicleDataIncomplete = vehicleDataIncomplete;
             
             Map<String, Object> debugInfo = new Map<String, Object>();
             debugInfo.put('queriedPackagesCount', dealerPackages.size());
@@ -4378,33 +4436,9 @@ private static Map<String, Decimal> calculatePricing(Decimal basePrice, Decimal 
             if (String.isBlank(dealerId)) {
                 return new List<Dealer_Package__c>();
             }
-            /*
-            try {
-                List<Dealer_Package__c> allDealerPackages = [
-                    SELECT Id, Name, RecordType.DeveloperName, RecordType.Name, Package__r.Name, Package__r.Class__c, Class__c
-                    FROM Dealer_Package__c 
-                    WHERE Dealer__c = :dealerId
-                    LIMIT 100
-                ];
-            } catch (Exception e) {
-                System.debug('Error querying dealer packages: ' + e.getMessage());
-                return new List<Dealer_Package__c>();
-            }
-            
-            List<Dealer_Package__c> samplePackages = [
-                SELECT RecordType.DeveloperName
-                FROM Dealer_Package__c 
-                WHERE Dealer__c = :dealerId
-                LIMIT 10
-            ];
-
-            Set<String> availableRecordTypes = new Set<String>();
-            for (Dealer_Package__c pkg : samplePackages) {
-                availableRecordTypes.add(pkg.RecordType.DeveloperName);
-            }
-            */
 
             String whereClause = 'Dealer__c = :dealerId';
+            
             if (String.isNotBlank(recordType)) {
                 whereClause += ' AND Package__r.RecordType.DeveloperName = :recordType';
             }
@@ -4419,7 +4453,8 @@ private static Map<String, Decimal> calculatePricing(Decimal basePrice, Decimal 
                                 RecordType.DeveloperName, RecordType.Name,
                                 Commercial_Business_Use__c, Commercial_Vehicle_Type__c, Commercial_Vehicle_Surcharge_Fee__c,
                                 Package__r.Package_Group__c, Package__r.Package_Group__r.Name, Package__r.Package_Group__r.Sort_Order__c,
-                                Package__r.Vehicle_Category_Filter__c, Package__r.Max_Intake_Hours__c
+                                Package__r.Vehicle_Category_Filter__c, Package__r.Max_Intake_Hours__c,
+                                Package__r.Commercial_Business_Use__c
                         FROM Dealer_Package__c 
                         WHERE Dealer__c = :dealerId AND RecordType.DeveloperName = :recordType
                         ORDER BY Name
@@ -4437,7 +4472,8 @@ private static Map<String, Decimal> calculatePricing(Decimal basePrice, Decimal 
                             RecordType.DeveloperName, RecordType.Name,
                             Commercial_Business_Use__c, Commercial_Vehicle_Type__c, Commercial_Vehicle_Surcharge_Fee__c,
                             Package__r.Package_Group__c, Package__r.Package_Group__r.Name, Package__r.Package_Group__r.Sort_Order__c,
-                            Package__r.Vehicle_Category_Filter__c, Package__r.Max_Intake_Hours__c
+                            Package__r.Vehicle_Category_Filter__c, Package__r.Max_Intake_Hours__c,
+                            Package__r.Commercial_Business_Use__c
                     FROM Dealer_Package__c 
                     WHERE Dealer__c = :dealerId
                     ORDER BY Name
@@ -4549,8 +4585,17 @@ return false;
             }
 
             if (String.isBlank(vehicleYear) || vehicleOdometer == null) {
-                // Vehicle data incomplete - treat term as eligible until vehicle is fully populated
-                return true;
+                // FAIL CLOSED (2026-09-22): the vehicle year and odometer are the
+                // inputs this check exists to judge. Returning true here ("treat
+                // as eligible until the vehicle is populated") made EVERY term
+                // eligible for an application with no vehicle - or a vehicle with
+                // a blank Year__c / null Odometer__c - so the portal listed the
+                // whole package catalogue and looked like eligibility had stopped
+                // working. Missing vehicle data is NOT proof of eligibility: the
+                // term is ineligible until the vehicle is complete (the dealer
+                // portal shows a "select a vehicle" state via
+                // DealerPackagesResponse.vehicleDataIncomplete).
+                return false;
             }
             
             Decimal vehicleOdometerKM = convertOdometerToKilometers(vehicleOdometer, vehicleOdometerUnit);
@@ -4650,6 +4695,74 @@ return false;
         } catch (Exception e) {
             return false;
         }
+    }
+
+
+    // ------------------------------------------------------------------
+    // Vehicle-schedule eligibility gate (Dealer_Package__c warranty filter)
+    // ------------------------------------------------------------------
+
+    /** Schedule family an exclusive Powersports package must be a member of. */
+    private static final String SCHEDULE_TYPE_POWERSPORTS = VehicleScheduleResolver.TYPE_POWERSPORTS_PROGRAM;
+    /** Schedule family a commercial/business-use package must be a member of. */
+    private static final String SCHEDULE_TYPE_COMMERCIAL_ELIGIBILITY = 'Commercial_Eligibility';
+
+    /**
+     * Feature-flag read for the vehicle-schedule eligibility gate.
+     *
+     * The flag lives on the org-level hierarchy setting
+     * Aprotect_Portal_Settings__c.Vehicle_Schedule_Gate_Enabled__c and defaults
+     * OFF. When the field is absent, the setting record cannot be read, or any
+     * error occurs, this returns false — the gate stays inert and the legacy
+     * warranty-package filter runs unchanged (fail SAFE to legacy, never to an
+     * empty package list).
+     */
+    private static Boolean isVehicleScheduleGateEnabled() {
+        try {
+            Aprotect_Portal_Settings__c settings = Aprotect_Portal_Settings__c.getInstance();
+            return settings != null && settings.Vehicle_Schedule_Gate_Enabled__c == true;
+        } catch (Exception e) {
+            System.debug('Vehicle schedule gate flag could not be read; defaulting to legacy (off): '
+                + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Vehicle-schedule membership probe for the dealer-portal gate.
+     *
+     * Returns true ONLY when the vehicle is an ACTIVE member of a schedule of
+     * `scheduleType` for this (dealer, package) context as of `asOf`. The probe
+     * reuses the deployed VehicleScheduleResolver resolution path and its member
+     * key grammar, so the portal judges membership exactly as the pricing engine
+     * does (R1-R6): active + effective schedule, a winning assignment, and a
+     * matching inclusion row that is not neutralised by an exclusion row.
+     *
+     * Fails CLOSED on every uncertainty — null ids, no assignment, inactive
+     * schedule, expired effectivity window, no matching member row, an exclusion
+     * row, or any resolver error/null — by returning false.
+     */
+    private static Boolean isVehicleActiveScheduleMember(
+            Id vehicleId, Id dealerId, Id packageId, String scheduleType, Date asOf) {
+        if (vehicleId == null || String.isBlank(scheduleType)) {
+            return false;
+        }
+        try {
+            VehicleScheduleResolver.ResolveRequest req = new VehicleScheduleResolver.ResolveRequest(
+                dealerId, vehicleId, packageId, asOf != null ? asOf : Date.today());
+            VehicleScheduleResolver.ResolverResult result = VehicleScheduleResolver.resolve(req);
+            if (result == null || result.lines == null) {
+                return false;
+            }
+            for (VehicleScheduleResolver.ResolvedFeeLine line : result.lines) {
+                if (line != null && scheduleType.equalsIgnoreCase(line.scheduleType)) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            System.debug('Vehicle schedule membership probe failed (fail closed): ' + e.getMessage());
+        }
+        return false;
     }
 
 

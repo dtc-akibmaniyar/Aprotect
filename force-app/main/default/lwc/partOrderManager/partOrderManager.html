@@ -1,0 +1,158 @@
+<template>
+    <lightning-card title="Order The Parts" icon-name="standard:order">
+        <template lwc:if={isLoading}>
+            <div class="slds-p-around_medium slds-align_absolute-center">
+                <lightning-spinner alternative-text="Loading part orders" size="small"></lightning-spinner>
+            </div>
+        </template>
+        <template lwc:else>
+            <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+                <div class="slds-text-title_caps slds-text-color_weak slds-p-bottom_x-small">Suggested Parts</div>
+                <template lwc:if={hasSuggestions}>
+                    <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                        <thead>
+                            <tr class="slds-line-height_reset">
+                                <th scope="col">Part</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Quantity</th>
+                                <th scope="col">Suggested Supplier</th>
+                                <th scope="col">From Estimate</th>
+                                <th scope="col"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template for:each={suggestions} for:item="s">
+                                <tr key={s.partId}>
+                                    <td>{s.partName}</td>
+                                    <td>{s.partType}</td>
+                                    <td>{s.quantity}</td>
+                                    <td>{s.supplierName}</td>
+                                    <td>{s.estimateName}</td>
+                                    <td>
+                                        <lightning-button
+                                            variant="brand"
+                                            label="Order This Part"
+                                            data-part-id={s.partId}
+                                            onclick={handleOrderPart}
+                                        ></lightning-button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </template>
+                <template lwc:else>
+                    <div class="slds-text-color_weak">No part was estimated for this claim - nothing to order.</div>
+                </template>
+            </div>
+
+            <template lwc:if={hasPartOrders}>
+                <template for:each={partOrders} for:item="po">
+                    <div key={po.id} class="slds-p-horizontal_medium slds-p-bottom_medium">
+                        <div class="slds-box slds-theme_default">
+                            <div class="slds-grid slds-wrap slds-gutters slds-p-bottom_small">
+                                <div class="slds-col slds-size_1-of-4">
+                                    <div class="slds-text-title_caps slds-text-color_weak">Part Order</div>
+                                    <a href="javascript:void(0);" data-id={po.id} onclick={handlePartOrderClick}>{po.name}</a>
+                                </div>
+                                <div class="slds-col slds-size_1-of-4">
+                                    <div class="slds-text-title_caps slds-text-color_weak">PO Number</div>
+                                    <template lwc:if={po.isEditing}>
+                                        <lightning-input variant="label-hidden" label="PO Number" value={po.poNumber}
+                                            data-po-id={po.id} data-field="poNumber" onchange={handlePoFieldChange}></lightning-input>
+                                    </template>
+                                    <template lwc:else>
+                                        <div>{po.poNumber}</div>
+                                    </template>
+                                </div>
+                                <div class="slds-col slds-size_1-of-4">
+                                    <div class="slds-text-title_caps slds-text-color_weak">Supplier</div>
+                                    <div>{po.supplierName}</div>
+                                </div>
+                                <div class="slds-col slds-size_1-of-4">
+                                    <div class="slds-text-title_caps slds-text-color_weak">Expected Delivery</div>
+                                    <template lwc:if={po.isEditing}>
+                                        <lightning-input type="date" variant="label-hidden" label="Expected Delivery" value={po.expectedDelivery}
+                                            data-po-id={po.id} data-field="expectedDelivery" onchange={handlePoFieldChange}></lightning-input>
+                                    </template>
+                                    <template lwc:else>
+                                        <lightning-formatted-date-time value={po.expectedDelivery} year="numeric" month="short" day="2-digit"></lightning-formatted-date-time>
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="slds-p-bottom_small slds-text-align_right">
+                                <template lwc:if={po.isEditing}>
+                                    <lightning-button label="Cancel" data-po-id={po.id} onclick={handleCancelEdit} class="slds-m-right_x-small"></lightning-button>
+                                    <lightning-button variant="brand" label="Save" data-po-id={po.id} onclick={handleSaveEdit}></lightning-button>
+                                </template>
+                                <template lwc:else>
+                                    <lightning-button label="Edit" data-po-id={po.id} onclick={handleEditPartOrder}></lightning-button>
+                                </template>
+                            </div>
+
+                            <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                                <thead>
+                                    <tr class="slds-line-height_reset">
+                                        <th scope="col">Name</th>
+                                        <th scope="col">Part Name</th>
+                                        <th scope="col">Description</th>
+                                        <th scope="col">Brand</th>
+                                        <th scope="col">Condition</th>
+                                        <th scope="col">Quantity</th>
+                                        <th scope="col">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template for:each={po.lines} for:item="line">
+                                        <tr key={line.id}>
+                                            <td><a href="javascript:void(0);" data-id={line.id} onclick={handlePartClick}>{line.name}</a></td>
+                                            <td>{line.partName}</td>
+                                            <td>
+                                                <template lwc:if={po.isEditing}>
+                                                    <lightning-textarea variant="label-hidden" label="Description" value={line.description}
+                                                        data-po-id={po.id} data-line-id={line.id} data-field="description" onchange={handleLineFieldChange}></lightning-textarea>
+                                                </template>
+                                                <template lwc:else>{line.description}</template>
+                                            </td>
+                                            <td>
+                                                <template lwc:if={po.isEditing}>
+                                                    <lightning-combobox variant="label-hidden" label="Brand" value={line.brand} options={brandOptions}
+                                                        data-po-id={po.id} data-line-id={line.id} data-field="brand" onchange={handleLineFieldChange}></lightning-combobox>
+                                                </template>
+                                                <template lwc:else>{line.brand}</template>
+                                            </td>
+                                            <td>
+                                                <template lwc:if={po.isEditing}>
+                                                    <lightning-combobox variant="label-hidden" label="Condition" value={line.condition} options={conditionOptions}
+                                                        data-po-id={po.id} data-line-id={line.id} data-field="condition" onchange={handleLineFieldChange}></lightning-combobox>
+                                                </template>
+                                                <template lwc:else>{line.condition}</template>
+                                            </td>
+                                            <td>{line.quantity}</td>
+                                            <td>
+                                                <lightning-combobox
+                                                    variant="label-hidden"
+                                                    label="Status"
+                                                    value={line.status}
+                                                    options={statusOptions}
+                                                    data-po-id={po.id}
+                                                    data-line-id={line.id}
+                                                    onchange={handleStatusChange}
+                                                ></lightning-combobox>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </template>
+            </template>
+            <template lwc:else>
+                <div class="slds-p-horizontal_medium slds-p-bottom_small slds-text-color_weak">
+                    No part orders yet for this claim.
+                </div>
+            </template>
+        </template>
+    </lightning-card>
+</template>
