@@ -223,7 +223,8 @@ public without sharing class DealerPackageSyncService {
                 return result;
             }
             List<Package__c> masters = [
-                SELECT Id, Name, RecordTypeId, RecordType.DeveloperName, Package_Group__c
+                SELECT Id, Name, RecordTypeId, RecordType.DeveloperName, Package_Group__c,
+                       Commercial_Business_Use__c, Commercial_Vehicle_Surcharge_Fee__c
                 FROM Package__c
                 WHERE Id = :packageId
                 LIMIT 1
@@ -512,6 +513,11 @@ public without sharing class DealerPackageSyncService {
             dealerRTId = Schema.SObjectType.Dealer_Package__c.getRecordTypeInfosByDeveloperName()
                 .get(dealerRTDevName)?.getRecordTypeId();
         }
+        // Dealer commercial price: seeded ONCE here from the master (commercial
+        // vehicle surcharge), then owned by the dealer. reconcile() deliberately
+        // never refreshes it from the master.
+        Decimal seedCommercialPrice = master.Commercial_Business_Use__c == true
+            ? master.Commercial_Vehicle_Surcharge_Fee__c : null;
         // Name uniqueness: Dealer_Package__c.Name is not unique, but keep the mirror name readable.
         List<Dealer_Package__c> mirrors = new List<Dealer_Package__c>();
         for (Id dealerId : dealerIds) {
@@ -520,6 +526,7 @@ public without sharing class DealerPackageSyncService {
                 Dealer__c = dealerId,
                 Package__c = master.Id,
                 RecordTypeId = dealerRTId,
+                Commercial_Vehicle_Surcharge_Fee__c = seedCommercialPrice,
                 // P7 watermark: a freshly gap-created mirror is born "as fresh as
                 // now" — the after-insert reconcile bumps it again at the end of
                 // the same transaction (see reconcile()).
@@ -598,10 +605,12 @@ public without sharing class DealerPackageSyncService {
 
             // Commercial_Business_Use__c and Commercial_Vehicle_Type__c are
             // FORMULA fields mirroring Package__r.* (org fact) — live already,
-            // never written. Only the stored surcharge mirror is refreshed.
-            Boolean masterCommercial = m.Commercial_Business_Use__c == true;
-            Decimal surcharge = masterCommercial ? m.Commercial_Vehicle_Surcharge_Fee__c : null;
-            if (dp.Commercial_Vehicle_Surcharge_Fee__c != surcharge) { u.Commercial_Vehicle_Surcharge_Fee__c = surcharge; dirty = true; }
+            // never written. Commercial_Vehicle_Surcharge_Fee__c is the dealer's
+            // own flat commercial figure: seeded ONCE at mirror creation
+            // (buildMirrorHeaders) and then dealer-owned. The reconcile never
+            // refreshes it from the master, so a master edit cannot move a
+            // dealer's effective price (dealer edits it through
+            // DealerPackageSyncController.saveDealerCommercialPrice).
 
             if (dirty) headerUpdates.add(u);
         }
@@ -911,16 +920,23 @@ public without sharing class DealerPackageSyncService {
         }
 
         Map<String, Dealer_Package_Option__c> existingOptions = new Map<String, Dealer_Package_Option__c>();
+        // Dealer-removed options (Is_Removed__c = true). A removed mirror row is
+        // KEPT (never deleted) and is never re-created nor refreshed by the sync:
+        // the dealer's keep/remove decision is authoritative. Removal is a flag,
+        // so the idempotency key below still matches the existing row.
+        Set<String> removedOptionKeys = new Set<String>();
         for (Dealer_Package_Option__c o : [
             SELECT Id, Dealer_Package__c, Dealer_Package_Term__c, Package_Option__c, Option__c,
                    Selection_Type__c, Inclusion__c, Exclusion__c, Category__c,
-                   Minimum_Value__c, Maximum_Value__c,
+                   Minimum_Value__c, Maximum_Value__c, Is_Removed__c,
                    Original_Package_Option_Price__c, Dealer_Markup__c, Markup_Type__c,
                    Discount_Type__c, Discount_Value__c
             FROM Dealer_Package_Option__c
             WHERE Dealer_Package__c IN :dealerPackageIds AND Package_Option__c != null
         ]) {
-            existingOptions.put(o.Dealer_Package__c + '_' + o.Package_Option__c, o);
+            String k = o.Dealer_Package__c + '_' + o.Package_Option__c;
+            existingOptions.put(k, o);
+            if (o.Is_Removed__c == true) removedOptionKeys.add(k);
         }
 
         List<Dealer_Package_Option__c> optionInserts = new List<Dealer_Package_Option__c>();
@@ -955,6 +971,8 @@ public without sharing class DealerPackageSyncService {
                 if (!include) continue;
 
                 String key = dp.Id + '_' + mo.Id;
+                // A dealer-removed option is never (re-)created or refreshed.
+                if (removedOptionKeys.contains(key)) continue;
                 Dealer_Package_Option__c existing = existingOptions.get(key);
                 if (existing == null) {
                     // Dealer_Package_Option__c.Name is Auto Number (not writable).
@@ -1086,11 +1104,43 @@ public without sharing class DealerPackageSyncService {
         if (existing.Expiry_Term__c != master.Expiry_Term__c) { upd.Expiry_Term__c = master.Expiry_Term__c; dirty = true; }
         if (existing.Odometer_KM__c != master.Odometer_KM__c) { upd.Odometer_KM__c = master.Odometer_KM__c; dirty = true; }
 
-        if (master.Price__c != null && existing.Original_Package_Term_Cost__c != master.Price__c) {
+        // Price ANCHOR freeze (dealer-authored pricing): once the dealer has any
+        // local pricing on this term (markup / discount / sales-rep incentive),
+        // the stored wholesale anchor is FROZEN — a later master price edit must
+        // NOT silently move the dealer's effective price (Net_Cost/Retail are
+        // formulas anchored on this snapshot). A deliberate, dealer-initiated
+        // refresh is available through DealerPackageSyncController
+        // .refreshDealerPriceAnchors(...). With no local pricing yet, the anchor
+        // keeps tracking the master as before (initial mirror behaviour).
+        if (master.Price__c != null
+            && existing.Original_Package_Term_Cost__c != master.Price__c
+            && !hasLocalTermPricing(existing)) {
             upd.Original_Package_Term_Cost__c = master.Price__c;
             dirty = true;
         }
         return dirty;
+    }
+
+    /**
+     * True when the dealer term carries any local pricing that the anchor freeze
+     * must protect (markup, discount or sales-rep incentive). Never written by
+     * the sync — read here only to decide whether the price anchor is frozen.
+     */
+    public static Boolean hasLocalTermPricing(Dealer_Package_Term__c t) {
+        if (t == null) return false;
+        return t.Markup__c != null || t.Markup_Type__c != null
+            || t.Discount_Type__c != null || t.Discount_Value__c != null
+            || t.Sales_Rep_Incentive__c != null;
+    }
+
+    /**
+     * True when the dealer option carries any local pricing (markup or discount)
+     * that the option price-anchor freeze must protect.
+     */
+    public static Boolean hasLocalOptionPricing(Dealer_Package_Option__c o) {
+        if (o == null) return false;
+        return o.Dealer_Markup__c != null || o.Markup_Type__c != null
+            || o.Discount_Type__c != null || o.Discount_Value__c != null;
     }
 
     private static void applyOptionMirror(Dealer_Package_Option__c target, Package_Option__c master, String packageRTDevName) {
@@ -1121,7 +1171,13 @@ public without sharing class DealerPackageSyncService {
         if (existing.Minimum_Value__c != master.Minimum_Value__c) { upd.Minimum_Value__c = master.Minimum_Value__c; dirty = true; }
         if (existing.Maximum_Value__c != master.Maximum_Value__c) { upd.Maximum_Value__c = master.Maximum_Value__c; dirty = true; }
 
-        if (master.Price__c != null && existing.Original_Package_Option_Price__c != master.Price__c) {
+        // Price ANCHOR freeze — same rule as terms: once the dealer has local
+        // option pricing (markup / discount), the stored option price snapshot is
+        // frozen and a master price edit no longer moves the dealer's effective
+        // option price.
+        if (master.Price__c != null
+            && existing.Original_Package_Option_Price__c != master.Price__c
+            && !hasLocalOptionPricing(existing)) {
             upd.Original_Package_Option_Price__c = master.Price__c;
             dirty = true;
         }

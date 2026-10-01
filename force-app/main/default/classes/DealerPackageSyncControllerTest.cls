@@ -343,8 +343,11 @@ private class DealerPackageSyncControllerTest {
         DealerPackageSyncController.ActionResult dry =
             DealerPackageSyncController.syncFromMaster(new List<Id>{ dp.Id }, true);
         System.assertEquals(true, dry.success, dry.message);
-        System.assertEquals(1, dry.createdCount, 'Dry run should flag the price change');
-        System.assertEquals(1, dry.results[0].changes.priceChanges);
+        // The dealer already has local pricing, so the stored master-price anchor
+        // is FROZEN: a master price edit is no longer a pending change here.
+        System.assertEquals(0, dry.createdCount, 'Frozen anchor — no pending price change');
+        System.assertEquals(0, dry.results[0].changes.priceChanges,
+            'Frozen anchor: the console must not report a price change it will not apply');
         System.assertEquals('would-update', dry.results[0].status);
 
         // Child counts before, to prove the re-run duplicates nothing.
@@ -357,7 +360,8 @@ private class DealerPackageSyncControllerTest {
         System.assertEquals(true, run.success, run.message);
 
         Dealer_Package_Term__c dt = dealerTermOf(dp.Id);
-        System.assertEquals(1750.00, dt.Original_Package_Term_Cost__c, 'Anchor refreshed');
+        System.assertEquals(1500.00, dt.Original_Package_Term_Cost__c,
+            'Frozen anchor: a master price edit must not move the dealer effective price');
         System.assertEquals(250, dt.Markup__c, 'Markup must never be overwritten');
         System.assertEquals('$', dt.Markup_Type__c);
         System.assertEquals(75, dt.Discount_Value__c);
@@ -633,5 +637,456 @@ private class DealerPackageSyncControllerTest {
         // The header still exists — the rejected detail was skipped, not fatal.
         System.assertEquals(1, [SELECT COUNT() FROM Dealer_Package__c
                                 WHERE Dealer__c = :dealer.Id AND Package__c = :elw.Id]);
+    }
+
+    // ---------------------------------------------------------------------
+    // Authoring (dealer-side): keep/remove, term pricing, commercial price
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_authoring_keepRemovePricingAndCommercialPrice() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = [SELECT Id FROM Package__c
+                          WHERE RecordType.DeveloperName = 'Extended_Limited_Warranty' LIMIT 1];
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+
+        DealerPackageSyncController.AuthoringDTO dto =
+            DealerPackageSyncController.getDealerAuthoring(dealer.Id);
+        System.assertEquals(true, dto.isDealerAccount);
+        System.assertEquals(true, dto.syncEnabled);
+        System.assertEquals(1, dto.packages.size(), 'One dealer package expected');
+        System.assertEquals(1, dto.packages[0].terms.size(), 'One term expected');
+        System.assertEquals(1, dto.packages[0].includedOptions.size(),
+            'Package-level included add-on expected');
+        System.assertEquals(1, dto.packages[0].terms[0].options.size(),
+            'Term-level optional add-on expected');
+
+        // Keep/remove: the dealer removes a mirrored add-on.
+        Id optId = dto.packages[0].terms[0].options[0].dealerOptionId;
+        DealerPackageSyncController.AuthoringResult rm =
+            DealerPackageSyncController.setDealerOptionRemoved(optId, true);
+        System.assertEquals(true, rm.success, rm.message);
+
+        Integer optCount = [SELECT COUNT() FROM Dealer_Package_Option__c WHERE Dealer_Package__c = :dp.Id];
+        DealerPackageSyncService.reconcileDealerPackages(new Set<Id>{ dp.Id });
+        System.assertEquals(optCount,
+            [SELECT COUNT() FROM Dealer_Package_Option__c WHERE Dealer_Package__c = :dp.Id],
+            'A removed add-on is never re-created');
+        System.assertEquals(true,
+            [SELECT Is_Removed__c FROM Dealer_Package_Option__c WHERE Id = :optId].Is_Removed__c,
+            'The removal flag survives a reconcile');
+
+        // Dealer commercial price — flat, per-dealer.
+        DealerPackageSyncController.AuthoringResult cp =
+            DealerPackageSyncController.saveDealerCommercialPrice(dp.Id, 325.00);
+        System.assertEquals(true, cp.success, cp.message);
+        System.assertEquals(325.00,
+            [SELECT Commercial_Vehicle_Surcharge_Fee__c FROM Dealer_Package__c WHERE Id = :dp.Id]
+                .Commercial_Vehicle_Surcharge_Fee__c);
+
+        // Term pricing: discount, incentive and markup.
+        Id termId = dto.packages[0].terms[0].dealerTermId;
+        DealerPackageSyncController.AuthoringResult tp =
+            DealerPackageSyncController.saveDealerTermPricing(termId, '$', 100, '$', 250, 40);
+        System.assertEquals(true, tp.success, tp.message);
+        Dealer_Package_Term__c t = dealerTermOf(dp.Id);
+        System.assertEquals(100, t.Discount_Value__c);
+        System.assertEquals(250, t.Markup__c);
+        System.assertEquals(40, t.Sales_Rep_Incentive__c);
+        System.assertEquals(1500.00, t.Original_Package_Term_Cost__c,
+            'Authoring local pricing freezes the stored anchor where it is');
+
+        // A later master edit no longer moves the dealer's effective price.
+        update new Package_Term__c(Id = masterTermOf(elw.Id).Id, Price__c = 2000.00);
+        DealerPackageSyncService.reconcileDealerPackages(new Set<Id>{ dp.Id });
+        System.assertEquals(1500.00, dealerTermOf(dp.Id).Original_Package_Term_Cost__c,
+            'Frozen anchor: master edit must not move the dealer effective price');
+
+        // The deliberate, dealer-initiated refresh moves it on purpose.
+        DealerPackageSyncController.AuthoringResult rf =
+            DealerPackageSyncController.refreshDealerPriceAnchors(new List<Id>{ dp.Id });
+        System.assertEquals(true, rf.success, rf.message);
+        System.assertEquals(2000.00, dealerTermOf(dp.Id).Original_Package_Term_Cost__c,
+            'Deliberate refresh re-seeds the anchor from the master');
+    }
+
+    @isTest
+    static void test_authoring_flagOff_refusesWrites() {
+        Account dealer = dealer();
+        setSyncFlag(false);
+        Package__c elw = [SELECT Id FROM Package__c
+                          WHERE RecordType.DeveloperName = 'Extended_Limited_Warranty' LIMIT 1];
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+
+        DealerPackageSyncController.AuthoringDTO dto =
+            DealerPackageSyncController.getDealerAuthoring(dealer.Id);
+        System.assertEquals(false, dto.syncEnabled, 'Read reflects the kill switch');
+
+        Id termId = dto.packages[0].terms[0].dealerTermId;
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.saveDealerTermPricing(termId, '$', 10, '$', 10, 10);
+        System.assertEquals(false, r.success);
+        System.assert(r.message.contains('switched off'), r.message);
+        assertNoApiNames(r.message);
+        System.assertEquals(null,
+            [SELECT Discount_Value__c FROM Dealer_Package_Term__c WHERE Id = :termId].Discount_Value__c,
+            'Flag-off authoring must not write');
+
+        DealerPackageSyncController.AuthoringResult rm =
+            DealerPackageSyncController.setDealerOptionRemoved(
+                dto.packages[0].terms[0].options[0].dealerOptionId, true);
+        System.assertEquals(false, rm.success);
+        assertNoApiNames(rm.message);
+    }
+
+    // ---------------------------------------------------------------------
+    // Master package detail (lazy, read-only) + dealer tier grouping
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_masterPackageDetail_groupsTiersTermsAndAdditionalOptions() {
+        Package__c elw = [SELECT Id, Name FROM Package__c
+                          WHERE RecordType.DeveloperName = 'Extended_Limited_Warranty' LIMIT 1];
+        Package_Tier__c tier = [SELECT Id, Name FROM Package_Tier__c
+                                WHERE Package__c = :elw.Id LIMIT 1];
+        Package_Term__c term = [SELECT Id, Name FROM Package_Term__c
+                                WHERE Package__c = :elw.Id LIMIT 1];
+        Package_Option__c opt = [SELECT Id, Option__r.Name FROM Package_Option__c
+                                 WHERE Package__c = :elw.Id AND Package_Term__c != null LIMIT 1];
+
+        // The test factory links no Option__c, so name the add-on here — the
+        // reference table must carry the OPTION's own name, not the shell row's.
+        Option__c optionRecord = new Option__c(Name = 'Zero Deductible');
+        insert optionRecord;
+
+        update new Package_Term__c(Id = term.Id, Price__c = 209.00);
+        update new Package_Option__c(Id = opt.Id, Option__c = optionRecord.Id, Price__c = 55.00);
+
+        Test.startTest();
+        DealerPackageSyncController.MasterPackageDetailDTO dto =
+            DealerPackageSyncController.getMasterPackageDetail(elw.Id);
+        Test.stopTest();
+
+        System.assertEquals(elw.Id, dto.masterPackageId);
+        System.assertEquals(true, dto.hasTiers, 'The master carries a coverage tier');
+        System.assertEquals(1, dto.termCount);
+        System.assertEquals(1, dto.optionCount, 'One term-level additional option');
+        System.assertEquals(1, dto.groups.size(), 'One tier block');
+        System.assertEquals(true, dto.groups[0].hasTier);
+        System.assertEquals(tier.Name, dto.groups[0].tierName);
+        System.assertEquals(2, dto.groups[0].rows.size(), 'Term row + its option sub-row');
+
+        DealerPackageSyncController.MasterDetailRow termRow = dto.groups[0].rows[0];
+        System.assertEquals('Term', termRow.kind);
+        System.assertEquals(term.Name, termRow.label);
+        System.assertEquals('$209', termRow.originalPrice, termRow.originalPrice);
+        System.assertEquals('\u2014', termRow.discount, 'Reference rows carry no discount');
+        System.assertEquals('$209', termRow.dealerPrice);
+
+        DealerPackageSyncController.MasterDetailRow optionRow = dto.groups[0].rows[1];
+        System.assertEquals('Option', optionRow.kind);
+        System.assertEquals('Zero Deductible', optionRow.label);
+        System.assertEquals('$55', optionRow.originalPrice);
+        System.assertEquals('\u2014', optionRow.discount);
+        System.assertEquals('$55', optionRow.dealerPrice);
+
+        assertNoApiNames(dto.name);
+        assertNoApiNames(dto.groupName);
+        assertNoApiNames(termRow.label);
+    }
+
+    @isTest
+    static void test_masterPackageDetail_tierlessPackageRendersUngrouped() {
+        Package__c p = activePackage('Extended_Limited_Warranty');
+        Package_Term__c t = TestDataFactory.createPackageTerm(p.Id, null, true); // no tier
+        update new Package_Term__c(Id = t.Id, Price__c = 149.00);
+
+        Test.startTest();
+        DealerPackageSyncController.MasterPackageDetailDTO dto =
+            DealerPackageSyncController.getMasterPackageDetail(p.Id);
+        Test.stopTest();
+
+        System.assertEquals(false, dto.hasTiers, 'No tiers on this master');
+        System.assertEquals(1, dto.groups.size(), 'A single un-grouped block');
+        System.assertEquals(false, dto.groups[0].hasTier);
+        System.assertEquals('', dto.groups[0].tierName);
+        System.assertEquals(1, dto.groups[0].rows.size());
+        System.assertEquals('$149', dto.groups[0].rows[0].originalPrice);
+    }
+
+    @isTest
+    static void test_masterPackageDetail_nullIsTyped() {
+        DealerPackageSyncController.MasterPackageDetailDTO none =
+            DealerPackageSyncController.getMasterPackageDetail(null);
+        System.assertEquals(0, none.groups.size());
+        System.assertEquals(false, none.hasTiers);
+        System.assertEquals(0, none.termCount);
+    }
+
+    @isTest
+    static void test_authoring_carriesTierGroupingForTheExpandedTable() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = [SELECT Id FROM Package__c
+                          WHERE RecordType.DeveloperName = 'Extended_Limited_Warranty' LIMIT 1];
+        Package_Tier__c tier = [SELECT Id, Name FROM Package_Tier__c
+                                WHERE Package__c = :elw.Id LIMIT 1];
+        mirrorFor(dealer.Id, elw.Id);
+
+        DealerPackageSyncController.AuthoringDTO dto =
+            DealerPackageSyncController.getDealerAuthoring(dealer.Id);
+        System.assertEquals(1, dto.packages.size());
+        DealerPackageSyncController.DealerPackageRow row = dto.packages[0];
+
+        System.assertEquals(1, row.tiers.size(), 'The dealer mirror carries its coverage tier');
+        System.assertEquals(tier.Name, row.tiers[0].tierName);
+        System.assertNotEquals(null, row.tiers[0].tierKey);
+
+        System.assertEquals(1, row.terms.size());
+        System.assertEquals(String.valueOf(tier.Id), row.terms[0].tierKey,
+            'The term carries its master tier key so the console can group it');
+        System.assertEquals(tier.Name, row.terms[0].tierName);
+    }
+
+    // ---------------------------------------------------------------------
+    // Premium vehicle fee (per term + package-level clear) — the console's
+    // fee chip. ON = store the amount on Premium_Model_Fee__c; OFF = blank it.
+    // The fee is NOT part of the Net / Retail formulas.
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_premiumFee_readsSeededValueAndRoundTrips() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = activePackage('Extended_Limited_Warranty');
+        Package_Tier__c tier = TestDataFactory.createPackageTier(elw.Id, true);
+        Package_Term__c term = TestDataFactory.createPackageTerm(elw.Id, tier.Id, true);
+        update new Package_Term__c(Id = term.Id, Price__c = 300.00, Premium_Model_Fee__c = 250.00);
+
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+
+        // The dealer read exposes the fee AND the master term's fee (the default
+        // the console reapplies the fee with).
+        DealerPackageSyncController.AuthoringDTO dto =
+            DealerPackageSyncController.getDealerAuthoring(dealer.Id);
+        System.assertEquals(1, dto.packages.size());
+        DealerPackageSyncController.DealerTermRow row = dto.packages[0].terms[0];
+        System.assertEquals(250.00, row.premiumFee,
+            'The dealer term carries the premium fee seeded from the master');
+        System.assertEquals(250.00, row.masterPremiumFee,
+            'The master term fee is exposed as the re-apply default');
+
+        Id termId = row.dealerTermId;
+        Decimal retailBefore = [SELECT Retail_Price__c FROM Dealer_Package_Term__c
+                                WHERE Id = :termId].Retail_Price__c;
+
+        // Save a different amount — dealer-owned, added on top (not in Retail).
+        DealerPackageSyncController.AuthoringResult saved =
+            DealerPackageSyncController.saveDealerTermPremiumFee(termId, 325.00);
+        System.assertEquals(true, saved.success, saved.message);
+        assertNoApiNames(saved.message);
+        System.assert(saved.message.contains('$325'), saved.message);
+        System.assertEquals(325.00,
+            [SELECT Premium_Model_Fee__c FROM Dealer_Package_Term__c WHERE Id = :termId]
+                .Premium_Model_Fee__c);
+
+        // OFF blanks the field; Retail Price is untouched either way.
+        DealerPackageSyncController.AuthoringResult cleared =
+            DealerPackageSyncController.saveDealerTermPremiumFee(termId, null);
+        System.assertEquals(true, cleared.success, cleared.message);
+        assertNoApiNames(cleared.message);
+        System.assertEquals(null,
+            [SELECT Premium_Model_Fee__c FROM Dealer_Package_Term__c WHERE Id = :termId]
+                .Premium_Model_Fee__c,
+            'Turning the fee off blanks the stored premium fee');
+        System.assertEquals(retailBefore,
+            [SELECT Retail_Price__c FROM Dealer_Package_Term__c WHERE Id = :termId]
+                .Retail_Price__c,
+            'The premium fee is not part of the Retail Price formula');
+    }
+
+    @isTest
+    static void test_premiumFee_packageLevelClearBlanksEveryTerm() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = activePackage('Extended_Limited_Warranty');
+        Package_Tier__c tier = TestDataFactory.createPackageTier(elw.Id, true);
+        Package_Term__c t1 = TestDataFactory.createPackageTerm(elw.Id, tier.Id, true);
+        Package_Term__c t2 = TestDataFactory.createPackageTerm(elw.Id, tier.Id, true);
+        update new Package_Term__c(Id = t1.Id, Price__c = 300.00, Premium_Model_Fee__c = 100.00);
+        update new Package_Term__c(Id = t2.Id, Price__c = 400.00, Premium_Model_Fee__c = 150.00);
+
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+        System.assertEquals(2, [SELECT COUNT() FROM Dealer_Package_Term__c
+                                WHERE Dealer_Package__c = :dp.Id AND Premium_Model_Fee__c != null],
+            'Both mirrored terms seed the premium fee from the master');
+
+        DealerPackageSyncController.AuthoringResult clr =
+            DealerPackageSyncController.clearDealerPackagePremiumFees(dp.Id);
+        System.assertEquals(true, clr.success, clr.message);
+        assertNoApiNames(clr.message);
+        System.assert(clr.message.contains('2 terms'), clr.message);
+        System.assertEquals(0, [SELECT COUNT() FROM Dealer_Package_Term__c
+                                WHERE Dealer_Package__c = :dp.Id AND Premium_Model_Fee__c != null],
+            'The package-level clear blanks the fee on every term');
+    }
+
+    @isTest
+    static void test_premiumFee_flagOffRefusesWrites() {
+        Account dealer = dealer();
+        setSyncFlag(false);
+        Package__c elw = [SELECT Id FROM Package__c
+                          WHERE RecordType.DeveloperName = 'Extended_Limited_Warranty' LIMIT 1];
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+        Id termId = [SELECT Id FROM Dealer_Package_Term__c
+                     WHERE Dealer_Package__c = :dp.Id LIMIT 1].Id;
+
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.saveDealerTermPremiumFee(termId, 50.00);
+        System.assertEquals(false, r.success);
+        System.assert(r.message.contains('switched off'), r.message);
+        assertNoApiNames(r.message);
+        System.assertEquals(null,
+            [SELECT Premium_Model_Fee__c FROM Dealer_Package_Term__c WHERE Id = :termId]
+                .Premium_Model_Fee__c,
+            'Flag-off premium fee write must not persist');
+
+        DealerPackageSyncController.AuthoringResult c =
+            DealerPackageSyncController.clearDealerPackagePremiumFees(dp.Id);
+        System.assertEquals(false, c.success);
+        System.assert(c.message.contains('switched off'), c.message);
+        assertNoApiNames(c.message);
+    }
+
+    // ---------------------------------------------------------------------
+    // Dealer-level premium vehicle fee settings (the dealer Account fields —
+    // dealer-wide, applies across every package).
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_dealerPremiumSettings_readsRoundTripsAndDisplays() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = [SELECT Id FROM Package__c
+                          WHERE RecordType.DeveloperName = 'Extended_Limited_Warranty' LIMIT 1];
+        mirrorFor(dealer.Id, elw.Id);
+
+        // Fresh dealer: no override yet; the charge flag is always a Boolean.
+        DealerPackageSyncController.AuthoringDTO before =
+            DealerPackageSyncController.getDealerAuthoring(dealer.Id);
+        System.assertEquals(null, before.premiumFeeOverrideAmount, 'No override yet');
+        System.assertEquals('', before.premiumFeeOverrideDisplay);
+        System.assertNotEquals(null, before.chargePremiumVehicleFee,
+            'The charge flag is exposed as a Boolean');
+
+        // The inventory payload carries the same dealer-level settings.
+        DealerPackageSyncController.SyncInventoryDTO inv =
+            DealerPackageSyncController.getSyncInventory(dealer.Id);
+        System.assertEquals(before.chargePremiumVehicleFee, inv.chargePremiumVehicleFee);
+        System.assertEquals(before.premiumFeeOverrideAmount, inv.premiumFeeOverrideAmount);
+        System.assertEquals(before.premiumFeeOverrideDisplay, inv.premiumFeeOverrideDisplay);
+
+        // Save an override AND waive the fees — one write, both fields.
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.saveDealerPremiumSettings(dealer.Id, 250.00, false);
+        System.assertEquals(true, r.success, r.message);
+        assertNoApiNames(r.message);
+        System.assert(r.message.contains('$250'), r.message);
+        System.assert(r.message.contains('waived'), r.message);
+        Account after = [
+            SELECT Premium_Fee_Override_Amount__c, Charge_Premium_Vehicle_Fee__c
+            FROM Account WHERE Id = :dealer.Id
+        ];
+        System.assertEquals(250.00, after.Premium_Fee_Override_Amount__c);
+        System.assertEquals(false, after.Charge_Premium_Vehicle_Fee__c);
+
+        // Read back: the console sees both settings (money formatted server-side).
+        DealerPackageSyncController.AuthoringDTO mid =
+            DealerPackageSyncController.getDealerAuthoring(dealer.Id);
+        System.assertEquals(250.00, mid.premiumFeeOverrideAmount);
+        System.assertEquals('$250', mid.premiumFeeOverrideDisplay);
+        System.assertEquals(false, mid.chargePremiumVehicleFee);
+
+        // Blank override + charge again → the standard package/term fees apply.
+        DealerPackageSyncController.AuthoringResult r2 =
+            DealerPackageSyncController.saveDealerPremiumSettings(dealer.Id, null, true);
+        System.assertEquals(true, r2.success, r2.message);
+        assertNoApiNames(r2.message);
+        System.assert(r2.message.contains('standard'), r2.message);
+        after = [
+            SELECT Premium_Fee_Override_Amount__c, Charge_Premium_Vehicle_Fee__c
+            FROM Account WHERE Id = :dealer.Id
+        ];
+        System.assertEquals(null, after.Premium_Fee_Override_Amount__c,
+            'A blank override clears the field (standard fees apply)');
+        System.assertEquals(true, after.Charge_Premium_Vehicle_Fee__c);
+    }
+
+    @isTest
+    static void test_dealerPremiumSettings_flagOffRefusesWrite() {
+        Account dealer = dealer();
+        setSyncFlag(false);
+
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.saveDealerPremiumSettings(dealer.Id, 300.00, false);
+        System.assertEquals(false, r.success);
+        System.assert(r.message.contains('switched off'), r.message);
+        assertNoApiNames(r.message);
+        System.assertEquals(null, [
+            SELECT Premium_Fee_Override_Amount__c FROM Account WHERE Id = :dealer.Id
+        ].Premium_Fee_Override_Amount__c,
+            'Flag-off premium settings write must not persist');
+    }
+
+    @isTest
+    static void test_dealerPremiumSettings_nonDealerAccountRefused() {
+        Account customer = TestDataFactory.createCustomerAccount(true);
+        setSyncFlag(true);
+
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.saveDealerPremiumSettings(customer.Id, 100.00, true);
+        System.assertEquals(false, r.success);
+        System.assert(r.message.contains('Dealer Account'), r.message);
+        assertNoApiNames(r.message);
+    }
+
+    // ---------------------------------------------------------------------
+    // Dealer package row: the master commercial value behind the dealer-owned
+    // commercial (surcharge) figure.
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_authoring_masterCommercialHint_showsValueAndNotSet() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = [SELECT Id FROM Package__c
+                          WHERE RecordType.DeveloperName = 'Extended_Limited_Warranty' LIMIT 1];
+        mirrorFor(dealer.Id, elw.Id);
+
+        // Blank master → the plain "not set" hint (today's org state).
+        DealerPackageSyncController.AuthoringDTO dto =
+            DealerPackageSyncController.getDealerAuthoring(dealer.Id);
+        System.assertEquals(1, dto.packages.size());
+        System.assertEquals(null, dto.packages[0].masterCommercialSurcharge);
+        System.assertEquals('Master: not set', dto.packages[0].masterCommercialLabel);
+
+        // A master value is surfaced as a server-formatted hint.
+        update new Package__c(Id = elw.Id, Commercial_Vehicle_Surcharge_Fee__c = 150.00);
+        dto = DealerPackageSyncController.getDealerAuthoring(dealer.Id);
+        System.assertEquals(150.00, dto.packages[0].masterCommercialSurcharge);
+        System.assertEquals('Master: $150', dto.packages[0].masterCommercialLabel,
+            'Money is formatted server-side');
+
+        // The hint follows the master; the dealer-owned figure does not.
+        Id dpId = dto.packages[0].dealerPackageId;
+        update new Dealer_Package__c(Id = dpId, Commercial_Vehicle_Surcharge_Fee__c = 200.00);
+        update new Package__c(Id = elw.Id, Commercial_Vehicle_Surcharge_Fee__c = 999.00);
+        DealerPackageSyncService.reconcileDealerPackages(new Set<Id>{ dpId });
+        dto = DealerPackageSyncController.getDealerAuthoring(dealer.Id);
+        System.assertEquals(999.00, dto.packages[0].masterCommercialSurcharge,
+            'The master hint tracks the current master value');
+        System.assertEquals(200.00, dto.packages[0].commercialVehicleSurcharge,
+            'The dealer-owned commercial figure is never refreshed from the master');
     }
 }

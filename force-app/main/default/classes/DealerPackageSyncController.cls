@@ -240,6 +240,10 @@ public without sharing class DealerPackageSyncController {
         @AuraEnabled public String recordTypeLabel;
         @AuraEnabled public String planTypeLabel;
         @AuraEnabled public String releaseLabel;      // '' when no release context
+        @AuraEnabled public String releaseName;       // Catalogue_Release__c name alone (grouping)
+        @AuraEnabled public String releaseStatus;     // Draft | Published | Superseded | ''
+        @AuraEnabled public String perClaimLimitLabel;// "$750 Per Claim" ('' when unset)
+        @AuraEnabled public String deductibleLabel;   // "$100 Deductible" ('' when unset)
         @AuraEnabled public String status;            // AvailableToAdd | AlreadyAvailable | UpdateAvailable
         @AuraEnabled public String statusLabel;       // plain words
         @AuraEnabled public String statusTone;        // new | ok | attention
@@ -270,6 +274,11 @@ public without sharing class DealerPackageSyncController {
         @AuraEnabled public Integer updateAvailableCount;
         @AuraEnabled public List<CatalogueRow> available;     // retained: gap-create candidates
         @AuraEnabled public List<MirrorRow> mirrored;         // retained: all mirrors (footer + deltas)
+        // Dealer-level premium vehicle fee settings (the dealer Account fields —
+        // this dealer-wide section sits above every package).
+        @AuraEnabled public Decimal premiumFeeOverrideAmount;  // the dealer's override, null when not set
+        @AuraEnabled public String premiumFeeOverrideDisplay;  // server-formatted ("$250" / '')
+        @AuraEnabled public Boolean chargePremiumVehicleFee;   // true (default) = fees are charged
     }
 
     // =========================================================================
@@ -296,7 +305,8 @@ public without sharing class DealerPackageSyncController {
             assertReadAccess();
 
             List<Account> accounts = [
-                SELECT Id, Name, RecordType.DeveloperName
+                SELECT Id, Name, RecordType.DeveloperName,
+                       Premium_Fee_Override_Amount__c, Charge_Premium_Vehicle_Fee__c
                 FROM Account
                 WHERE Id = :accountId
                 LIMIT 1
@@ -307,6 +317,10 @@ public without sharing class DealerPackageSyncController {
                 return dto;
             }
             dto.accountName = accounts[0].Name;
+            dto.premiumFeeOverrideAmount = accounts[0].Premium_Fee_Override_Amount__c;
+            dto.premiumFeeOverrideDisplay = accounts[0].Premium_Fee_Override_Amount__c == null
+                ? '' : amountText(accounts[0].Premium_Fee_Override_Amount__c);
+            dto.chargePremiumVehicleFee = accounts[0].Charge_Premium_Vehicle_Fee__c == true;
             dto.isDealerAccount = accounts[0].RecordType != null
                 && accounts[0].RecordType.DeveloperName == DEALER_ACCOUNT_RT;
             if (!dto.isDealerAccount) return dto;
@@ -356,7 +370,9 @@ public without sharing class DealerPackageSyncController {
                            Premium_Model_Fee__c, Mileage_Restriction__c, Mileage_Restriction_Start__c,
                            Mileage_Restriction_End__c, Restriction_Type__c, Duration_Type__c,
                            Start_Term__c, Expiry_Term__c, Odometer_KM__c,
-                           Original_Package_Term_Cost__c
+                           Original_Package_Term_Cost__c,
+                           Markup__c, Markup_Type__c, Discount_Type__c, Discount_Value__c,
+                           Sales_Rep_Incentive__c
                     FROM Dealer_Package_Term__c
                     WHERE Dealer_Package__c IN :dpIds AND Package_Term__c != null
                 ]) {
@@ -365,7 +381,9 @@ public without sharing class DealerPackageSyncController {
                 for (Dealer_Package_Option__c o : [
                     SELECT Id, Dealer_Package__c, Dealer_Package_Term__c, Package_Option__c, Option__c,
                            Selection_Type__c, Inclusion__c, Exclusion__c, Category__c,
-                           Minimum_Value__c, Maximum_Value__c, Original_Package_Option_Price__c
+                           Minimum_Value__c, Maximum_Value__c, Original_Package_Option_Price__c,
+                           Is_Removed__c, Dealer_Markup__c, Markup_Type__c, Discount_Type__c,
+                           Discount_Value__c
                     FROM Dealer_Package_Option__c
                     WHERE Dealer_Package__c IN :dpIds AND Package_Option__c != null
                 ]) {
@@ -426,6 +444,10 @@ public without sharing class DealerPackageSyncController {
                 u.recordTypeLabel = m.RecordType != null ? m.RecordType.Name : '';
                 u.planTypeLabel = m.Package_Group__r != null ? m.Package_Group__r.Name : '';
                 u.releaseLabel = releaseLabel(m);
+                u.releaseName = releaseNameOf(m);
+                u.releaseStatus = releaseStatusOf(m);
+                u.perClaimLimitLabel = perClaimLimitLabel(m.Coverage_per_claim__c);
+                u.deductibleLabel = deductibleLabel(m.Deductible__c);
                 u.countsLabel = countsLabel(m, tiersByPackage, termsByPackage, optionsByPackage);
                 u.scheduleLabel = scheduleLabel(scheduleCountsByPackage.get(m.Id));
 
@@ -650,7 +672,9 @@ public without sharing class DealerPackageSyncController {
                        Premium_Model_Fee__c, Mileage_Restriction__c, Mileage_Restriction_Start__c,
                        Mileage_Restriction_End__c, Restriction_Type__c, Duration_Type__c,
                        Start_Term__c, Expiry_Term__c, Odometer_KM__c,
-                       Original_Package_Term_Cost__c
+                       Original_Package_Term_Cost__c,
+                       Markup__c, Markup_Type__c, Discount_Type__c, Discount_Value__c,
+                       Sales_Rep_Incentive__c
                 FROM Dealer_Package_Term__c
                 WHERE Dealer_Package__c IN :ids AND Package_Term__c != null
             ]) {
@@ -659,7 +683,9 @@ public without sharing class DealerPackageSyncController {
             for (Dealer_Package_Option__c o : [
                 SELECT Id, Dealer_Package__c, Dealer_Package_Term__c, Package_Option__c, Option__c,
                        Selection_Type__c, Inclusion__c, Exclusion__c, Category__c,
-                       Minimum_Value__c, Maximum_Value__c, Original_Package_Option_Price__c
+                       Minimum_Value__c, Maximum_Value__c, Original_Package_Option_Price__c,
+                       Is_Removed__c, Dealer_Markup__c, Markup_Type__c, Discount_Type__c,
+                       Discount_Value__c
                 FROM Dealer_Package_Option__c
                 WHERE Dealer_Package__c IN :ids AND Package_Option__c != null
             ]) {
@@ -731,6 +757,929 @@ public without sharing class DealerPackageSyncController {
             result.success = false;
             result.message = GENERIC_ERROR_MESSAGE;
             return result;
+        }
+    }
+
+    // =========================================================================
+    // 4. Dealer authoring — the console's two-pane authoring surface
+    //
+    //    Everything below is DEALER-SIDE only: it reads and writes Dealer_*
+    //    records and never performs DML on any master object (Package__c /
+    //    Package_Tier__c / Package_Term__c / Package_Option__c / Option__c /
+    //    Vehicle_Schedule__c / Vehicle_Schedule_Member__c). Every write honours
+    //    the package-sync kill switch and runs allOrNone = false, reporting the
+    //    rows it could not save in plain words (never an API / field name).
+    // =========================================================================
+
+    /** One option row (keep/remove + local option pricing). */
+    public class DealerOptionRow {
+        @AuraEnabled public Id dealerOptionId;
+        @AuraEnabled public Id masterOptionId;
+        @AuraEnabled public String optionName;
+        @AuraEnabled public String selectionType;   // Included | Optional
+        @AuraEnabled public String category;
+        @AuraEnabled public Boolean isRemoved;      // dealer keep/remove decision
+        @AuraEnabled public Decimal originalPrice;  // stored anchor (frozen if local pricing)
+        @AuraEnabled public String discountType;
+        @AuraEnabled public Decimal discountValue;
+        @AuraEnabled public String markupType;
+        @AuraEnabled public Decimal markupValue;
+        @AuraEnabled public Decimal netCost;        // formula, read-only
+        @AuraEnabled public Decimal retailPrice;    // formula, read-only
+        @AuraEnabled public Boolean anchorFrozen;
+        public DealerOptionRow() { isRemoved = false; anchorFrozen = false; }
+    }
+
+    /**
+     * One coverage tier of a dealer package (the read-only grouping label the
+     * console prints in the Tier Name column of the expanded terms table).
+     */
+    public class DealerTierRow {
+        @AuraEnabled public String tierKey;    // master tier id (fallback: the mirror id)
+        @AuraEnabled public String tierName;
+        public DealerTierRow() {}
+    }
+
+    /** One term row (discount / incentive / markup authoring + its options). */
+    public class DealerTermRow {
+        @AuraEnabled public Id dealerTermId;
+        @AuraEnabled public Id masterTermId;
+        @AuraEnabled public String name;
+        @AuraEnabled public String months;
+        @AuraEnabled public String tierKey;   // master tier id ('' when the term is tier-less)
+        @AuraEnabled public String tierName;  // the tier's name ('' when the term is tier-less)
+        @AuraEnabled public Decimal originalCost;
+        @AuraEnabled public String discountType;
+        @AuraEnabled public Decimal discountValue;
+        @AuraEnabled public String markupType;
+        @AuraEnabled public Decimal markupValue;
+        @AuraEnabled public Decimal salesRepIncentive;
+        @AuraEnabled public Decimal premiumFee;       // dealer premium vehicle fee (null = not applied)
+        @AuraEnabled public Decimal masterPremiumFee; // the master term's own fee — the default on re-enable
+        @AuraEnabled public Decimal netCost;
+        @AuraEnabled public Decimal retailPrice;
+        @AuraEnabled public Boolean anchorFrozen;
+        @AuraEnabled public List<DealerOptionRow> options;   // term-level optional options
+        public DealerTermRow() {
+            options = new List<DealerOptionRow>();
+            anchorFrozen = false;
+        }
+    }
+
+    /** One dealer package accordion row for the authoring pane. */
+    public class DealerPackageRow {
+        @AuraEnabled public Id dealerPackageId;
+        @AuraEnabled public Id masterPackageId;
+        @AuraEnabled public String name;
+        @AuraEnabled public String recordTypeLabel;
+        @AuraEnabled public String planTypeLabel;
+        @AuraEnabled public String releaseName;       // Catalogue_Release__c name alone (grouping)
+        @AuraEnabled public String releaseStatus;     // Draft | Published | Superseded | ''
+        @AuraEnabled public String perClaimLimitLabel;// "$750 Per Claim" ('' when unset)
+        @AuraEnabled public String deductibleLabel;   // "$100 Deductible" ('' when unset)
+        @AuraEnabled public Decimal commercialVehicleSurcharge; // dealer-owned commercial figure
+        @AuraEnabled public Decimal masterCommercialSurcharge;  // the master's commercial value (seed source)
+        @AuraEnabled public String masterCommercialLabel;       // "Master: $x" / "Master: not set"
+        @AuraEnabled public String lastSyncedLabel;
+        @AuraEnabled public List<DealerTermRow> terms;
+        @AuraEnabled public List<DealerTierRow> tiers;             // coverage tiers (grouping)
+        @AuraEnabled public List<DealerOptionRow> includedOptions; // package-level included add-ons
+        public DealerPackageRow() {
+            terms = new List<DealerTermRow>();
+            tiers = new List<DealerTierRow>();
+            includedOptions = new List<DealerOptionRow>();
+        }
+    }
+
+    /** getDealerAuthoring payload. */
+    public class AuthoringDTO {
+        @AuraEnabled public Id accountId;
+        @AuraEnabled public String accountName;
+        @AuraEnabled public Boolean isDealerAccount;
+        @AuraEnabled public Boolean syncEnabled;
+        @AuraEnabled public String syncEnabledMessage;
+        @AuraEnabled public List<DealerPackageRow> packages;
+        // Dealer-level premium vehicle fee settings (the dealer Account fields —
+        // dealer-wide, applies across every package of this dealer).
+        @AuraEnabled public Decimal premiumFeeOverrideAmount;  // the dealer's override, null when not set
+        @AuraEnabled public String premiumFeeOverrideDisplay;  // server-formatted ("$250" / '')
+        @AuraEnabled public Boolean chargePremiumVehicleFee;   // true (default) = fees are charged
+        public AuthoringDTO() { packages = new List<DealerPackageRow>(); }
+    }
+
+    /** Result envelope for the authoring writes. */
+    public class AuthoringResult {
+        @AuraEnabled public Boolean success;
+        @AuraEnabled public String message;
+        @AuraEnabled public Integer updatedCount;
+        @AuraEnabled public Integer skippedCount;
+        @AuraEnabled public List<String> skippedReasons;
+        public AuthoringResult() {
+            success = false;
+            updatedCount = 0;
+            skippedCount = 0;
+            skippedReasons = new List<String>();
+        }
+    }
+
+    private static final String AUTHORING_REJECTED_MESSAGE =
+        'One or more changes could not be saved. Check the values and try again.';
+
+    /**
+     * Authoring read: every dealer mirror of the account with its terms,
+     * package-level included options and term-level optional options, carrying
+     * the fields the console edits (discount / incentive / markup / removal /
+     * dealer commercial price). Read-only; never touches master records.
+     */
+    @AuraEnabled
+    public static AuthoringDTO getDealerAuthoring(Id accountId) {
+        AuthoringDTO dto = new AuthoringDTO();
+        dto.accountId = accountId;
+        dto.syncEnabled = PortalFeatureFlagService.isDealerSyncEnabled();
+        dto.syncEnabledMessage = dto.syncEnabled
+            ? 'Dealer pricing and options can be edited.'
+            : FLAG_OFF_MESSAGE;
+        try {
+            assertReadAccess();
+            List<Account> accounts = [
+                SELECT Id, Name, RecordType.DeveloperName,
+                       Premium_Fee_Override_Amount__c, Charge_Premium_Vehicle_Fee__c
+                FROM Account WHERE Id = :accountId LIMIT 1
+            ];
+            if (accounts.isEmpty()) {
+                dto.isDealerAccount = false;
+                dto.accountName = '';
+                return dto;
+            }
+            dto.accountName = accounts[0].Name;
+            dto.premiumFeeOverrideAmount = accounts[0].Premium_Fee_Override_Amount__c;
+            dto.premiumFeeOverrideDisplay = accounts[0].Premium_Fee_Override_Amount__c == null
+                ? '' : amountText(accounts[0].Premium_Fee_Override_Amount__c);
+            dto.chargePremiumVehicleFee = accounts[0].Charge_Premium_Vehicle_Fee__c == true;
+            dto.isDealerAccount = accounts[0].RecordType != null
+                && accounts[0].RecordType.DeveloperName == DEALER_ACCOUNT_RT;
+            if (!dto.isDealerAccount) return dto;
+
+            Map<Id, Dealer_Package__c> dps = new Map<Id, Dealer_Package__c>([
+                SELECT Id, Name, Dealer__c, Package__c, RecordType.Name, RecordType.DeveloperName,
+                       Plan_Type__r.Name, Commercial_Vehicle_Surcharge_Fee__c,
+                       Package__r.Commercial_Vehicle_Surcharge_Fee__c,
+                       Per_Claim_Limit__c, Deductable__c,
+                       Package__r.Package_Group__r.Catalogue_Release__r.Name,
+                       Package__r.Package_Group__r.Catalogue_Release__r.Status__c,
+                       Last_Synced_At__c, CreatedDate
+                FROM Dealer_Package__c
+                WHERE Dealer__c = :accountId
+                ORDER BY Name
+            ]);
+            if (dps.isEmpty()) return dto;
+
+            Map<Id, DealerPackageRow> rowByDp = new Map<Id, DealerPackageRow>();
+            for (Dealer_Package__c dp : dps.values()) {
+                DealerPackageRow r = new DealerPackageRow();
+                r.dealerPackageId = dp.Id;
+                r.masterPackageId = dp.Package__c;
+                r.name = dp.Name;
+                r.recordTypeLabel = dp.RecordType != null ? dp.RecordType.Name : '';
+                r.planTypeLabel = dp.Plan_Type__r != null ? dp.Plan_Type__r.Name : '';
+                r.releaseName = (dp.Package__r != null && dp.Package__r.Package_Group__r != null
+                    && dp.Package__r.Package_Group__r.Catalogue_Release__r != null)
+                    ? dp.Package__r.Package_Group__r.Catalogue_Release__r.Name : '';
+                r.releaseStatus = (dp.Package__r != null && dp.Package__r.Package_Group__r != null
+                    && dp.Package__r.Package_Group__r.Catalogue_Release__r != null)
+                    ? dp.Package__r.Package_Group__r.Catalogue_Release__r.Status__c : '';
+                r.perClaimLimitLabel = perClaimLimitLabel(dp.Per_Claim_Limit__c);
+                r.deductibleLabel = deductibleLabel(dp.Deductable__c);
+                r.commercialVehicleSurcharge = dp.Commercial_Vehicle_Surcharge_Fee__c;
+                // The master value this dealer figure was seeded from (read-only
+                // reference; the dealer figure itself is dealer-owned and never
+                // refreshed from it). Blank master → plain "Master: not set".
+                r.masterCommercialSurcharge = dp.Package__r != null
+                    ? dp.Package__r.Commercial_Vehicle_Surcharge_Fee__c : null;
+                r.masterCommercialLabel = r.masterCommercialSurcharge == null
+                    ? 'Master: not set' : 'Master: ' + amountText(r.masterCommercialSurcharge);
+                Datetime wm = dp.Last_Synced_At__c != null ? dp.Last_Synced_At__c : dp.CreatedDate;
+                r.lastSyncedLabel = wm == null ? '' : 'Last synced ' + formatDate(wm);
+                rowByDp.put(dp.Id, r);
+            }
+
+            Map<Id, DealerTermRow> termRowById = new Map<Id, DealerTermRow>();
+
+            // Coverage tiers of each dealer mirror — the read-only grouping label
+            // for the console's expanded terms table (the tier NAME the server
+            // supplies; the console never derives it). Purely additive: the term
+            // rows themselves are unchanged apart from their tier key / label.
+            Map<Id, List<DealerTierRow>> tiersByDp = new Map<Id, List<DealerTierRow>>();
+            Map<String, String> tierNameByTermKey = new Map<String, String>();
+            for (Dealer_Package_Tier__c dt : [
+                SELECT Id, Dealer_Package__c, Package_Tier__c, Name
+                FROM Dealer_Package_Tier__c
+                WHERE Dealer_Package__c IN :dps.keySet()
+                ORDER BY Name
+            ]) {
+                DealerTierRow tierRow = new DealerTierRow();
+                tierRow.tierKey = dt.Package_Tier__c != null ? String.valueOf(dt.Package_Tier__c) : String.valueOf(dt.Id);
+                tierRow.tierName = dt.Name;
+                if (!tiersByDp.containsKey(dt.Dealer_Package__c)) {
+                    tiersByDp.put(dt.Dealer_Package__c, new List<DealerTierRow>());
+                }
+                tiersByDp.get(dt.Dealer_Package__c).add(tierRow);
+                if (dt.Package_Tier__c != null) {
+                    tierNameByTermKey.put(dt.Dealer_Package__c + '_' + dt.Package_Tier__c, dt.Name);
+                }
+            }
+            for (DealerPackageRow pr : rowByDp.values()) {
+                List<DealerTierRow> tierRows = tiersByDp.get(pr.dealerPackageId);
+                pr.tiers = tierRows == null ? new List<DealerTierRow>() : tierRows;
+            }
+
+            for (Dealer_Package_Term__c t : [
+                SELECT Id, Dealer_Package__c, Dealer_Package_Tier__c, Package_Tier__c, Package_Term__c, Name, Month__c,
+                       Original_Package_Term_Cost__c, Net_Cost__c, Retail_Price__c,
+                       Markup__c, Markup_Type__c, Discount_Type__c, Discount_Value__c,
+                       Sales_Rep_Incentive__c, Premium_Model_Fee__c,
+                       Package_Term__r.Premium_Model_Fee__c
+                FROM Dealer_Package_Term__c
+                WHERE Dealer_Package__c IN :dps.keySet()
+                ORDER BY Name
+            ]) {
+                DealerTermRow tr = new DealerTermRow();
+                tr.dealerTermId = t.Id;
+                tr.masterTermId = t.Package_Term__c;
+                tr.name = t.Name;
+                tr.months = t.Month__c;
+                tr.tierKey = t.Package_Tier__c != null ? String.valueOf(t.Package_Tier__c) : '';
+                tr.tierName = t.Package_Tier__c != null
+                    ? tierNameByTermKey.get(t.Dealer_Package__c + '_' + t.Package_Tier__c)
+                    : '';
+                if (tr.tierName == null) tr.tierName = '';
+                tr.originalCost = t.Original_Package_Term_Cost__c;
+                tr.discountType = t.Discount_Type__c;
+                tr.discountValue = t.Discount_Value__c;
+                tr.markupType = t.Markup_Type__c;
+                tr.markupValue = t.Markup__c;
+                tr.salesRepIncentive = t.Sales_Rep_Incentive__c;
+                tr.premiumFee = t.Premium_Model_Fee__c;
+                tr.masterPremiumFee = t.Package_Term__r != null
+                    ? t.Package_Term__r.Premium_Model_Fee__c : null;
+                tr.netCost = t.Net_Cost__c;
+                tr.retailPrice = t.Retail_Price__c;
+                tr.anchorFrozen = DealerPackageSyncService.hasLocalTermPricing(t);
+                DealerPackageRow pr = rowByDp.get(t.Dealer_Package__c);
+                if (pr != null) pr.terms.add(tr);
+                termRowById.put(t.Id, tr);
+            }
+
+            for (Dealer_Package_Option__c o : [
+                SELECT Id, Dealer_Package__c, Dealer_Package_Term__c, Package_Option__c, Option__c,
+                       Option__r.Name, Selection_Type__c, Category__c, Is_Removed__c,
+                       Original_Package_Option_Price__c, Net_Cost__c, Retail_Price__c,
+                       Dealer_Markup__c, Markup_Type__c, Discount_Type__c, Discount_Value__c
+                FROM Dealer_Package_Option__c
+                WHERE Dealer_Package__c IN :dps.keySet()
+                ORDER BY Option__r.Name
+            ]) {
+                DealerOptionRow orow = new DealerOptionRow();
+                orow.dealerOptionId = o.Id;
+                orow.masterOptionId = o.Package_Option__c;
+                orow.optionName = o.Option__r != null ? o.Option__r.Name : '';
+                orow.selectionType = o.Selection_Type__c;
+                orow.category = o.Category__c;
+                orow.isRemoved = o.Is_Removed__c == true;
+                orow.originalPrice = o.Original_Package_Option_Price__c;
+                orow.discountType = o.Discount_Type__c;
+                orow.discountValue = o.Discount_Value__c;
+                orow.markupType = o.Markup_Type__c;
+                orow.markupValue = o.Dealer_Markup__c;
+                orow.netCost = o.Net_Cost__c;
+                orow.retailPrice = o.Retail_Price__c;
+                orow.anchorFrozen = DealerPackageSyncService.hasLocalOptionPricing(o);
+
+                if (o.Dealer_Package_Term__c != null && termRowById.containsKey(o.Dealer_Package_Term__c)) {
+                    termRowById.get(o.Dealer_Package_Term__c).options.add(orow);
+                } else {
+                    DealerPackageRow pr = rowByDp.get(o.Dealer_Package__c);
+                    if (pr != null) pr.includedOptions.add(orow);
+                }
+            }
+
+            dto.packages = new List<DealerPackageRow>(rowByDp.values());
+            return dto;
+        } catch (Exception e) {
+            throw new AuraHandledException(GENERIC_ERROR_MESSAGE);
+        }
+    }
+
+    /** Term pricing authoring: discount, sales-rep incentive and markup. */
+    @AuraEnabled
+    public static AuthoringResult saveDealerTermPricing(
+        Id dealerTermId, String discountType, Decimal discountValue,
+        String markupType, Decimal markupValue, Decimal salesRepIncentive
+    ) {
+        AuthoringResult result = new AuthoringResult();
+        try {
+            assertReadAccess();
+            if (dealerTermId == null) {
+                result.message = 'A dealer term is required.';
+                return result;
+            }
+            if (!PortalFeatureFlagService.isDealerSyncEnabled()) {
+                result.message = FLAG_OFF_MESSAGE;
+                return result;
+            }
+            // Dealer term only — never a master Package_Term__c.
+            List<Dealer_Package_Term__c> guard = [
+                SELECT Id FROM Dealer_Package_Term__c WHERE Id = :dealerTermId LIMIT 1
+            ];
+            if (guard.isEmpty()) {
+                result.message = 'This term is not available to the dealer.';
+                return result;
+            }
+            Dealer_Package_Term__c t = new Dealer_Package_Term__c(Id = dealerTermId);
+            t.Discount_Type__c = String.isBlank(discountType) ? null : discountType;
+            t.Discount_Value__c = discountValue;
+            t.Markup_Type__c = String.isBlank(markupType) ? null : markupType;
+            t.Markup__c = markupValue;
+            t.Sales_Rep_Incentive__c = salesRepIncentive;
+
+            // allOrNone = false — a rejected value never fails the whole action.
+            Database.SaveResult[] saved = Database.update(new List<Dealer_Package_Term__c>{ t }, false);
+            applyAuthoringSaveResults(saved, result);
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = GENERIC_ERROR_MESSAGE;
+            return result;
+        }
+    }
+
+    /**
+     * Per-term premium vehicle fee. This is the ONE place the dealer writes
+     * Dealer_Package_Term__c.Premium_Model_Fee__c:
+     *   • amount != null → store it (fee ON for this term),
+     *   • amount == null → blank the field (fee OFF).
+     * The fee is a separate per-term amount — it is NOT part of the Net_Cost__c
+     * or Retail_Price__c formulas, so clearing or changing it never moves the
+     * dealer's Retail Price. Dealer term only — never a master Package_Term__c.
+     */
+    @AuraEnabled
+    public static AuthoringResult saveDealerTermPremiumFee(Id dealerTermId, Decimal amount) {
+        AuthoringResult result = new AuthoringResult();
+        try {
+            assertReadAccess();
+            if (dealerTermId == null) {
+                result.message = 'A dealer term is required.';
+                return result;
+            }
+            if (!PortalFeatureFlagService.isDealerSyncEnabled()) {
+                result.message = FLAG_OFF_MESSAGE;
+                return result;
+            }
+            List<Dealer_Package_Term__c> guard = [
+                SELECT Id FROM Dealer_Package_Term__c WHERE Id = :dealerTermId LIMIT 1
+            ];
+            if (guard.isEmpty()) {
+                result.message = 'This term is not available to the dealer.';
+                return result;
+            }
+            Dealer_Package_Term__c t = new Dealer_Package_Term__c(Id = dealerTermId);
+            // null clears the field — "off" means no premium fee on this term.
+            t.Premium_Model_Fee__c = amount;
+
+            Database.SaveResult[] saved = Database.update(
+                new List<Dealer_Package_Term__c>{ t }, false);
+            applyAuthoringSaveResults(saved, result);
+            if (result.success) {
+                result.message = amount == null
+                    ? 'Premium fee removed from this term.'
+                    : 'Premium fee of ' + amountText(amount) + ' saved for this term.';
+            }
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = GENERIC_ERROR_MESSAGE;
+            return result;
+        }
+    }
+
+    /**
+     * Package-level shortcut: blank the premium vehicle fee on EVERY term of one
+     * dealer package (the console's "Remove Premium Fee from Package"). Blanks
+     * only rows that currently carry a fee; Retail Price is untouched because the
+     * fee is not part of the Retail formula. allOrNone = false.
+     */
+    @AuraEnabled
+    public static AuthoringResult clearDealerPackagePremiumFees(Id dealerPackageId) {
+        AuthoringResult result = new AuthoringResult();
+        try {
+            assertReadAccess();
+            if (dealerPackageId == null) {
+                result.message = 'A dealer package is required.';
+                return result;
+            }
+            if (!PortalFeatureFlagService.isDealerSyncEnabled()) {
+                result.message = FLAG_OFF_MESSAGE;
+                return result;
+            }
+            List<Dealer_Package__c> guard = [
+                SELECT Id FROM Dealer_Package__c WHERE Id = :dealerPackageId LIMIT 1
+            ];
+            if (guard.isEmpty()) {
+                result.message = 'This package is not available to the dealer.';
+                return result;
+            }
+            List<Dealer_Package_Term__c> updates = new List<Dealer_Package_Term__c>();
+            for (Dealer_Package_Term__c t : [
+                SELECT Id, Premium_Model_Fee__c FROM Dealer_Package_Term__c
+                WHERE Dealer_Package__c = :dealerPackageId AND Premium_Model_Fee__c != null
+            ]) {
+                updates.add(new Dealer_Package_Term__c(Id = t.Id, Premium_Model_Fee__c = null));
+            }
+            if (updates.isEmpty()) {
+                result.success = true;
+                result.message = 'No premium fees to remove on this package.';
+                return result;
+            }
+            applyAuthoringSaveResults(Database.update(updates, false), result);
+            if (result.success) {
+                result.message = 'Premium fee removed from '
+                    + updates.size() + (updates.size() == 1 ? ' term.' : ' terms.');
+            }
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = GENERIC_ERROR_MESSAGE;
+            return result;
+        }
+    }
+
+    /** Option pricing authoring: discount and markup on a dealer option. */
+    @AuraEnabled
+    public static AuthoringResult saveDealerOptionPricing(
+        Id dealerOptionId, String discountType, Decimal discountValue,
+        String markupType, Decimal markupValue
+    ) {
+        AuthoringResult result = new AuthoringResult();
+        try {
+            assertReadAccess();
+            if (dealerOptionId == null) {
+                result.message = 'A dealer add-on is required.';
+                return result;
+            }
+            if (!PortalFeatureFlagService.isDealerSyncEnabled()) {
+                result.message = FLAG_OFF_MESSAGE;
+                return result;
+            }
+            List<Dealer_Package_Option__c> guard = [
+                SELECT Id FROM Dealer_Package_Option__c WHERE Id = :dealerOptionId LIMIT 1
+            ];
+            if (guard.isEmpty()) {
+                result.message = 'This add-on is not available to the dealer.';
+                return result;
+            }
+            Dealer_Package_Option__c o = new Dealer_Package_Option__c(Id = dealerOptionId);
+            o.Discount_Type__c = String.isBlank(discountType) ? null : discountType;
+            o.Discount_Value__c = discountValue;
+            o.Markup_Type__c = String.isBlank(markupType) ? null : markupType;
+            o.Dealer_Markup__c = markupValue;
+
+            Database.SaveResult[] saved = Database.update(new List<Dealer_Package_Option__c>{ o }, false);
+            applyAuthoringSaveResults(saved, result);
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = GENERIC_ERROR_MESSAGE;
+            return result;
+        }
+    }
+
+    /**
+     * Keep / remove a mirrored option. Dealers only KEEP or REMOVE options
+     * mirrored from the master — they never invent option content. The row is
+     * flagged (never deleted) so the next reconcile neither re-creates nor
+     * refreshes it.
+     */
+    @AuraEnabled
+    public static AuthoringResult setDealerOptionRemoved(Id dealerOptionId, Boolean removed) {
+        AuthoringResult result = new AuthoringResult();
+        try {
+            assertReadAccess();
+            if (dealerOptionId == null) {
+                result.message = 'A dealer add-on is required.';
+                return result;
+            }
+            if (!PortalFeatureFlagService.isDealerSyncEnabled()) {
+                result.message = FLAG_OFF_MESSAGE;
+                return result;
+            }
+            List<Dealer_Package_Option__c> guard = [
+                SELECT Id FROM Dealer_Package_Option__c WHERE Id = :dealerOptionId LIMIT 1
+            ];
+            if (guard.isEmpty()) {
+                result.message = 'This add-on is not available to the dealer.';
+                return result;
+            }
+            Database.SaveResult[] saved = Database.update(new List<Dealer_Package_Option__c>{
+                new Dealer_Package_Option__c(Id = dealerOptionId, Is_Removed__c = removed == true)
+            }, false);
+            applyAuthoringSaveResults(saved, result);
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = GENERIC_ERROR_MESSAGE;
+            return result;
+        }
+    }
+
+    /**
+     * Dealer commercial price (flat per-dealer figure). Reuses the existing
+     * Dealer_Package__c.Commercial_Vehicle_Surcharge_Fee__c field — dealer-owned,
+     * seeded once at mirror creation and never refreshed from the master.
+     */
+    @AuraEnabled
+    public static AuthoringResult saveDealerCommercialPrice(Id dealerPackageId, Decimal amount) {
+        AuthoringResult result = new AuthoringResult();
+        try {
+            assertReadAccess();
+            if (dealerPackageId == null) {
+                result.message = 'A dealer package is required.';
+                return result;
+            }
+            List<Dealer_Package__c> guard = [
+                SELECT Id, Dealer__c FROM Dealer_Package__c WHERE Id = :dealerPackageId LIMIT 1
+            ];
+            if (guard.isEmpty()) {
+                result.message = 'This package is not available to the dealer.';
+                return result;
+            }
+            if (!PortalFeatureFlagService.isDealerSyncEnabled()) {
+                result.message = FLAG_OFF_MESSAGE;
+                return result;
+            }
+            Database.SaveResult[] saved = Database.update(new List<Dealer_Package__c>{
+                new Dealer_Package__c(Id = dealerPackageId, Commercial_Vehicle_Surcharge_Fee__c = amount)
+            }, false);
+            applyAuthoringSaveResults(saved, result);
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = GENERIC_ERROR_MESSAGE;
+            return result;
+        }
+    }
+
+    /**
+     * Dealer-level premium vehicle fee settings — the TWO premium fields on the
+     * dealer Account (they apply across EVERY package for this dealer):
+     *   • Premium_Fee_Override_Amount__c — this dealer's override of the standard
+     *     premium vehicle fee (null = blank = use the standard package/term fee).
+     *   • Charge_Premium_Vehicle_Fee__c  — on (default) / off (waive the premium
+     *     vehicle fee for this dealer entirely).
+     * ONE confirm-gated write for both, honouring the package-sync kill switch and
+     * allOrNone = false, with plain-word messages (money formatted server-side).
+     * These are Account writes, so field-level update permission is checked first
+     * and surfaced plainly rather than letting the write fail silently.
+     */
+    @AuraEnabled
+    public static AuthoringResult saveDealerPremiumSettings(
+        Id accountId, Decimal overrideAmount, Boolean chargePremiumFee
+    ) {
+        AuthoringResult result = new AuthoringResult();
+        try {
+            assertReadAccess();
+            if (accountId == null) {
+                result.message = 'A dealer account is required.';
+                return result;
+            }
+            if (!PortalFeatureFlagService.isDealerSyncEnabled()) {
+                result.message = FLAG_OFF_MESSAGE;
+                return result;
+            }
+            // Account writes — check field-level update access up front (the class
+            // is `without sharing`, so this reads the running user's own access).
+            if (!Account.Premium_Fee_Override_Amount__c.getDescribe().isUpdateable()
+                || !Account.Charge_Premium_Vehicle_Fee__c.getDescribe().isUpdateable()) {
+                result.message = 'You do not have permission to change the dealer premium '
+                    + 'fee settings. Ask an administrator to grant access.';
+                return result;
+            }
+            Account dealerAcc = requireDealerAccount(accountId);
+            if (dealerAcc == null) {
+                result.message = 'This action is for Dealer Account records only.';
+                return result;
+            }
+            // A blank override means "use the standard package/term fees" (null);
+            // the charge flag defaults ON, so only an explicit false waives fees.
+            Boolean charge = chargePremiumFee != false;
+            Database.SaveResult[] saved = Database.update(new List<Account>{
+                new Account(
+                    Id = accountId,
+                    Premium_Fee_Override_Amount__c = overrideAmount,
+                    Charge_Premium_Vehicle_Fee__c = charge
+                )
+            }, false);
+            applyAuthoringSaveResults(saved, result);
+            if (result.success) {
+                result.message = 'Dealer premium fee settings saved. '
+                    + (overrideAmount == null
+                        ? 'The standard premium vehicle fees apply.'
+                        : 'The premium fee override of ' + amountText(overrideAmount)
+                            + ' applies for this dealer.')
+                    + (charge
+                        ? ' Premium vehicle fees are charged.'
+                        : ' Premium vehicle fees are waived for this dealer.');
+            }
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = GENERIC_ERROR_MESSAGE;
+            return result;
+        }
+    }
+
+    /**
+     * Deliberate, dealer-initiated price-anchor refresh. Re-seeds the stored
+     * wholesale anchors from the CURRENT master price for the given dealer
+     * packages, overwriting the freeze — the dealer explicitly asks to move to
+     * the master's latest price. Markup / discount / incentive are untouched.
+     * Writes dealer rows only; allOrNone = false.
+     */
+    @AuraEnabled
+    public static AuthoringResult refreshDealerPriceAnchors(List<Id> dealerPackageIds) {
+        AuthoringResult result = new AuthoringResult();
+        try {
+            assertReadAccess();
+            if (dealerPackageIds == null || dealerPackageIds.isEmpty()) {
+                result.message = 'Select at least one package.';
+                return result;
+            }
+            if (!PortalFeatureFlagService.isDealerSyncEnabled()) {
+                result.message = FLAG_OFF_MESSAGE;
+                return result;
+            }
+            Set<Id> ids = new Set<Id>(dealerPackageIds);
+
+            Map<Id, Dealer_Package_Term__c> terms = new Map<Id, Dealer_Package_Term__c>([
+                SELECT Id, Package_Term__c FROM Dealer_Package_Term__c
+                WHERE Dealer_Package__c IN :ids AND Package_Term__c != null
+            ]);
+            Set<Id> masterTermIds = new Set<Id>();
+            for (Dealer_Package_Term__c t : terms.values()) masterTermIds.add(t.Package_Term__c);
+            Map<Id, Decimal> termPrice = new Map<Id, Decimal>();
+            if (!masterTermIds.isEmpty()) {
+                for (Package_Term__c mt : [SELECT Id, Price__c FROM Package_Term__c WHERE Id IN :masterTermIds]) {
+                    termPrice.put(mt.Id, mt.Price__c);
+                }
+            }
+            List<Dealer_Package_Term__c> termUpdates = new List<Dealer_Package_Term__c>();
+            for (Dealer_Package_Term__c t : terms.values()) {
+                Decimal p = termPrice.get(t.Package_Term__c);
+                if (p != null) termUpdates.add(new Dealer_Package_Term__c(
+                    Id = t.Id, Original_Package_Term_Cost__c = p));
+            }
+            if (!termUpdates.isEmpty()) {
+                applyAuthoringSaveResults(Database.update(termUpdates, false), result);
+            }
+
+            Map<Id, Dealer_Package_Option__c> opts = new Map<Id, Dealer_Package_Option__c>([
+                SELECT Id, Package_Option__c FROM Dealer_Package_Option__c
+                WHERE Dealer_Package__c IN :ids AND Package_Option__c != null AND Is_Removed__c = false
+            ]);
+            Set<Id> masterOptionIds = new Set<Id>();
+            for (Dealer_Package_Option__c o : opts.values()) masterOptionIds.add(o.Package_Option__c);
+            Map<Id, Decimal> optionPrice = new Map<Id, Decimal>();
+            if (!masterOptionIds.isEmpty()) {
+                for (Package_Option__c mo : [SELECT Id, Price__c FROM Package_Option__c WHERE Id IN :masterOptionIds]) {
+                    optionPrice.put(mo.Id, mo.Price__c);
+                }
+            }
+            List<Dealer_Package_Option__c> optionUpdates = new List<Dealer_Package_Option__c>();
+            for (Dealer_Package_Option__c o : opts.values()) {
+                Decimal p = optionPrice.get(o.Package_Option__c);
+                if (p != null) optionUpdates.add(new Dealer_Package_Option__c(
+                    Id = o.Id, Original_Package_Option_Price__c = p));
+            }
+            if (!optionUpdates.isEmpty()) {
+                applyAuthoringSaveResults(Database.update(optionUpdates, false), result);
+            }
+
+            if (result.updatedCount == 0 && result.skippedCount == 0) {
+                result.success = true;
+                result.message = 'Nothing to refresh — every price is already current.';
+            } else if (result.skippedCount == 0) {
+                result.message = 'Refreshed ' + result.updatedCount + ' dealer price(s) from the master catalogue.';
+            }
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = GENERIC_ERROR_MESSAGE;
+            return result;
+        }
+    }
+
+    /** Folds an allOrNone = false save into the authoring result (plain words). */
+    private static void applyAuthoringSaveResults(Database.SaveResult[] saved, AuthoringResult result) {
+        Integer ok = 0;
+        Integer skipped = 0;
+        if (saved != null) {
+            for (Database.SaveResult sr : saved) {
+                if (sr.isSuccess()) ok++;
+                else skipped++;
+            }
+        }
+        result.updatedCount += ok;
+        result.skippedCount += skipped;
+        if (skipped > 0) {
+            result.success = false;
+            result.skippedReasons.add(MIRROR_VALUE_GAP_MESSAGE);
+            result.message = AUTHORING_REJECTED_MESSAGE;
+        } else {
+            result.success = true;
+            result.message = 'Saved ' + ok + ' change(s).';
+        }
+    }
+
+    // =========================================================================
+    // 5. Master package detail — the lazy, read-only reference read
+    //
+    //    Fetched on FIRST EXPAND of a master package row (never bulk-loaded into
+    //    the inventory payload — the org carries large option sets). Returns the
+    //    tier → term → additional-option structure of ONE master package with
+    //    server-formatted reference pricing, so the console stays a dumb
+    //    renderer. Strictly read-only: this method performs no DML and never
+    //    writes a master record.
+    // =========================================================================
+
+    /** One rendered row of a master package's read-only reference table. */
+    public class MasterDetailRow {
+        @AuraEnabled public String rowId;
+        @AuraEnabled public String kind;          // Term | Option
+        @AuraEnabled public String label;
+        @AuraEnabled public String originalPrice; // server-formatted ("$209")
+        @AuraEnabled public String discount;      // always the em dash on reference rows
+        @AuraEnabled public String dealerPrice;   // server-formatted reference price
+    }
+
+    /** A tier block of a master package (tierName '' when the package has no tiers). */
+    public class MasterDetailGroup {
+        @AuraEnabled public String groupKey;
+        @AuraEnabled public String tierName;
+        @AuraEnabled public Boolean hasTier;
+        @AuraEnabled public List<MasterDetailRow> rows;
+        public MasterDetailGroup() {
+            hasTier = false;
+            rows = new List<MasterDetailRow>();
+        }
+    }
+
+    /** getMasterPackageDetail payload — one master package's reference structure. */
+    public class MasterPackageDetailDTO {
+        @AuraEnabled public Id masterPackageId;
+        @AuraEnabled public String name;
+        @AuraEnabled public String groupName;     // the package group ("POWERTRAIN")
+        @AuraEnabled public String releaseName;   // the catalogue release ("V25")
+        @AuraEnabled public String seriesLabel;   // "Master Package Series: V25" ('' when none)
+        @AuraEnabled public Boolean hasTiers;
+        @AuraEnabled public Integer termCount;
+        @AuraEnabled public Integer optionCount;
+        @AuraEnabled public List<MasterDetailGroup> groups;
+        public MasterPackageDetailDTO() {
+            hasTiers = false;
+            termCount = 0;
+            optionCount = 0;
+            groups = new List<MasterDetailGroup>();
+        }
+    }
+
+    /** The em dash shown wherever a reference row has no value (never a blank). */
+    private static final String DASH = '\u2014';
+
+    /** "$209" / "—" — server-side money for the reference table (never client-side). */
+    private static String moneyOrDash(Decimal v) {
+        return v == null ? DASH : amountText(v);
+    }
+
+    /**
+     * Read-only detail of ONE master package: its coverage tiers, the terms
+     * beneath each tier (tier-less terms fall into a single un-grouped block),
+     * and each term's ADDITIONAL (term-level optional) options as sub-rows.
+     *
+     * Reference pricing mapping (the console's three price columns):
+     *   Original Dealer Price = the term's / option's own catalogue price
+     *   Discount              = the em dash (nothing is discounted on the master)
+     *   Dealer Price          = the same catalogue price (the master baseline)
+     *
+     * Package-level Included add-ons are deliberately NOT part of this table —
+     * they are the dealer pane's own "Included add-ons" block, and the mock's
+     * reference table carries terms + their additional options only.
+     */
+    @AuraEnabled
+    public static MasterPackageDetailDTO getMasterPackageDetail(Id masterPackageId) {
+        MasterPackageDetailDTO dto = new MasterPackageDetailDTO();
+        try {
+            assertReadAccess();
+            if (masterPackageId == null) return dto;
+
+            List<Package__c> pkgs = [
+                SELECT Id, Name, Package_Group__r.Name,
+                       Package_Group__r.Catalogue_Release__r.Name
+                FROM Package__c
+                WHERE Id = :masterPackageId
+                LIMIT 1
+            ];
+            if (pkgs.isEmpty()) return dto;
+            Package__c m = pkgs[0];
+            dto.masterPackageId = m.Id;
+            dto.name = m.Name;
+            dto.groupName = m.Package_Group__r != null ? m.Package_Group__r.Name : '';
+            dto.releaseName = releaseNameOf(m);
+            dto.seriesLabel = String.isBlank(dto.releaseName)
+                ? '' : 'Master Package Series: ' + dto.releaseName;
+
+            List<Package_Tier__c> tiers = [
+                SELECT Id, Name FROM Package_Tier__c
+                WHERE Package__c = :masterPackageId
+                ORDER BY Name
+            ];
+            List<Package_Term__c> terms = [
+                SELECT Id, Name, Price__c, Package_Tier__c FROM Package_Term__c
+                WHERE Package__c = :masterPackageId
+                ORDER BY Name
+            ];
+            List<Package_Option__c> options = [
+                SELECT Id, Option__r.Name, Price__c, Package_Term__c FROM Package_Option__c
+                WHERE Package__c = :masterPackageId AND Package_Term__c != null
+                ORDER BY Option__r.Name
+            ];
+            dto.hasTiers = !tiers.isEmpty();
+            dto.termCount = terms.size();
+
+            // Option sub-rows keyed by the term they ride on.
+            Map<Id, List<MasterDetailRow>> optionsByTerm = new Map<Id, List<MasterDetailRow>>();
+            for (Package_Option__c o : options) {
+                MasterDetailRow oe = new MasterDetailRow();
+                oe.rowId = String.valueOf(o.Id);
+                oe.kind = 'Option';
+                oe.label = o.Option__r != null && String.isNotBlank(o.Option__r.Name)
+                    ? o.Option__r.Name : 'Add-on';
+                oe.originalPrice = moneyOrDash(o.Price__c);
+                oe.discount = DASH;
+                oe.dealerPrice = moneyOrDash(o.Price__c);
+                if (!optionsByTerm.containsKey(o.Package_Term__c)) {
+                    optionsByTerm.put(o.Package_Term__c, new List<MasterDetailRow>());
+                }
+                optionsByTerm.get(o.Package_Term__c).add(oe);
+                dto.optionCount++;
+            }
+
+            // Terms, each followed immediately by its own additional options.
+            Map<String, List<MasterDetailRow>> rowsByTier = new Map<String, List<MasterDetailRow>>();
+            List<MasterDetailRow> tierlessRows = new List<MasterDetailRow>();
+            for (Package_Term__c t : terms) {
+                MasterDetailRow tr = new MasterDetailRow();
+                tr.rowId = String.valueOf(t.Id);
+                tr.kind = 'Term';
+                tr.label = t.Name;
+                tr.originalPrice = moneyOrDash(t.Price__c);
+                tr.discount = DASH;
+                tr.dealerPrice = moneyOrDash(t.Price__c);
+
+                List<MasterDetailRow> block = new List<MasterDetailRow>{ tr };
+                if (optionsByTerm.containsKey(t.Id)) {
+                    block.addAll(optionsByTerm.get(t.Id));
+                }
+                if (t.Package_Tier__c == null) {
+                    tierlessRows.addAll(block);
+                } else {
+                    String key = String.valueOf(t.Package_Tier__c);
+                    if (!rowsByTier.containsKey(key)) rowsByTier.put(key, new List<MasterDetailRow>());
+                    rowsByTier.get(key).addAll(block);
+                }
+            }
+
+            // One group per tier (empty tier blocks are skipped), then the
+            // un-grouped block for tier-less terms.
+            for (Package_Tier__c tier : tiers) {
+                List<MasterDetailRow> rows = rowsByTier.get(String.valueOf(tier.Id));
+                if (rows == null || rows.isEmpty()) continue;
+                MasterDetailGroup g = new MasterDetailGroup();
+                g.groupKey = String.valueOf(tier.Id);
+                g.tierName = tier.Name;
+                g.hasTier = true;
+                g.rows = rows;
+                dto.groups.add(g);
+            }
+            if (!tierlessRows.isEmpty()) {
+                MasterDetailGroup g = new MasterDetailGroup();
+                g.groupKey = 'no-tier';
+                g.tierName = '';
+                g.hasTier = false;
+                g.rows = tierlessRows;
+                dto.groups.add(g);
+            }
+            return dto;
+        } catch (Exception e) {
+            throw new AuraHandledException(GENERIC_ERROR_MESSAGE);
         }
     }
 
@@ -916,6 +1865,59 @@ public without sharing class DealerPackageSyncController {
         return d == null ? '' : d.format('d MMM yyyy');
     }
 
+    /** The catalogue release NAME alone (grouping): "V25" / "V27" ('' when none). */
+    private static String releaseNameOf(Package__c m) {
+        return (m != null && m.Package_Group__r != null
+            && m.Package_Group__r.Catalogue_Release__r != null)
+            ? m.Package_Group__r.Catalogue_Release__r.Name : '';
+    }
+
+    /** The catalogue release STATUS alone: Draft | Published | Superseded | ''. */
+    private static String releaseStatusOf(Package__c m) {
+        return (m != null && m.Package_Group__r != null
+            && m.Package_Group__r.Catalogue_Release__r != null)
+            ? m.Package_Group__r.Catalogue_Release__r.Status__c : '';
+    }
+
+    /** "$750 Per Claim" — server-formatted; '' when the package carries no limit. */
+    private static String perClaimLimitLabel(Decimal v) {
+        return v == null ? '' : amountText(v) + ' Per Claim';
+    }
+
+    /** "$100 Deductible" — server-formatted; '' when no deductible is set. */
+    private static String deductibleLabel(Decimal v) {
+        return v == null ? '' : amountText(v) + ' Deductible';
+    }
+
+    /** "$1,250.50" / "$750" — whole dollars drop the decimals. Server-side only. */
+    private static String amountText(Decimal v) {
+        if (v == null) return '';
+        Boolean whole = (v == v.setScale(0, System.RoundingMode.HALF_UP));
+        String raw = whole ? String.valueOf(v.setScale(0)) : String.valueOf(v.setScale(2));
+        Boolean neg = raw.startsWith('-');
+        if (neg) raw = raw.substring(1);
+        Integer dot = raw.indexOf('.');
+        String intPart = dot == -1 ? raw : raw.substring(0, dot);
+        String frac = dot == -1 ? '' : raw.substring(dot);
+        return (neg ? '-$' : '$') + groupThousands(intPart) + frac;
+    }
+
+    /** "10000" → "10,000" (never locale-dependent). */
+    private static String groupThousands(String digits) {
+        if (String.isBlank(digits)) return '0';
+        String out = '';
+        Integer count = 0;
+        for (Integer i = digits.length() - 1; i >= 0; i--) {
+            out = digits.substring(i, i + 1) + out;
+            count++;
+            if (count == 3 && i > 0) {
+                out = ',' + out;
+                count = 0;
+            }
+        }
+        return out;
+    }
+
     /** Release chip text for a master package: "Draft · V27 Book" ('' when none). */
     private static String releaseLabel(Package__c m) {
         if (m.Package_Group__r == null || m.Package_Group__r.Catalogue_Release__r == null) {
@@ -1026,10 +2028,9 @@ public without sharing class DealerPackageSyncController {
             || (String.isNotBlank(m.Description__c) && dp.Package_Description__c != m.Description__c)) {
             cs.headerChanged = true;
         }
-        Boolean masterCommercial = m.Commercial_Business_Use__c == true;
-        Decimal wantSurcharge = masterCommercial ? m.Commercial_Vehicle_Surcharge_Fee__c : null;
-        if (dp.Commercial_Vehicle_Surcharge_Fee__c != wantSurcharge) cs.headerChanged = true;
-
+        // The dealer commercial figure (Commercial_Vehicle_Surcharge_Fee__c) is
+        // dealer-owned — seeded once at mirror creation and never refreshed from
+        // the master — so it is deliberately NOT part of the change delta.
         String rtDev = m.RecordType != null ? m.RecordType.DeveloperName : null;
 
         // ---- tiers / terms ----
@@ -1057,8 +2058,11 @@ public without sharing class DealerPackageSyncController {
                     continue;
                 }
                 Boolean struct = termStructureChanged(dterm, mterm);
+                // Anchors frozen once the dealer has local pricing: the sync will
+                // NOT move them, so a master price edit is not a pending change.
                 Boolean price = mterm.Price__c != null
-                    && dterm.Original_Package_Term_Cost__c != mterm.Price__c;
+                    && dterm.Original_Package_Term_Cost__c != mterm.Price__c
+                    && !DealerPackageSyncService.hasLocalTermPricing(dterm);
                 if (price) cs.priceChanges++;
                 else if (struct) cs.termsChanged++;
                 countTermLevelOptions(dp, mterm, optionsByPackage, dealerTerms, dealerOptions, rtDev, cs);
@@ -1081,7 +2085,8 @@ public without sharing class DealerPackageSyncController {
             }
             Boolean struct = termStructureChanged(dterm, mterm);
             Boolean price = mterm.Price__c != null
-                && dterm.Original_Package_Term_Cost__c != mterm.Price__c;
+                && dterm.Original_Package_Term_Cost__c != mterm.Price__c
+                && !DealerPackageSyncService.hasLocalTermPricing(dterm);
             if (price) cs.priceChanges++;
             else if (struct) cs.termsChanged++;
             countTermLevelOptions(dp, mterm, optionsByPackage, dealerTerms, dealerOptions, rtDev, cs);
@@ -1102,6 +2107,10 @@ public without sharing class DealerPackageSyncController {
             Dealer_Package_Option__c dopt = dealerOptions.get(dp.Id + '_' + mo.Id);
             if (dopt == null) {
                 cs.optionsAdded++;
+            } else if (dopt.Is_Removed__c == true) {
+                // Deliberately removed by the dealer — never (re-)created nor
+                // reported as a pending change.
+                continue;
             } else if (optionChanged(dopt, mo, rtDev)) {
                 cs.optionsChanged++;
             }
@@ -1131,6 +2140,7 @@ public without sharing class DealerPackageSyncController {
             }
             Dealer_Package_Option__c dopt = dealerOptions.get(dp.Id + '_' + mo.Id);
             if (dopt == null) cs.optionsAdded++;
+            else if (dopt.Is_Removed__c == true) continue; // dealer removed it deliberately
             else if (optionChanged(dopt, mo, rtDev)) cs.optionsChanged++;
         }
     }
@@ -1172,7 +2182,8 @@ public without sharing class DealerPackageSyncController {
             || dopt.Category__c != wantCategory
             || dopt.Minimum_Value__c != mo.Minimum_Value__c
             || dopt.Maximum_Value__c != mo.Maximum_Value__c;
-        Boolean price = mo.Price__c != null && dopt.Original_Package_Option_Price__c != mo.Price__c;
+        Boolean price = mo.Price__c != null && dopt.Original_Package_Option_Price__c != mo.Price__c
+            && !DealerPackageSyncService.hasLocalOptionPricing(dopt);
         return struct || price;
     }
 
@@ -1271,11 +2282,16 @@ public without sharing class DealerPackageSyncController {
         SObjectField[] fields = new SObjectField[]{
             Dealer_Package__c.Last_Synced_At__c,
             Dealer_Package_Term__c.Original_Package_Term_Cost__c,
+            Dealer_Package_Term__c.Premium_Model_Fee__c,
             Dealer_Package_Option__c.Original_Package_Option_Price__c,
             Package_Term__c.Price__c,
             Package_Option__c.Price__c,
             Package__c.Is_Active__c,
-            Catalogue_Release__c.Status__c
+            Catalogue_Release__c.Status__c,
+            // Dealer-level premium vehicle fee settings (read here; written through
+            // saveDealerPremiumSettings, which additionally checks update access).
+            Account.Premium_Fee_Override_Amount__c,
+            Account.Charge_Premium_Vehicle_Fee__c
         };
         for (SObjectField f : fields) {
             if (!f.getDescribe().isAccessible()) {

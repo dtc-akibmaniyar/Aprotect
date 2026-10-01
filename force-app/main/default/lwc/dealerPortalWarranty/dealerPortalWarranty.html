@@ -97,7 +97,7 @@
                                         <div class="terms-scroll-container">
                                             <template for:each={planTypeGroupsWithPackageTerms} for:item="group">
                                                 <div key={group.key} class="plan-type-group">
-                                                    <div class={group.headerClass}>{group.label}</div>
+                                                    <div class={group.headerClass} style={group.headerStyle}>{group.displayLabel}</div>
                                                     <template if:true={group.hasDescription}>
                                                         <div class="plan-type-group-description" data-description={group.description}></div>
                                                     </template>

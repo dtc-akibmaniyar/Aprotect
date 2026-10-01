@@ -302,6 +302,15 @@ public without sharing class DealerPortalController {
         @AuraEnabled public String planTypeId;
         @AuraEnabled public String planTypeName;
         @AuraEnabled public String planTypeDescription;
+        /**
+         * Catalogue (Catalogue_Release__c) of the plan type / Package_Group__c this
+         * package belongs to. Carried so the warranty tab can distinguish same-named
+         * plan types coming from different catalogues. Read from Plan_Type__r (the
+         * dealer package's Package_Group__c); null-safe when the group or its
+         * catalogue is blank.
+         */
+        @AuraEnabled public String planTypeCatalogueId;
+        @AuraEnabled public String planTypeCatalogueName;
         @AuraEnabled public String DealerName;
         @AuraEnabled public String DealerId;
         @AuraEnabled public String PackageClass;
@@ -313,6 +322,36 @@ public without sharing class DealerPortalController {
         @AuraEnabled public Decimal commercialVehicleSurchargeFee; // Surcharge fee for commercial vehicles
         @AuraEnabled public Decimal packageGroupSortOrder; // Sort_Order__c from Package_Group__c
         @AuraEnabled public String packageGroupName; // Name of Package_Group__c
+        /**
+         * Sort order of the plan type / Package_Group__c (Plan_Type__r.Sort_Order__c).
+         * Carried so the warranty tab can order its plan-type SECTIONS by the group's
+         * sort order instead of alphabetically. Read from Plan_Type__r -- the group
+         * the section is keyed by (Plan_Type__c) -- so the value always matches the
+         * section key. Null when the group is absent or its Sort_Order__c is blank
+         * (the LWC sorts nulls last).
+         */
+        @AuraEnabled public Decimal planTypeSortOrder;
+        /**
+         * Flat header colour of the plan type / Package_Group__c
+         * (Plan_Type__r.Package_Color__c, e.g. '#201471'). The warranty tab paints
+         * the section header with it; when blank the existing gradient class is used
+         * as the fallback, so no header is ever left unpainted. Null-safe.
+         */
+        @AuraEnabled public String planTypeColor;
+        /**
+         * Numeric per-claim limit of the dealer package (Dealer_Package__c.Per_Claim_Limit__c).
+         * Carried so the warranty tab can order the packages WITHIN a section by the
+         * actual money amount ascending, instead of by PackageName -- the name embeds
+         * the RAW amount ("Essential / $10000 Per Claim") and therefore sorts as TEXT
+         * ("$1000" before "$10000" before "$1500"). Null-safe.
+         */
+        @AuraEnabled public Decimal perClaimLimit;
+        /**
+         * Numeric deductible of the dealer package (Dealer_Package__c.Deductable__c).
+         * Secondary ordering key within a section (per-claim first, deductible next).
+         * Null-safe.
+         */
+        @AuraEnabled public Decimal deductible;
         
         public DealerPackageDTO() {}
     }
@@ -388,6 +427,15 @@ public without sharing class DealerPortalController {
 
         @AuraEnabled public Decimal expiryTerm;
         @AuraEnabled public Decimal odometerKM;
+        /**
+         * Restriction_Type__c of the dealer term -- 'Unlimited', 'Rolling Odometer',
+         * 'Fixed Odometer', or blank. Surfaced so the warranty tab can identify an
+         * UNLIMITED odometer from data instead of inferring it from a null
+         * Odometer_KM__c (unlimited terms are stored as Odometer_KM__c = null +
+         * Restriction_Type__c = 'Unlimited', which is indistinguishable from a
+         * genuinely missing cap without this field).
+         */
+        @AuraEnabled public String restrictionType;
         
         @AuraEnabled public Decimal premiumModelFee; // Premium model fee from Package_Term__c
 
@@ -406,8 +454,19 @@ public without sharing class DealerPortalController {
     }
 
     /**
-     * Comparator for sorting DealerPackageDTO by Package_Group__c.Sort_Order__c ascending (nulls last),
-     * then by package name as a secondary sort key.
+     * Comparator for sorting DealerPackageDTO.
+     *
+     * PRIMARY key: the package group's Sort_Order__c ascending (nulls last) --
+     * unchanged, this keeps the groups themselves in their configured order.
+     *
+     * WITHIN a group (equal Sort_Order__c, or both null) the packages are ordered
+     * by the NUMERIC per-claim amount ascending, then the NUMERIC deductible
+     * ascending, then the package name as a stable final tie-break.
+     *
+     * The amount keys matter: the package name embeds the RAW amount
+     * ("Essential / $10000 Per Claim"), so a name-led compare is a TEXT sort and
+     * lands "$10000" before "$1500" -- the reported defect. The money fields
+     * (Dealer_Package__c.Per_Claim_Limit__c / Deductable__c) are the real order.
      */
     public class DealerPackageSortOrderComparator implements Comparator<DealerPackageDTO> {
         public Integer compare(DealerPackageDTO a, DealerPackageDTO b) {
@@ -415,14 +474,34 @@ public without sharing class DealerPortalController {
             Decimal sortB = b.packageGroupSortOrder;
             // Null sort orders go last
             if (sortA == null && sortB == null) {
-                return compareName(a, b);
+                return compareWithinGroup(a, b);
             }
             if (sortA == null) return 1;
             if (sortB == null) return -1;
             if (sortA != sortB) {
                 return sortA < sortB ? -1 : 1;
             }
+            return compareWithinGroup(a, b);
+        }
+        // Within a package group: numeric per-claim, then numeric deductible,
+        // then name. null amounts sort last so a blank never jumps the queue.
+        private Integer compareWithinGroup(DealerPackageDTO a, DealerPackageDTO b) {
+            Integer cmp = compareDecimalAscNullsLast(a.perClaimLimit, b.perClaimLimit);
+            if (cmp != 0) {
+                return cmp;
+            }
+            cmp = compareDecimalAscNullsLast(a.deductible, b.deductible);
+            if (cmp != 0) {
+                return cmp;
+            }
             return compareName(a, b);
+        }
+        private Integer compareDecimalAscNullsLast(Decimal x, Decimal y) {
+            if (x == null && y == null) return 0;
+            if (x == null) return 1;   // nulls last
+            if (y == null) return -1;
+            if (x == y) return 0;
+            return x < y ? -1 : 1;
         }
         private Integer compareName(DealerPackageDTO a, DealerPackageDTO b) {
             String nameA = a.PackageName != null ? a.PackageName : '';
@@ -1373,6 +1452,14 @@ public without sharing class DealerPortalController {
                     dto.planTypeId = dp.Plan_Type__c;
                     dto.planTypeName = dp.Plan_Type__r != null ? dp.Plan_Type__r.Name : null;
                     dto.planTypeDescription = dp.Plan_Type__r != null ? dp.Plan_Type__r.Package_Description__c : null;
+                    // Catalogue of the plan type (Package_Group__c). Null-safe: the
+                    // group may be absent, and even when present its Catalogue
+                    // Release lookup may be empty — traversing .Name on a null
+                    // parent would throw, so both levels are guarded.
+                    dto.planTypeCatalogueId = dp.Plan_Type__r != null ? dp.Plan_Type__r.Catalogue_Release__c : null;
+                    dto.planTypeCatalogueName = (dp.Plan_Type__r != null && dp.Plan_Type__r.Catalogue_Release__r != null)
+                        ? dp.Plan_Type__r.Catalogue_Release__r.Name
+                        : null;
 
                     if (String.isNotBlank(dp.Package_Description__c)) {
                         dto.PackageDescription = dp.Package_Description__c;
@@ -1388,6 +1475,18 @@ public without sharing class DealerPortalController {
                     dto.commercialVehicleSurchargeFee = (isCommercialVehicle && dp.Commercial_Business_Use__c == true) ? dp.Commercial_Vehicle_Surcharge_Fee__c : null;
                     dto.packageGroupSortOrder = (dp.Package__r != null && dp.Package__r.Package_Group__r != null) ? dp.Package__r.Package_Group__r.Sort_Order__c : null;
                     dto.packageGroupName = (dp.Package__r != null && dp.Package__r.Package_Group__r != null) ? dp.Package__r.Package_Group__r.Name : null;
+                    // Numeric money on the dealer package, carried so the warranty tab
+                    // can order packages WITHIN a section numerically (per-claim, then
+                    // deductible) rather than by the amount-bearing package name.
+                    dto.perClaimLimit = dp.Per_Claim_Limit__c;
+                    dto.deductible = dp.Deductable__c;
+                    // Plan-type (Package_Group__c) section sort order and flat header
+                    // colour, taken from Plan_Type__r -- the group the warranty tab
+                    // keys its sections by (planTypeId == Plan_Type__c). Null-safe:
+                    // the group may be absent, and Sort_Order__c / Package_Color__c
+                    // may be blank.
+                    dto.planTypeSortOrder = dp.Plan_Type__r != null ? dp.Plan_Type__r.Sort_Order__c : null;
+                    dto.planTypeColor = dp.Plan_Type__r != null ? dp.Plan_Type__r.Package_Color__c : null;
 
                     List<DealerPackageTermDTO> termList = new List<DealerPackageTermDTO>(); // Keep for backward compatibility
                     List<DealerPackageTierDTO> tierList = new List<DealerPackageTierDTO>(); // NEW: Grouped by tiers
@@ -4449,6 +4548,8 @@ private static Map<String, Decimal> calculatePricing(Decimal basePrice, Decimal 
                     packages = [
                         SELECT Id, Name, Package__c, Deductable__c, Per_Claim_Limit__c, Package_Description__c, Class__c,
                                 Plan_Type__c, Plan_Type__r.Name, Plan_Type__r.Package_Description__c,
+                                Plan_Type__r.Catalogue_Release__c, Plan_Type__r.Catalogue_Release__r.Name,
+                                Plan_Type__r.Sort_Order__c, Plan_Type__r.Package_Color__c,
                                 Dealer__c, Dealer__r.Name, Dealer__r.Tax_Region__c, Dealer__r.Tax_Region__r.Total_Tax_Rate__c,
                                 RecordType.DeveloperName, RecordType.Name,
                                 Commercial_Business_Use__c, Commercial_Vehicle_Type__c, Commercial_Vehicle_Surcharge_Fee__c,
@@ -4468,6 +4569,8 @@ private static Map<String, Decimal> calculatePricing(Decimal basePrice, Decimal 
                 packages = [
                     SELECT Id, Name, Package__c, Deductable__c, Per_Claim_Limit__c, Package_Description__c, Class__c,
                             Plan_Type__c, Plan_Type__r.Name, Plan_Type__r.Package_Description__c,
+                            Plan_Type__r.Catalogue_Release__c, Plan_Type__r.Catalogue_Release__r.Name,
+                            Plan_Type__r.Sort_Order__c, Plan_Type__r.Package_Color__c,
                             Dealer__c, Dealer__r.Name, Dealer__r.Tax_Region__c, Dealer__r.Tax_Region__r.Total_Tax_Rate__c,
                             RecordType.DeveloperName, RecordType.Name,
                             Commercial_Business_Use__c, Commercial_Vehicle_Type__c, Commercial_Vehicle_Surcharge_Fee__c,
@@ -4829,6 +4932,7 @@ return false;
         termDto.packageTermName = term.Name;
         termDto.expiryTerm = term.Expiry_Term__c;
         termDto.odometerKM = term.Odometer_KM__c;
+        termDto.restrictionType = term.Restriction_Type__c;
         termDto.allowDeferral = term.Package_Term__r != null && term.Package_Term__r.Allow_Deferral__c == true;
         
         // Powersports brand-tier surcharge: override Premium_Model_Fee__c

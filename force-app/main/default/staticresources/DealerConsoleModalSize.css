@@ -1,0 +1,15 @@
+/* Dealer Package Sync — quick-action modal sizing.
+   Scoped with :has() to the modal that actually hosts the console, so other
+   quick actions and dialogs on the page keep their normal size. */
+.slds-modal__container:has(c-dealer-portal-package-sync) {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    height: 90vh !important;
+    max-height: 90vh !important;
+}
+
+.slds-modal__container:has(c-dealer-portal-package-sync) .slds-modal__content {
+    height: calc(90vh - 6rem) !important;
+    max-height: calc(90vh - 6rem) !important;
+    overflow-y: auto;
+}

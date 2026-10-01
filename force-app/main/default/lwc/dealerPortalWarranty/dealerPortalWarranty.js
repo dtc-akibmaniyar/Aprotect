@@ -675,7 +675,7 @@ export default class DealerPortalWarranty extends LightningElement {
     // Get dynamic dealer packages for display
     get dealerPackagesDisplay() {
         
-        return this.dealerPackages.map(pkg => {
+        return this._sortPackagesByAmount(this.dealerPackages).map(pkg => {
             const isSelected = this.selectedDealerPackage && this.selectedDealerPackage.Id === pkg.Id;
             const baseName = pkg.PackageName || pkg.Name || 'Warranty';
             const displayLabel = `${baseName} WARRANTY`;
@@ -821,11 +821,14 @@ export default class DealerPortalWarranty extends LightningElement {
     // term name (the previous _parseKmFromName/_parseMonthsFromName fallbacks
     // were fragile: they silently produced 0 for any unexpected name shape).
     //
-    // Order key: AMOUNT, then MONTHS, then KM. Values come straight from the
-    // Apex DTO fields:
-    //   amount : totalPrice (retail incl. markup)   -> fallback netCost
-    //   months : expiryTerm (term duration, months) -> fallback durationRestrictionInMonths
-    //   km     : odometerKM (odometer cap, KM)      -> fallback mileageRestriction
+    // Order key: EXPIRY (months), then ODOMETER (KM), then AMOUNT. Values come
+    // straight from the Apex DTO fields:
+    //   expiry   : expiryTerm (term duration, months) -> fallback durationRestrictionInMonths
+    //   odometer : odometerKM (odometer cap, KM)      -> fallback mileageRestriction
+    //   amount   : totalPrice (retail incl. markup)   -> fallback netCost
+    // Unlimited odometer (restrictionType === 'Unlimited') is the HIGHEST
+    // coverage, so it is placed AFTER the largest finite cap - never treated as
+    // a missing value. A genuinely unknown/blank odometer sorts LAST of all.
     // A value that is genuinely absent sorts LAST; ties break on Id so the
     // order is fully stable across renders.
     _sortValue(value) {
@@ -841,8 +844,20 @@ export default class DealerPortalWarranty extends LightningElement {
         return this._sortValue(term.expiryTerm != null ? term.expiryTerm : term.durationRestrictionInMonths);
     }
 
-    _termKm(term) {
-        return this._sortValue(term.odometerKM != null ? term.odometerKM : term.mileageRestriction);
+    // Odometer sort rank. Finite caps sort by their KM value; an UNLIMITED
+    // odometer (identified from data via Restriction_Type__c, not inferred from
+    // a null) ranks AFTER every finite cap; a genuinely unknown/blank odometer
+    // ranks LAST. The two sentinels are far above any real odometer reading.
+    _termOdometerRank(term) {
+        const restriction = (term && term.restrictionType != null) ? String(term.restrictionType) : '';
+        if (restriction.toLowerCase() === 'unlimited') {
+            return 1e18; // highest coverage - after all finite caps
+        }
+        const km = this._sortValue(term.odometerKM != null ? term.odometerKM : term.mileageRestriction);
+        if (km === null) {
+            return 2e18; // genuinely unknown/blank odometer - last
+        }
+        return km;
     }
 
     _compareNullable(a, b) {
@@ -854,11 +869,16 @@ export default class DealerPortalWarranty extends LightningElement {
 
     _sortTerms(terms) {
         return [...(terms || [])].sort((a, b) => {
-            let cmp = this._compareNullable(this._termAmount(a), this._termAmount(b));
+            // 1) Expiry term (months) ascending, nulls last
+            let cmp = this._compareNullable(this._termMonths(a), this._termMonths(b));
             if (cmp !== 0) return cmp;
-            cmp = this._compareNullable(this._termMonths(a), this._termMonths(b));
-            if (cmp !== 0) return cmp;
-            cmp = this._compareNullable(this._termKm(a), this._termKm(b));
+            // 2) Odometer ascending; Unlimited after the largest finite cap;
+            //    genuinely unknown/blank odometer last.
+            const rankA = this._termOdometerRank(a);
+            const rankB = this._termOdometerRank(b);
+            if (rankA !== rankB) return rankA < rankB ? -1 : 1;
+            // 3) Amount ascending (final tie-break before Id)
+            cmp = this._compareNullable(this._termAmount(a), this._termAmount(b));
             if (cmp !== 0) return cmp;
             return String(a.Id || '').localeCompare(String(b.Id || ''));
         });
@@ -873,6 +893,25 @@ export default class DealerPortalWarranty extends LightningElement {
             cmp = this._compareNullable(this._sortValue(a.mileageRestrictionEnd), this._sortValue(b.mileageRestrictionEnd));
             if (cmp !== 0) return cmp;
             return String(a.Id || '').localeCompare(String(b.Id || ''));
+        });
+    }
+
+    // Order the packages WITHIN a section by the NUMERIC per-claim amount
+    // ascending, then the NUMERIC deductible ascending, then name as a stable
+    // final tie-break. The package NAME embeds the RAW amount
+    // ("Essential / $10000 Per Claim"), so it must never lead the comparison --
+    // a text sort puts "$10000" before "$1500", which is the reported defect.
+    // Apex already returns the list in this order (DealerPackageSortOrderComparator
+    // carries perClaimLimit/deductible on the DTO); this defensive re-sort keeps
+    // the browser order numeric even if a stale response is rendered. Blank/null
+    // amounts sort last, matching the Apex nulls-last rule.
+    _sortPackagesByAmount(packages) {
+        return [...(packages || [])].sort((a, b) => {
+            let cmp = this._compareNullable(this._sortValue(a.perClaimLimit), this._sortValue(b.perClaimLimit));
+            if (cmp !== 0) return cmp;
+            cmp = this._compareNullable(this._sortValue(a.deductible), this._sortValue(b.deductible));
+            if (cmp !== 0) return cmp;
+            return String(a.PackageName || a.Name || '').localeCompare(String(b.PackageName || b.Name || ''));
         });
     }
 
@@ -3052,6 +3091,11 @@ export default class DealerPortalWarranty extends LightningElement {
                     key: planTypeKey,
                     label: planTypeLabel,
                     planTypeDescription: pkg.planTypeDescription || '',
+                    // Group sort order (Package_Group__c.Sort_Order__c, carried from
+                    // Apex as planTypeSortOrder) and the flat header colour. Nulls
+                    // sort last; a blank colour falls back to the gradient class.
+                    sortOrder: this._sortValue(pkg.planTypeSortOrder),
+                    planTypeColor: this._packageColor(pkg.planTypeColor),
                     packageCount: 0
                 });
             }
@@ -3060,14 +3104,25 @@ export default class DealerPortalWarranty extends LightningElement {
             if (!group.planTypeDescription && pkg.planTypeDescription) {
                 group.planTypeDescription = pkg.planTypeDescription;
             }
+            if (!group.planTypeColor && pkg.planTypeColor) {
+                group.planTypeColor = this._packageColor(pkg.planTypeColor);
+            }
+            if (group.sortOrder === null && pkg.planTypeSortOrder != null) {
+                group.sortOrder = this._sortValue(pkg.planTypeSortOrder);
+            }
             group.packageCount += 1;
         });
 
         const groups = Array.from(groupsMap.values());
         
         groups.sort((a, b) => {
+            // "Other Packages" bucket always stays last.
             if (a.key === this.otherPlanTypeKey) return 1;
             if (b.key === this.otherPlanTypeKey) return -1;
+            // Then by the group's Sort_Order__c ascending (nulls last), with the
+            // label as a stable tie-break.
+            const cmp = this._compareNullable(a.sortOrder, b.sortOrder);
+            if (cmp !== 0) return cmp;
             return a.label.localeCompare(b.label);
         });
 
@@ -3124,7 +3179,7 @@ export default class DealerPortalWarranty extends LightningElement {
             return;
         }
 
-        this.dealerPackages = filteredPackages;
+        this.dealerPackages = this._sortPackagesByAmount(filteredPackages);
         this.selectedDealerPackage = null; // Don't auto-select - show all packages
         this.selectedWarrantyTerm = null;
         this.selectedWarrantyTierId = null;
@@ -3133,6 +3188,15 @@ export default class DealerPortalWarranty extends LightningElement {
 
     get hasSelectedPackage() {
         return this.selectedDealerPackage !== null;
+    }
+
+    // Flat header colour guard: accept only a well-formed hex colour
+    // (#rgb / #rrggbb / #rrggbbaa); anything else (blank, junk, a named colour)
+    // returns '' so the caller keeps the gradient fallback and no header is ever
+    // left unpainted with an invalid value.
+    _packageColor(value) {
+        const raw = (value == null) ? '' : String(value).trim();
+        return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(raw) ? raw : '';
     }
 
     getPackageGradientClass(name, packageId) {
@@ -3294,26 +3358,60 @@ export default class DealerPortalWarranty extends LightningElement {
 
         const groupsMap = new Map();
         
-        this.allDealerPackages.forEach(pkg => {
+        // Packages are pushed into their section in this order; sort them
+        // numerically WITHIN each section (see _sortPackagesByAmount).
+        this._sortPackagesByAmount(this.allDealerPackages).forEach(pkg => {
             const key = pkg.planTypeId || this.otherPlanTypeKey;
             const label = pkg.planTypeName || 'Other Packages';
             const description = pkg.planTypeDescription || '';
+            // Catalogue release of the plan type (Package_Group__c), carried from
+            // Apex (planTypeCatalogueName). Lets two same-named plan types from
+            // different catalogues be told apart (e.g. Essential vs Essential
+            // Warranties). Optional: when blank the plain label is rendered.
+            const catalogueName = pkg.planTypeCatalogueName || '';
+            // Group sort order + flat header colour (Package_Group__c.Sort_Order__c
+            // / Package_Color__c, carried from Apex on every package of the group).
+            const sortOrder = this._sortValue(pkg.planTypeSortOrder);
+            const planTypeColor = this._packageColor(pkg.planTypeColor);
             if (!groupsMap.has(key)) {
                 const gradientClass = this.getPackageGradientClass(label, key);
                 groupsMap.set(key, {
                     key,
                     label,
+                    catalogueName,
+                    displayLabel: catalogueName ? `${label} (${catalogueName})` : label,
                     description,
                     hasDescription: !!description,
-                    headerClass: `plan-type-section-header ${gradientClass}`,
+                    sortOrder,
+                    planTypeColor,
+                    // Flat colour on the section header when one is set; otherwise
+                    // the existing gradient class paints it (never left unpainted).
+                    headerClass: planTypeColor
+                        ? 'plan-type-section-header'
+                        : `plan-type-section-header ${gradientClass}`,
+                    headerStyle: planTypeColor ? `background: ${planTypeColor};` : '',
                     packagesWithTerms: []
                 });
             }
-            groupsMap.get(key).packagesWithTerms.push(this.buildPackageWithTerms(pkg));
+            const group = groupsMap.get(key);
+            if (!group.planTypeColor && planTypeColor) {
+                group.planTypeColor = planTypeColor;
+                group.headerClass = 'plan-type-section-header';
+                group.headerStyle = `background: ${planTypeColor};`;
+            }
+            if (group.sortOrder === null && sortOrder !== null) {
+                group.sortOrder = sortOrder;
+            }
+            group.packagesWithTerms.push(this.buildPackageWithTerms(pkg));
         });
         return Array.from(groupsMap.values()).sort((a, b) => {
+            // "Other Packages" bucket always stays last.
             if (a.key === this.otherPlanTypeKey) return 1;
             if (b.key === this.otherPlanTypeKey) return -1;
+            // Then by the group's Sort_Order__c ascending (nulls last), label as
+            // a stable tie-break.
+            const cmp = this._compareNullable(a.sortOrder, b.sortOrder);
+            if (cmp !== 0) return cmp;
             return a.label.localeCompare(b.label);
         });
     }
@@ -3372,7 +3470,7 @@ export default class DealerPortalWarranty extends LightningElement {
             return [];
         }
 
-        return this.dealerPackages.map(pkg => {
+        return this._sortPackagesByAmount(this.dealerPackages).map(pkg => {
             // Use tiers if available, otherwise fall back to terms for backward compatibility
             const hasTiers = pkg.tiers && pkg.tiers.length > 0;
             const hasTerms = pkg.warrantyTerms && pkg.warrantyTerms.length > 0;

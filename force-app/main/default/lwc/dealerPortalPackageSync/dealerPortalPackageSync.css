@@ -2,64 +2,482 @@
     display: block;
 }
 
-/* The modal can get tall — keep the console scrollable and the list bounded. */
+/* ══════════════════════════════════════════════════════════════════════
+   Theme tokens.
+   Dark is the DEFAULT (the root gets .console_dark); the in-component
+   toggle swaps to .console_light. Every surface below reads these vars.
+   ══════════════════════════════════════════════════════════════════════ */
 .console {
-    max-height: 78vh;
-    overflow-y: auto;
+    /* light palette (used when .console_light is applied) */
+    --bg: #F3F3F3;
+    --surface: #FFFFFF;
+    --surface-alt: #F3F3F3;
+    --border: #DDDBDA;
+    --border-strong: #C9C7C5;
+    --text: #181818;
+    --text-secondary: #3E3E3C;
+    --text-tertiary: #706E6B;
+    --accent: #0176D3;
+    --accent-hover: #014486;
+    --accent-soft: #EAF5FE;
+    --accent-soft-strong: #D8ECFB;
+    --success: #2E844A;
+    --success-soft: #E9F6EC;
+    --danger: #BA0517;
+    --danger-soft: #FDEEEF;
+    --warn: #A86403;
+    --warn-soft: #FFF6E1;
+    --shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.10);
+    --overlay: rgba(0, 0, 0, 0.4);
+    --radius: 4px;
 }
+
+.console_dark {
+    --bg: #16181D;
+    --surface: #242424;
+    --surface-alt: #2B2B2B;
+    --border: #3E3E3E;
+    --border-strong: #545454;
+    --text: #F3F3F3;
+    --text-secondary: #C9C7C5;
+    --text-tertiary: #9D9B99;
+    --accent: #1B96FF;
+    --accent-hover: #57A3FD;
+    --accent-soft: #0B2942;
+    --accent-soft-strong: #0F3A5F;
+    --success: #4BCA81;
+    --success-soft: #123822;
+    --danger: #FF6259;
+    --danger-soft: #3D1414;
+    --warn: #FFB75D;
+    --warn-soft: #3D2A0F;
+    --shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.3);
+    --overlay: rgba(0, 0, 0, 0.6);
+}
+
+.console {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Salesforce Sans', Arial, sans-serif;
+    font-size: 13px;
+    padding: 0.75rem 1rem 1rem;
+    border-radius: var(--radius);
+}
+
+/* ── Loading / error / not-dealer ───────────────────────────────────── */
+.state-block {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2rem 1rem;
+    color: var(--text-secondary);
+}
+
+.state-block_column { flex-direction: column; align-items: stretch; }
+.state-block__text { font-size: 0.8125rem; }
+.state-block__action { margin-top: 0.5rem; }
+
+/* ── Component header ───────────────────────────────────────────────── */
+.console__topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.6rem;
+}
+
+.console__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: var(--text);
+}
+
+.brand-mark {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 3px;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.theme-switch {
+    display: inline-flex;
+    border: 1px solid var(--border-strong);
+    border-radius: 1rem;
+    overflow: hidden;
+    background: var(--surface);
+}
+
+.theme-opt {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 0.2rem 0.7rem;
+    cursor: pointer;
+}
+
+.theme-opt:hover { background: var(--surface-alt); }
+
+.theme-opt_active {
+    background: var(--accent);
+    color: #ffffff;
+}
+
+.theme-opt_active:hover { background: var(--accent-hover); }
+
+/* ── Top-level tabs (Home · services) ───────────────────────────────── */
+.toptabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.toptab {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 0.55rem 0.875rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px;
+}
+
+.toptab:hover { color: var(--accent); background: var(--accent-soft); }
+
+.toptab_active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.toptab_active:hover { background: transparent; }
+
+/* ══ HOME — service picker ═══════════════════════════════════════════ */
+.picker { padding-top: 1rem; }
+
+.pageheader {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--accent);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 0.875rem 1.25rem 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.pageheader__row { display: flex; align-items: flex-start; gap: 0.75rem; }
+
+.pageheader__icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.pageheader__icon svg { width: 1.125rem; height: 1.125rem; }
+
+.pageheader__text { flex: 1; min-width: 0; }
+
+.pageheader__h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+    color: var(--text);
+}
+
+.crumb {
+    font-size: 0.6875rem;
+    color: var(--text-tertiary);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+}
+
+.subhead {
+    font-size: 0.78125rem;
+    color: var(--text-secondary);
+    margin: 0.625rem 0 0;
+    max-width: 82ch;
+    line-height: 1.5;
+}
+
+/* ── Page header: dealer identity (right-hand region) ───────────────── */
+.pageheader__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+}
+
+.pageheader__main { flex: 1 1 22rem; min-width: 0; }
+
+.pageheader__dealer {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-left: auto;
+    text-align: right;
+}
+
+.pageheader__dealer-name {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.pageheader__dealer-status {
+    margin: 0.1875rem 0 0;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 40rem) {
+    .pageheader__dealer {
+        margin-left: 0;
+        text-align: left;
+        flex-basis: 100%;
+    }
+}
+
+/* ── Service page header (top of a service tab) ─────────────────────── */
+.crumb-link {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.crumb-link:hover { color: var(--accent); text-decoration: underline; }
+.crumb-sep { margin: 0 0.35rem; }
+
+.highlights {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    margin-top: 0.875rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+.highlight {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0 1.5rem 0 0;
+    margin-right: 1.5rem;
+    border-right: 1px solid var(--border);
+}
+
+.highlight:last-child { border-right: none; margin-right: 0; padding-right: 0; }
+
+.highlight__k {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+}
+
+.highlight__v {
+    font-size: 0.8125rem;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+    flex-shrink: 0;
+}
+
+/* ── Cards ──────────────────────────────────────────────────────────── */
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.picker__card { max-width: 40rem; overflow: hidden; }
+
+.card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.125rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.card__title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text);
+}
+
+.card__head-actions { display: flex; align-items: center; gap: 0.625rem; }
+.card__count { font-size: 0.75rem; color: var(--text-tertiary); }
+
+/* ── Service rows ───────────────────────────────────────────────────── */
+.service-row {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.875rem 1.125rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.service-row:last-child { border-bottom: none; }
+.service-row:hover, .service-row:focus-visible { background: var(--surface-alt); outline: none; }
+
+.service-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 6px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.service-icon svg { width: 1.25rem; height: 1.25rem; }
+
+.service-text { flex: 1; min-width: 0; }
+.service-name { font-size: 0.875rem; font-weight: 600; color: var(--text); }
+.service-meta { font-size: 0.75rem; color: var(--text-tertiary); margin-top: 3px; }
+
+.chev-right { width: 1rem; height: 1rem; color: var(--text-tertiary); flex-shrink: 0; }
+
+/* ══ SERVICE WORKBENCH ═══════════════════════════════════════════════ */
+.workbench { padding-top: 1rem; }
 
 .console__header {
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid #e5e5e4;
-}
-
-.console__header h2 {
-    margin: 0;
+    border-bottom: 1px solid var(--border);
 }
 
 /* ── Header count chips ─────────────────────────────────────────────── */
-.counts {
-    gap: 0.5rem;
-}
+.counts { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
 .count-chip {
     display: inline-flex;
     align-items: baseline;
     gap: 0.35rem;
     padding: 0.25rem 0.6rem;
-    border: 1px solid #dddbda;
+    border: 1px solid var(--border);
     border-radius: 1rem;
     font-size: 0.75rem;
     line-height: 1.25;
     white-space: nowrap;
+    background: var(--surface);
 }
 
-.count-chip__num {
-    font-weight: 700;
-    font-size: 0.875rem;
-}
+.count-chip__num { font-weight: 700; font-size: 0.875rem; }
 
-.count-chip_attention { background: #fdf3e3; border-color: #f0c36d; color: #6b4e00; }
-.count-chip_new       { background: #eaf5fe; border-color: #9fc9e9; color: #0b5cab; }
-.count-chip_ok        { background: #f3f3f2; border-color: #dddbda; color: #514f4d; }
+.count-chip_attention { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.count-chip_new       { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.count-chip_ok        { background: var(--surface-alt); border-color: var(--border); color: var(--text-secondary); }
 
-/* ── Quick filter ───────────────────────────────────────────────────── */
-.filter-bar {
+/* ── Sub-tabs ───────────────────────────────────────────────────────── */
+.tabs {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
+    margin-top: 0.75rem;
+    border-bottom: 1px solid var(--border);
 }
 
-.filter-btn:focus-visible {
-    outline: 2px solid #0b5cab;
-    outline-offset: 1px;
+.tab {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
 }
 
-/* ── Unified package list ───────────────────────────────────────────── */
-.section-title {
-    margin: 0.25rem 0 0;
+.tab:hover { color: var(--accent); }
+
+.tab_active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
 }
 
+/* ── Two-pane layout ────────────────────────────────────────────────── */
+/* Master pane | flow arrow | Dealer pane */
+.pane-grid {
+    display: grid;
+    grid-template-columns: minmax(20rem, 1fr) auto minmax(22rem, 1.15fr);
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    align-items: start;
+}
+
+@media (max-width: 56rem) {
+    .pane-grid { grid-template-columns: 1fr; }
+}
+
+.pane {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    background: var(--surface);
+    min-width: 0;
+}
+
+.pane_master { background: var(--surface-alt); }
+
+.pane__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.pane__title { margin: 0; font-size: 0.8125rem; font-weight: 700; color: var(--text); }
+
+.pane__note { font-size: 0.6875rem; color: var(--text-tertiary); }
+
+/* ── Master package rows ────────────────────────────────────────────── */
 .pkg-list {
     list-style: none;
     margin: 0;
@@ -75,34 +493,15 @@
     gap: 1rem;
     padding: 0.75rem 0.875rem;
     margin-top: 0.5rem;
-    background: #ffffff;
-    border: 1px solid #e5e5e4;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-left: 3px solid transparent;
-    border-radius: 0.25rem;
-    transition: box-shadow 0.1s ease, border-color 0.1s ease;
+    border-radius: var(--radius);
 }
 
-.pkg-row:hover {
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
+.pkg-row:hover { box-shadow: var(--shadow); }
 
-.pkg-row:focus-within {
-    box-shadow: 0 0 0 2px #0b5cab;
-}
-
-.pkg-row_attention {
-    background: #fffdf9;
-    border-left-color: #dd7a01;
-}
-
-.pkg-row_muted {
-    background: #fafaf9;
-}
-
-.pkg-row__body {
-    min-width: 0;
-    flex: 1 1 auto;
-}
+.pkg-row__body { min-width: 0; flex: 1 1 auto; }
 
 .pkg-row__head {
     display: flex;
@@ -111,9 +510,7 @@
     gap: 0.5rem;
 }
 
-.pkg-row__name {
-    font-weight: 600;
-}
+.pkg-row__name { font-weight: 600; color: var(--text); }
 
 .pkg-row__meta {
     display: flex;
@@ -123,37 +520,1112 @@
     margin-top: 0.25rem;
 }
 
-.meta-text {
+.meta-text { font-size: 0.75rem; color: var(--text-tertiary); }
+
+.tag {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 0.05rem 0.5rem;
+    white-space: nowrap;
+}
+
+.pkg-row__reason { margin: 0.375rem 0 0; font-size: 0.75rem; color: var(--text-secondary); }
+
+.pkg-row__action { flex: 0 0 auto; align-self: center; }
+
+.empty-state { padding: 0.75rem 0; font-size: 0.75rem; color: var(--text-tertiary); }
+
+/* ── Status chips (from the server's tone token) ────────────────────── */
+.count-badge {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    border-radius: 1rem;
+    padding: 0.1rem 0.55rem;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.count-badge_attention { color: var(--warn); background: var(--warn-soft); border-color: var(--warn); }
+.count-badge_new       { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+.count-badge_ok        { color: var(--success); background: var(--success-soft); border-color: var(--success); }
+
+/* ── Accordion ──────────────────────────────────────────────────────── */
+.acc-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.acc {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-top: 0.5rem;
+    background: var(--surface);
+}
+
+.acc__head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    padding: 0.6rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    color: var(--text);
+}
+
+.acc__chevron { color: var(--text-tertiary); width: 1rem; }
+.acc__title { font-weight: 600; margin-right: 0.25rem; color: var(--text); }
+
+.acc__body {
+    padding: 0.25rem 0.75rem 0.875rem;
+    border-top: 1px solid var(--border);
+}
+
+.sub-title {
     font-size: 0.75rem;
-    color: #514f4d;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-tertiary);
+    margin: 0.875rem 0 0.25rem;
 }
 
-.pkg-row__reason {
-    margin: 0.375rem 0 0;
-    color: #514f4d;
+/* ── Commercial price bar ───────────────────────────────────────────── */
+.price-bar {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 0.6rem;
+    background: var(--accent-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
 }
 
-.pkg-row__action {
+.field { display: flex; flex-direction: column; gap: 0.15rem; }
+
+.field__label { font-size: 0.6875rem; color: var(--text-secondary); }
+
+.cell-input {
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 0.15rem 0.35rem;
+    font-size: 0.75rem;
+    min-width: 6rem;
+    max-width: 9rem;
+    background: var(--surface);
+    color: var(--text);
+}
+
+.cell-input_xs { min-width: 4.25rem; max-width: 5.5rem; }
+
+/* Inside the fixed-width Discount track the two controls may shrink instead of
+   pushing out of their column. */
+.disc-cell .cell-input_xs { min-width: 0; flex: 0 1 4.25rem; }
+
+.cell-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* ── Terms table ────────────────────────────────────────────────────── */
+.terms {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.terms th {
+    text-align: left;
+    color: var(--text-tertiary);
+    font-weight: 600;
+    padding: 0.25rem 0.35rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.terms td {
+    padding: 0.3rem 0.35rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    color: var(--text);
+}
+
+.term-name { font-weight: 600; }
+.money { font-variant-numeric: tabular-nums; }
+.frozen {
+    display: block;
+    font-size: 0.625rem;
+    color: var(--text-tertiary);
+    overflow-wrap: anywhere;
+}
+
+/* ── Options ────────────────────────────────────────────────────────── */
+.opt-grid { display: flex; flex-direction: column; gap: 0.375rem; margin-top: 0.25rem; }
+
+.opt-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.opt-row__name { display: flex; align-items: center; gap: 0.5rem; min-width: 12rem; }
+.opt-name { font-weight: 600; }
+
+.opt-row__cells {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.cell-label { font-size: 0.6875rem; color: var(--text-secondary); }
+.opt-row__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
+
+.opt-state {
+    font-size: 0.625rem;
+    border-radius: 0.75rem;
+    padding: 0.05rem 0.5rem;
+    border: 1px solid;
+}
+
+.opt-state_kept { color: var(--success); border-color: var(--success); background: var(--success-soft); }
+.opt-state_removed { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+
+/* ── Inline action buttons ─────────────────────────────────────────────────
+   The Save / keep-remove pair, the term strip's Save and the package-level
+   price + sync actions. A plain <button> with a class we own (the same idea
+   as the fee chip, the tabs and the crumb) rather than a base component
+   whose inner text node we cannot style — so a label can NEVER wrap onto a
+   second line and every button in the set shares one height, padding, font
+   size, corner radius and alignment. Colours read the shared theme tokens,
+   so dark (default) and light both come out correct. */
+.act-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex: 0 0 auto;
-    align-self: center;
+    width: max-content;
+    box-sizing: border-box;
+    padding: 0.2rem 0.6rem;
+    font-family: inherit;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    color: var(--text-secondary);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 0.75rem;
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
-.empty-state {
-    padding: 0.75rem 0;
+.act-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.act-btn:active:not(:disabled) { background: var(--accent-soft); }
+.act-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.act-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Flat sections (Dealer Portal Preview / Commissions) ────────────── */
+.flat-section { margin-top: 0.75rem; }
+
+.flat-section .card { padding: 0.75rem; margin-top: 0.5rem; }
+.flat-section .card__title { margin: 0 0 0.15rem; }
+
+/* ── Dealer Portal Preview ──────────────────────────────────────────────
+   A read-only "what the dealer actually sees" view: grouped by package
+   group (the configuration tree's family rows), one package block per
+   package, and the prototype's four-column table
+   (Term/Option · List Price · Discount · Dealer Price).  ONE identical
+   grid template is shared by the header and every body row, every cell is
+   shrinkable and wraps inside its own track (never spilling into the next
+   column), and every colour reads the shared theme tokens so dark (the
+   default) and light both come out correct. */
+.preview-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
 }
 
+.preview-head__text { min-width: 0; }
+.preview-head__h { margin: 0; font-size: 0.9375rem; font-weight: 700; color: var(--text); }
+
+.preview-head__hint {
+    margin: 0.2rem 0 0;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    max-width: 62rem;
+    line-height: 1.45;
+}
+
+.preview-body { margin-top: 0.75rem; }
+
+/* Group header — the same visual language as the configuration tree's
+   family-header rows: uppercase, muted, surface-alt band with borders. */
+.preview-fam-header {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    background: var(--surface-alt);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.preview-fam:first-child .preview-fam-header { border-top: none; }
+
+.preview-pkg { border-bottom: 1px solid var(--border); }
+.preview-pkg:last-child { border-bottom: none; }
+
+.preview-pkg-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.35rem 0.75rem;
+    padding: 0.7rem 0.75rem 0.4rem;
+}
+
+.preview-pkg-name { font-size: 0.875rem; font-weight: 700; color: var(--text); }
+.preview-pkg-meta { font-size: 0.75rem; font-weight: 500; color: var(--text-tertiary); }
+
+.preview-table {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    margin: 0 0.75rem 0.75rem;
+    /* A genuinely narrow pane scrolls horizontally rather than overlapping. */
+    overflow-x: auto;
+    overflow-y: visible;
+}
+
+/* ONE column template for the header and every body row alike. */
+.preview-trow-head,
+.preview-trow {
+    display: grid;
+    grid-template-columns: minmax(9rem, 1.6fr) minmax(5.5rem, 0.8fr) minmax(5.5rem, 0.8fr) minmax(7.5rem, 1fr);
+    gap: 0.5rem;
+    align-items: center;
+    min-width: 30rem;
+}
+
+/* Every direct grid child is shrinkable AND wraps inside its own track. */
+.preview-trow-head > *,
+.preview-trow > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.preview-trow-head {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    background: var(--surface-alt);
+    border-bottom: 1px solid var(--border);
+}
+
+.pv-col-list, .pv-col-final { text-align: right; }
+.pv-col-disc { text-align: center; }
+
+.preview-trow {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+}
+
+.preview-trow:last-child { border-bottom: none; }
+.preview-trow:hover { background: var(--surface-alt); }
+.preview-trow_opt { background: var(--surface-alt); }
+.preview-trow_opt:hover { background: var(--accent-soft); }
+
+.pv-term {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.pv-opt {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+.pv-indent { display: inline-block; width: 1rem; flex-shrink: 0; }
+.pv-label { min-width: 0; overflow-wrap: anywhere; }
+
+.pv-list {
+    text-align: right;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.pv-disc { text-align: center; color: var(--text-tertiary); }
+
+.pv-final {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+    min-width: 0;
+    text-align: right;
+}
+
+.pv-final-price {
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.preview-trow .fee-line {
+    display: block;
+    font-size: 0.625rem;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    text-align: right;
+    white-space: normal;
+}
+
+.preview-empty {
+    padding: 1.5rem 1rem;
+    text-align: center;
+    color: var(--text-tertiary);
+    font-size: 0.8125rem;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────── */
 .console__footer {
-    padding-top: 0.5rem;
-    border-top: 1px solid #e5e5e4;
+    padding-top: 0.75rem;
+    margin-top: 1rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
 }
 
-/* ── Narrow modal: stack the action under the row ───────────────────── */
-@media (max-width: 30rem) {
-    .pkg-row {
-        flex-direction: column;
-    }
+/* ── Confirmation dialog (own markup → themeable) ───────────────────── */
+.dialog__header { background: var(--surface); border-bottom: 1px solid var(--border); }
+.dialog__title { color: var(--text); margin: 0; }
+.dialog__content { background: var(--surface); }
+.dialog__summary { margin: 0; font-size: 0.8125rem; color: var(--text); }
+.dialog__note { margin: 0.75rem 0 0; font-size: 0.75rem; color: var(--text-tertiary); }
+.dialog__footer { background: var(--surface); border-top: 1px solid var(--border); }
 
-    .pkg-row__action {
-        align-self: flex-start;
-    }
+/* ══════════════════════════════════════════════════════════════════════
+   Grouped package tree (Release → Group → Package) — both panes.
+   Mirrors the master-packages prototype: header rows carry a tri-state
+   checkbox + "(n of m selected)" counter + a chevron; package rows carry
+   the mock's four columns (Name · Per Claim Limit · Deductible · Series).
+   ══════════════════════════════════════════════════════════════════════ */
+.pane__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    justify-content: flex-end;
 }
+
+.pane__count { font-size: 0.6875rem; color: var(--text-secondary); white-space: nowrap; }
+.pane__sep { color: var(--text-tertiary); font-size: 0.6875rem; }
+
+.link-btn {
+    border: none;
+    background: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.link-btn:hover { color: var(--accent-hover); text-decoration: underline; }
+
+.icon-btn {
+    border: none;
+    background: none;
+    padding: 2px;
+    margin: 0;
+    display: flex;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
+.icon-btn svg { width: 14px; height: 14px; }
+
+/* Column header row — same grid as every row below it */
+.tree-cols,
+.ref-header,
+.family-header,
+.tree-row {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1.7fr) 0.9fr 0.9fr 0.6fr 26px;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.tree-cols {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    border-bottom: 1px solid var(--border);
+}
+
+.tree { margin-top: 0.1rem; max-height: 30rem; overflow-y: auto; }
+
+.tree-ref { border-top: 2px solid var(--border-strong); }
+.tree-ref:first-child { border-top: none; }
+
+.ref-header {
+    padding: 0.6rem 0.75rem;
+    background: var(--accent-soft);
+    border-bottom: 1px solid var(--border-strong);
+    cursor: pointer;
+}
+
+.ref-header:hover { background: var(--accent-soft-strong); }
+
+.ref-label {
+    grid-column: 2 / span 4;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.ref-count { font-weight: 500; font-size: 0.75rem; color: var(--text-secondary); }
+
+.ref-body { padding-left: 0.9rem; }
+
+.family-header {
+    padding: 0.45rem 0.75rem;
+    background: var(--surface-alt);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+}
+
+.family-header:first-child { border-top: none; }
+.family-header:hover { background: var(--accent-soft); }
+
+.family-label {
+    grid-column: 2 / span 4;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.family-count {
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    font-size: 0.6875rem;
+    color: var(--text-tertiary);
+}
+
+.row-group { border-bottom: 1px solid var(--border); }
+.row-group:last-child { border-bottom: none; }
+
+.tree-row { padding: 0.5rem 0.75rem; }
+.tree-row:hover { background: var(--surface-alt); }
+.tree-row_open { background: var(--accent-soft); }
+
+.name-cell { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
+
+.pkg-name {
+    font-size: 0.8125rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tree-row .num { font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
+.tree-row .series { font-size: 0.6875rem; color: var(--text-tertiary); }
+
+.chev {
+    border: none;
+    background: none;
+    padding: 2px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    justify-self: end;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 0.625rem;
+    line-height: 1;
+    width: 20px;
+    height: 20px;
+}
+
+.chev::before { content: '\25B8'; }
+.chev_open::before { content: '\25BE'; }
+.chev:hover { background: var(--accent-soft); color: var(--accent); }
+.tree-row_open .chev { color: var(--accent); }
+
+.tree-cols input[type="checkbox"],
+.ref-header input[type="checkbox"],
+.family-header input[type="checkbox"],
+.tree-row input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.row-detail {
+    padding: 0.5rem 0.75rem 0.75rem 2.1rem;
+    border-top: 1px dashed var(--border);
+    background: var(--surface-alt);
+}
+
+.row-detail_authoring { padding-left: 0.75rem; }
+
+.row-detail__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+
+.pkg-reason { margin: 0.35rem 0 0; font-size: 0.75rem; color: var(--text-secondary); }
+
+.update-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--warn);
+    background: var(--warn-soft);
+    border-radius: var(--radius);
+}
+
+.update-strip__text { font-size: 0.75rem; color: var(--warn); }
+
+/* Flow arrow between the two panes */
+.flow-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    padding: 0 0.15rem;
+}
+
+.btn-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #ffffff;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.4rem 0.7rem;
+    border-radius: 1rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-copy:hover:enabled { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-copy:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-copy svg { width: 14px; height: 14px; }
+
+@media (max-width: 56rem) {
+    .flow-arrow { padding: 0.5rem 0; }
+    .row-detail { padding-left: 0.75rem; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Terms & Additional Options — the expandable tiers table (BOTH panes).
+   Level cues, in order: catalogue release › group › package › term ›
+   additional option. Each nesting level carries its own weight / size /
+   marker so a group can never be read as a package, nor a term as an
+   option. Every colour reads from the shared theme tokens (dark default).
+   ══════════════════════════════════════════════════════════════════════ */
+.accordion-label {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 0.75rem 0 0.4rem;
+}
+
+.accordion-label__text {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+}
+
+.ref-only-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 3px;
+    padding: 0.1rem 0.5rem;
+}
+
+/* The hierarchy crumb — names every level so the identification is explicit. */
+.ref-crumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.4rem;
+    font-size: 0.6875rem;
+}
+
+.ref-crumb__level { color: var(--text-secondary); }
+.ref-crumb__level_release {
+    color: var(--accent);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.ref-crumb__level_group {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+}
+.ref-crumb__level_pkg { font-weight: 600; color: var(--text); }
+.ref-crumb__sep { color: var(--text-tertiary); }
+.ref-crumb__count { margin-left: auto; color: var(--text-tertiary); }
+
+.detail-state {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0.25rem 0.25rem;
+    color: var(--text-secondary);
+}
+.detail-state__text { font-size: 0.75rem; }
+
+.ref-detail { margin-top: 0.5rem; }
+
+.tiers-table {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    /* Horizontal scrolling is the fallback for a genuinely narrow pane; the
+       vertical axis must NOT clip — a row that grows taller when its content
+       wraps would otherwise lose its wrapped lines. */
+    overflow-x: auto;
+    overflow-y: visible;
+}
+
+.trow-head,
+.trow {
+    display: grid;
+    grid-template-columns: 26px minmax(90px, 1.3fr) minmax(110px, 1.7fr) 96px 152px 96px;
+    gap: 0.5rem;
+    /* Start alignment: the vertical padding does the optical centring, so a
+       row that grows taller never pushes cells into each other. */
+    align-items: start;
+    min-width: 40rem;
+}
+
+/* Every direct grid child must be shrinkable AND wrap its own content, so a
+   long value wraps inside its own track instead of spilling into the next
+   column. Applies to the reference and the authoring table alike. */
+.trow > *,
+.trow-head > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.trow-head {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    background: var(--surface-alt);
+    border-bottom: 1px solid var(--border);
+}
+
+.trow-head span:nth-child(4),
+.trow-head span:nth-child(6) { text-align: right; }
+.trow-head span:nth-child(5) { text-align: center; }
+
+.trow {
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+}
+
+.trow_group-start { border-top: 1px solid var(--border-strong); }
+.trow:hover { background: var(--surface-alt); }
+.trow_addon { background: var(--surface-alt); }
+.trow_addon:hover { background: var(--accent-soft); }
+
+.tier-block { min-width: 40rem; }
+
+.lvl { font-size: 0.625rem; line-height: 1; color: var(--text-tertiary); text-align: center; }
+.lvl_term { color: var(--accent); }
+.lvl_opt { color: var(--text-tertiary); }
+
+.tier-cell {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+.trow_addon .tier-cell { visibility: hidden; }
+
+.term-cell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.lvl-chip {
+    flex-shrink: 0;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-radius: 0.75rem;
+    padding: 0.02rem 0.4rem;
+    border: 1px solid;
+}
+.lvl-chip_term { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.lvl-chip_opt { color: var(--text-tertiary); border-color: var(--border-strong); background: transparent; }
+
+.term-label { font-size: 0.8125rem; font-weight: 600; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.addon-label { font-size: 0.75rem; font-weight: 400; color: var(--text-secondary); }
+
+.opt-indent { display: inline-block; width: 1rem; flex-shrink: 0; }
+
+.price-orig {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: right;
+    /* The anchor note wraps under the price instead of crossing columns. */
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.price-final { font-size: 0.8125rem; font-weight: 700; color: var(--text); text-align: right; }
+
+.disc-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    min-width: 0;
+}
+.disc-cell_ref { color: var(--text-tertiary); }
+
+/* Reference-table checkbox column — layout parity with the mock, never wired
+   to a write on a read-only reference row (options are chosen after copying). */
+.ref-chk { display: flex; justify-content: center; }
+.ref-chk input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--accent);
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Authoring strip beneath a term / option row — keeps EVERY existing control
+   (markup, incentive, net, save, keep / remove) while the row itself shows the
+   mock's three price columns. */
+.trow-detail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem 0.5rem 3.1rem;
+    border-bottom: 1px dashed var(--border);
+    background: var(--surface);
+}
+.trow-detail_addon { padding-left: 4.35rem; background: var(--surface-alt); }
+
+.tiers-table_auth .trow { border-bottom: none; }
+.tiers-table_auth .trow-detail { border-bottom: 1px solid var(--border); }
+.tiers-table_auth .tier-block:last-child > div:last-child .trow-detail:last-child { border-bottom: none; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   Premium vehicle fee (per term) — the mock's fee chip on the term row,
+   the editable amount + combined "+ $x fee = $y" note in the Dealer Price
+   cell, and the package-level bulk clear strip.
+   ══════════════════════════════════════════════════════════════════════ */
+.fee-chip {
+    flex-shrink: 0;
+    margin-left: 0.35rem;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    line-height: 1.5;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.75rem;
+    padding: 0.02rem 0.45rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.fee-chip:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.fee-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+.fee-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.fee-chip_on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fee-chip_on:hover:not(:disabled) {
+    background: var(--accent-hover); border-color: var(--accent-hover); color: #fff;
+}
+
+/* The Dealer Price cell stacks the price and, when the fee is on, the note. */
+.tiers-table_auth .price-final {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+    min-width: 0;
+    max-width: 100%;
+}
+.fee-note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.2rem;
+    max-width: 100%;
+    min-width: 0;
+    font-size: 0.625rem;
+    color: var(--text-tertiary);
+    text-align: right;
+    /* No nowrap: "+ $x fee = $y" wraps inside the Dealer Price cell instead of
+       riding over the neighbouring column. */
+    white-space: normal;
+}
+.fee-note input.fee-amt-input {
+    width: 3rem;
+    min-width: 2.75rem;
+    padding: 0.05rem 0.3rem;
+    font-size: 0.625rem;
+    text-align: right;
+    flex: 0 1 auto;
+}
+
+/* The authoring table uses ONE track set for the header and for EVERY body
+   row — term rows and the folded option rows alike — so all columns line up
+   with each other. The Dealer Price track is wide enough for the fee note; the
+   trailing track belongs to the option's inline actions and stays empty on the
+   other rows (the option row used to carry an extra `auto` track, which pushed
+   its columns out of step with the header). */
+.tiers-table_auth .trow-head,
+.tiers-table_auth .trow,
+.tiers-table_auth .trow_addon {
+    grid-template-columns:
+        26px                  /* level cue */
+        minmax(80px, 1.1fr)   /* tier name */
+        minmax(150px, 1.8fr)  /* term / option */
+        96px                  /* original dealer price */
+        minmax(108px, 0.9fr)  /* discount */
+        minmax(190px, 1.4fr)  /* dealer price (+ fee note) */
+        minmax(168px, 1.05fr);/* option actions — compact Save / keep-remove pair */
+    /* Track minimums still total 818px (+ 48px gaps + 24px padding = 890px)
+       inside the declared 56rem / 896px floor, so a narrow pane scrolls
+       horizontally instead of overlapping. The trailing actions track grew
+       from 124px to 168px so the now-compact Save / keep-remove pair sits on
+       ONE line; the discount and original-price tracks gave up the slack
+       (two small controls / a wrapping note live there), so the total, and
+       therefore the no-overlap guarantee, is unchanged. */
+}
+
+/* A genuinely narrow pane scrolls horizontally rather than overlapping: the
+   tracks keep their minimums. */
+.tiers-table_auth .trow-head,
+.tiers-table_auth .trow,
+.tiers-table_auth .tier-block {
+    min-width: 56rem;
+}
+.opt-actions {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* Package-level bulk clear — confirm-gated, sits under the terms table. */
+.fee-remove-strip {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+.fee-remove-hint { font-size: 0.6875rem; color: var(--text-tertiary); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   Dealer-level premium vehicle fees — the dealer-wide card at the top of
+   Package Configuration (applies across every package, not per package).
+   Every colour reads the shared theme tokens, so it is correct in dark
+   (default) and light mode.
+   ══════════════════════════════════════════════════════════════════════ */
+.dealer-fees {
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem 0.875rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.dealer-fees__head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.dealer-fees__title { margin: 0; font-size: 0.8125rem; font-weight: 700; color: var(--text); }
+
+.dealer-fees__scope {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: 0.75rem;
+    padding: 0.05rem 0.5rem;
+    white-space: nowrap;
+}
+
+.dealer-fees__intro { margin: 0.35rem 0 0; font-size: 0.75rem; color: var(--text-secondary); }
+
+.dealer-fees__grid {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+    margin-top: 0.75rem;
+}
+
+.dealer-fees__grid .field { max-width: 26rem; }
+
+.dealer-fees__actions { align-self: flex-end; margin-left: auto; }
+
+.dealer-fees__state {
+    margin: 0.75rem 0 0;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.6875rem;
+    color: var(--text-tertiary);
+}
+
+/* Muted helper lines under a field — the master reference and the ownership note. */
+.hint {
+    display: block;
+    font-size: 0.625rem;
+    color: var(--text-tertiary);
+    margin-top: 3px;
+    max-width: 30rem;
+    line-height: 1.4;
+}
+.hint_muted { font-style: italic; }
+
+/* On/off switch — theme-aware, native checkbox kept for accessibility. */
+.switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    margin-top: 2px;
+    position: relative;
+}
+
+.switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+.switch__track {
+    width: 2.25rem;
+    height: 1.15rem;
+    border-radius: 1rem;
+    background: var(--border-strong);
+    position: relative;
+    transition: background 0.12s ease;
+    flex-shrink: 0;
+}
+
+.switch__knob {
+    position: absolute;
+    top: 0.15rem;
+    left: 0.15rem;
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 50%;
+    background: #ffffff;
+    transition: transform 0.12s ease;
+}
+
+.switch input:checked + .switch__track { background: var(--accent); }
+.switch input:checked + .switch__track .switch__knob { transform: translateX(1.1rem); }
+.switch input:focus-visible + .switch__track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch input:disabled + .switch__track { opacity: 0.5; }
+.switch input:disabled ~ .switch__state { opacity: 0.6; }
+
+.switch__state { font-size: 0.6875rem; font-weight: 600; color: var(--text-secondary); }

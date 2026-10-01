@@ -111,7 +111,7 @@ private class DealerPackageSyncServiceTest {
     // ---------------------------------------------------------------------
 
     @isTest
-    static void test_masterPriceChangePropagatesAndPreservesMarkup() {
+    static void test_masterPriceChangeFrozenOnceDealerHasLocalPricing() {
         Account dealer = createDistinctDealer(1);
         Package__c pkg = getMasterPackage();
         Dealer_Package__c dp = TestDataFactory.createDealerPackage(
@@ -151,14 +151,17 @@ private class DealerPackageSyncServiceTest {
                    Sales_Rep_Incentive__c
             FROM Dealer_Package_Term__c WHERE Dealer_Package__c = :dp.Id LIMIT 1
         ];
-        // Org fact: Net_Cost/Retail are FORMULAS anchored on the stored
-        // Original_Package_Term_Cost snapshot + dealer discount/markup:
-        //   Net = Original − discount($50) = 1850; Retail = Net + markup($200) = 2050.
-        System.assertEquals(1900, after.Original_Package_Term_Cost__c,
-            'Stored wholesale anchor refreshed from master in one run');
-        System.assertEquals(1850, after.Net_Cost__c,
-            'Net_Cost (formula) = anchor − preserved $50 discount');
-        System.assertEquals(2050, after.Retail_Price__c,
+        // PRICE-ANCHOR FREEZE: the dealer already has local pricing, so the
+        // stored wholesale anchor is frozen — the master edit must NOT move the
+        // dealer's effective price. Org fact: Net_Cost/Retail are FORMULAS
+        // anchored on the stored Original_Package_Term_Cost snapshot + dealer
+        // discount/markup:
+        //   Net = Original(1500) − discount($50) = 1450; Retail = Net + markup($200) = 1650.
+        System.assertEquals(1500, after.Original_Package_Term_Cost__c,
+            'Frozen anchor: a master price edit must not move the dealer effective price');
+        System.assertEquals(1450, after.Net_Cost__c,
+            'Net_Cost (formula) = frozen anchor − preserved $50 discount');
+        System.assertEquals(1650, after.Retail_Price__c,
             'Retail (formula) = Net + preserved $200 markup');
         System.assertEquals(200, after.Markup__c, 'Markup untouched by sync');
         System.assertEquals('$', after.Markup_Type__c, 'Markup type untouched');
@@ -600,5 +603,104 @@ private class DealerPackageSyncServiceTest {
         System.assertEquals(425.00,
             [SELECT Premium_Model_Fee__c FROM Dealer_Package_Term__c WHERE Id = :dealerTerm.Id].Premium_Model_Fee__c,
             'the kill switch blocks the re-push write');
+    }
+
+    // ---------------------------------------------------------------------
+    // Price-anchor freeze: without local pricing the anchor still tracks the
+    // master (initial mirror behaviour is unchanged)
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_masterPriceChangeTracksWhenNoLocalPricing() {
+        Account dealer = createDistinctDealer(4);
+        Package__c pkg = getMasterPackage();
+        Dealer_Package__c dp = TestDataFactory.createDealerPackage(
+            dealer.Id, pkg.Id, 'Extended_Limited_Warranty', true);
+
+        Package_Term__c masterTerm = [
+            SELECT Id FROM Package_Term__c WHERE Package_Tier__c IN
+                (SELECT Id FROM Package_Tier__c WHERE Package__c = :pkg.Id) LIMIT 1
+        ];
+        update new Package_Term__c(Id = masterTerm.Id, Price__c = 1900);
+
+        Test.startTest();
+        DealerPackageSyncService.reconcileForMasterTerm(new Set<Id>{ masterTerm.Id });
+        Test.stopTest();
+
+        Dealer_Package_Term__c after = [
+            SELECT Original_Package_Term_Cost__c FROM Dealer_Package_Term__c
+            WHERE Dealer_Package__c = :dp.Id LIMIT 1
+        ];
+        System.assertEquals(1900, after.Original_Package_Term_Cost__c,
+            'With no local pricing the anchor keeps tracking the master');
+    }
+
+    // ---------------------------------------------------------------------
+    // Removed add-on: never re-created, never refreshed
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_removedOptionNeverRecreatedNorRefreshed() {
+        Account dealer = createDistinctDealer(5);
+        Package__c pkg = getMasterPackage();
+        Dealer_Package__c dp = TestDataFactory.createDealerPackage(
+            dealer.Id, pkg.Id, 'Extended_Limited_Warranty', true);
+
+        Dealer_Package_Option__c removed = [
+            SELECT Id, Original_Package_Option_Price__c FROM Dealer_Package_Option__c
+            WHERE Dealer_Package__c = :dp.Id AND Selection_Type__c = 'Included' LIMIT 1
+        ];
+        update new Dealer_Package_Option__c(Id = removed.Id, Is_Removed__c = true);
+
+        Integer before = [SELECT COUNT() FROM Dealer_Package_Option__c WHERE Dealer_Package__c = :dp.Id];
+
+        Package_Option__c masterIncluded = [
+            SELECT Id FROM Package_Option__c
+            WHERE Package__c = :pkg.Id AND Selection_Type__c = 'Included' LIMIT 1
+        ];
+        update new Package_Option__c(Id = masterIncluded.Id, Price__c = 175);
+
+        Test.startTest();
+        DealerPackageSyncService.reconcileForMasterOption(new Set<Id>{ masterIncluded.Id });
+        Test.stopTest();
+
+        System.assertEquals(before,
+            [SELECT COUNT() FROM Dealer_Package_Option__c WHERE Dealer_Package__c = :dp.Id],
+            'A removed add-on is never re-created by a reconcile');
+
+        Dealer_Package_Option__c after = [
+            SELECT Is_Removed__c, Original_Package_Option_Price__c
+            FROM Dealer_Package_Option__c WHERE Id = :removed.Id
+        ];
+        System.assertEquals(true, after.Is_Removed__c,
+            'The removal flag survives the reconcile');
+        System.assertEquals(removed.Original_Package_Option_Price__c,
+            after.Original_Package_Option_Price__c,
+            'A removed add-on is not refreshed from the master');
+    }
+
+    // ---------------------------------------------------------------------
+    // Dealer commercial price: seeded at creation, then dealer-owned
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_dealerCommercialPriceNeverRefreshedFromMaster() {
+        Account dealer = createDistinctDealer(6);
+        Package__c pkg = getMasterPackage();
+        Dealer_Package__c dp = TestDataFactory.createDealerPackage(
+            dealer.Id, pkg.Id, 'Extended_Limited_Warranty', true);
+
+        // The dealer owns their commercial figure.
+        update new Dealer_Package__c(Id = dp.Id, Commercial_Vehicle_Surcharge_Fee__c = 999.00);
+
+        Test.startTest();
+        DealerPackageSyncService.reconcileForMasterPackage(new Set<Id>{ pkg.Id });
+        Test.stopTest();
+
+        Dealer_Package__c after = [
+            SELECT Commercial_Vehicle_Surcharge_Fee__c FROM Dealer_Package__c WHERE Id = :dp.Id
+        ];
+        System.assertEquals(999.00, after.Commercial_Vehicle_Surcharge_Fee__c,
+            'The dealer commercial price is dealer-owned and never refreshed from the master');
     }
 }

@@ -1,173 +1,886 @@
 <template>
-    <!-- Loading -->
-    <template if:true={viewLoading}>
-        <div class="slds-p-around_large slds-align_absolute-center">
-            <lightning-spinner alternative-text="Loading packages" size="medium"></lightning-spinner>
-            <span class="slds-m-left_small slds-text-body_regular">Loading packages…</span>
-        </div>
-    </template>
+    <div class={rootClass} role="region" aria-label="Dealer package console">
 
-    <!-- Error -->
-    <template if:true={viewError}>
-        <div class="slds-p-around_medium">
-            <lightning-alert variant="error" title="Packages could not be loaded"
-                message={errorMessage}></lightning-alert>
-            <div class="slds-m-top_small">
-                <lightning-button label="Try again" variant="brand"
-                    onclick={loadInventory}></lightning-button>
+        <!-- Loading -->
+        <template if:true={viewLoading}>
+            <div class="state-block">
+                <lightning-spinner alternative-text="Loading packages" size="medium"></lightning-spinner>
+                <span class="state-block__text">Loading packages…</span>
             </div>
-        </div>
-    </template>
+        </template>
 
-    <!-- Not a dealer account -->
-    <template if:true={viewNotDealer}>
-        <div class="slds-p-around_medium">
-            <lightning-alert variant="info" title="Dealer accounts only"
-                message="This action is available on dealer accounts only."></lightning-alert>
-        </div>
-    </template>
-
-    <!-- Ready -->
-    <template if:true={viewReady}>
-        <div class="console slds-p-around_medium" role="region" aria-label="Dealer package sync">
-
-            <!-- Header -->
-            <header class="console__header slds-grid slds-grid_align-spread slds-grid_vertical-align-start slds-wrap">
-                <div class="slds-m-right_medium slds-m-bottom_x-small">
-                    <h2 class="slds-text-heading_small slds-truncate" title={accountName}>{accountName}</h2>
-                    <p class="slds-text-body_small slds-text-color_weak slds-m-top_xxx-small">
-                        {syncEnabledMessage}
-                    </p>
+        <!-- Error -->
+        <template if:true={viewError}>
+            <div class="state-block state-block_column">
+                <lightning-alert variant="error" title="Packages could not be loaded"
+                    message={errorMessage}></lightning-alert>
+                <div class="state-block__action">
+                    <lightning-button label="Try again" variant="brand" onclick={loadAll}></lightning-button>
                 </div>
-                <div class="counts slds-grid slds-wrap" role="status" aria-live="polite">
-                    <span class="count-chip count-chip_attention">
-                        <span class="count-chip__num">{updateCount}</span>
-                        <span class="count-chip__lbl">update available</span>
-                    </span>
-                    <span class="count-chip count-chip_new">
-                        <span class="count-chip__num">{toAddCount}</span>
-                        <span class="count-chip__lbl">available to add</span>
-                    </span>
-                    <span class="count-chip count-chip_ok">
-                        <span class="count-chip__num">{uptodateCount}</span>
-                        <span class="count-chip__lbl">up to date</span>
-                    </span>
+            </div>
+        </template>
+
+        <!-- Not a dealer account -->
+        <template if:true={viewNotDealer}>
+            <div class="state-block state-block_column">
+                <lightning-alert variant="info" title="Dealer accounts only"
+                    message="This action is available on dealer accounts only."></lightning-alert>
+            </div>
+        </template>
+
+        <!-- Ready -->
+        <template if:true={viewReady}>
+
+            <!-- Component header: identity + theme toggle -->
+            <header class="console__topbar">
+                <div class="console__brand">
+                    <span class="brand-mark" aria-hidden="true"></span>
+                    <span class="brand-text">A-Protect Dealer Sync Console</span>
+                </div>
+                <div class="theme-switch" role="group" aria-label="Theme">
+                    <button type="button" class={themeDarkClass} onclick={handleThemeDark}
+                        aria-pressed={isDark} title="Dark theme">Dark</button>
+                    <button type="button" class={themeLightClass} onclick={handleThemeLight}
+                        aria-pressed={isLight} title="Light theme">Light</button>
                 </div>
             </header>
 
-            <!-- View-only lock -->
-            <template if:true={flagOff}>
-                <div class="slds-m-top_small">
-                    <lightning-alert variant="warning" title="Editing is switched off"
-                        message={flagOffMessage}></lightning-alert>
-                </div>
-            </template>
-
-            <!-- Quick filter -->
-            <div class="filter-bar slds-m-top_medium" role="group" aria-label="Filter packages">
-                <template for:each={filterButtons} for:item="f">
-                    <button key={f.value} type="button" class={f.cls} data-value={f.value}
-                        onclick={handleFilter} aria-pressed={f.aria}>{f.text}</button>
+            <!-- Top-level tabs -->
+            <nav class="toptabs" role="tablist" aria-label="Console views">
+                <template for:each={topTabs} for:item="t">
+                    <button key={t.value} type="button" class={t.cls} role="tab"
+                        data-tab={t.value} onclick={handleTopTab} aria-selected={t.aria}>{t.label}</button>
                 </template>
-            </div>
+            </nav>
 
-            <!-- The one unified list -->
-            <section class="slds-m-top_small">
-                <h3 class="section-title slds-text-title_bold">Packages</h3>
-
-                <template if:true={noRows}>
-                    <p class="empty-state slds-text-body_small slds-text-color_weak">{emptyMessage}</p>
-                </template>
-
-                <ul class="pkg-list" role="list">
-                    <template for:each={visibleRows} for:item="row">
-                        <li key={row.rowId} class={row.rowClass}>
-                            <div class="pkg-row__body">
-                                <div class="pkg-row__head">
-                                    <span class="pkg-row__name slds-text-body_regular">{row.name}</span>
-                                    <span class={row.chipClass}>{row.statusLabel}</span>
-                                </div>
-                                <div class="pkg-row__meta">
-                                    <span class="slds-badge slds-badge_lightest">{row.recordTypeLabel}</span>
-                                    <template if:true={row.hasPlanType}>
-                                        <span class="meta-text">{row.planTypeLabel}</span>
-                                    </template>
-                                    <span class="meta-text">{row.countsLabel}</span>
-                                    <template if:true={row.hasSchedule}>
-                                        <span class="meta-text">{row.scheduleLabel}</span>
-                                    </template>
-                                    <template if:true={row.hasRelease}>
-                                        <span class="meta-text">{row.releaseLabel}</span>
-                                    </template>
-                                    <template if:true={row.hasLastSynced}>
-                                        <span class="meta-text">{row.lastSyncedLabel}</span>
-                                    </template>
-                                </div>
-                                <p class="pkg-row__reason slds-text-body_small">{row.reason}</p>
+            <!-- ══ Home — service picker (on-load view) ══ -->
+            <template if:true={showHome}>
+                <section class="picker">
+                    <div class="pageheader">
+                        <div class="pageheader__row">
+                            <div class="pageheader__icon" aria-hidden="true">
+                                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect x="2.5" y="2.5" width="6" height="6" rx="1.2" stroke="currentColor" stroke-width="1.5"/>
+                                    <rect x="11.5" y="2.5" width="6" height="6" rx="1.2" stroke="currentColor" stroke-width="1.5"/>
+                                    <rect x="2.5" y="11.5" width="6" height="6" rx="1.2" stroke="currentColor" stroke-width="1.5"/>
+                                    <rect x="11.5" y="11.5" width="6" height="6" rx="1.2" stroke="currentColor" stroke-width="1.5"/>
+                                </svg>
                             </div>
-                            <template if:true={row.hasAction}>
-                                <div class="pkg-row__action">
-                                    <lightning-button variant="brand" label={row.primaryActionLabel}
-                                        disabled={row.busy} onclick={handleRowAction}
-                                        data-id={row.actionId} data-kind={row.primaryAction}
-                                        data-rowid={row.rowId} data-name={row.name}>
-                                    </lightning-button>
+                            <div class="pageheader__text">
+                                <div class="crumb">Services</div>
+                                <h1 class="pageheader__h1">Select Services to Enable</h1>
+                            </div>
+                        </div>
+                        <p class="subhead">Choose which A-Protect service line you'd like to configure for this dealership. Each service keeps its own master package library and its own Dealer Package Plan.</p>
+                    </div>
+
+                    <div class="card picker__card">
+                        <div class="card__head">
+                            <h2 class="card__title">Services</h2>
+                            <div class="card__head-actions">
+                                <span class="card__count">{servicesCountLabel}</span>
+                            </div>
+                        </div>
+                        <div class="service-list">
+                            <template for:each={serviceRows} for:item="s">
+                                <div key={s.key} class="service-row" role="button" tabindex="0"
+                                    data-service={s.value} onclick={handleServiceRow}
+                                    onkeydown={handleServiceRowKey} aria-label={s.name}>
+                                    <div class="service-icon" aria-hidden="true">
+                                        <template if:true={s.isShield}>
+                                            <svg viewBox="0 0 20 20" fill="none">
+                                                <path d="M10 2l6.5 2.5v4.6c0 4.2-2.7 7.9-6.5 9.4-3.8-1.5-6.5-5.2-6.5-9.4V4.5L10 2z"
+                                                    stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                                            </svg>
+                                        </template>
+                                        <template if:true={s.isBullseye}>
+                                            <svg viewBox="0 0 20 20" fill="none">
+                                                <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/>
+                                                <circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.5"/>
+                                            </svg>
+                                        </template>
+                                    </div>
+                                    <div class="service-text">
+                                        <div class="service-name">{s.name}</div>
+                                        <div class="service-meta">{s.meta}</div>
+                                    </div>
+                                    <svg class="chev-right" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                        <path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7"
+                                            stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
                                 </div>
                             </template>
-                        </li>
-                    </template>
-                </ul>
-            </section>
-
-            <!-- Informational footer -->
-            <template if:true={hasFooterRows}>
-                <section class="slds-m-top_large">
-                    <h3 class="section-title slds-text-title_bold">Inactive or master-less copies</h3>
-                    <p class="slds-text-body_small slds-text-color_weak slds-m-top_xxx-small">
-                        These are kept for reference and are not updated automatically.
-                    </p>
-                    <ul class="pkg-list" role="list">
-                        <template for:each={footerRows} for:item="row">
-                            <li key={row.dealerPackageId} class="pkg-row pkg-row_muted">
-                                <div class="pkg-row__body">
-                                    <div class="pkg-row__head">
-                                        <span class="pkg-row__name slds-text-body_regular">{row.name}</span>
-                                        <span class="slds-badge slds-badge_lightest">{row.statusLabel}</span>
-                                    </div>
-                                    <p class="pkg-row__reason slds-text-body_small slds-text-color_weak">{row.reason}</p>
-                                </div>
-                            </li>
-                        </template>
-                    </ul>
+                        </div>
+                    </div>
                 </section>
             </template>
 
-            <div class="console__footer slds-m-top_large">
+            <!-- ══ Service workbench (Extended Warranty / Tire & Rim Protection) ══ -->
+            <template if:true={showService}>
+                <section class="workbench">
+
+                    <!-- Service page header — master-package intro for the active service -->
+                    <div class="pageheader">
+                        <div class="pageheader__top">
+                            <div class="pageheader__main">
+                                <div class="pageheader__row">
+                                    <div class="pageheader__icon" aria-hidden="true">
+                                        <template if:true={isShieldService}>
+                                            <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M10 2l6.5 2.5v4.6c0 4.2-2.7 7.9-6.5 9.4-3.8-1.5-6.5-5.2-6.5-9.4V4.5L10 2z"
+                                                    stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                                            </svg>
+                                        </template>
+                                        <template if:true={isBullseyeService}>
+                                            <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/>
+                                                <circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.5"/>
+                                            </svg>
+                                        </template>
+                                    </div>
+                                    <div class="pageheader__text">
+                                        <div class="crumb">
+                                            <button type="button" class="crumb-link" onclick={handleBackToServices}>Services</button>
+                                            <span class="crumb-sep" aria-hidden="true">›</span>
+                                            <span class="crumb-service">{activeServiceName}</span>
+                                        </div>
+                                        <h1 class="pageheader__h1">Master Packages</h1>
+                                    </div>
+                                </div>
+                                <p class="subhead">{servicePageSubhead}</p>
+                            </div>
+
+                            <!-- Dealer identity — moved out of the body into the page header -->
+                            <div class="pageheader__dealer">
+                                <div class="pageheader__dealer-name" title={accountName}>{accountName}</div>
+                                <p class="pageheader__dealer-status">{syncEnabledMessage}</p>
+                            </div>
+                        </div>
+                        <div class="highlights">
+                            <div class="highlight">
+                                <span class="highlight__k">Service Line</span>
+                                <span class="highlight__v">{activeServiceName}</span>
+                            </div>
+                            <div class="highlight">
+                                <span class="highlight__k">Master Package Series</span>
+                                <span class="highlight__v">{activeServiceSeries}</span>
+                            </div>
+                            <div class="highlight">
+                                <span class="highlight__k">Master Packages</span>
+                                <span class="highlight__v">{activeServiceCount}</span>
+                            </div>
+                            <div class="highlight">
+                                <span class="highlight__k">Status</span>
+                                <span class="highlight__v"><span class="status-dot"></span>Active</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Entry context — count chips -->
+                    <header class="console__header">
+                        <div class="counts" role="status" aria-live="polite">
+                            <span class="count-chip count-chip_attention">
+                                <span class="count-chip__num">{updateCount}</span>
+                                <span class="count-chip__lbl">update available</span>
+                            </span>
+                            <span class="count-chip count-chip_new">
+                                <span class="count-chip__num">{toAddCount}</span>
+                                <span class="count-chip__lbl">available to add</span>
+                            </span>
+                            <span class="count-chip count-chip_ok">
+                                <span class="count-chip__num">{uptodateCount}</span>
+                                <span class="count-chip__lbl">up to date</span>
+                            </span>
+                        </div>
+                    </header>
+
+                    <!-- View-only lock -->
+                    <template if:true={flagOff}>
+                        <div class="slds-m-top_small">
+                            <lightning-alert variant="warning" title="Editing is switched off"
+                                message={flagOffMessage}></lightning-alert>
+                        </div>
+                    </template>
+
+                    <!-- Sub-tabs -->
+                    <nav class="tabs" role="tablist" aria-label="Console sections">
+                        <template for:each={tabs} for:item="t">
+                            <button key={t.value} type="button" class={t.cls} role="tab"
+                                data-tab={t.value} onclick={handleTab} aria-selected={t.aria}>{t.label}</button>
+                        </template>
+                    </nav>
+
+                    <!-- ══ Package Configuration ══ -->
+                    <template if:true={showConfig}>
+
+                    <!-- Dealer-level premium vehicle fees — dealer-wide, above every package -->
+                    <template if:true={isShieldService}>
+                    <section class="dealer-fees" aria-label="Dealer premium vehicle fee settings">
+                        <div class="dealer-fees__head">
+                            <h3 class="dealer-fees__title">Dealer Premium Vehicle Fees</h3>
+                            <span class="dealer-fees__scope">Dealer-level · applies to every package</span>
+                        </div>
+                        <p class="dealer-fees__intro">These settings apply across all packages for this dealership — they are not set per package.</p>
+                        <div class="dealer-fees__grid">
+                            <label class="field">
+                                <span class="field__label">Premium vehicle fee override</span>
+                                <input class="cell-input" type="number" step="0.01"
+                                    value={premiumOverrideValue}
+                                    onchange={handlePremiumOverrideField}
+                                    disabled={premiumDisabled}
+                                    placeholder="Leave blank for standard fees" />
+                                <span class="hint">Leave blank to use the standard premium vehicle fees from the package and its terms. A value here overrides the standard amount for this dealer.</span>
+                            </label>
+                            <div class="field">
+                                <span class="field__label">Charge premium vehicle fees</span>
+                                <label class="switch">
+                                    <input type="checkbox" checked={chargePremiumChecked}
+                                        onchange={handleChargePremiumToggle}
+                                        disabled={premiumDisabled}
+                                        aria-label="Charge premium vehicle fees" />
+                                    <span class="switch__track" aria-hidden="true"><span class="switch__knob"></span></span>
+                                    <span class="switch__state">{chargePremiumStateLabel}</span>
+                                </label>
+                                <span class="hint">Switch off to waive premium vehicle fees for this dealer entirely.</span>
+                            </div>
+                            <div class="dealer-fees__actions">
+                                <button type="button" class="act-btn"
+                                    disabled={premiumDisabled} onclick={handleSavePremiumSettings}>Save dealer fee settings</button>
+                            </div>
+                        </div>
+                        <p class="dealer-fees__state">{premiumStateLine}</p>
+                    </section>
+                    </template>
+
+                    <section class="pane-grid">
+
+                        <!-- Left pane: Master Packages (fetch-only) — Release → Group → Package -->
+                        <div class="pane pane_master">
+                            <div class="pane__head">
+                                <h3 class="pane__title">Master Packages</h3>
+                                <div class="pane__actions">
+                                    <button type="button" class="icon-btn" data-pane="master" onclick={handleRefresh}
+                                        title="Refresh" aria-label="Refresh packages">
+                                        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                            <path d="M16 6.5a6.5 6.5 0 10.9 5.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                                            <path d="M16 3v4h-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                    </button>
+                                    <span class="pane__count">{masterEnabledLabel}</span>
+                                    <span class="pane__sep" aria-hidden="true">·</span>
+                                    <button type="button" class="link-btn" data-pane="master" onclick={handleSelectAll}>Select all</button>
+                                    <button type="button" class="link-btn" data-pane="master" onclick={handleClearAll}>Clear all</button>
+                                </div>
+                            </div>
+
+                            <div class="tree-cols">
+                                <span aria-hidden="true"></span>
+                                <span>Package Name</span>
+                                <span>Per Claim Limit</span>
+                                <span>Deductible</span>
+                                <span>Series</span>
+                                <span aria-hidden="true"></span>
+                            </div>
+
+                            <template if:true={masterPaneEmpty}>
+                                <p class="empty-state">No master packages match this service.</p>
+                            </template>
+
+                            <div class="tree">
+                                <template for:each={masterTree} for:item="ref">
+                                    <div key={ref.key} class="tree-ref">
+                                        <div class="ref-header" data-pane="master" data-key={ref.key} onclick={handleRefToggle}>
+                                            <input type="checkbox" checked={ref.checked} data-tri={ref.tri}
+                                                data-pane="master" data-key={ref.key}
+                                                onclick={handleCheckboxStop} onchange={handleRefSelect} />
+                                            <span class="ref-label">{ref.label} <span class="ref-count">{ref.counterLabel}</span></span>
+                                            <button type="button" class={ref.chevronClass} data-pane="master" data-key={ref.key}
+                                                onclick={handleRefChevron} aria-label="Expand or collapse series"></button>
+                                        </div>
+                                        <template if:true={ref.expanded}>
+                                            <div class="ref-body">
+                                                <template for:each={ref.groups} for:item="grp">
+                                                    <div key={grp.key} class="tree-group">
+                                                        <div class="family-header" data-pane="master" data-key={grp.key} onclick={handleGroupToggle}>
+                                                            <input type="checkbox" checked={grp.checked} data-tri={grp.tri}
+                                                                data-pane="master" data-key={grp.key}
+                                                                onclick={handleCheckboxStop} onchange={handleGroupSelect} />
+                                                            <span class="family-label">{grp.upperName} <span class="family-count">{grp.counterLabel}</span></span>
+                                                            <button type="button" class={grp.chevronClass} data-pane="master" data-key={grp.key}
+                                                                onclick={handleGroupChevron} aria-label="Expand or collapse group"></button>
+                                                        </div>
+                                                        <template if:true={grp.expanded}>
+                                                            <template for:each={grp.packages} for:item="p">
+                                                                <div key={p.rowId} class="row-group">
+                                                                    <div class={p.rowClass}>
+                                                                        <input type="checkbox" checked={p.selected}
+                                                                            data-tri={p.tri}
+                                                                            data-pane="master" data-id={p.selId} onchange={handlePkgSelect} />
+                                                                        <span class="name-cell">
+                                                                            <span class="pkg-name">{p.name}</span>
+                                                                            <span class={p.chipClass}>{p.statusLabel}</span>
+                                                                        </span>
+                                                                        <span class="num">{p.perClaimLimitLabel}</span>
+                                                                        <span class="num">{p.deductibleLabel}</span>
+                                                                        <span class="series">{p.seriesLabel}</span>
+                                                                        <button type="button" class={p.chevronClass}
+                                                                            data-pane="master" data-id={p.rowId}
+                                                                            onclick={handleMasterPkgChevron} aria-label="Package details"></button>
+                                                                    </div>
+                                                                    <template if:true={p.open}>
+                                                                        <div class="row-detail">
+                                                                            <div class="row-detail__meta">
+                                                                                <span class="tag">{p.recordTypeLabel}</span>
+                                                                                <span class="meta-text">{p.planTypeLabel}</span>
+                                                                                <span class="meta-text">{p.countsLabel}</span>
+                                                                                <template if:true={p.hasSchedule}>
+                                                                                    <span class="meta-text">{p.scheduleLabel}</span>
+                                                                                </template>
+                                                                                <template if:true={p.hasLastSynced}>
+                                                                                    <span class="meta-text">{p.lastSyncedLabel}</span>
+                                                                                </template>
+                                                                            </div>
+                                                                            <p class="pkg-reason">{p.reason}</p>
+                                                                            <template if:true={p.hasSync}>
+                                                                                <div class="update-strip">
+                                                                                    <span class="update-strip__text">This package has been updated in the master library.</span>
+                                                                                    <button type="button" class="act-btn"
+                                                                                        disabled={p.disabled} onclick={handleSyncRow}
+                                                                                        data-id={p.syncId} data-name={p.name}>Update from master</button>
+                                                                                </div>
+                                                                            </template>
+
+                                                                            <!-- Reference detail — tiers → terms → additional options (read-only) -->
+                                                                            <template if:true={p.detailLoading}>
+                                                                                <div class="detail-state">
+                                                                                    <lightning-spinner size="small" alternative-text="Loading package detail"></lightning-spinner>
+                                                                                    <span class="detail-state__text">Loading package detail…</span>
+                                                                                </div>
+                                                                            </template>
+
+                                                                            <template if:true={p.hasDetail}>
+                                                                                <div class="ref-detail">
+                                                                                    <div class="accordion-label">
+                                                                                        <span class="accordion-label__text">Terms &amp; Additional Options</span>
+                                                                                        <span class="ref-only-tag">reference pricing — edit after copying to Dealer Plan</span>
+                                                                                    </div>
+                                                                                    <div class="ref-crumb">
+                                                                                        <span class="ref-crumb__level ref-crumb__level_release">{p.detailSeriesLabel}</span>
+                                                                                        <span class="ref-crumb__sep" aria-hidden="true">›</span>
+                                                                                        <span class="ref-crumb__level ref-crumb__level_group">{p.detailGroupName}</span>
+                                                                                        <span class="ref-crumb__sep" aria-hidden="true">›</span>
+                                                                                        <span class="ref-crumb__level ref-crumb__level_pkg">{p.name}</span>
+                                                                                        <span class="ref-crumb__count">{p.detailNote}</span>
+                                                                                    </div>
+                                                                                    <div class="tiers-table">
+                                                                                        <div class="trow-head">
+                                                                                            <span aria-hidden="true"></span>
+                                                                                            <span>Tier Name</span>
+                                                                                            <span>Term / Option</span>
+                                                                                            <span>Original Dealer Price</span>
+                                                                                            <span>Discount</span>
+                                                                                            <span>Dealer Price</span>
+                                                                                        </div>
+                                                                                        <template for:each={p.detailGroups} for:item="g">
+                                                                                            <div key={g.key} class="tier-block">
+                                                                                                <template for:each={g.rows} for:item="row">
+                                                                                                    <div key={row.rowId} class={row.rowClass}>
+                                                                                                        <span class="ref-chk" title="Options are chosen after copying to the Dealer Plan.">
+                                                                                                            <input type="checkbox" disabled tabindex="-1" aria-hidden="true" />
+                                                                                                        </span>
+                                                                                                        <span class="tier-cell">{row.tierCell}</span>
+                                                                                                        <span class="term-cell">
+                                                                                                            <span class={row.levelChipClass}>{row.levelLabel}</span>
+                                                                                                            <span class={row.labelClass}>{row.label}</span>
+                                                                                                        </span>
+                                                                                                        <span class="price-orig num">{row.originalPrice}</span>
+                                                                                                        <span class="disc-cell disc-cell_ref">{row.discount}</span>
+                                                                                                        <span class="price-final num">{row.dealerPrice}</span>
+                                                                                                    </div>
+                                                                                                </template>
+                                                                                            </div>
+                                                                                        </template>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </template>
+                                                                        </div>
+                                                                    </template>
+                                                                </div>
+                                                            </template>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Flow arrow — copy the master selection into the Dealer Plan -->
+                        <div class="flow-arrow">
+                            <button type="button" class="btn-copy" onclick={handleCopyToDealer} disabled={copyDisabled}>
+                                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                    <path d="M4 10h10m0 0l-4-4m4 4l-4 4M16 4v12" stroke="currentColor"
+                                        stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                <span>{copyLabel}</span>
+                            </button>
+                        </div>
+
+                        <!-- Right pane: Dealer Packages (authoring) — Release → Group → Package -->
+                        <div class="pane pane_dealer">
+                            <div class="pane__head">
+                                <h3 class="pane__title">Dealer Packages</h3>
+                                <div class="pane__actions">
+                                    <span class="pane__count">{dealerEnabledLabel}</span>
+                                    <span class="pane__sep" aria-hidden="true">·</span>
+                                    <button type="button" class="link-btn" data-pane="dealer" onclick={handleSelectAll}>Select all</button>
+                                    <button type="button" class="link-btn" data-pane="dealer" onclick={handleClearAll}>Clear all</button>
+                                </div>
+                            </div>
+
+                            <div class="tree-cols">
+                                <span aria-hidden="true"></span>
+                                <span>Package Name</span>
+                                <span>Per Claim Limit</span>
+                                <span>Deductible</span>
+                                <span>Series</span>
+                                <span aria-hidden="true"></span>
+                            </div>
+
+                            <template if:true={dealerRowsEmpty}>
+                                <p class="empty-state">
+                                    No packages in this dealer’s plan yet. Select packages in Master Packages,
+                                    then click “Copy Selected to Dealer Plan.”
+                                </p>
+                            </template>
+
+                            <div class="tree">
+                                <template for:each={dealerTree} for:item="ref">
+                                    <div key={ref.key} class="tree-ref">
+                                        <div class="ref-header" data-pane="dealer" data-key={ref.key} onclick={handleRefToggle}>
+                                            <input type="checkbox" checked={ref.checked} data-tri={ref.tri}
+                                                data-pane="dealer" data-key={ref.key}
+                                                onclick={handleCheckboxStop} onchange={handleRefSelect} />
+                                            <span class="ref-label">{ref.label} <span class="ref-count">{ref.counterLabel}</span></span>
+                                            <button type="button" class={ref.chevronClass} data-pane="dealer" data-key={ref.key}
+                                                onclick={handleRefChevron} aria-label="Expand or collapse series"></button>
+                                        </div>
+                                        <template if:true={ref.expanded}>
+                                            <div class="ref-body">
+                                                <template for:each={ref.groups} for:item="grp">
+                                                    <div key={grp.key} class="tree-group">
+                                                        <div class="family-header" data-pane="dealer" data-key={grp.key} onclick={handleGroupToggle}>
+                                                            <input type="checkbox" checked={grp.checked} data-tri={grp.tri}
+                                                                data-pane="dealer" data-key={grp.key}
+                                                                onclick={handleCheckboxStop} onchange={handleGroupSelect} />
+                                                            <span class="family-label">{grp.upperName} <span class="family-count">{grp.counterLabel}</span></span>
+                                                            <button type="button" class={grp.chevronClass} data-pane="dealer" data-key={grp.key}
+                                                                onclick={handleGroupChevron} aria-label="Expand or collapse group"></button>
+                                                        </div>
+                                                        <template if:true={grp.expanded}>
+                                                            <template for:each={grp.packages} for:item="pkg">
+                                                                <div key={pkg.rowId} class="row-group">
+                                                                    <div class={pkg.rowClass}>
+                                                                        <input type="checkbox" checked={pkg.selected}
+                                                                            data-tri={pkg.tri}
+                                                                            data-pane="dealer" data-id={pkg.selId} onchange={handlePkgSelect} />
+                                                                        <span class="name-cell">
+                                                                            <span class="pkg-name">{pkg.name}</span>
+                                                                            <template if:true={pkg.hasBadge}>
+                                                                                <span class={pkg.badgeClass}>{pkg.badgeLabel}</span>
+                                                                            </template>
+                                                                        </span>
+                                                                        <span class="num">{pkg.perClaimLimitLabel}</span>
+                                                                        <span class="num">{pkg.deductibleLabel}</span>
+                                                                        <span class="series">{pkg.seriesLabel}</span>
+                                                                        <button type="button" class={pkg.chevronClass}
+                                                                            data-pane="dealer" data-id={pkg.rowId}
+                                                                            onclick={handleDealerPkgChevron} aria-label="Terms and options"></button>
+                                                                    </div>
+                                                                    <template if:true={pkg.open}>
+                                                                        <div class="row-detail row-detail_authoring">
+                                                                            <div class="row-detail__meta">
+                                                                                <span class="tag">{pkg.recordTypeLabel}</span>
+                                                                                <span class="meta-text">{pkg.termCount} terms</span>
+                                                                                <span class="meta-text">{pkg.lastSyncedLabel}</span>
+                                                                            </div>
+                                                                            <template if:true={pkg.hasSync}>
+                                                                                <div class="update-strip">
+                                                                                    <span class="update-strip__text">This package has been updated in the master library since it was copied.</span>
+                                                                                    <button type="button" class="act-btn"
+                                                                                        disabled={pkg.disabled} onclick={handleSyncRow}
+                                                                                        data-id={pkg.syncId} data-name={pkg.name}>Update from master</button>
+                                                                                </div>
+                                                                            </template>
+
+                                                <!-- Dealer commercial price (flat, per-dealer) -->
+                                                <div class="price-bar">
+                                                    <template if:true={isShieldService}>
+                                                    <label class="field">
+                                                        <span class="field__label">Commercial vehicle surcharge</span>
+                                                        <input class="cell-input" type="number" step="0.01"
+                                                            value={pkg.commercialPrice}
+                                                            data-commercial={pkg.dealerPackageId}
+                                                            data-pkgid={pkg.dealerPackageId}
+                                                            data-field="commercialPrice"
+                                                            onchange={handleCommercialField} disabled={flagOff} />
+                                                        <span class="hint">{pkg.masterCommercialHint}</span>
+                                                        <span class="hint hint_muted">Dealer-owned — set when the package is copied, never refreshed from the master.</span>
+                                                    </label>
+                                                    </template>
+                                                    <template if:true={isShieldService}>
+                                                    <button type="button" class="act-btn"
+                                                        disabled={flagOff} onclick={handleSaveCommercial}
+                                                        data-pkgid={pkg.dealerPackageId}>Save price</button>
+                                                    </template>
+                                                    <button type="button" class="act-btn"
+                                                        disabled={flagOff} onclick={handleRefreshAnchors}
+                                                        data-pkgid={pkg.dealerPackageId}>Refresh prices from master</button>
+                                                </div>
+
+                                                <!-- Package-level included add-ons -->
+                                                <template if:true={pkg.hasIncluded}>
+                                                    <p class="sub-title">Included add-ons</p>
+                                                    <div class="opt-grid">
+                                                        <template for:each={pkg.includedOptions} for:item="o">
+                                                            <div key={o.rowKey} class="opt-row">
+                                                                <div class="opt-row__name">
+                                                                    <span class="opt-name">{o.optionName}</span>
+                                                                </div>
+                                                                <div class="opt-row__cells">
+                                                                    <span class="cell-label">Master {o.originalPrice}</span>
+                                                                    <select class="cell-input cell-input_xs"
+                                                                        data-optionid={o.dealerOptionId}
+                                                                        data-field="discountType"
+                                                                        onchange={handleOptionField} disabled={o.disabled}
+                                                                        value={o.discountType}>
+                                                                        <option value="%">%</option>
+                                                                        <option value="$">$</option>
+                                                                    </select>
+                                                                    <input class="cell-input cell-input_xs" type="number"
+                                                                        step="0.01" value={o.discountValue}
+                                                                        placeholder="Discount"
+                                                                        data-optionid={o.dealerOptionId}
+                                                                        data-field="discountValue"
+                                                                        onchange={handleOptionField} disabled={o.disabled} />
+                                                                    <select class="cell-input cell-input_xs"
+                                                                        data-optionid={o.dealerOptionId}
+                                                                        data-field="markupType"
+                                                                        onchange={handleOptionField} disabled={o.disabled}
+                                                                        value={o.markupType}>
+                                                                        <option value="$">$</option>
+                                                                        <option value="%">%</option>
+                                                                    </select>
+                                                                    <input class="cell-input cell-input_xs" type="number"
+                                                                        step="0.01" value={o.markupValue}
+                                                                        placeholder="Markup"
+                                                                        data-optionid={o.dealerOptionId}
+                                                                        data-field="markupValue"
+                                                                        onchange={handleOptionField} disabled={o.disabled} />
+                                                                    <span class="cell-label">Net {o.netCost}</span>
+                                                                    <span class="cell-label">Retail {o.retailPrice}</span>
+                                                                </div>
+                                                                <div class="opt-row__actions">
+                                                                    <button type="button" class="act-btn"
+                                                                        disabled={o.disabled} onclick={handleSaveOption}
+                                                                        data-optionid={o.dealerOptionId}>Save</button>
+                                                                    <button type="button" class="act-btn"
+                                                                        disabled={o.disabled} onclick={handleToggleRemoved}
+                                                                        data-optionid={o.dealerOptionId}>{o.removedLabel}</button>
+                                                                </div>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Terms & Additional Options — grouped under each coverage tier -->
+                                                <template if:true={pkg.hasTerms}>
+                                                    <p class="sub-title">Terms &amp; Additional Options</p>
+                                                    <div class="tiers-table tiers-table_auth">
+                                                        <div class="trow-head">
+                                                            <span aria-hidden="true"></span>
+                                                            <span>Tier Name</span>
+                                                            <span>Term / Option</span>
+                                                            <span>Original Dealer Price</span>
+                                                            <span>Discount</span>
+                                                            <span>Dealer Price</span>
+                                                        </div>
+                                                        <template for:each={pkg.termGroups} for:item="grp">
+                                                            <div key={grp.key} class="tier-block">
+                                                                <template for:each={grp.terms} for:item="t">
+                                                                    <div key={t.rowKey}>
+                                                                        <div class={t.authRowClass}>
+                                                                            <span class="lvl lvl_term" aria-hidden="true"></span>
+                                                                            <span class="tier-cell" title={grp.tierName}>{t.tierCell}</span>
+                                                                            <span class="term-cell">
+                                                                                <span class="lvl-chip lvl-chip_term">Term</span>
+                                                                                <span class="term-label">{t.name}</span>
+                                                                                <template if:true={isShieldService}>
+                                                                                <button type="button" class={t.feeChipClass}
+                                                                                    data-termid={t.dealerTermId} onclick={handleTogglePremiumFee}
+                                                                                    disabled={t.disabled} aria-pressed={t.feeAria}
+                                                                                    title={t.feeTitle}>{t.feeChipLabel}</button>
+                                                                                </template>
+                                                                            </span>
+                                                                            <span class="price-orig num">
+                                                                                <span class="money">{t.originalCost}</span>
+                                                                                <span class="frozen">{t.anchorNote}</span>
+                                                                            </span>
+                                                                            <span class="disc-cell">
+                                                                                <select class="cell-input cell-input_xs"
+                                                                                    data-termid={t.dealerTermId}
+                                                                                    data-field="discountType" onchange={handleTermField}
+                                                                                    disabled={t.disabled} value={t.discountType}>
+                                                                                    <option value="%">%</option>
+                                                                                    <option value="$">$</option>
+                                                                                </select>
+                                                                                <input class="cell-input cell-input_xs" type="number"
+                                                                                    step="0.01" value={t.discountValue}
+                                                                                    data-termid={t.dealerTermId}
+                                                                                    data-field="discountValue" onchange={handleTermField}
+                                                                                    disabled={t.disabled} />
+                                                                            </span>
+                                                                            <span class="price-final num">
+                                                                                <span class="money">{t.retailPrice}</span>
+                                                                                <template if:true={isShieldService}>
+                                                                                <template if:true={t.feeOn}>
+                                                                                    <span class="fee-note">+ $<input
+                                                                                            class="cell-input fee-amt-input" type="number"
+                                                                                            step="0.01" value={t.premiumFee}
+                                                                                            data-termid={t.dealerTermId}
+                                                                                            data-field="premiumFee"
+                                                                                            onchange={handlePremiumFeeAmount}
+                                                                                            disabled={t.disabled} /> fee = {t.feeTotal}</span>
+                                                                                </template>
+                                                                                </template>
+                                                                            </span>
+                                                                        </div>
+
+                                                                        <!-- Term authoring strip — markup, incentive and save -->
+                                                                        <div class="trow-detail">
+                                                                            <span class="cell-label">Markup</span>
+                                                                            <select class="cell-input cell-input_xs"
+                                                                                data-termid={t.dealerTermId}
+                                                                                data-field="markupType" onchange={handleTermField}
+                                                                                disabled={t.disabled} value={t.markupType}>
+                                                                                <option value="$">$</option>
+                                                                                <option value="%">%</option>
+                                                                            </select>
+                                                                            <input class="cell-input cell-input_xs" type="number"
+                                                                                step="0.01" value={t.markupValue}
+                                                                                data-termid={t.dealerTermId}
+                                                                                data-field="markupValue" onchange={handleTermField}
+                                                                                disabled={t.disabled} />
+                                                                            <span class="cell-label">Incentive</span>
+                                                                            <input class="cell-input cell-input_xs" type="number"
+                                                                                step="0.01" value={t.incentiveValue}
+                                                                                data-termid={t.dealerTermId}
+                                                                                data-field="incentive" onchange={handleTermField}
+                                                                                disabled={t.disabled} />
+                                                                            <button type="button" class="act-btn"
+                                                                                disabled={t.disabled} onclick={handleSaveTerm}
+                                                                                data-termid={t.dealerTermId}>Save</button>
+                                                                        </div>
+
+                                                                        <!-- Additional options — indented sub-rows under their parent term -->
+                                                                        <template if:true={t.hasOptions}>
+                                                                            <template for:each={t.options} for:item="o">
+                                                                                <div key={o.rowKey} class="trow trow_addon">
+                                                                                    <span class="lvl lvl_opt" aria-hidden="true"></span>
+                                                                                    <span class="tier-cell"></span>
+                                                                                    <span class="term-cell">
+                                                                                        <span class="opt-indent" aria-hidden="true"></span>
+                                                                                        <span class="lvl-chip lvl-chip_opt">Option</span>
+                                                                                        <span class="addon-label">{o.optionName}</span>
+                                                                                    </span>
+                                                                                    <span class="price-orig num">{o.originalPrice}</span>
+                                                                                    <span class="disc-cell">
+                                                                                        <input class="cell-input cell-input_xs" type="number"
+                                                                                            step="0.01" value={o.discountValue}
+                                                                                            placeholder="Discount"
+                                                                                            data-optionid={o.dealerOptionId}
+                                                                                            data-field="discountValue"
+                                                                                            onchange={handleOptionField} disabled={o.disabled} />
+                                                                                    </span>
+                                                                                    <span class="price-final num">{o.retailPrice}</span>
+                                                                                    <span class="opt-actions">
+                                                                                        <span class="cell-label">Markup</span>
+                                                                                        <input class="cell-input cell-input_xs" type="number"
+                                                                                            step="0.01" value={o.markupValue}
+                                                                                            placeholder="Markup"
+                                                                                            data-optionid={o.dealerOptionId}
+                                                                                            data-field="markupValue"
+                                                                                            onchange={handleOptionField} disabled={o.disabled} />
+                                                                                        <button type="button" class="act-btn"
+                                                                                            disabled={o.disabled} onclick={handleSaveOption}
+                                                                                            data-optionid={o.dealerOptionId}>Save</button>
+                                                                                        <button type="button" class="act-btn"
+                                                                                            disabled={o.disabled} onclick={handleToggleRemoved}
+                                                                                            data-optionid={o.dealerOptionId}>{o.removedLabel}</button>
+                                                                                    </span>
+                                                                                </div>
+                                                                            </template>
+                                                                        </template>
+                                                                    </div>
+                                                                </template>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+
+                                                    <!-- Package-level premium-fee shortcut — confirm-gated bulk clear -->
+                                                    <template if:true={isShieldService}>
+                                                    <div class="fee-remove-strip">
+                                                        <button type="button" class="act-btn"
+                                                            disabled={pkg.feeRemoveDisabled} onclick={handleRemovePackageFees}
+                                                            data-pkgid={pkg.dealerPackageId}>Remove Premium Fee from Package</button>
+                                                        <span class="fee-remove-hint">Turns off the premium vehicle fee for every term in this package at once. Retail prices are not changed.</span>
+                                                    </div>
+                                                    </template>
+                                                </template>
+                                                                        </div>
+                                                                    </template>
+                                                                </div>
+                                                            </template>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </section>
+                    </template>
+
+                    <!-- ══ Dealer Portal Preview — read-only, grouped by package group ══ -->
+                    <section if:true={showPreview} class="flat-section preview">
+                        <header class="preview-head">
+                            <div class="preview-head__text">
+                                <h3 class="preview-head__h">Dealer Portal Preview</h3>
+                                <p class="preview-head__hint">Exactly what this dealer sees after discounts are applied — separate from Package Configuration. Commission tracking lives on its own Commissions tab and never appears here.</p>
+                            </div>
+                            <button type="button" class="icon-btn" data-pane="preview" onclick={handleRefresh}
+                                title="Refresh" aria-label="Refresh preview">
+                                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                    <path d="M16 6.5a6.5 6.5 0 10.9 5.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                                    <path d="M16 3v4h-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </header>
+
+                        <template if:true={previewEmpty}>
+                            <p class="preview-empty">No packages are enabled for this dealer yet. Enable packages in the Package Configuration tab to see them here.</p>
+                        </template>
+
+                        <template if:false={previewEmpty}>
+                            <div class="preview-body">
+                                <template for:each={previewGroups} for:item="g">
+                                    <div key={g.key} class="preview-fam">
+                                        <div class="preview-fam-header">{g.upperName}</div>
+                                        <template for:each={g.packages} for:item="p">
+                                            <div key={p.dealerPackageId} class="preview-pkg">
+                                                <div class="preview-pkg-head">
+                                                    <span class="preview-pkg-name">{p.name}</span>
+                                                    <span if:true={p.hasMeta} class="preview-pkg-meta">{p.metaLine}</span>
+                                                </div>
+                                                <div class="preview-table">
+                                                    <template if:true={p.hasRows}>
+                                                        <div class="preview-trow preview-trow-head">
+                                                            <span class="pv-col-term">Term / Option</span>
+                                                            <span class="pv-col-list">List Price</span>
+                                                            <span class="pv-col-disc">Discount</span>
+                                                            <span class="pv-col-final">Dealer Price</span>
+                                                        </div>
+                                                        <template for:each={p.rows} for:item="r">
+                                                            <div key={r.rowKey} class={r.rowClass}>
+                                                                <span class={r.labelClass}>
+                                                                    <template if:true={r.isOption}>
+                                                                        <span class="pv-indent" aria-hidden="true"></span>
+                                                                    </template>
+                                                                    <span class="pv-label">{r.label}</span>
+                                                                </span>
+                                                                <span class="pv-list">{r.listPrice}</span>
+                                                                <span class="pv-disc">{r.discount}</span>
+                                                                <span class="pv-final">
+                                                                    <span class="pv-final-price">{r.dealerPrice}</span>
+                                                                    <span if:true={r.hasFeeNote} class="fee-line">{r.feeNote}</span>
+                                                                </span>
+                                                            </div>
+                                                        </template>
+                                                    </template>
+                                                    <template if:false={p.hasRows}>
+                                                        <p class="preview-empty">No terms are currently enabled for this warranty.</p>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </section>
+
+                    <!-- ══ Commissions ══ -->
+                    <section if:true={showCommissions} class="flat-section">
+                        <p class="pane__note">Sales-rep incentive per term — the commission basis the portal uses.</p>
+                        <template if:true={commissionEmpty}>
+                            <p class="empty-state">
+                                No dealer packages to commission yet.
+                            </p>
+                        </template>
+                        <template for:each={commissionRows} for:item="p">
+                            <article key={p.dealerPackageId} class="card">
+                                <h4 class="card__title">{p.name}</h4>
+                                <p class="meta-text">{p.planTypeLabel}</p>
+                                <table class="terms">
+                                    <thead>
+                                        <tr><th>Term</th><th>Retail</th><th>Incentive</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <template for:each={p.terms} for:item="t">
+                                            <tr key={t.rowKey}>
+                                                <td>{t.name}</td>
+                                                <td class="money">{t.retailPrice}</td>
+                                                <td class="money">{t.incentive}</td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </article>
+                        </template>
+                    </section>
+                </section>
+            </template>
+
+            <div class="console__footer">
                 <lightning-button label="Done" variant="neutral" onclick={closeAction}></lightning-button>
             </div>
-        </div>
-    </template>
+        </template>
 
-    <!-- Shared confirmation dialog, fed by the server dry-run summary -->
-    <template if:true={dialogOpen}>
-        <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="confirmHeading"
-            class="slds-modal slds-fade-in-open">
-            <div class="slds-modal__container">
-                <header class="slds-modal__header">
-                    <h2 id="confirmHeading" class="slds-text-heading_medium">{dialogTitle}</h2>
-                </header>
-                <div class="slds-modal__content slds-p-around_medium" id="dialogContent">
-                    <p class="slds-text-body_regular">{dialogSummary}</p>
-                    <p class="slds-text-body_small slds-text-color_weak slds-m-top_small">{dialogNote}</p>
+        <!-- Shared confirmation dialog -->
+        <template if:true={dialogOpen}>
+            <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="confirmHeading"
+                class="slds-modal slds-fade-in-open">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header dialog__header">
+                        <h2 id="confirmHeading" class="slds-text-heading_medium dialog__title">{dialogTitle}</h2>
+                    </header>
+                    <div class="slds-modal__content slds-p-around_medium dialog__content">
+                        <p class="dialog__summary">{dialogSummary}</p>
+                        <p class="dialog__note">{dialogNote}</p>
+                    </div>
+                    <footer class="slds-modal__footer dialog__footer">
+                        <lightning-button label="Cancel" variant="neutral"
+                            onclick={dialogCancel}></lightning-button>
+                        <lightning-button label={dialogConfirmLabel} variant="brand"
+                            disabled={dialogBusy} onclick={dialogConfirm}></lightning-button>
+                    </footer>
                 </div>
-                <footer class="slds-modal__footer">
-                    <lightning-button label="Cancel" variant="neutral"
-                        onclick={dialogCancel}></lightning-button>
-                    <lightning-button label={dialogConfirmLabel} variant="brand"
-                        disabled={dialogBusy} onclick={dialogConfirm}></lightning-button>
-                </footer>
-            </div>
-        </section>
-        <div class="slds-backdrop slds-backdrop_open"></div>
-    </template>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+    </div>
 </template>
