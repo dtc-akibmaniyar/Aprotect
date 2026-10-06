@@ -11,6 +11,20 @@ public without sharing class ApplicationPDFExtension {
     public String  dealerWebsite   { get; set; }
     public String  dealerAddress   { get; set; }
 
+    /**
+     * Lubrico-contract PDF support: printed-on date rendered in the running
+     * footer ("Printed on: <date>"), and the application's vehicle purchase
+     * price used as the contract liability limit ("Total liability equals the
+     * purchase price of the vehicle before taxes").
+     */
+    public String printedOn {
+        get {
+            Date t = Date.today();
+            return DateTime.newInstance(t.year(), t.month(), t.day()).format('MMM d, yyyy');
+        }
+    }
+    private Decimal applicationVehiclePurchasePrice;
+
     public List<Application_Package__c> applicationPackages { get; private set; }
     private Map<Id, String>  packageLogoUrls;
     private Map<Id, Boolean> packageHasLogo;
@@ -261,6 +275,20 @@ public without sharing class ApplicationPDFExtension {
         // Flattened relationship fields for PDF renderer compatibility
         public String                              planName         { get; set; }
         public String                              termName         { get; set; }
+        // Lubrico-contract PDF display bindings (pre-formatted, null-safe).
+        // Populated in the constructor loop from the real record data so the
+        // page markup stays presentation-only.
+        public String                              contractStartDateDisplay { get; set; }
+        public String                              contractEndDateDisplay   { get; set; }
+        public String                              odometerStartDisplay     { get; set; }
+        public String                              odometerEndDisplay       { get; set; }
+        public String                              mileageDisplay           { get; set; }
+        public String                              deductibleDisplay        { get; set; }
+        public String                              perClaimLimitDisplay     { get; set; }
+        public String                              liabilityDisplay         { get; set; }
+        public String                              premiumWithoutTaxDisplay { get; set; }
+        public String                              taxDisplay               { get; set; }
+        public String                              totalPremiumDisplay      { get; set; }
         // P4 [T]: when true the package carries a persisted engine line set and
         // the rendered* money keys below come from the stored lines (§07.3
         // rebuild — sum(non-Tax lines), sum(Tax lines), sum(all)); otherwise
@@ -392,9 +420,41 @@ public without sharing class ApplicationPDFExtension {
                 wrapper.storedNoTaxTotal = lineMoney.noTaxTotal;
                 wrapper.storedTaxTotal = lineMoney.taxTotal;
             }
-            
+
+            // --- Lubrico-contract PDF display bindings (real record data) ---
+            wrapper.contractStartDateDisplay = formatDateLong(pkg.Contract_Start_Date__c);
+            wrapper.contractEndDateDisplay   = formatDateLong(pkg.Contract_End_Date__c);
+
+            String startUnit = String.isNotBlank(pkg.Odometer_Start_Unit__c) ? pkg.Odometer_Start_Unit__c : 'KM';
+            String endUnit   = String.isNotBlank(pkg.Odometer_End_Unit__c)   ? pkg.Odometer_End_Unit__c   : 'KM';
+            wrapper.odometerStartDisplay = (pkg.Odometer_Start__c == null)
+                ? '' : (groupNumber(pkg.Odometer_Start__c) + ' ' + startUnit);
+
+            // Unlimited-KM substitution ported from the Summary tab: an
+            // 'Unlimited' restriction displays "Unlimited" with the KM unit
+            // instead of a blank odometer (matches the dealerPortalSummary rule).
+            String restriction = resolveRestrictionType(pkg);
+            if (restriction != null && restriction.equalsIgnoreCase('Unlimited')) {
+                wrapper.odometerEndDisplay = 'Unlimited ' + endUnit;
+            } else if (pkg.Odometer_End__c != null) {
+                wrapper.odometerEndDisplay = groupNumber(pkg.Odometer_End__c) + ' ' + endUnit;
+            } else {
+                wrapper.odometerEndDisplay = '';
+            }
+            wrapper.mileageDisplay = wrapper.odometerEndDisplay;
+
+            wrapper.deductibleDisplay    = formatMoney(resolveDeductible(pkg));
+            wrapper.perClaimLimitDisplay = formatMoney(resolvePerClaimLimit(pkg));
+            wrapper.liabilityDisplay     = formatMoney(applicationVehiclePurchasePrice);
+
+            // Money display stays sourced from the rendered* keys so the
+            // contract matches the portal and the invoice on mixed-fee deals.
+            wrapper.premiumWithoutTaxDisplay = formatMoney(wrapper.renderedContractPremiumWithoutTax);
+            wrapper.taxDisplay               = formatMoney(wrapper.renderedTaxAmount);
+            wrapper.totalPremiumDisplay      = formatMoney(wrapper.renderedContractPremium);
+
             // Record type info
-            String rt = String.isBlank(pkg.Package_Record_Type__c) ? 'Other' : pkg.Package_Record_Type__c;
+            String rt = resolveRecordTypeName(pkg);
             wrapper.recordTypeName = rt;
             wrapper.isTireRim = rt.containsIgnoreCase('Tire') && rt.containsIgnoreCase('Rim');
 
@@ -412,16 +472,16 @@ public without sharing class ApplicationPDFExtension {
             }
         }
 
-        // Filter by rt param if present
+        // Filter by rt param if present. The rt key equals the package's real
+        // record type (resolveRecordTypeName) — the SAME key the Summary PDF
+        // button sends. If the key still does not resolve we keep ALL wrappers
+        // rather than filtering to an empty list, so a call never renders a
+        // blank PDF.
         PageReference currentPage = ApexPages.currentPage();
         if (currentPage != null) {
             String rtFilter = currentPage.getParameters().get('rt');
-            if (!String.isBlank(rtFilter)) {
-                if (recordTypeWrappers.containsKey(rtFilter)) {
-                    recordTypeWrappersList = new List<RecordTypeWrapper>{ recordTypeWrappers.get(rtFilter) };
-                } else {
-                    recordTypeWrappersList = new List<RecordTypeWrapper>();
-                }
+            if (!String.isBlank(rtFilter) && recordTypeWrappers.containsKey(rtFilter)) {
+                recordTypeWrappersList = new List<RecordTypeWrapper>{ recordTypeWrappers.get(rtFilter) };
             }
         }
     }
@@ -439,6 +499,7 @@ public without sharing class ApplicationPDFExtension {
         try {
             Application__c app = [
                 SELECT Id, Dealer_Name__c,
+                       Vehicle_Purchase_Price__c,
                        Dealer_Name__r.Name,
                        Dealer_Name__r.Phone,
                        Dealer_Name__r.Email__c,
@@ -453,6 +514,9 @@ public without sharing class ApplicationPDFExtension {
                 WHERE Id = :application.Id
                 LIMIT 1
             ];
+
+            // Liability limit = the vehicle purchase price (before taxes).
+            applicationVehiclePurchasePrice = app.Vehicle_Purchase_Price__c;
 
             if (app.Dealer_Name__c != null && app.Dealer_Name__r != null) {
                 dealerName = app.Dealer_Name__r.Name != null ? app.Dealer_Name__r.Name : '';
@@ -615,6 +679,7 @@ public without sharing class ApplicationPDFExtension {
         try {
             List<Application_Package__c> all = [
                 SELECT Id, Name, Application_Status__c,
+                       RecordType.Name,
                        Package_Plan_Type__r.Name,
                        Package__r.Name,
                        Package__r.Id,
@@ -631,6 +696,14 @@ public without sharing class ApplicationPDFExtension {
                        Disclaimer_Body__c,
                        Payment_Status__c,
                        Deductible__c,
+                       Per_Claim_Limit__c,
+                       Package_Term__r.Per_Claim_Limit__c,
+                       Package_Term__r.Restriction_Type__c,
+                       Dealer_Package__r.Per_Claim_Limit__c,
+                       Dealer_Package__r.Deductable__c,
+                       Dealer_Package_Term__r.Restriction_Type__c,
+                       Dealer_Package_Term__r.Odometer_KM__c,
+                       Dealer_Package_Term__r.Package_Term__r.Per_Claim_Limit__c,
                        Contract_Start_Date__c,
                        Contract_End_Date__c,
                        Odometer_Start__c,
@@ -655,13 +728,17 @@ public without sharing class ApplicationPDFExtension {
                 FROM Application_Package__c
                 WHERE Application__c = :application.Id
                   AND Active__c = true
-                ORDER BY Package_Record_Type__c, CreatedDate DESC
+                ORDER BY RecordTypeId, CreatedDate DESC
             ];
 
             applicationPackages = new List<Application_Package__c>();
             Set<String> seen = new Set<String>();
             for (Application_Package__c p : all) {
-                String rt = String.isBlank(p.Package_Record_Type__c) ? 'Other' : p.Package_Record_Type__c;
+                // Group/dedupe on the package's REAL record type (fallback to
+                // Package_Record_Type__c then 'Other') so the key matches what
+                // the Summary PDF button sends and never lumps every engine
+                // package under a single 'Other' bucket.
+                String rt = resolveRecordTypeName(p);
                 if (!seen.contains(rt)) {
                     applicationPackages.add(p);
                     seen.add(rt);
@@ -670,6 +747,117 @@ public without sharing class ApplicationPDFExtension {
         } catch (Exception e) {
             applicationPackages = new List<Application_Package__c>();
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Lubrico-contract PDF helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * The grouping/filter key for a package = its REAL record type name, with a
+     * fallback so the key always equals what the Summary PDF button sends
+     * (never a blank PDF):
+     *   rt = blank(RecordType.Name)
+     *          ? (blank(Package_Record_Type__c) ? 'Other' : Package_Record_Type__c)
+     *          : RecordType.Name
+     */
+    private static String resolveRecordTypeName(Application_Package__c p) {
+        String rtName = (p.RecordType != null) ? p.RecordType.Name : null;
+        if (String.isNotBlank(rtName)) {
+            return rtName;
+        }
+        return String.isBlank(p.Package_Record_Type__c) ? 'Other' : p.Package_Record_Type__c;
+    }
+
+    /** Restriction type from the dealer term, falling back to the master term. */
+    private static String resolveRestrictionType(Application_Package__c p) {
+        if (p.Dealer_Package_Term__r != null
+                && String.isNotBlank(p.Dealer_Package_Term__r.Restriction_Type__c)) {
+            return p.Dealer_Package_Term__r.Restriction_Type__c;
+        }
+        if (p.Package_Term__r != null && String.isNotBlank(p.Package_Term__r.Restriction_Type__c)) {
+            return p.Package_Term__r.Restriction_Type__c;
+        }
+        return null;
+    }
+
+    /** Per-claim limit: package field, then master term, then the dealer links. */
+    private static Decimal resolvePerClaimLimit(Application_Package__c p) {
+        if (p.Per_Claim_Limit__c != null) {
+            return p.Per_Claim_Limit__c;
+        }
+        if (p.Package_Term__r != null && p.Package_Term__r.Per_Claim_Limit__c != null) {
+            return p.Package_Term__r.Per_Claim_Limit__c;
+        }
+        if (p.Dealer_Package_Term__r != null
+                && p.Dealer_Package_Term__r.Package_Term__r != null
+                && p.Dealer_Package_Term__r.Package_Term__r.Per_Claim_Limit__c != null) {
+            return p.Dealer_Package_Term__r.Package_Term__r.Per_Claim_Limit__c;
+        }
+        if (p.Dealer_Package__r != null && p.Dealer_Package__r.Per_Claim_Limit__c != null) {
+            return p.Dealer_Package__r.Per_Claim_Limit__c;
+        }
+        return null;
+    }
+
+    /** Deductible: package field, then the dealer package override (Deductable__c). */
+    private static Decimal resolveDeductible(Application_Package__c p) {
+        if (p.Deductible__c != null) {
+            return p.Deductible__c;
+        }
+        if (p.Dealer_Package__r != null && p.Dealer_Package__r.Deductable__c != null) {
+            return p.Dealer_Package__r.Deductable__c;
+        }
+        return null;
+    }
+
+    /** "MMM d, yyyy" (e.g. Jul 29, 2026); '' when null. */
+    private static String formatDateLong(Date d) {
+        if (d == null) {
+            return '';
+        }
+        return DateTime.newInstance(d.year(), d.month(), d.day()).format('MMM d, yyyy');
+    }
+
+    /** "$1,234.56"; null renders as $0.00 (prototype shows $0 for empty). */
+    private static String formatMoney(Decimal value) {
+        if (value == null) {
+            return '$0.00';
+        }
+        Decimal v = value.setScale(2, System.RoundingMode.HALF_UP);
+        Boolean negative = v < 0;
+        v = v.abs();
+        String s = v.toPlainString();
+        Integer dot = s.indexOf('.');
+        String whole = (dot >= 0) ? s.substring(0, dot) : s;
+        String cents = (dot >= 0) ? s.substring(dot + 1) : '00';
+        if (cents.length() == 1) {
+            cents += '0';
+        } else if (cents.length() > 2) {
+            cents = cents.substring(0, 2);
+        }
+        return (negative ? '-$' : '$') + groupDigits(whole) + '.' + cents;
+    }
+
+    /** "40,000" for a whole-number odometer reading. */
+    private static String groupNumber(Decimal value) {
+        if (value == null) {
+            return '';
+        }
+        return groupDigits(value.setScale(0, System.RoundingMode.HALF_UP).toPlainString());
+    }
+
+    private static String groupDigits(String digits) {
+        String out = '';
+        Integer c = 0;
+        for (Integer i = digits.length() - 1; i >= 0; i--) {
+            out = digits.substring(i, i + 1) + out;
+            c++;
+            if (Math.mod(c, 3) == 0 && i > 0) {
+                out = ',' + out;
+            }
+        }
+        return out;
     }
 
     private String buildFileUrl(String versionId) {
