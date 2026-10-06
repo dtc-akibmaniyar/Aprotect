@@ -526,6 +526,16 @@ public without sharing class DealerPackageSyncService {
                 Dealer__c = dealerId,
                 Package__c = master.Id,
                 RecordTypeId = dealerRTId,
+                // A newly assigned / created dealer package is ALWAYS born Active.
+                // Set explicitly (never rely on the field default): the Metadata
+                // API does not reliably carry a Checkbox default, and existing
+                // rows are not backfilled when the field is added — so depending
+                // on the default silently produced Inactive mirrors. This is the
+                // ONE creation path for Dealer_Package__c, so the guarantee lives
+                // here. The user can then deactivate any package via the console
+                // toggle; reconcile() deliberately never rewrites Active__c, so a
+                // deactivation is a soft state that survives every later sync.
+                Active__c = true,
                 Commercial_Vehicle_Surcharge_Fee__c = seedCommercialPrice,
                 // P7 watermark: a freshly gap-created mirror is born "as fresh as
                 // now" — the after-insert reconcile bumps it again at the end of

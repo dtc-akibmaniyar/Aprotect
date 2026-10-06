@@ -440,12 +440,15 @@
                                 </div>
                             </div>
 
-                            <div class="tree-cols">
+                            <div class="dealer-scroll">
+                            <div class="tree-cols tree-cols_wide">
                                 <span aria-hidden="true"></span>
                                 <span>Package Name</span>
                                 <span>Per Claim Limit</span>
                                 <span>Deductible</span>
                                 <span>Series</span>
+                                <span class="tree-col-toggle">Active</span>
+                                <span aria-hidden="true"></span>
                                 <span aria-hidden="true"></span>
                             </div>
 
@@ -495,6 +498,15 @@
                                                                         <span class="num">{pkg.perClaimLimitLabel}</span>
                                                                         <span class="num">{pkg.deductibleLabel}</span>
                                                                         <span class="series">{pkg.seriesLabel}</span>
+                                                                        <span class="row-state">
+                                                                            <span class={pkg.activeChipClass}>{pkg.activeLabel}</span>
+                                                                        </span>
+                                                                        <span class="row-toggle">
+                                                                            <button type="button" class="act-btn"
+                                                                                disabled={pkg.disabled} onclick={handleToggleActive}
+                                                                                data-pkgid={pkg.dealerPackageId}
+                                                                                title={pkg.toggleActiveTitle}>{pkg.toggleActiveLabel}</button>
+                                                                        </span>
                                                                         <button type="button" class={pkg.chevronClass}
                                                                             data-pane="dealer" data-id={pkg.rowId}
                                                                             onclick={handleDealerPkgChevron} aria-label="Terms and options"></button>
@@ -514,6 +526,33 @@
                                                                                         data-id={pkg.syncId} data-name={pkg.name}>Update from master</button>
                                                                                 </div>
                                                                             </template>
+
+                                                <!-- Bulk Discount — one discount for every term of this package
+                                                     (dealer-side authoring; shown on BOTH service tabs). Sits
+                                                     directly above the dealer commercial price bar. -->
+                                                <template if:true={pkg.hasTerms}>
+                                                    <div class="fee-remove-strip bulk-disc">
+                                                        <label class="bulk-disc__field">
+                                                            <span class="bulk-disc__label">Bulk Discount</span>
+                                                            <input class="cell-input cell-input_xs" type="number"
+                                                                step="0.01" min="0" value={pkg.bulkDiscountDraft}
+                                                                data-pkgid={pkg.dealerPackageId}
+                                                                data-field="bulkDiscount"
+                                                                onchange={handleBulkDiscountField}
+                                                                disabled={pkg.bulkDiscountDisabled} />
+                                                            <span class="bulk-disc__unit">%</span>
+                                                        </label>
+                                                        <button type="button" class="act-btn"
+                                                            disabled={pkg.bulkDiscountDisabled}
+                                                            onclick={handleApplyBulkDiscount}
+                                                            data-pkgid={pkg.dealerPackageId}>Apply to All Terms</button>
+                                                        <button type="button" class="bulk-disc__link"
+                                                            disabled={pkg.bulkDiscountDisabled}
+                                                            onclick={handleClearBulkDiscount}
+                                                            data-pkgid={pkg.dealerPackageId}>Clear Discount</button>
+                                                        <span class="fee-remove-hint">Sets one discount for every term in this warranty at once — individual terms below can still be fine-tuned afterward.</span>
+                                                    </div>
+                                                </template>
 
                                                 <!-- Dealer commercial price (flat, per-dealer) -->
                                                 <div class="price-bar">
@@ -750,6 +789,7 @@
                                         </template>
                                     </div>
                                 </template>
+                            </div>
                             </div>
                         </div>
                     </section>

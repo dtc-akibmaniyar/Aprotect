@@ -14,6 +14,7 @@ import saveDealerOptionPricing from '@salesforce/apex/DealerPackageSyncControlle
 import setDealerOptionRemoved from '@salesforce/apex/DealerPackageSyncController.setDealerOptionRemoved';
 import saveDealerCommercialPrice from '@salesforce/apex/DealerPackageSyncController.saveDealerCommercialPrice';
 import saveDealerPremiumSettings from '@salesforce/apex/DealerPackageSyncController.saveDealerPremiumSettings';
+import setDealerPackageActive from '@salesforce/apex/DealerPackageSyncController.setDealerPackageActive';
 import refreshDealerPriceAnchors from '@salesforce/apex/DealerPackageSyncController.refreshDealerPriceAnchors';
 import getMasterPackageDetail from '@salesforce/apex/DealerPackageSyncController.getMasterPackageDetail';
 
@@ -112,6 +113,10 @@ export default class DealerPortalPackageSync extends LightningElement {
     // persisted together through the one confirm-gated write.
     premiumOverrideDraft = null;     // string as typed; '' cleared to null on save
     chargePremiumDraft = null;       // boolean once toggled
+
+    // Bulk discount drafts, keyed by dealer package id. Defaults to {} so the
+    // render getter never throws; a missing key renders as 0 (a no-op on apply).
+    bulkDiscountDrafts = {};
 
     dialogOpen = false;
     dialogBusy = false;
@@ -677,11 +682,15 @@ export default class DealerPortalPackageSync extends LightningElement {
                     packages: grpPkgs.map((row) => {
                         const open = this.isRowOpen(pane, row.rowId);
                         const selected = this.isSelected(selectedIds, row.selId);
+                        // The dealer pane rows carry one extra track (the Active /
+                        // Inactive toggle); the master pane keeps the shared grid.
+                        const rowBase = pane === 'dealer'
+                            ? 'tree-row tree-row_wide' : 'tree-row';
                         return Object.assign({}, row, {
                             open: open,
                             selected: selected,
                             tri: selected ? 'checked' : 'unchecked',
-                            rowClass: open ? 'tree-row tree-row_open' : 'tree-row',
+                            rowClass: open ? rowBase + ' tree-row_open' : rowBase,
                             chevronClass: open ? 'chev chev_open' : 'chev'
                         });
                     })
@@ -862,6 +871,14 @@ export default class DealerPortalPackageSync extends LightningElement {
                     perClaimLimitLabel: p.perClaimLimitLabel,
                     deductibleLabel: p.deductibleLabel,
                     lastSyncedLabel: p.lastSyncedLabel,
+                    // Active / Inactive soft state — the per-row toggle.
+                    isActive: p.isActive === true,
+                    activeLabel: p.isActive === true ? 'Active' : 'Inactive',
+                    activeChipClass: p.isActive === true
+                        ? 'state-chip state-chip_active' : 'state-chip state-chip_inactive',
+                    toggleActiveLabel: p.isActive === true ? 'Deactivate' : 'Activate',
+                    toggleActiveTitle: p.isActive === true
+                        ? 'Deactivate this dealer package' : 'Activate this dealer package',
                     commercialPrice: this.numStr(p.commercialVehicleSurcharge),
                     commercialDisplay: this.money(p.commercialVehicleSurcharge),
                     // The master value this figure was seeded from — server-built label.
@@ -887,7 +904,10 @@ export default class DealerPortalPackageSync extends LightningElement {
                     // The package-level bulk clear is offered only when at least one
                     // term currently carries a premium fee (and the row is editable).
                     feeRemoveDisabled: this.flagOff || this.busy
-                        || !(p.terms || []).some((t) => this.hasPremiumFee(t))
+                        || !(p.terms || []).some((t) => this.hasPremiumFee(t)),
+                    // Bulk Discount strip — one discount for every term of this package.
+                    bulkDiscountDraft: this.bulkDiscountDraftFor(p.dealerPackageId),
+                    bulkDiscountDisabled: this.flagOff || this.busy
                 };
             });
     }
@@ -1522,6 +1542,78 @@ export default class DealerPortalPackageSync extends LightningElement {
         });
     }
 
+    /**
+     * The staged bulk-discount draft for one dealer package.
+     *
+     * Defensive by design: a package that has never been edited has no key in
+     * `bulkDiscountDrafts` yet, and the render model must NEVER throw for one.
+     * A missing (or null/undefined) key renders as 0 — a no-op when applied —
+     * so the Bulk Discount strip is always safe to render, on every service tab.
+     */
+    bulkDiscountDraftFor(dealerPackageId) {
+        if (!dealerPackageId) return 0;
+        const drafts = this.bulkDiscountDrafts || {};
+        if (!Object.prototype.hasOwnProperty.call(drafts, dealerPackageId)) return 0;
+        const raw = drafts[dealerPackageId];
+        return raw === null || raw === undefined ? 0 : raw;
+    }
+
+    /** Bulk Discount input — staged locally; the strip's Apply reads this draft. */
+    handleBulkDiscountField(event) {
+        const pkgId = event.currentTarget.dataset.pkgid;
+        if (!pkgId) return;
+        const value = event.currentTarget.value;
+        this.bulkDiscountDrafts = Object.assign({}, this.bulkDiscountDrafts, {
+            [pkgId]: value
+        });
+        this.refreshDealerView();
+    }
+
+    /**
+     * Bulk Discount — one fixed '%' discount for EVERY term of this package.
+     * A blank or zero input is a no-op (informational toast, no confirm, no write).
+     * Confirm-gated like every other authoring write.
+     */
+    handleApplyBulkDiscount(event) {
+        const pkgId = event.currentTarget.dataset.pkgid;
+        if (!pkgId) return;
+        const value = this.parseNum(this.bulkDiscountDrafts[pkgId]);
+        if (value === null || value === 0) {
+            this.toast('Enter a discount above zero to apply to every term.', 'info');
+            return;
+        }
+        if (this.flagOff) {
+            this.toast(this.flagOffMessage, 'error');
+            return;
+        }
+        this.openConfirm({
+            kind: 'bulkDiscount',
+            params: { dealerPackageId: pkgId, discountType: '%', discountValue: value },
+            title: 'Apply a bulk discount to every term?',
+            summary: 'A ' + value + '% discount will be set on every term in this dealer package.',
+            note: 'Your stored wholesale price is frozen once you set your own pricing \u2014 "Price locked to your own pricing" will apply to every term touched by this discount.',
+            confirmLabel: 'Apply to all terms'
+        });
+    }
+
+    /** Clear Discount — remove the discount from every term that currently carries one. */
+    handleClearBulkDiscount(event) {
+        const pkgId = event.currentTarget.dataset.pkgid;
+        if (!pkgId) return;
+        if (this.flagOff) {
+            this.toast(this.flagOffMessage, 'error');
+            return;
+        }
+        this.openConfirm({
+            kind: 'clearBulkDiscount',
+            params: { dealerPackageId: pkgId },
+            title: 'Clear the discount on every term?',
+            summary: 'The discount will be removed from every term in this dealer package that currently carries one.',
+            note: 'Markup, sales-rep incentive and the premium fee are not changed.',
+            confirmLabel: 'Clear discount'
+        });
+    }
+
     handleSaveOption(event) {
         const optId = event.currentTarget.dataset.optionid;
         const found = this.findOption(optId);
@@ -1581,6 +1673,32 @@ export default class DealerPortalPackageSync extends LightningElement {
             summary: 'The flat per-dealer commercial figure will be saved on this dealer package.',
             note: 'This figure is dealer-owned — it is never refreshed from the master catalogue.',
             confirmLabel: 'Save price'
+        });
+    }
+
+    /**
+     * Active / Inactive toggle for ONE dealer package. A soft state only — the
+     * row stays in the plan and keeps syncing. Confirm-gated like every write.
+     */
+    handleToggleActive(event) {
+        event.stopPropagation();
+        const pkgId = event.currentTarget.dataset.pkgid;
+        if (!pkgId) return;
+        let pkg = null;
+        (this.authoring.packages || []).forEach((p) => {
+            if (p.dealerPackageId === pkgId) pkg = p;
+        });
+        if (!pkg) return;
+        const next = pkg.isActive !== true;   // toggle the stored state
+        this.openConfirm({
+            kind: 'toggleActive',
+            params: { dealerPackageId: pkgId, active: next },
+            title: (next ? 'Activate ' : 'Deactivate ') + '\u201C' + (pkg.name || 'this package') + '\u201D?',
+            summary: next
+                ? 'This dealer package will show as Active again on this console.'
+                : 'This dealer package will show as Inactive on this console. It stays in the dealer plan and keeps syncing exactly as before.',
+            note: 'Changing the Active state does not remove the package, its terms or add-ons, and never changes your dealer pricing. Nothing is deleted.',
+            confirmLabel: next ? 'Activate package' : 'Deactivate package'
         });
     }
 
@@ -1685,6 +1803,8 @@ export default class DealerPortalPackageSync extends LightningElement {
                 return saveDealerPremiumSettings(action.params);
             case 'refreshAnchors':
                 return refreshDealerPriceAnchors(action.params);
+            case 'toggleActive':
+                return setDealerPackageActive(action.params);
             default:
                 return Promise.resolve({ success: false, message: 'Unknown action.' });
         }

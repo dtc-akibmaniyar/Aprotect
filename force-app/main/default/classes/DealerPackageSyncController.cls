@@ -841,6 +841,7 @@ public without sharing class DealerPackageSyncController {
         @AuraEnabled public Decimal masterCommercialSurcharge;  // the master's commercial value (seed source)
         @AuraEnabled public String masterCommercialLabel;       // "Master: $x" / "Master: not set"
         @AuraEnabled public String lastSyncedLabel;
+        @AuraEnabled public Boolean isActive;          // Active (default) / Inactive — soft display state
         @AuraEnabled public List<DealerTermRow> terms;
         @AuraEnabled public List<DealerTierRow> tiers;             // coverage tiers (grouping)
         @AuraEnabled public List<DealerOptionRow> includedOptions; // package-level included add-ons
@@ -924,7 +925,7 @@ public without sharing class DealerPackageSyncController {
                 SELECT Id, Name, Dealer__c, Package__c, RecordType.Name, RecordType.DeveloperName,
                        Plan_Type__r.Name, Commercial_Vehicle_Surcharge_Fee__c,
                        Package__r.Commercial_Vehicle_Surcharge_Fee__c,
-                       Per_Claim_Limit__c, Deductable__c,
+                       Per_Claim_Limit__c, Deductable__c, Active__c,
                        Package__r.Package_Group__r.Catalogue_Release__r.Name,
                        Package__r.Package_Group__r.Catalogue_Release__r.Status__c,
                        Last_Synced_At__c, CreatedDate
@@ -950,6 +951,7 @@ public without sharing class DealerPackageSyncController {
                     ? dp.Package__r.Package_Group__r.Catalogue_Release__r.Status__c : '';
                 r.perClaimLimitLabel = perClaimLimitLabel(dp.Per_Claim_Limit__c);
                 r.deductibleLabel = deductibleLabel(dp.Deductable__c);
+                r.isActive = dp.Active__c == true;
                 r.commercialVehicleSurcharge = dp.Commercial_Vehicle_Surcharge_Fee__c;
                 // The master value this dealer figure was seeded from (read-only
                 // reference; the dealer figure itself is dealer-owned and never
@@ -1203,6 +1205,131 @@ public without sharing class DealerPackageSyncController {
             applyAuthoringSaveResults(Database.update(updates, false), result);
             if (result.success) {
                 result.message = 'Premium fee removed from '
+                    + updates.size() + (updates.size() == 1 ? ' term.' : ' terms.');
+            }
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = GENERIC_ERROR_MESSAGE;
+            return result;
+        }
+    }
+
+    /**
+     * Package-level bulk discount: set ONE discount (type + value) on EVERY term
+     * of a dealer package in a single write (the console's "Bulk Discount" strip).
+     * Writes ONLY Discount_Type__c / Discount_Value__c — never Markup__c,
+     * Markup_Type__c, Sales_Rep_Incentive__c or the premium fee. Setting the
+     * discount freezes the stored wholesale price anchor on every touched term
+     * (the same rule as saving a discount on a single term). allOrNone = false.
+     */
+    @AuraEnabled
+    public static AuthoringResult applyDealerPackageTermDiscount(
+        Id dealerPackageId, String discountType, Decimal discountValue
+    ) {
+        AuthoringResult result = new AuthoringResult();
+        try {
+            assertReadAccess();
+            if (dealerPackageId == null) {
+                result.message = 'A dealer package is required.';
+                return result;
+            }
+            if (!PortalFeatureFlagService.isDealerSyncEnabled()) {
+                result.message = FLAG_OFF_MESSAGE;
+                return result;
+            }
+            List<Dealer_Package__c> guard = [
+                SELECT Id FROM Dealer_Package__c WHERE Id = :dealerPackageId LIMIT 1
+            ];
+            if (guard.isEmpty()) {
+                result.message = 'This package is not available to the dealer.';
+                return result;
+            }
+            // Blank or zero is a no-op by design — "Clear Discount" is the only
+            // removal path, and a zero discount is never written.
+            if (discountValue == null || discountValue == 0) {
+                result.success = true;
+                result.message = 'Enter a discount above zero to apply to every term.';
+                return result;
+            }
+            String t = String.isBlank(discountType) ? '%' : discountType;
+            List<Dealer_Package_Term__c> updates = new List<Dealer_Package_Term__c>();
+            for (Dealer_Package_Term__c row : [
+                SELECT Id FROM Dealer_Package_Term__c
+                WHERE Dealer_Package__c = :dealerPackageId
+            ]) {
+                // Only the two discount fields — every other authoring value is left alone.
+                updates.add(new Dealer_Package_Term__c(
+                    Id = row.Id,
+                    Discount_Type__c = t,
+                    Discount_Value__c = discountValue
+                ));
+            }
+            if (updates.isEmpty()) {
+                result.success = true;
+                result.message = 'This package has no terms to discount.';
+                return result;
+            }
+            applyAuthoringSaveResults(Database.update(updates, false), result);
+            if (result.success) {
+                String shown = '$'.equals(t)
+                    ? amountText(discountValue)
+                    : (discountValue == null ? '' : String.valueOf(discountValue) + '%');
+                result.message = 'Discount of ' + shown + ' applied to '
+                    + updates.size() + (updates.size() == 1 ? ' term.' : ' terms.');
+            }
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = GENERIC_ERROR_MESSAGE;
+            return result;
+        }
+    }
+
+    /**
+     * Package-level bulk clear: remove the discount from every term of one dealer
+     * package (the console's "Clear Discount" link). Blanks ONLY
+     * Discount_Type__c / Discount_Value__c, and only on terms that currently carry
+     * a discount — markup, incentive and the premium fee are never touched.
+     * No-op-safe with an honest count. allOrNone = false.
+     */
+    @AuraEnabled
+    public static AuthoringResult clearDealerPackageTermDiscounts(Id dealerPackageId) {
+        AuthoringResult result = new AuthoringResult();
+        try {
+            assertReadAccess();
+            if (dealerPackageId == null) {
+                result.message = 'A dealer package is required.';
+                return result;
+            }
+            if (!PortalFeatureFlagService.isDealerSyncEnabled()) {
+                result.message = FLAG_OFF_MESSAGE;
+                return result;
+            }
+            List<Dealer_Package__c> guard = [
+                SELECT Id FROM Dealer_Package__c WHERE Id = :dealerPackageId LIMIT 1
+            ];
+            if (guard.isEmpty()) {
+                result.message = 'This package is not available to the dealer.';
+                return result;
+            }
+            List<Dealer_Package_Term__c> updates = new List<Dealer_Package_Term__c>();
+            for (Dealer_Package_Term__c row : [
+                SELECT Id, Discount_Type__c, Discount_Value__c FROM Dealer_Package_Term__c
+                WHERE Dealer_Package__c = :dealerPackageId
+                  AND (Discount_Type__c != null OR Discount_Value__c != null)
+            ]) {
+                updates.add(new Dealer_Package_Term__c(
+                    Id = row.Id, Discount_Type__c = null, Discount_Value__c = null));
+            }
+            if (updates.isEmpty()) {
+                result.success = true;
+                result.message = 'No discounts to clear on this package.';
+                return result;
+            }
+            applyAuthoringSaveResults(Database.update(updates, false), result);
+            if (result.success) {
+                result.message = 'Discount cleared from '
                     + updates.size() + (updates.size() == 1 ? ' term.' : ' terms.');
             }
             return result;
@@ -1468,6 +1595,58 @@ public without sharing class DealerPackageSyncController {
                 result.message = 'Nothing to refresh — every price is already current.';
             } else if (result.skippedCount == 0) {
                 result.message = 'Refreshed ' + result.updatedCount + ' dealer price(s) from the master catalogue.';
+            }
+            return result;
+        } catch (Exception e) {
+            result.success = false;
+            result.message = GENERIC_ERROR_MESSAGE;
+            return result;
+        }
+    }
+
+    /**
+     * Activate / deactivate ONE dealer package — the console's per-row
+     * Active / Inactive toggle. A soft display / enablement state only: the
+     * package stays in the dealer plan and keeps syncing exactly as before, and
+     * nothing is deleted. Dealer-package row only; allOrNone = false.
+     */
+    @AuraEnabled
+    public static AuthoringResult setDealerPackageActive(Id dealerPackageId, Boolean active) {
+        AuthoringResult result = new AuthoringResult();
+        try {
+            assertReadAccess();
+            if (dealerPackageId == null) {
+                result.message = 'A dealer package is required.';
+                return result;
+            }
+            if (!PortalFeatureFlagService.isDealerSyncEnabled()) {
+                result.message = FLAG_OFF_MESSAGE;
+                return result;
+            }
+            // Dealer package write — check field-level update access up front
+            // (the class is `without sharing`, so this reads the running user's
+            // own access) rather than letting the write fail silently.
+            if (!Dealer_Package__c.Active__c.getDescribe().isUpdateable()) {
+                result.message = 'You do not have permission to change whether a dealer '
+                    + 'package is active. Ask an administrator to grant access.';
+                return result;
+            }
+            List<Dealer_Package__c> guard = [
+                SELECT Id FROM Dealer_Package__c WHERE Id = :dealerPackageId LIMIT 1
+            ];
+            if (guard.isEmpty()) {
+                result.message = 'This package is not available to the dealer.';
+                return result;
+            }
+            Boolean next = active == true;
+            Database.SaveResult[] saved = Database.update(new List<Dealer_Package__c>{
+                new Dealer_Package__c(Id = dealerPackageId, Active__c = next)
+            }, false);
+            applyAuthoringSaveResults(saved, result);
+            if (result.success) {
+                result.message = next
+                    ? 'This dealer package is now Active.'
+                    : 'This dealer package is now Inactive.';
             }
             return result;
         } catch (Exception e) {
@@ -2281,6 +2460,7 @@ public without sharing class DealerPackageSyncController {
         // Field-level: the watermark + the money/structure anchors the console reads.
         SObjectField[] fields = new SObjectField[]{
             Dealer_Package__c.Last_Synced_At__c,
+            Dealer_Package__c.Active__c,
             Dealer_Package_Term__c.Original_Package_Term_Cost__c,
             Dealer_Package_Term__c.Premium_Model_Fee__c,
             Dealer_Package_Option__c.Original_Package_Option_Price__c,

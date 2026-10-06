@@ -997,6 +997,78 @@
     align-items: center;
 }
 
+/* Dealer pane — ONE deterministic track set shared by the column header AND
+   every package row. The dealer rows carry the package name, the Active /
+   Inactive state chip and the Deactivate / Activate toggle on top of the
+   shared columns, so the header and the rows must use the same 8-track grid:
+   select · name · per-claim · deductible · series · state chip · toggle ·
+   chevron. Every track is a FIXED length or a minmax() with a real minimum —
+   never an `auto` track, which each row sized from its own content and so
+   pushed the header out of step with the rows (the earlier collision). One
+   shared template ⇒ the columns line up; the chip sits under the ACTIVE
+   header and the toggle gets its own track, so neither can run into the Per
+   Claim Limit cell.
+   Widths (rebalanced): the name track has a real 13rem floor and grows at
+   2fr, so full package names read without ellipsis at a normal pane width
+   (the Outdated badge wraps under the name rather than squeezing it — see
+   .name-cell), and the toggle track floors at 6.5rem so the widest label
+   ("Deactivate") always fits on one line. Track minimums total 43.5rem
+   (+ 3.5rem gaps + 2.4rem padding = 49.4rem), so the pane floor is 49.5rem. */
+.tree-cols_wide,
+.tree-row_wide {
+    grid-template-columns:
+        22px                     /* select */
+        minmax(13rem, 2fr)       /* package name (+ Outdated badge, wraps below) */
+        6.75rem                  /* per claim limit */
+        6.25rem                  /* deductible */
+        3rem                     /* series */
+        5rem                     /* Active / Inactive state chip */
+        6.5rem                   /* Deactivate / Activate toggle — fits the widest label */
+        26px;                    /* chevron */
+}
+
+.tree-col-toggle { text-align: left; }
+
+/* Every dealer row cell stays inside its own track — shrinkable and wrapping
+   rather than bleeding into the next column. */
+.tree-row_wide > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.row-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 0;
+}
+
+/* The Active / Inactive chip in its own track, aligned under the ACTIVE
+   header. Colours come from the shared .state-chip_* rules below. */
+.row-state {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 0;
+}
+
+/* Active / Inactive state chip beside the package name — theme-token colours,
+   so dark (default) and light both read correctly. */
+.state-chip {
+    flex-shrink: 0;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-radius: 0.75rem;
+    padding: 0.02rem 0.4rem;
+    border: 1px solid;
+    white-space: nowrap;
+}
+
+.state-chip_active { color: var(--success); border-color: var(--success); background: var(--success-soft); }
+.state-chip_inactive { color: var(--text-tertiary); border-color: var(--border-strong); background: transparent; }
+
 .tree-cols {
     padding: 0.5rem 0.75rem;
     font-size: 0.625rem;
@@ -1008,6 +1080,32 @@
 }
 
 .tree { margin-top: 0.1rem; max-height: 30rem; overflow-y: auto; }
+
+/* The dealer table's column header and its rows share ONE horizontal scroll
+   context, so they stay aligned as the table scrolls; at narrow widths the
+   whole table scrolls sideways rather than letting a cell overlap its
+   neighbour (the same guarantee as the tiers table). The header sits outside
+   the scroll wrapper on the master pane, so this is scoped to the dealer
+   pane only. */
+.dealer-scroll { overflow-x: auto; }
+
+/* The header row and the data rows share this ONE floor, and it equals the
+   8-track minimum total (43.5rem tracks + 3.5rem gaps + 2.4rem padding =
+   49.4rem), so when the pane is narrower than that the whole dealer table —
+   header included — scrolls sideways as one unit instead of clipping at the
+   right edge. Nothing may be cut off without a scrollbar. */
+.pane_dealer .tree-cols_wide,
+.pane_dealer .tree {
+    min-width: 49.5rem;
+}
+
+/* The package rows live inside the tree's 0.9rem indent (.ref-body), so the
+   column header carries the same left inset — otherwise its tracks would be
+   ~0.9rem to the left of the row tracks and the columns would look shifted
+   even though the template matches. */
+.pane_dealer .tree-cols_wide {
+    padding-left: 1.65rem;
+}
 
 .tree-ref { border-top: 2px solid var(--border-strong); }
 .tree-ref:first-child { border-top: none; }
@@ -1074,15 +1172,38 @@
 .tree-row:hover { background: var(--surface-alt); }
 .tree-row_open { background: var(--accent-soft); }
 
-.name-cell { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
+/* Package name + Outdated badge. The name is shrinkable (min-width: 0, so it
+   ellipsises only when the track is genuinely tiny) and the badge never
+   shrinks; the cell wraps, so when the track is too narrow for both the badge
+   drops to its own line instead of collapsing the name to a couple of
+   characters. */
+.name-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+/* Dealer rows only: when the name track is too narrow for the name AND the
+   Outdated badge, the badge drops to its own line instead of collapsing the
+   name to a couple of characters. */
+.pane_dealer .name-cell {
+    flex-wrap: wrap;
+    gap: 0.25rem 0.4rem;
+}
 
 .pkg-name {
+    flex: 0 1 auto;
+    min-width: 0;
     font-size: 0.8125rem;
     color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* The Outdated badge keeps its full width in the name cell. */
+.name-cell .count-badge { flex-shrink: 0; }
 
 .tree-row .num { font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
 .tree-row .series { font-size: 0.6875rem; color: var(--text-tertiary); }
@@ -1517,6 +1638,37 @@
     background: var(--surface);
 }
 .fee-remove-hint { font-size: 0.6875rem; color: var(--text-tertiary); }
+
+/* Bulk Discount — an inline strip sitting directly above the commercial
+   price bar; reuses .fee-remove-strip for its shell so there is no new
+   visual language. .bulk-disc adds the gap the terms table used to provide. */
+.bulk-disc { margin-bottom: 0.5rem; }
+.bulk-disc__field {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.bulk-disc__label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+.bulk-disc__unit { font-size: 0.75rem; color: var(--text-tertiary); }
+.bulk-disc__link {
+    border: none;
+    background: none;
+    padding: 0 0.15rem;
+    font-family: inherit;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+}
+.bulk-disc__link:hover:not(:disabled) { color: var(--text); }
+.bulk-disc__link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.bulk-disc__link:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ══════════════════════════════════════════════════════════════════════
    Dealer-level premium vehicle fees — the dealer-wide card at the top of

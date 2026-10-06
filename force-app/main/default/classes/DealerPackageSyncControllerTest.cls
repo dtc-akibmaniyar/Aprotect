@@ -960,6 +960,229 @@ private class DealerPackageSyncControllerTest {
     }
 
     // ---------------------------------------------------------------------
+    // Bulk Discount — one discount for every term of a dealer package
+    // (applyDealerPackageTermDiscount / clearDealerPackageTermDiscounts).
+    // Writes ONLY Discount_Type__c / Discount_Value__c.
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_bulkDiscount_appliesToEveryTerm_keepsMarkupAndIncentive() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = activePackage('Extended_Limited_Warranty');
+        Package_Tier__c tier = TestDataFactory.createPackageTier(elw.Id, true);
+        TestDataFactory.createPackageTerm(elw.Id, tier.Id, true);   // tiered
+        TestDataFactory.createPackageTerm(elw.Id, null, true);      // tier-less
+
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+        System.assertEquals(2, [SELECT COUNT() FROM Dealer_Package_Term__c
+                                WHERE Dealer_Package__c = :dp.Id],
+            'Both the tiered and the tier-less term mirror');
+
+        // Pre-seed markup + incentive so the bulk discount has something to spare.
+        List<Dealer_Package_Term__c> seed = [
+            SELECT Id FROM Dealer_Package_Term__c WHERE Dealer_Package__c = :dp.Id
+        ];
+        for (Dealer_Package_Term__c t : seed) {
+            t.Markup__c = 75.00;
+            t.Markup_Type__c = '$';
+            t.Sales_Rep_Incentive__c = 40.00;
+        }
+        update seed;
+
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.applyDealerPackageTermDiscount(dp.Id, '%', 10.00);
+        System.assertEquals(true, r.success, r.message);
+        assertNoApiNames(r.message);
+        System.assert(r.message.contains('2 terms'), r.message);
+        System.assertEquals(2, r.updatedCount, r.message);
+
+        System.assertEquals(2, [SELECT COUNT() FROM Dealer_Package_Term__c
+                                WHERE Dealer_Package__c = :dp.Id
+                                  AND Discount_Type__c = '%' AND Discount_Value__c = 10.00],
+            'The discount lands on every term (tiered and tier-less)');
+        for (Dealer_Package_Term__c t : [
+            SELECT Markup__c, Markup_Type__c, Sales_Rep_Incentive__c
+            FROM Dealer_Package_Term__c WHERE Dealer_Package__c = :dp.Id
+        ]) {
+            System.assertEquals(75.00, t.Markup__c, 'Markup must not be touched');
+            System.assertEquals('$', t.Markup_Type__c, 'Markup type must not be touched');
+            System.assertEquals(40.00, t.Sales_Rep_Incentive__c, 'Incentive must not be touched');
+        }
+    }
+
+    @isTest
+    static void test_bulkDiscount_clearRemovesOnlyTheDiscountFields() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = activePackage('Extended_Limited_Warranty');
+        Package_Tier__c tier = TestDataFactory.createPackageTier(elw.Id, true);
+        TestDataFactory.createPackageTerm(elw.Id, tier.Id, true);
+        TestDataFactory.createPackageTerm(elw.Id, null, true);
+
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+
+        // Pre-seed markup, incentive AND a discount on both terms.
+        List<Dealer_Package_Term__c> seed = [
+            SELECT Id FROM Dealer_Package_Term__c WHERE Dealer_Package__c = :dp.Id
+        ];
+        for (Dealer_Package_Term__c t : seed) {
+            t.Markup__c = 50.00;
+            t.Markup_Type__c = '$';
+            t.Sales_Rep_Incentive__c = 25.00;
+            t.Discount_Type__c = '%';
+            t.Discount_Value__c = 12.00;
+        }
+        update seed;
+
+        DealerPackageSyncController.AuthoringResult c =
+            DealerPackageSyncController.clearDealerPackageTermDiscounts(dp.Id);
+        System.assertEquals(true, c.success, c.message);
+        assertNoApiNames(c.message);
+        System.assert(c.message.contains('2 terms'), c.message);
+        System.assertEquals(0, [SELECT COUNT() FROM Dealer_Package_Term__c
+                                WHERE Dealer_Package__c = :dp.Id
+                                  AND (Discount_Type__c != null OR Discount_Value__c != null)],
+            'The discount fields are blanked');
+        for (Dealer_Package_Term__c t : [
+            SELECT Markup__c, Markup_Type__c, Sales_Rep_Incentive__c
+            FROM Dealer_Package_Term__c WHERE Dealer_Package__c = :dp.Id
+        ]) {
+            System.assertEquals(50.00, t.Markup__c, 'Markup is retained by the clear');
+            System.assertEquals('$', t.Markup_Type__c, 'Markup type is retained');
+            System.assertEquals(25.00, t.Sales_Rep_Incentive__c, 'Incentive is retained');
+        }
+
+        // A second clear is a safe no-op with an honest count.
+        DealerPackageSyncController.AuthoringResult c2 =
+            DealerPackageSyncController.clearDealerPackageTermDiscounts(dp.Id);
+        System.assertEquals(true, c2.success, c2.message);
+        assertNoApiNames(c2.message);
+        System.assert(c2.message.contains('No discounts'), c2.message);
+        System.assertEquals(0, c2.updatedCount, c2.message);
+    }
+
+    @isTest
+    static void test_bulkDiscount_flagOffRefusesWrites() {
+        Account dealer = dealer();
+        setSyncFlag(false);
+        Package__c elw = [SELECT Id FROM Package__c
+                          WHERE RecordType.DeveloperName = 'Extended_Limited_Warranty' LIMIT 1];
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.applyDealerPackageTermDiscount(dp.Id, '%', 10.00);
+        System.assertEquals(false, r.success);
+        System.assert(r.message.contains('switched off'), r.message);
+        assertNoApiNames(r.message);
+        System.assertEquals(0, [SELECT COUNT() FROM Dealer_Package_Term__c
+                                WHERE Dealer_Package__c = :dp.Id AND Discount_Value__c != null],
+            'Flag-off bulk discount must not persist');
+
+        DealerPackageSyncController.AuthoringResult c =
+            DealerPackageSyncController.clearDealerPackageTermDiscounts(dp.Id);
+        System.assertEquals(false, c.success);
+        System.assert(c.message.contains('switched off'), c.message);
+        assertNoApiNames(c.message);
+    }
+
+    @isTest
+    static void test_bulkDiscount_freezesPriceAnchorsForTouchedTerms() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = activePackage('Extended_Limited_Warranty');
+        Package_Tier__c tier = TestDataFactory.createPackageTier(elw.Id, true);
+        TestDataFactory.createPackageTerm(elw.Id, tier.Id, true);
+        TestDataFactory.createPackageTerm(elw.Id, null, true);
+
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.applyDealerPackageTermDiscount(dp.Id, '%', 15.00);
+        System.assertEquals(true, r.success, r.message);
+
+        for (Dealer_Package_Term__c t : [
+            SELECT Id, Markup__c, Markup_Type__c, Discount_Type__c, Discount_Value__c,
+                   Sales_Rep_Incentive__c
+            FROM Dealer_Package_Term__c WHERE Dealer_Package__c = :dp.Id
+        ]) {
+            System.assert(DealerPackageSyncService.hasLocalTermPricing(t),
+                'Applying a discount freezes the stored wholesale price anchor');
+        }
+
+        // The console reads the same freeze back on the authoring DTO.
+        DealerPackageSyncController.AuthoringDTO dto =
+            DealerPackageSyncController.getDealerAuthoring(dealer.Id);
+        System.assertEquals(1, dto.packages.size());
+        for (DealerPackageSyncController.DealerTermRow row : dto.packages[0].terms) {
+            System.assertEquals(true, row.anchorFrozen,
+                'The expanded table reports "Price locked to your own pricing"');
+        }
+    }
+
+    @isTest
+    static void test_bulkDiscount_blankOrZeroIsANoOp() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = activePackage('Extended_Limited_Warranty');
+        Package_Tier__c tier = TestDataFactory.createPackageTier(elw.Id, true);
+        TestDataFactory.createPackageTerm(elw.Id, tier.Id, true);
+
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+
+        DealerPackageSyncController.AuthoringResult zero =
+            DealerPackageSyncController.applyDealerPackageTermDiscount(dp.Id, '%', 0);
+        System.assertEquals(true, zero.success, zero.message);
+        System.assertEquals(0, zero.updatedCount, zero.message);
+        assertNoApiNames(zero.message);
+
+        DealerPackageSyncController.AuthoringResult blank =
+            DealerPackageSyncController.applyDealerPackageTermDiscount(dp.Id, '%', null);
+        System.assertEquals(true, blank.success, blank.message);
+        System.assertEquals(0, blank.updatedCount, blank.message);
+
+        System.assertEquals(0, [SELECT COUNT() FROM Dealer_Package_Term__c
+                                WHERE Dealer_Package__c = :dp.Id
+                                  AND (Discount_Type__c != null OR Discount_Value__c != null)],
+            'A blank or zero discount writes nothing');
+    }
+
+    @isTest
+    static void test_bulkDiscount_doesNotTouchOptions() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = activePackage('Extended_Limited_Warranty');
+        Package_Tier__c tier = TestDataFactory.createPackageTier(elw.Id, true);
+        Package_Term__c term = TestDataFactory.createPackageTerm(elw.Id, tier.Id, true);
+        TestDataFactory.createPackageOption(elw.Id, null, 'Included', true);
+        TestDataFactory.createPackageOption(elw.Id, term.Id, 'Optional', true);
+
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+        Map<Id, Dealer_Package_Option__c> before = new Map<Id, Dealer_Package_Option__c>([
+            SELECT Id, Discount_Type__c, Discount_Value__c, Dealer_Markup__c, Is_Removed__c
+            FROM Dealer_Package_Option__c WHERE Dealer_Package__c = :dp.Id
+        ]);
+        System.assert(!before.isEmpty(), 'The mirrored options exist before the apply');
+
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.applyDealerPackageTermDiscount(dp.Id, '%', 10.00);
+        System.assertEquals(true, r.success, r.message);
+
+        Map<Id, Dealer_Package_Option__c> after = new Map<Id, Dealer_Package_Option__c>([
+            SELECT Id, Discount_Type__c, Discount_Value__c, Dealer_Markup__c, Is_Removed__c
+            FROM Dealer_Package_Option__c WHERE Dealer_Package__c = :dp.Id
+        ]);
+        System.assertEquals(before.size(), after.size(),
+            'A term-only bulk discount never adds or removes option rows');
+        for (Id k : before.keySet()) {
+            System.assertEquals(before.get(k).Discount_Type__c, after.get(k).Discount_Type__c);
+            System.assertEquals(before.get(k).Discount_Value__c, after.get(k).Discount_Value__c);
+            System.assertEquals(before.get(k).Dealer_Markup__c, after.get(k).Dealer_Markup__c);
+            System.assertEquals(before.get(k).Is_Removed__c, after.get(k).Is_Removed__c);
+        }
+    }
+
+    // ---------------------------------------------------------------------
     // Dealer-level premium vehicle fee settings (the dealer Account fields —
     // dealer-wide, applies across every package).
     // ---------------------------------------------------------------------
@@ -1088,5 +1311,86 @@ private class DealerPackageSyncControllerTest {
             'The master hint tracks the current master value');
         System.assertEquals(200.00, dto.packages[0].commercialVehicleSurcharge,
             'The dealer-owned commercial figure is never refreshed from the master');
+    }
+
+    // ---------------------------------------------------------------------
+    // Dealer package Active / Inactive toggle (per-row soft state)
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_dealerPackageActive_defaultsActive_andTogglesBothWays() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = [SELECT Id FROM Package__c
+                          WHERE RecordType.DeveloperName = 'Extended_Limited_Warranty' LIMIT 1];
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+
+        // Default: a new dealer package reads Active on the authoring read.
+        DealerPackageSyncController.AuthoringDTO dto =
+            DealerPackageSyncController.getDealerAuthoring(dealer.Id);
+        System.assertEquals(1, dto.packages.size());
+        System.assertEquals(true, dto.packages[0].isActive,
+            'A new dealer package defaults to Active');
+
+        // Toggle -> Inactive (one write, plain-word, API-name-free message).
+        DealerPackageSyncController.AuthoringResult off =
+            DealerPackageSyncController.setDealerPackageActive(dp.Id, false);
+        System.assertEquals(true, off.success, off.message);
+        System.assertEquals(1, off.updatedCount, off.message);
+        assertNoApiNames(off.message);
+        System.assert(off.message.contains('Inactive'), off.message);
+        System.assertEquals(false,
+            [SELECT Active__c FROM Dealer_Package__c WHERE Id = :dp.Id].Active__c,
+            'The toggle stores Inactive');
+
+        // Toggle back -> Active.
+        DealerPackageSyncController.AuthoringResult back =
+            DealerPackageSyncController.setDealerPackageActive(dp.Id, true);
+        System.assertEquals(true, back.success, back.message);
+        assertNoApiNames(back.message);
+        System.assert(back.message.contains('Active'), back.message);
+        System.assertEquals(true,
+            [SELECT Active__c FROM Dealer_Package__c WHERE Id = :dp.Id].Active__c,
+            'The toggle restores Active');
+
+        // The read reflects the stored state for the console.
+        dto = DealerPackageSyncController.getDealerAuthoring(dealer.Id);
+        System.assertEquals(true, dto.packages[0].isActive);
+    }
+
+    @isTest
+    static void test_dealerPackageActive_flagOffRefusesWrite() {
+        Account dealer = dealer();
+        setSyncFlag(false);
+        Package__c elw = [SELECT Id FROM Package__c
+                          WHERE RecordType.DeveloperName = 'Extended_Limited_Warranty' LIMIT 1];
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.setDealerPackageActive(dp.Id, false);
+        System.assertEquals(false, r.success);
+        System.assert(r.message.contains('switched off'), r.message);
+        assertNoApiNames(r.message);
+        System.assertEquals(true,
+            [SELECT Active__c FROM Dealer_Package__c WHERE Id = :dp.Id].Active__c,
+            'Flag-off toggle must not persist');
+    }
+
+    @isTest
+    static void test_dealerPackageActive_nullAndUnknownPackageRefused() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+
+        DealerPackageSyncController.AuthoringResult nul =
+            DealerPackageSyncController.setDealerPackageActive(null, false);
+        System.assertEquals(false, nul.success);
+        assertNoApiNames(nul.message);
+
+        // A valid Id that is not a dealer package (a customer account).
+        Account customer = TestDataFactory.createCustomerAccount(true);
+        DealerPackageSyncController.AuthoringResult unknown =
+            DealerPackageSyncController.setDealerPackageActive(customer.Id, false);
+        System.assertEquals(false, unknown.success);
+        assertNoApiNames(unknown.message);
     }
 }

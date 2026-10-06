@@ -288,6 +288,51 @@ private class DealerPackageSyncServiceTest {
     }
 
     // ---------------------------------------------------------------------
+    // A newly assigned / created dealer package starts ACTIVE (never Inactive),
+    // and a deliberate deactivation is a soft state the reconcile never undoes.
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_newlyAssignedDealerPackageStartsActive() {
+        Package__c pkg = getMasterPackage();
+        Account dealer = createDealerNamed('Active Default Motors');
+
+        Test.startTest();
+        DealerPackageSyncService.BulkAssignResult run =
+            DealerPackageSyncService.assignPlanToAllDealers(pkg.Id, 'ALL', false);
+        Test.stopTest();
+
+        System.assertEquals(true, run.success, run.message);
+        System.assertEquals(1, run.newlyAssigned, 'One dealer assigned');
+
+        Dealer_Package__c dp = [
+            SELECT Id, Active__c FROM Dealer_Package__c WHERE Dealer__c = :dealer.Id LIMIT 1
+        ];
+        System.assertEquals(true, dp.Active__c,
+            'A freshly assigned dealer package must start Active');
+
+        // The console toggle still works: deactivate, then re-activate.
+        Database.SaveResult deact = Database.update(
+            new Dealer_Package__c(Id = dp.Id, Active__c = false), false);
+        System.assert(deact.isSuccess());
+        System.assertEquals(false,
+            [SELECT Active__c FROM Dealer_Package__c WHERE Id = :dp.Id].Active__c,
+            'The toggle can deactivate a package');
+
+        Database.update(new Dealer_Package__c(Id = dp.Id, Active__c = true), false);
+        System.assertEquals(true,
+            [SELECT Active__c FROM Dealer_Package__c WHERE Id = :dp.Id].Active__c,
+            'The toggle can re-activate a package');
+
+        // A reconcile must NOT resurrect a deactivated package (soft state).
+        Database.update(new Dealer_Package__c(Id = dp.Id, Active__c = false), false);
+        DealerPackageSyncService.reconcileDealerPackages(new Set<Id>{ dp.Id });
+        System.assertEquals(false,
+            [SELECT Active__c FROM Dealer_Package__c WHERE Id = :dp.Id].Active__c,
+            'Reconcile must preserve a deliberate deactivation');
+    }
+
+    // ---------------------------------------------------------------------
     // P7-e-fix — dealer picklist accepts every master Restriction_Type value
     // (regression: a master term carrying "Unlimited" must mirror cleanly)
     // ---------------------------------------------------------------------
