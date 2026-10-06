@@ -208,6 +208,11 @@ public without sharing class ApplicationSummaryController {
         @AuraEnabled public Decimal contractExpiryOdometer { get; set; }
         @AuraEnabled public String contractStartOdometerUnit { get; set; }
         @AuraEnabled public String contractExpiryOdometerUnit { get; set; }
+        // Display-only value for the Contract Expiry Odometer line. An
+        // "Unlimited" mileage restriction has no numeric expiry, so this
+        // renders the literal text "Unlimited" beside the unit; Fixed and
+        // Rolling terms render their derived odometer value as text.
+        @AuraEnabled public String contractExpiryOdometerDisplay { get; set; }
         @AuraEnabled public Decimal packageTermOdometerKM { get; set; }
         @AuraEnabled public List<String> additionalOptionsPurchased { get; set; }
         // Fix 2 — Powersports per-package fields
@@ -814,6 +819,15 @@ public without sharing class ApplicationSummaryController {
                 }
                 // else null — blank in UI
                 pkgWrapper.contractExpiryOdometer = expiryOdometer;
+                // Display value: an Unlimited mileage restriction shows the
+                // literal text "Unlimited" (renders as "Unlimited KM"), so the
+                // Summary does not show a blank value next to the unit. Fixed
+                // and Rolling terms keep their derived numeric value.
+                if (restrictionType == 'Unlimited') {
+                    pkgWrapper.contractExpiryOdometerDisplay = 'Unlimited';
+                } else if (expiryOdometer != null) {
+                    pkgWrapper.contractExpiryOdometerDisplay = expiryOdometer.stripTrailingZeros().toPlainString();
+                }
 
                 // Fix 2 — Per-Claim Limit
                 pkgWrapper.perClaimLimit = pkg.Package_Term__r != null ? pkg.Package_Term__r.Per_Claim_Limit__c : null;
