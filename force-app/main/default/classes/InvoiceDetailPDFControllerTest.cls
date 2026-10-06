@@ -808,6 +808,8 @@ private class InvoiceDetailPDFControllerTest {
             'hasPremiumModelFee should be true when fee > 0');
         System.assertEquals(1150.00, row.lineTotal,
             'lineTotal = base (1000) + add-ons (100) + premium fee (50)');
+        System.assertEquals(1050.00, row.packageCostWithFees,
+            'folded PRICE = base (1000) + premium fee (50) + extra fees (0); add-ons excluded');
     }
 
     @isTest
@@ -1163,5 +1165,131 @@ private class InvoiceDetailPDFControllerTest {
 
         // Note: 'Something Else' is not a valid Invoice Status__c value —
         // the default branch is exercised above via 'Overdue'.
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // P4 [T] — persisted fee lines (diesel / commercial / powersports)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Inserts one priced engine line into the package's persisted line set. */
+    private static void insertPricedLine(Id pkgId, String lineType, Decimal amount, Integer sortOrder) {
+        Application_Package_Line_Item__c line = new Application_Package_Line_Item__c(
+            Application_Package__c = pkgId,
+            Name                   = lineType,
+            Line_Type__c           = lineType,
+            Description__c         = lineType,
+            Amount__c              = amount,
+            Taxable__c             = true,
+            Quantity__c            = 1,
+            Sort_Order__c          = sortOrder
+        );
+        Database.insert(line, System.AccessLevel.SYSTEM_MODE);
+    }
+
+    /**
+     * Persisted diesel / commercial / powersports fee lines surface as their
+     * own rows and are added to the dealer cost EXACTLY ONCE. The premium fee
+     * is already inside Contract_Cost_Price__c, so it must not be added again.
+     */
+    @isTest
+    static void testConstructor_persistedFees_addedOnceAsRows() {
+        Map<String, SObject>   chain  = setupInvoiceWithPackageAndLineItem();
+        Invoice__c             inv    = (Invoice__c)             chain.get('invoice');
+        Application_Package__c appPkg = (Application_Package__c) chain.get('appPackage');
+
+        appPkg.Dealer_Package_Price__c = 1500.00;
+        appPkg.Add_Ons_Price__c        = 0;
+        appPkg.Premium_Model_Fee__c    = 500.00;
+        appPkg.Tax_Percentage__c       = 13.00;
+        update appPkg;
+
+        insertPricedLine(appPkg.Id, 'Base_Coverage', 1500.00, 0);
+        insertPricedLine(appPkg.Id, 'Premium_Fee',     500.00, 1);
+        insertPricedLine(appPkg.Id, 'Diesel_Fee',      200.00, 2);
+        insertPricedLine(appPkg.Id, 'Commercial_Surcharge',   300.00, 3);
+        insertPricedLine(appPkg.Id, 'Powersports_Adjustment', 100.00, 4);
+        insertPricedLine(appPkg.Id, 'Tax',             280.00, 5);
+
+        Test.startTest();
+            InvoiceDetailPDFController ctrl = buildController(inv.Id);
+        Test.stopTest();
+
+        System.assertEquals(1, ctrl.packages.size(), 'one package expected');
+        InvoiceDetailPDFController.PackageRow row = ctrl.packages[0];
+
+        System.assertEquals(200.00, row.dieselFee,         'diesel fee from line set');
+        System.assertEquals(300.00, row.commercialFee,     'commercial surcharge from line set');
+        System.assertEquals(100.00, row.powersportsFee,    'powersports adjustment from line set');
+        System.assertEquals(600.00, row.extraFeeTotal,     'extra fee total');
+        System.assertEquals(true,   row.hasDieselFee,      'hasDieselFee');
+        System.assertEquals(true,   row.hasCommercialFee,  'hasCommercialFee');
+        System.assertEquals(true,   row.hasPowersportsFee, 'hasPowersportsFee');
+        // lineTotal = base 1500 + add-ons 0 + premium 500 + extra 600
+        System.assertEquals(2600.00, row.lineTotal,        'lineTotal includes the extra fees once');
+        // Folded PRICE = base 1500 + premium 500 + extra 600 (add-ons 0)
+        System.assertEquals(2600.00, row.packageCostWithFees,
+            'folded PRICE folds premium + all extra fees into base');
+
+        System.assertEquals(2600.00, ctrl.subTotal,   'subTotal includes extra fees once');
+        System.assertEquals(338.00,  ctrl.taxTotal,   'tax on extra fees too');
+        // grandTotal = 2260 + 600*1.13 = 2938
+        System.assertEquals(2938.00, ctrl.grandTotal, 'premium counted once; extra fees added once');
+    }
+
+    /** No persisted line set → the legacy money is untouched (graceful fallback). */
+    @isTest
+    static void testConstructor_noLineItems_legacyFallback() {
+        Map<String, SObject>   chain  = setupInvoiceWithPackageAndLineItem();
+        Invoice__c             inv    = (Invoice__c)             chain.get('invoice');
+        Application_Package__c appPkg = (Application_Package__c) chain.get('appPackage');
+
+        appPkg.Dealer_Package_Price__c = 1500.00;
+        appPkg.Premium_Model_Fee__c    = 500.00;
+        appPkg.Tax_Percentage__c       = 13.00;
+        update appPkg;
+
+        Test.startTest();
+            InvoiceDetailPDFController ctrl = buildController(inv.Id);
+        Test.stopTest();
+
+        InvoiceDetailPDFController.PackageRow row = ctrl.packages[0];
+        System.assertEquals(0,     row.extraFeeTotal,  'no fee lines -> no extra fees');
+        System.assertEquals(false, row.hasDieselFee,  'hasDieselFee false');
+        // Folded PRICE = base 1500 + premium 500 + extra 0
+        System.assertEquals(2000.00, row.packageCostWithFees,
+            'folded PRICE = base + premium when no persisted fee lines');
+        System.assertEquals(2000.00, ctrl.subTotal,   'legacy sub-total unchanged');
+        System.assertEquals(260.00,  ctrl.taxTotal,   'legacy tax unchanged');
+        System.assertEquals(2260.00, ctrl.grandTotal, 'legacy total unchanged');
+    }
+
+    /** A premium line alone must NOT be added on top of the folded base. */
+    @isTest
+    static void testConstructor_premiumLineOnly_noDoubleCount() {
+        Map<String, SObject>   chain  = setupInvoiceWithPackageAndLineItem();
+        Invoice__c             inv    = (Invoice__c)             chain.get('invoice');
+        Application_Package__c appPkg = (Application_Package__c) chain.get('appPackage');
+
+        appPkg.Dealer_Package_Price__c = 1500.00;
+        appPkg.Premium_Model_Fee__c    = 500.00;
+        appPkg.Tax_Percentage__c       = 13.00;
+        update appPkg;
+
+        insertPricedLine(appPkg.Id, 'Base_Coverage', 1500.00, 0);
+        insertPricedLine(appPkg.Id, 'Premium_Fee',     500.00, 1);
+        insertPricedLine(appPkg.Id, 'Tax',             260.00, 2);
+
+        Test.startTest();
+            InvoiceDetailPDFController ctrl = buildController(inv.Id);
+        Test.stopTest();
+
+        InvoiceDetailPDFController.PackageRow row = ctrl.packages[0];
+        System.assertEquals(0, row.extraFeeTotal, 'premium is not an extra fee');
+        // Folded PRICE = base 1500 + premium 500 + extra 0 (premium counted once)
+        System.assertEquals(2000.00, row.packageCostWithFees,
+            'folded PRICE counts the premium fee exactly once');
+        System.assertEquals(2000.00, ctrl.subTotal,   'premium counted once');
+        System.assertEquals(260.00,  ctrl.taxTotal,   'tax unchanged');
+        System.assertEquals(2260.00, ctrl.grandTotal, 'no double count');
     }
 }

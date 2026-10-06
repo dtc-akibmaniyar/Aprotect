@@ -293,6 +293,11 @@ public without sharing class InvoiceDetailPDFController {
         }
 
         // ── 3. Packages scoped to the invoice's line items (LWC parity) ───────
+        // P4 [T]-invoice: persisted engine fee lines (diesel / commercial /
+        // powersports) — the same stored snapshot QuotePDFExtension renders.
+        // SYSTEM_MODE read (no portal FLS on the line fields). The premium fee
+        // is already inside the stored cost and is deliberately NOT re-added.
+        Map<Id, FeeSet> feeByPkg = loadFeeLinesByPackage(packageIds);
         Map<Id, Decimal> pkgDisplayPrice = new Map<Id, Decimal>();
         if (!packageIds.isEmpty()) {
             List<Application_Package__c> appPkgs = [
@@ -320,7 +325,14 @@ public without sharing class InvoiceDetailPDFController {
             ];
 
             for (Application_Package__c pkg : appPkgs) {
-                pkgDisplayPrice.put(pkg.Id, getDisplayPrice(pkg));
+                FeeSet fs = feeByPkg.get(pkg.Id);
+                Decimal extraWithTax = 0;
+                if (fs != null && fs.extraFee > 0) {
+                    Decimal rate = pkg.Tax_Percentage__c != null ? pkg.Tax_Percentage__c : 0;
+                    extraWithTax = (fs.extraFee + (fs.extraFee * rate / 100))
+                        .setScale(2, System.RoundingMode.HALF_UP);
+                }
+                pkgDisplayPrice.put(pkg.Id, getDisplayPrice(pkg) + extraWithTax);
             }
 
             for (Application_Package__c pkg : appPkgs) {
@@ -337,17 +349,38 @@ public without sharing class InvoiceDetailPDFController {
                     : new List<OptionWrapper>();
 
                 // ── LWC line-item row fields ──
+                // Premium is already inside the stored cost price; shown as a
+                // row, never added a second time.
                 row.premiumModelFee    = pkg.Premium_Model_Fee__c != null ? pkg.Premium_Model_Fee__c : 0;
                 row.hasPremiumModelFee = row.premiumModelFee > 0;
-                row.lineTotal          = row.baseCostPrice + row.addOnsTotal + row.premiumModelFee;
+
+                // P4 [T] persisted fee rows (diesel / commercial / powersports)
+                // — no carrier in the stored cost formula, so added once here.
+                FeeSet fs = feeByPkg.get(pkg.Id);
+                row.dieselFee         = fs != null ? fs.dieselFee : 0;
+                row.commercialFee     = fs != null ? fs.commercialFee : 0;
+                row.powersportsFee    = fs != null ? fs.powersportsFee : 0;
+                row.hasDieselFee      = row.dieselFee > 0;
+                row.hasCommercialFee  = row.commercialFee > 0;
+                row.hasPowersportsFee = row.powersportsFee > 0;
+                row.extraFeeTotal     = fs != null ? fs.extraFee : 0;
+
+                row.lineTotal          = row.baseCostPrice + row.addOnsTotal + row.premiumModelFee + row.extraFeeTotal;
+                // Display-only fold: the package PRICE cell shows the dealer cost
+                // with the premium fee and all extra fees (diesel / commercial /
+                // powersports) folded in. The separate fee rows are removed from
+                // the markup, so nothing double-counts; SUB-TOTAL / tax / TOTAL
+                // still come from the untouched lineTotal-driven path.
+                row.packageCostWithFees = row.baseCostPrice + row.premiumModelFee + row.extraFeeTotal;
                 row.termDisplay        = resolveTermName(pkg).replaceAll('\\bnull\\b', '0');
 
                 // Tax breakdown
-                row.basePriceWithoutTax = pkg.Contract_Cost_Price_Without_Tax__c != null ? pkg.Contract_Cost_Price_Without_Tax__c : 0;
+                row.basePriceWithoutTax = (pkg.Contract_Cost_Price_Without_Tax__c != null ? pkg.Contract_Cost_Price_Without_Tax__c : 0)
+                    + row.extraFeeTotal;
                 row.taxPercentage = pkg.Tax_Percentage__c != null ? pkg.Tax_Percentage__c : 0;
                 Decimal costWithTax = pkg.Contract_Cost_Price__c != null ? pkg.Contract_Cost_Price__c : 0;
-                row.taxAmount = costWithTax - row.basePriceWithoutTax;
-                row.hasTax = row.taxPercentage > 0 || row.taxAmount > 0;
+                row.taxAmount = costWithTax - (row.basePriceWithoutTax - row.extraFeeTotal);
+                row.hasTax = row.taxPercentage > 0 || row.taxAmount > 0 || row.extraFeeTotal > 0;
 
                 if (pkgMap.containsKey(pkg.Id)) {
                     Decimal displayPrice = pkgDisplayPrice.get(pkg.Id);
@@ -404,7 +437,82 @@ public without sharing class InvoiceDetailPDFController {
         public Decimal                     premiumModelFee     { get; set; }
         public Boolean                     hasPremiumModelFee  { get; set; }
         public Decimal                     lineTotal           { get; set; }
+        // Display-only folded package cost (base + premium + extra fees)
+        public Decimal                     packageCostWithFees { get; set; }
         public String                      termDisplay         { get; set; }
+        // P4 [T] persisted fee rows (diesel / commercial / powersports)
+        public Decimal                     dieselFee           { get; set; }
+        public Decimal                     commercialFee       { get; set; }
+        public Decimal                     powersportsFee      { get; set; }
+        public Boolean                     hasDieselFee        { get; set; }
+        public Boolean                     hasCommercialFee    { get; set; }
+        public Boolean                     hasPowersportsFee   { get; set; }
+        public Decimal                     extraFeeTotal       { get; set; }
+    }
+
+    /** Fee amounts sourced from the persisted engine line set. */
+    public class FeeSet {
+        public Boolean hasLines       = false;
+        public Decimal premiumFee     = 0;
+        public Decimal dieselFee      = 0;
+        public Decimal commercialFee  = 0;
+        public Decimal powersportsFee = 0;
+        public Decimal extraFee       = 0;   // diesel + commercial + powersports
+    }
+
+    /**
+     * Reads the package's persisted engine line set (SYSTEM_MODE — the line
+     * fields carry no portal FLS, same mode the snapshot writer and
+     * QuotePDFExtension use) and reduces it to the fee amounts the invoice
+     * needs. Diesel / commercial / powersports are the fees the stored cost
+     * formula does NOT carry, so they are added exactly once. The premium fee
+     * is intentionally NOT surfaced here — already folded into the stored
+     * Contract_Cost_Price__c via Premium_Model_Fee__c. Never throws: a read
+     * failure yields no extra fees and the legacy rendering stands.
+     */
+    @TestVisible
+    private static Map<Id, FeeSet> loadFeeLinesByPackage(Set<Id> pkgIds) {
+        Map<Id, FeeSet> byPkg = new Map<Id, FeeSet>();
+        if (pkgIds == null || pkgIds.isEmpty()) {
+            return byPkg;
+        }
+        try {
+            for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.queryWithBinds(
+                    'SELECT Application_Package__c, Line_Type__c, Amount__c' +
+                    ' FROM Application_Package_Line_Item__c' +
+                    ' WHERE Application_Package__c IN :pkgIds' +
+                    ' ORDER BY Application_Package__c, Sort_Order__c, Id',
+                    new Map<String, Object>{ 'pkgIds' => pkgIds },
+                    System.AccessLevel.SYSTEM_MODE)) {
+                if (line.Application_Package__c == null) {
+                    continue;
+                }
+                FeeSet fs = byPkg.get(line.Application_Package__c);
+                if (fs == null) {
+                    fs = new FeeSet();
+                    byPkg.put(line.Application_Package__c, fs);
+                }
+                fs.hasLines = true;
+                Decimal amt = line.Amount__c != null ? line.Amount__c : 0;
+                if ('Premium_Fee'.equals(line.Line_Type__c)) {
+                    fs.premiumFee += amt;
+                } else if ('Diesel_Fee'.equals(line.Line_Type__c)) {
+                    fs.dieselFee += amt;
+                } else if ('Commercial_Surcharge'.equals(line.Line_Type__c)) {
+                    fs.commercialFee += amt;
+                } else if ('Powersports_Adjustment'.equals(line.Line_Type__c)) {
+                    fs.powersportsFee += amt;
+                }
+            }
+            for (FeeSet fs : byPkg.values()) {
+                fs.extraFee = fs.dieselFee + fs.commercialFee + fs.powersportsFee;
+            }
+        } catch (Exception e) {
+            System.debug(LoggingLevel.WARN,
+                'InvoiceDetailPDFController: fee line read unavailable: ' + e.getMessage());
+            byPkg.clear();
+        }
+        return byPkg;
     }
 
     public class LineItemWrapper {

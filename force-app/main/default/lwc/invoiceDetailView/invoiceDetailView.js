@@ -373,14 +373,39 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
             const premiumModelFee = pkg.premiumModelFee || 0;
             const hasPremiumModelFee = pkg.hasPremiumModelFee === true;
 
-            // Base price without tax from Apex (Contract_Cost_Price_Without_Tax__c)
-            // This formula field now INCLUDES the premium model fee,
-            // so we subtract it for the display "Base Price" line
-            const basePriceWithoutTax = pkg.basePriceWithoutTax || 0;
-            const displayBasePrice = basePriceWithoutTax - premiumModelFee;
+            // P4 [T]: persisted fee rows sourced from the package's engine line
+            // set. Diesel / commercial / powersports have no carrier in the
+            // stored cost formula, so Apex adds them exactly once; the premium
+            // fee is already inside the stored cost and is not re-added.
+            const commercialFee    = pkg.commercialFee || 0;
+            const dieselFee        = pkg.dieselFee || 0;
+            const powersportsFee   = pkg.powersportsFee || 0;
+            const hasCommercialFee    = pkg.hasCommercialFee === true;
+            const hasDieselFee        = pkg.hasDieselFee === true;
+            const hasPowersportsFee   = pkg.hasPowersportsFee === true;
+            const extraFeeTotal    = pkg.extraFeeTotal || 0;
+            const hasExtraFees     = pkg.hasExtraFees === true;
 
-            // Line total = base price + add-ons + premium fee (excluding tax)
-            const baseWithAddons = (pkg.baseCostPrice || 0) + (pkg.addOnsTotal || 0) + (hasPremiumModelFee ? premiumModelFee : 0);
+            // Base price without tax from Apex (Contract_Cost_Price_Without_Tax__c
+            // + the persisted extra fees). That formula field already INCLUDES
+            // the premium model fee, so we subtract it (and the extra fees) for
+            // the display "Base Price" line.
+            const basePriceWithoutTax = pkg.basePriceWithoutTax || 0;
+            const displayBasePrice = basePriceWithoutTax - premiumModelFee - extraFeeTotal;
+
+            // Line total = base price + add-ons + premium fee + extra fees (ex tax)
+            const baseWithAddons = (pkg.baseCostPrice || 0) + (pkg.addOnsTotal || 0)
+                + (hasPremiumModelFee ? premiumModelFee : 0) + extraFeeTotal;
+
+            // Display-only folded package cost: the PRICE cell shows the dealer
+            // cost with the premium fee and all extra fees (diesel / commercial /
+            // powersports) folded in. The separate fee rows are removed from the
+            // markup, so nothing double-counts; SUB-TOTAL / tax / TOTAL are
+            // unchanged (still driven by the line-total path). Add raw Decimals
+            // and format once — never round the folded value independently.
+            const warrantyPackageCost = (pkg.baseCostPrice || 0)
+                + (hasPremiumModelFee ? premiumModelFee : 0)
+                + extraFeeTotal;
             return {
                 packageId:    pkg.packageId,
                 recordTypeName: pkg.recordTypeName,
@@ -391,6 +416,9 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
                 expiryDate:   pkg.expiryDate,
                 categoryRowKey: pkg.packageId + '-cat',
                 premiumRowKey: pkg.packageId + '-premium',
+                commercialRowKey: pkg.packageId + '-commercial',
+                dieselRowKey: pkg.packageId + '-diesel',
+                powersportsRowKey: pkg.packageId + '-powersports',
                 formattedLineTotal: this.formatCurrency(baseWithAddons),
                 formattedStartOdometer: pkg.startOdometer != null
                     ? this.formatNumber(pkg.startOdometer) + ' KM'
@@ -401,6 +429,7 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
                 // Price breakdown
                 hasBreakdown: pkg.hasBreakdown === true,
                 formattedBaseCostPrice: this.formatCurrency(pkg.baseCostPrice),
+                formattedWarrantyPackageCost: this.formatCurrency(warrantyPackageCost),
                 formattedAddOnsTotal: this.formatCurrency(pkg.addOnsTotal),
                 additionalOptions: (pkg.additionalOptions || []).map(opt => ({
                     optionId:          opt.optionId,
@@ -411,6 +440,15 @@ export default class InvoiceDetailView extends NavigationMixin(LightningElement)
                 // Premium Model Fee
                 hasPremiumModelFee: hasPremiumModelFee,
                 formattedPremiumModelFee: this.formatCurrency(premiumModelFee),
+                // P4 [T] persisted fee rows (diesel / commercial / powersports)
+                hasCommercialFee: hasCommercialFee,
+                formattedCommercialFee: this.formatCurrency(commercialFee),
+                hasDieselFee: hasDieselFee,
+                formattedDieselFee: this.formatCurrency(dieselFee),
+                hasPowersportsFee: hasPowersportsFee,
+                formattedPowersportsFee: this.formatCurrency(powersportsFee),
+                hasExtraFees: hasExtraFees,
+                formattedExtraFeeTotal: this.formatCurrency(extraFeeTotal),
                 // Tax breakdown — tax is computed on (base + premium fee)
                 hasTax: pkg.hasTax === true,
                 formattedBasePriceWithoutTax: this.formatCurrency(displayBasePrice),

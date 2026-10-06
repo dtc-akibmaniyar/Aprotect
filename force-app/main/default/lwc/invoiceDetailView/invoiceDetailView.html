@@ -163,7 +163,7 @@
 
                                 </td>
                                 <td class="li-td li-td-term">{pkg.packageTerm}</td>
-                                <td class="li-td li-td-price">{pkg.formattedBaseCostPrice}</td>
+                                <td class="li-td li-td-price">{pkg.formattedWarrantyPackageCost}</td>
                                 <td class="li-td li-td-sub">{pkg.formattedLineTotal}</td>
                             </tr>
                             <!-- Add-on rows -->
@@ -175,18 +175,6 @@
                                     </td>
                                     <td class="li-td li-td-term">-</td>
                                     <td class="li-td li-td-price">{opt.formattedCostPrice}</td>
-                                    <td class="li-td li-td-sub"></td>
-                                </tr>
-                            </template>
-                            <!-- Premium fee row -->
-                            <template if:true={pkg.hasPremiumModelFee}>
-                                <tr key={pkg.premiumRowKey} class="li-addon-row">
-                                    <td class="li-td li-td-desc li-addon-desc">
-                                        Premium Vehicle Fee
-                                        <span class="opt-tag">(Fee)</span>
-                                    </td>
-                                    <td class="li-td li-td-term">-</td>
-                                    <td class="li-td li-td-price">{pkg.formattedPremiumModelFee}</td>
                                     <td class="li-td li-td-sub"></td>
                                 </tr>
                             </template>
