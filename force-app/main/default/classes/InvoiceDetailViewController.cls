@@ -1,17 +1,44 @@
 public without sharing class InvoiceDetailViewController {
-
-    /**
-     * Returns the dealer cost price (base + tax) for an Application Package.
-     * Used on the dealer portal invoice page to show what the dealer owes.
-     */
     private static Decimal getDisplayPrice(Application_Package__c pkg) {
         return pkg.Contract_Cost_Price__c != null ? pkg.Contract_Cost_Price__c : 0;
     }
-
-    /**
-     * Checks whether any Payment__c record exists on the invoice's Remittance Form.
-     * Any payment record (regardless of status) means payment has been initiated.
-     */
+    private static String resolvePackageName(Application_Package__c pkg) {
+        if (pkg.Package__r != null && String.isNotBlank(pkg.Package__r.Name)) {
+            return pkg.Package__r.Name;
+        }
+        if (pkg.Dealer_Package__r != null && pkg.Dealer_Package__r.Package__r != null
+                && String.isNotBlank(pkg.Dealer_Package__r.Package__r.Name)) {
+            return pkg.Dealer_Package__r.Package__r.Name;
+        }
+        if (pkg.Dealer_Package__r != null && String.isNotBlank(pkg.Dealer_Package__r.Name)) {
+            return pkg.Dealer_Package__r.Name;
+        }
+        return '';
+    }
+    private static String resolveTermName(Application_Package__c pkg) {
+        if (pkg.Package_Term__r != null && String.isNotBlank(pkg.Package_Term__r.Name)) {
+            return pkg.Package_Term__r.Name;
+        }
+        if (pkg.Dealer_Package_Term__r != null && pkg.Dealer_Package_Term__r.Package_Term__r != null
+                && String.isNotBlank(pkg.Dealer_Package_Term__r.Package_Term__r.Name)) {
+            return pkg.Dealer_Package_Term__r.Package_Term__r.Name;
+        }
+        if (pkg.Dealer_Package_Term__r != null && String.isNotBlank(pkg.Dealer_Package_Term__r.Name)) {
+            return pkg.Dealer_Package_Term__r.Name;
+        }
+        return '';
+    }
+    private static String stripOptionalSuffix(String value) {
+        if (value == null) {
+            return '';
+        }
+        String trimmed = value.trim();
+        if (trimmed.endsWith(InvoiceOptionLineService.OPTIONAL_SUFFIX)) {
+            return trimmed.substring(0,
+                trimmed.length() - InvoiceOptionLineService.OPTIONAL_SUFFIX.length());
+        }
+        return trimmed;
+    }
     private static Boolean checkPaymentInitiated(Id remittanceFormId) {
         if (remittanceFormId == null) return false;
         return [
@@ -20,15 +47,12 @@ public without sharing class InvoiceDetailViewController {
             WHERE Remittance_Form__c = :remittanceFormId
         ] > 0;
     }
-
     @AuraEnabled(cacheable=true)
     public static InvoiceDetailData getInvoiceDetail(String invoiceId) {
         try {
         if (String.isBlank(invoiceId)) {
             throw new AuraHandledException('Invoice ID is required');
         }
-
-        // ── 1. Query Invoice + Application + Remittance Bill To ──────────────
         List<Invoice__c> invoices = [
             SELECT Id, Name, Status__c, CreatedDate,
                    Total_Balance_Amount__c, Invoice_Due_Date__c,
@@ -58,29 +82,27 @@ public without sharing class InvoiceDetailViewController {
             WHERE Id = :invoiceId
             LIMIT 1
         ];
-
         if (invoices.isEmpty()) {
             throw new AuraHandledException('Invoice not found');
         }
-
         Invoice__c inv = invoices[0];
-
-        // ── 1b. Check if payment has been initiated ──────────────────────────
         Boolean paymentInitiated = checkPaymentInitiated(inv.Remittance_Form__c);
-
-        // ── 2. Query Invoice Line Items first to determine which packages to load ─
         List<Invoice_Line_Item__c> lineItems = [
             SELECT Id, Invoice__c, Application_Package__c,
                    Contract_Cost_Price__c,
-                   Tax_Amount__c, Status__c
+                   Tax_Amount__c, Status__c, Amount__c, Description__c
             FROM Invoice_Line_Item__c
             WHERE Invoice__c = :invoiceId
             ORDER BY Application_Package_Name__c ASC
             LIMIT 1000
         ];
-
-        // ── 3. Query only the Application Packages referenced by line items ────
-        //       Now includes retail/custom pricing fields for display
+        Set<String> billedOptionKeys = new Set<String>();
+        for (Invoice_Line_Item__c li : lineItems) {
+            if (li.Application_Package__c == null && li.Amount__c != null && li.Amount__c != 0) {
+                billedOptionKeys.add(
+                    InvoiceOptionLineService.normalize(stripOptionalSuffix(li.Description__c)));
+            }
+        }
         Set<Id> packageIds = new Set<Id>();
         for (Invoice_Line_Item__c li : lineItems) {
             if (li.Application_Package__c != null) packageIds.add(li.Application_Package__c);
@@ -91,7 +113,11 @@ public without sharing class InvoiceDetailViewController {
                 SELECT Id, Application__c, Package__r.Name, Package_Term__r.Name,
                        Odometer_Start__c, Odometer_End__c,
                        Contract_Start_Date__c, Contract_End_Date__c,
-                       Dealer_Package__c, Dealer_Package_Term__r.Dealer_Package__c,
+                       Dealer_Package__c, Dealer_Package__r.Name,
+                       Dealer_Package__r.Package__r.Name,
+                       Dealer_Package_Term__r.Dealer_Package__c,
+                       Dealer_Package_Term__r.Name,
+                       Dealer_Package_Term__r.Package_Term__r.Name,
                        RecordType.Name,
                        Contract_Cost_Price__c,
                        Contract_Cost_Price_Without_Tax__c,
@@ -107,19 +133,7 @@ public without sharing class InvoiceDetailViewController {
                 FROM Application_Package__c
                 WHERE Id IN :packageIds
               ];
-
-        // ── 3a. Persisted engine fee lines (P4 [T]-invoice). Commercial /
-        // diesel / powersports rows written by ApplicationSnapshotService —
-        // the same stored snapshot QuotePDFExtension renders. SYSTEM_MODE read:
-        // the line fields carry no portal FLS (same mode the snapshot writer
-        // and QuotePDFExtension use). A package with no fee lines keeps the
-        // legacy money untouched (graceful fallback).
         Map<Id, FeeSet> feeByPkg = loadFeeLinesByPackage(packageIds);
-
-        // Build a map of package Id → display price (with-tax dealer cost,
-        // including the extra fee rows the stored cost formula does not carry;
-        // the premium fee is already inside Contract_Cost_Price__c and is NOT
-        // re-added here — no double counting).
         Map<Id, Decimal> pkgDisplayPrice = new Map<Id, Decimal>();
         for (Application_Package__c pkg : packages) {
             FeeSet fs = feeByPkg.get(pkg.Id);
@@ -131,13 +145,6 @@ public without sharing class InvoiceDetailViewController {
             }
             pkgDisplayPrice.put(pkg.Id, getDisplayPrice(pkg) + extraWithTax);
         }
-
-        // ── 3b. Query Option LINE ITEMS for breakdown (P4 [S]: option state
-        // lives on the package's priced Option lines — the engine snapshot
-        // contract; Application_Package_Option__c children are retired). The
-        // line carries the priced retail; the cost side is re-derived from
-        // the dealer-option mirror (the Net_Cost formula the legacy child
-        // copied). Rows carry the LINE id (the LWC row key).
         Map<Id, List<OptionData>> pkgToOptions = new Map<Id, List<OptionData>>();
         if (!packageIds.isEmpty()) {
             Map<Id, Id> dealerPkgByPkg = new Map<Id, Id>();
@@ -174,6 +181,10 @@ public without sharing class InvoiceDetailViewController {
                 if (line.Application_Package__c == null) {
                     continue;
                 }
+                if (billedOptionKeys.contains(
+                        InvoiceOptionLineService.normalize(line.Description__c))) {
+                    continue; // already rendered as a real (billed) invoice line
+                }
                 List<OptionData> rows = pkgToOptions.get(line.Application_Package__c);
                 if (rows == null) {
                     rows = new List<OptionData>();
@@ -190,28 +201,89 @@ public without sharing class InvoiceDetailViewController {
                 rows.add(od);
             }
         }
-
-        // ── 4. Map package → line items using display prices ──────────────────
+        Map<String, Id> optionNameToPkg   = new Map<String, Id>();
+        Set<String>     ambiguousOption   = new Set<String>();
+        Map<Id, List<OptionData>> billedOptionsByPkg = new Map<Id, List<OptionData>>();
+        Set<Id>         nestedOptionLineIds = new Set<Id>();
+        Decimal         nestedOptionSubTotal = 0;
+        try {
+            if (!packageIds.isEmpty()) {
+                for (Application_Package_Line_Item__c line : (List<Application_Package_Line_Item__c>) Database.queryWithBinds(
+                        'SELECT Id, Name, Application_Package__c' +
+                        ' FROM Application_Package_Line_Item__c' +
+                        ' WHERE Application_Package__c IN :packageIds',
+                        new Map<String, Object>{ 'packageIds' => packageIds },
+                        System.AccessLevel.SYSTEM_MODE)) {
+                    if (line.Application_Package__c == null || String.isBlank(line.Name)) {
+                        continue;
+                    }
+                    String key = InvoiceOptionLineService.normalize(line.Name);
+                    if (String.isBlank(key)) {
+                        continue;
+                    }
+                    if (!optionNameToPkg.containsKey(key)) {
+                        optionNameToPkg.put(key, line.Application_Package__c);
+                    } else if (optionNameToPkg.get(key) != line.Application_Package__c) {
+                        ambiguousOption.add(key);   // same option name on more than one package
+                    }
+                }
+            }
+            for (Invoice_Line_Item__c li : lineItems) {
+                if (li.Application_Package__c != null || li.Amount__c == null || li.Amount__c == 0) {
+                    continue;
+                }
+                if (!(li.Description__c != null
+                        && li.Description__c.trim().endsWith(InvoiceOptionLineService.OPTIONAL_SUFFIX))) {
+                    continue;   // not a billed option line — leave it untouched
+                }
+                String stem = InvoiceOptionLineService.normalize(stripOptionalSuffix(li.Description__c));
+                if (String.isBlank(stem) || ambiguousOption.contains(stem)) {
+                    continue;
+                }
+                Id ownerPkg = optionNameToPkg.get(stem);
+                if (ownerPkg == null) {
+                    continue;   // owning package could not be determined — keep the fallback
+                }
+                OptionData od     = new OptionData();
+                od.optionId       = li.Id;
+                od.optionName     = stripOptionalSuffix(li.Description__c);
+                od.costPrice      = li.Amount__c;
+                od.selectionType  = 'Optional';
+                od.isBilledOption = true;
+                List<OptionData> rows = billedOptionsByPkg.get(ownerPkg);
+                if (rows == null) {
+                    rows = new List<OptionData>();
+                    billedOptionsByPkg.put(ownerPkg, rows);
+                }
+                rows.add(od);
+                nestedOptionLineIds.add(li.Id);
+                nestedOptionSubTotal += li.Amount__c;
+            }
+        } catch (Exception e) {
+            System.debug(LoggingLevel.WARN, 'LWC: option->package mapping unavailable: ' + e.getMessage());
+            billedOptionsByPkg.clear();
+            nestedOptionLineIds.clear();
+            nestedOptionSubTotal = 0;
+        }
         Map<Id, List<Invoice_Line_Item__c>> pkgToLineItems = new Map<Id, List<Invoice_Line_Item__c>>();
-        // Track display price per line item (for grand total)
         Map<Id, Decimal> lineItemDisplayPrice = new Map<Id, Decimal>();
         Decimal grandTotal = 0;
+        Decimal standaloneSubTotal = 0;
         for (Invoice_Line_Item__c li : lineItems) {
-            // Use display price from package instead of cost price
             Decimal displayAmt = (li.Application_Package__c != null && pkgDisplayPrice.containsKey(li.Application_Package__c))
                 ? pkgDisplayPrice.get(li.Application_Package__c)
-                : (li.Contract_Cost_Price__c != null ? li.Contract_Cost_Price__c : 0);
+                : (li.Amount__c != null ? li.Amount__c : 0);
             lineItemDisplayPrice.put(li.Id, displayAmt);
             grandTotal += displayAmt;
-            if (li.Application_Package__c != null) {
+            if (li.Application_Package__c == null) {
+                standaloneSubTotal += displayAmt;
+            } else {
                 if (!pkgToLineItems.containsKey(li.Application_Package__c)) {
                     pkgToLineItems.put(li.Application_Package__c, new List<Invoice_Line_Item__c>());
                 }
                 pkgToLineItems.get(li.Application_Package__c).add(li);
             }
         }
-
-        // ── 5. Build result ───────────────────────────────────────────────────
         InvoiceDetailData result = new InvoiceDetailData();
         result.invoiceId     = inv.Id;
         result.invoiceName   = inv.Name;
@@ -222,12 +294,9 @@ public without sharing class InvoiceDetailViewController {
         result.hasRemittanceForm = inv.Remittance_Form__c != null;
         result.dueDate = inv.Invoice_Due_Date__c != null ? String.valueOf(inv.Invoice_Due_Date__c) : null;
         result.hasPaymentInitiated = paymentInitiated;
-        // Dealer name: prefer Remittance Form dealer, fall back to Application dealer
         result.dealerName = inv.Remittance_Form__r?.Dealer_Name__r?.Name != null
             ? inv.Remittance_Form__r.Dealer_Name__r.Name
             : (inv.Application__r?.Dealer_Name__r?.Name != null ? inv.Application__r.Dealer_Name__r.Name : null);
-
-        // Bill To: prefer Remittance Form Bill_To__c rich-text, fall back to building from dealer account fields
         if (inv.Remittance_Form__r?.Bill_To__c != null) {
             result.billTo = inv.Remittance_Form__r.Bill_To__c;
         } else if (inv.Application__r?.Dealer_Name__r != null) {
@@ -248,7 +317,6 @@ public without sharing class InvoiceDetailViewController {
         }
         result.applicationId       = inv.Application__r?.Name;
         result.applicationRecordId = inv.Application__c;
-
         Application__c app = inv.Application__r;
         if (app != null) {
             String fn = app.Customer_First_Name__c != null ? app.Customer_First_Name__c : '';
@@ -256,7 +324,6 @@ public without sharing class InvoiceDetailViewController {
             result.customerFullName = (fn + ' ' + ln).trim();
             result.customerAddress  = app.Customer_Address__c;
             result.vin              = app.Vehicle_VIN__c;
-
             List<String> vParts = new List<String>();
             if (app.Vehicle_Year__c  != null)             vParts.add(String.valueOf(app.Vehicle_Year__c));
             if (String.isNotBlank(app.Vehicle_Make__c))  vParts.add(app.Vehicle_Make__c);
@@ -265,14 +332,14 @@ public without sharing class InvoiceDetailViewController {
             result.odometer    = app.Odometer__c;
             result.odometerUnit = app.Odometer_Unit__c != null ? app.Odometer_Unit__c : 'KM';
         }
-
         result.packages = new List<PackageData>();
         for (Application_Package__c pkg : packages) {
             PackageData pd   = new PackageData();
             pd.packageId     = pkg.Id;
             pd.recordTypeName = pkg.RecordType?.Name;
-            pd.packageName   = pkg.Package__r?.Name;
-            pd.packageTerm   = pkg.Package_Term__r?.Name;
+            pd.isOptionRow   = false;
+            pd.packageName   = resolvePackageName(pkg);
+            pd.packageTerm   = resolveTermName(pkg);
             pd.startDate     = pkg.Contract_Start_Date__c != null
                 ? Datetime.newInstance(pkg.Contract_Start_Date__c, Time.newInstance(0,0,0,0)).format('dd-MM-yyyy')
                 : null;
@@ -281,23 +348,11 @@ public without sharing class InvoiceDetailViewController {
                 : null;
             pd.startOdometer  = pkg.Odometer_Start__c;
             pd.expiryOdometer = pkg.Odometer_End__c;
-
-            // Price breakdown
             pd.baseCostPrice = pkg.Dealer_Package_Price__c != null ? pkg.Dealer_Package_Price__c : 0;
             pd.addOnsTotal   = pkg.Add_Ons_Price__c != null ? pkg.Add_Ons_Price__c : 0;
             pd.hasBreakdown  = pd.addOnsTotal > 0;
-
-            // Premium Model Fee — already folded into the stored cost price
-            // (Contract_Cost_Price_Without_Tax__c = Dealer_Package_Price__c +
-            // Add_Ons_Price__c + Premium_Model_Fee__c). Shown as a row; never
-            // added again below.
             pd.premiumModelFee = pkg.Premium_Model_Fee__c != null ? pkg.Premium_Model_Fee__c : 0;
             pd.hasPremiumModelFee = pd.premiumModelFee > 0;
-
-            // P4 [T] persisted fee rows (diesel / commercial / powersports).
-            // These have NO carrier in the stored cost formula, so they are
-            // added exactly once (below). The premium fee is deliberately NOT
-            // read from the line set — it would double count the base.
             FeeSet fs = feeByPkg.get(pkg.Id);
             pd.dieselFee         = fs != null ? fs.dieselFee : 0;
             pd.commercialFee     = fs != null ? fs.commercialFee : 0;
@@ -308,8 +363,6 @@ public without sharing class InvoiceDetailViewController {
             pd.extraFeeTotal     = fs != null ? fs.extraFee : 0;
             pd.hasExtraFees      = pd.extraFeeTotal > 0;
             pd.hasStoredLineSet  = fs != null && fs.hasLines;
-
-            // Tax breakdown
             pd.basePriceWithoutTax = (pkg.Contract_Cost_Price_Without_Tax__c != null ? pkg.Contract_Cost_Price_Without_Tax__c : 0)
                 + pd.extraFeeTotal;
             pd.taxPercentage = pkg.Tax_Percentage__c != null ? pkg.Tax_Percentage__c : 0;
@@ -317,27 +370,58 @@ public without sharing class InvoiceDetailViewController {
             Decimal costWithoutTax = pd.basePriceWithoutTax - pd.extraFeeTotal;
             pd.taxAmount = costWithTax - costWithoutTax;
             pd.hasTax = pd.taxPercentage > 0 || pd.taxAmount > 0 || pd.extraFeeTotal > 0;
-
-            // Additional options (P4 [S]: line-sourced rows, see 3b)
-            pd.additionalOptions = pkgToOptions.containsKey(pkg.Id)
-                ? pkgToOptions.get(pkg.Id)
+            List<OptionData> pkgOptionRows = pkgToOptions.containsKey(pkg.Id)
+                ? new List<OptionData>(pkgToOptions.get(pkg.Id))
                 : new List<OptionData>();
-
+            if (billedOptionsByPkg.containsKey(pkg.Id)) {
+                pkgOptionRows.addAll(billedOptionsByPkg.get(pkg.Id));
+            }
+            pd.additionalOptions = pkgOptionRows;
             pd.lineItems = new List<LineItemData>();
             if (pkgToLineItems.containsKey(pkg.Id)) {
                 for (Invoice_Line_Item__c li : pkgToLineItems.get(pkg.Id)) {
                     LineItemData ld = new LineItemData();
                     ld.lineItemId = li.Id;
                     ld.status     = li.Status__c;
-                    // Use retail/custom display price instead of cost
                     ld.amount     = lineItemDisplayPrice.get(li.Id);
                     pd.lineItems.add(ld);
                 }
             }
             result.packages.add(pd);
         }
-
-        // Calculate subTotal (sum of base prices without tax) and taxTotal
+        for (Invoice_Line_Item__c li : lineItems) {
+            if (li.Application_Package__c != null) {
+                continue;
+            }
+            Decimal amt = li.Amount__c != null ? li.Amount__c : 0;
+            if (amt == 0) {
+                continue;
+            }
+            if (nestedOptionLineIds.contains(li.Id)) {
+                continue;
+            }
+            PackageData pd         = new PackageData();
+            pd.packageId           = li.Id;
+            pd.recordTypeName      = 'Options';
+            pd.packageName         = String.isNotBlank(li.Description__c) ? li.Description__c : 'Option';
+            pd.packageTerm         = '';
+            pd.lineItems           = new List<LineItemData>();
+            pd.additionalOptions   = new List<OptionData>();
+            pd.baseCostPrice       = amt;
+            pd.addOnsTotal         = 0;
+            pd.hasBreakdown        = false;
+            pd.premiumModelFee     = 0;
+            pd.hasPremiumModelFee  = false;
+            pd.basePriceWithoutTax = amt;
+            pd.taxPercentage       = 0;
+            pd.taxAmount           = 0;
+            pd.hasTax              = false;
+            pd.extraFeeTotal       = 0;
+            pd.hasExtraFees        = false;
+            pd.hasStoredLineSet    = false;
+            pd.isOptionRow         = true;
+            result.packages.add(pd);
+        }
         Decimal subTotalCalc = 0;
         Decimal taxTotalCalc = 0;
         for (PackageData pd2 : result.packages) {
@@ -347,12 +431,11 @@ public without sharing class InvoiceDetailViewController {
             }
         }
         result.totalAmount   = grandTotal;
-        result.subTotal      = subTotalCalc;
+        result.subTotal      = subTotalCalc + nestedOptionSubTotal;
         result.taxTotal      = taxTotalCalc;
         result.balanceAmount = inv.Total_Balance_Amount__c != null ? inv.Total_Balance_Amount__c : 0;
         result.packageCount  = result.packages.size();
         return result;
-
         } catch (AuraHandledException e) {
             throw e;
         } catch (QueryException e) {
@@ -365,9 +448,6 @@ public without sharing class InvoiceDetailViewController {
             throw ahe;
         }
     }
-
-    // ── Cancellation Request ──────────────────────────────────────────────────
-
     @AuraEnabled
     public static OperationResult submitCancellationRequest(String invoiceId, String lineItemId, String reason) {
         try {
@@ -377,7 +457,6 @@ public without sharing class InvoiceDetailViewController {
             if (String.isBlank(reason)) {
                 return new OperationResult(false, 'Cancellation reason is required.');
             }
-
             List<Invoice__c> invoices = [
                 SELECT Id, Name, Status__c, Remittance_Form__c
                 FROM Invoice__c
@@ -388,27 +467,20 @@ public without sharing class InvoiceDetailViewController {
                 return new OperationResult(false, 'Invoice not found.');
             }
             Invoice__c inv = invoices[0];
-
-            // ── Payment initiation guard ─────────────────────────────────────
             if (checkPaymentInitiated(inv.Remittance_Form__c)) {
                 throw new AuraHandledException('Packages cannot be removed after a payment has been initiated on this invoice.');
             }
-
             Cancellation__c cancellation = new Cancellation__c();
             cancellation.Invoice__c                    = inv.Id;
             cancellation.Cancellation_Reason__c        = reason;
             cancellation.Cancellation_Status__c        = 'Pending';
             cancellation.Invoice_Status_At_Request__c  = inv.Status__c;
-
             if (String.isBlank(lineItemId)) {
-                // Invoice-level cancellation
                 if (inv.Status__c == 'Cancelled') {
                     return new OperationResult(false, 'This invoice is already cancelled.');
                 }
                 cancellation.Cancellation_Type__c = 'Invoice';
                 insert cancellation;
-
-                // Create a Cancellation__c record for each line item immediately
                 List<Invoice_Line_Item__c> allLineItems = [
                     SELECT Id, Status__c
                     FROM Invoice_Line_Item__c
@@ -431,7 +503,6 @@ public without sharing class InvoiceDetailViewController {
                 }
                 return new OperationResult(true, 'Cancellation request submitted successfully.');
             } else {
-                // Line item-level cancellation
                 List<Invoice_Line_Item__c> lineItems2 = [
                     SELECT Id, Status__c
                     FROM Invoice_Line_Item__c
@@ -451,7 +522,6 @@ public without sharing class InvoiceDetailViewController {
                 insert cancellation;
                 return new OperationResult(true, 'Cancellation request submitted successfully.');
             }
-
         } catch (AuraHandledException e) {
             throw e;
         } catch (Exception e) {
@@ -460,16 +530,12 @@ public without sharing class InvoiceDetailViewController {
             throw ahe;
         }
     }
-
-    // ── Pay Now: Create Remittance Form for a single Invoice ─────────────────
-
     @AuraEnabled
     public static OperationResult createRemittanceForInvoice(String invoiceId) {
         try {
             if (String.isBlank(invoiceId)) {
                 return new OperationResult(false, 'Invoice ID is required.');
             }
-
             List<Invoice__c> invoices = [
                 SELECT Id, Name, Status__c, Remittance_Form__c,
                        Application__c,
@@ -479,24 +545,19 @@ public without sharing class InvoiceDetailViewController {
                 WHERE Id = :invoiceId
                 LIMIT 1
             ];
-
             if (invoices.isEmpty()) {
                 return new OperationResult(false, 'Invoice not found.');
             }
-
             Invoice__c inv = invoices[0];
-
             if (inv.Status__c == 'Paid') {
                 return new OperationResult(false, 'This invoice has already been paid.');
             }
             if (inv.Status__c == 'Cancelled') {
                 return new OperationResult(false, 'This invoice has been cancelled.');
             }
-
             String dealerId   = inv.Application__r?.Dealer_Name__c;
             String dealerName2 = inv.Application__r?.Dealer_Name__r?.Name != null
                 ? inv.Application__r.Dealer_Name__r.Name : '';
-
             Remittance_Form__c rf = new Remittance_Form__c(
                 RecordTypeId     = Schema.SObjectType.Remittance_Form__c
                                        .getRecordTypeInfosByDeveloperName()
@@ -507,23 +568,16 @@ public without sharing class InvoiceDetailViewController {
                 Status__c        = 'Open'
             );
             insert rf;
-
-            // Link Application to the new remittance form
             if (inv.Application__c != null) {
                 update new Application__c(Id = inv.Application__c, Remittance_Form__c = rf.Id);
             }
-
-            // Link Invoice to the new remittance form
             update new Invoice__c(Id = inv.Id, Remittance_Form__c = rf.Id);
-
-            // Query unpaid line items for this invoice (include package reference)
             List<Invoice_Line_Item__c> lineItems3 = [
                 SELECT Id, Contract_Cost_Price__c, Application_Package__c
                 FROM Invoice_Line_Item__c
                 WHERE Invoice__c = :invoiceId
                 AND Status__c != 'Paid'
             ];
-
             if (!lineItems3.isEmpty()) {
                 Set<Id> unpaidLineItemIds = new Set<Id>();
                 Set<Id> packageIds = new Set<Id>();
@@ -531,8 +585,6 @@ public without sharing class InvoiceDetailViewController {
                     unpaidLineItemIds.add(li.Id);
                     if (li.Application_Package__c != null) packageIds.add(li.Application_Package__c);
                 }
-
-                // ── FIX: Query Application Packages for retail pricing ──
                 Map<Id, Application_Package__c> pkgMap = new Map<Id, Application_Package__c>();
                 if (!packageIds.isEmpty()) {
                     for (Application_Package__c pkg : [
@@ -543,8 +595,6 @@ public without sharing class InvoiceDetailViewController {
                         pkgMap.put(pkg.Id, pkg);
                     }
                 }
-
-                // Delete stale Planned junctions from previous remittance attempts
                 List<Remittance_Line_Item_Junction__c> staleJunctions = [
                     SELECT Id
                     FROM Remittance_Line_Item_Junction__c
@@ -552,13 +602,9 @@ public without sharing class InvoiceDetailViewController {
                     AND Payment_Status__c = 'Planned'
                 ];
                 if (!staleJunctions.isEmpty()) delete staleJunctions;
-
-                // Create fresh junction records on the new remittance form
                 List<Remittance_Line_Item_Junction__c> junctions = new List<Remittance_Line_Item_Junction__c>();
                 for (Invoice_Line_Item__c li : lineItems3) {
-                    // Use dealer cost price for remittance payable amount
                     Decimal displayAmount = li.Contract_Cost_Price__c != null ? li.Contract_Cost_Price__c : 0;
-
                     junctions.add(new Remittance_Line_Item_Junction__c(
                         Remittance_Form__c   = rf.Id,
                         Invoice__c           = inv.Id,
@@ -569,35 +615,27 @@ public without sharing class InvoiceDetailViewController {
                 }
                 insert junctions;
             }
-
             return new OperationResult(true, 'Remittance form created successfully.', rf.Id);
-
         } catch (Exception e) {
             AuraHandledException ahe = new AuraHandledException('Error creating remittance form: ' + e.getMessage());
             ahe.setMessage('Error creating remittance form: ' + e.getMessage());
             throw ahe;
         }
     }
-
     public class OperationResult {
         @AuraEnabled public Boolean success;
         @AuraEnabled public String  message;
         @AuraEnabled public String  remittanceFormId;
-
         public OperationResult(Boolean success, String message) {
             this.success = success;
             this.message = message;
         }
-
         public OperationResult(Boolean success, String message, String remittanceFormId) {
             this.success = success;
             this.message = message;
             this.remittanceFormId = remittanceFormId;
         }
     }
-
-    // ── PDF Download ──────────────────────────────────────────────────────────
-
     @AuraEnabled
     public static PDFDownloadResponse downloadInvoicePDF(String invoiceId) {
         try {
@@ -622,15 +660,12 @@ public without sharing class InvoiceDetailViewController {
             return r;
         }
     }
-
     public class PDFDownloadResponse {
         @AuraEnabled public Boolean success;
         @AuraEnabled public String  message;
         @AuraEnabled public String  pdfData;
         @AuraEnabled public String  fileName;
     }
-
-    // ── Wrapper classes ───────────────────────────────────────────────────────
     public class InvoiceDetailData {
         @AuraEnabled public String  invoiceId;
         @AuraEnabled public String  invoiceName;
@@ -656,7 +691,6 @@ public without sharing class InvoiceDetailViewController {
         @AuraEnabled public Decimal subTotal;
         @AuraEnabled public Decimal taxTotal;
     }
-
     public class PackageData {
         @AuraEnabled public String  packageId;
         @AuraEnabled public String  recordTypeName;
@@ -671,17 +705,12 @@ public without sharing class InvoiceDetailViewController {
         @AuraEnabled public Decimal addOnsTotal;
         @AuraEnabled public Boolean hasBreakdown;
         @AuraEnabled public List<OptionData> additionalOptions;
-        // Premium Model Fee
         @AuraEnabled public Decimal premiumModelFee;
         @AuraEnabled public Boolean hasPremiumModelFee;
-        // Tax breakdown fields
         @AuraEnabled public Decimal basePriceWithoutTax;
         @AuraEnabled public Decimal taxPercentage;
         @AuraEnabled public Decimal taxAmount;
         @AuraEnabled public Boolean hasTax;
-        // P4 [T] persisted fee rows (diesel / commercial / powersports) —
-        // sourced from Application_Package_Line_Item__c; the premium fee keeps
-        // its existing carrier field above.
         @AuraEnabled public Decimal dieselFee;
         @AuraEnabled public Decimal commercialFee;
         @AuraEnabled public Decimal powersportsFee;
@@ -691,24 +720,20 @@ public without sharing class InvoiceDetailViewController {
         @AuraEnabled public Decimal extraFeeTotal;
         @AuraEnabled public Boolean hasExtraFees;
         @AuraEnabled public Boolean hasStoredLineSet;
+        @AuraEnabled public Boolean isOptionRow;
     }
-
     public class LineItemData {
         @AuraEnabled public String  lineItemId;
         @AuraEnabled public String  status;
         @AuraEnabled public Decimal amount;
     }
-
     public class OptionData {
         @AuraEnabled public String  optionId;
         @AuraEnabled public String  optionName;
         @AuraEnabled public Decimal costPrice;
         @AuraEnabled public String  selectionType;
+        @AuraEnabled public Boolean isBilledOption;
     }
-
-    // ── P4 [T] persisted fee lines ────────────────────────────────────────────
-
-    /** Fee amounts sourced from the persisted engine line set. */
     public class FeeSet {
         public Boolean hasLines       = false;
         public Decimal premiumFee     = 0;
@@ -717,18 +742,6 @@ public without sharing class InvoiceDetailViewController {
         public Decimal powersportsFee = 0;
         public Decimal extraFee       = 0;   // diesel + commercial + powersports
     }
-
-    /**
-     * Reads the package's persisted engine line set (SYSTEM_MODE — the line
-     * fields carry no portal FLS, the same mode the snapshot writer and
-     * QuotePDFExtension use) and reduces it to the fee amounts the invoice
-     * needs. Diesel / commercial / powersports are the fees the stored cost
-     * formula does NOT carry, so they are added exactly once. The premium fee
-     * is intentionally NOT surfaced here — it is already folded into the
-     * stored Contract_Cost_Price__c via Premium_Model_Fee__c, so adding it
-     * again would double count. Never throws: a read failure yields no extra
-     * fees and the legacy rendering stands.
-     */
     @TestVisible
     private static Map<Id, FeeSet> loadFeeLinesByPackage(Set<Id> pkgIds) {
         Map<Id, FeeSet> byPkg = new Map<Id, FeeSet>();

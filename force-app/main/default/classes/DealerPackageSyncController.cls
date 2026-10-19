@@ -1098,9 +1098,17 @@ public without sharing class DealerPackageSyncController {
                 return result;
             }
             Dealer_Package_Term__c t = new Dealer_Package_Term__c(Id = dealerTermId);
-            t.Discount_Type__c = String.isBlank(discountType) ? null : discountType;
+            // Defensive type default. The console's dropdown shows a default type
+            // ('%' discount / '$' markup) even when the underlying value is blank,
+            // so a value can arrive with a blank type. A blank type makes the
+            // Net_Cost__c / Retail_Price__c formulas ignore the amount entirely
+            // (ISBLANK(TEXT(type)) branch), so when a value is supplied we store the
+            // same default type the console displays instead of leaving it null.
+            t.Discount_Type__c = String.isBlank(discountType)
+                ? (discountValue == null ? null : '%') : discountType;
             t.Discount_Value__c = discountValue;
-            t.Markup_Type__c = String.isBlank(markupType) ? null : markupType;
+            t.Markup_Type__c = String.isBlank(markupType)
+                ? (markupValue == null ? null : '$') : markupType;
             t.Markup__c = markupValue;
             t.Sales_Rep_Incentive__c = salesRepIncentive;
 
@@ -1365,9 +1373,14 @@ public without sharing class DealerPackageSyncController {
                 return result;
             }
             Dealer_Package_Option__c o = new Dealer_Package_Option__c(Id = dealerOptionId);
-            o.Discount_Type__c = String.isBlank(discountType) ? null : discountType;
+            // Defensive type default — same rule as the term save: a value with a
+            // blank type would otherwise be ignored by the option Net/Retail
+            // formulas. Store the default type the console shows.
+            o.Discount_Type__c = String.isBlank(discountType)
+                ? (discountValue == null ? null : '%') : discountType;
             o.Discount_Value__c = discountValue;
-            o.Markup_Type__c = String.isBlank(markupType) ? null : markupType;
+            o.Markup_Type__c = String.isBlank(markupType)
+                ? (markupValue == null ? null : '$') : markupType;
             o.Dealer_Markup__c = markupValue;
 
             Database.SaveResult[] saved = Database.update(new List<Dealer_Package_Option__c>{ o }, false);

@@ -135,6 +135,7 @@ public without sharing class PricingEngineService {
         public Decimal netCost { get; set; }        // Dealer_Package_Price__c anchor
         public Decimal markupAmount { get; set; }   // Dealer_Markup__c anchor
         public Decimal premiumFee { get; set; }     // Premium_Model_Fee__c audit value
+        public Decimal dieselFee { get; set; }      // Diesel_Fee__c audit value (mandatory diesel fee)
         public Decimal addOnsNet { get; set; }
         public Decimal addOnsMarkup { get; set; }
         public Decimal addOnsRetail { get; set; }
@@ -155,6 +156,7 @@ public without sharing class PricingEngineService {
             this.netCost = 0;
             this.markupAmount = 0;
             this.premiumFee = 0;
+            this.dieselFee = 0;
             this.addOnsNet = 0;
             this.addOnsMarkup = 0;
             this.addOnsRetail = 0;
@@ -308,6 +310,51 @@ public without sharing class PricingEngineService {
             }
         }
 
+        // ---- 3a. Diesel fee (term-field path; mandatory, option-independent) ----
+        // The mandatory Diesel Fee is charged whenever the vehicle is Diesel,
+        // INDEPENDENT of whether the "Diesel Components" OPTION is selected. The
+        // fee is resolved from the package TERM fields (dealer-first, then
+        // master — see resolveDieselFee), not from a Vehicle_Schedule: no
+        // Diesel_Fee schedule family rows exist, so the resolver never emits a
+        // diesel line today. VehicleScheduleResolver.TYPE_DIESEL_FEE remains the
+        // gate / line-type reference (LT_DIESEL_FEE below); the term-field path
+        // replaces the schedule dependency for diesel.
+        //
+        // The line is a standalone TAXABLE fee line (user decision D-diesel:
+        // the fee is taxable) — it is NEVER folded into the
+        // Included_Options_Price__c / Additional_Options_Price__c option
+        // rollups. If a schedule-resolved diesel line IS present (legacy data),
+        // it wins and this path is skipped, so the fee is never charged twice.
+        if (!overrideApplied && req.vehicleId != null) {
+            // Resolve the TERM fee FIRST — a pure field read, NO query. Only
+            // when a fee is actually configured (dealer or master Diesel_Fee__c
+            // > 0) do we read the vehicle's fuel type, so a quote whose term
+            // carries no diesel fee costs ZERO extra SOQL. This matters: an
+            // unconditional per-quote vehicle read pushed multi-case harness
+            // tests (e.g. PricingEngineReconciliationHarnessTest) over the
+            // 100-SOQL governor cap.
+            Decimal dieselFee = resolveDieselFee(term);
+            if (dieselFee > 0) {
+                Boolean dieselLinePresent = false;
+                for (QuoteLine existing : lines) {
+                    if (LT_DIESEL_FEE.equals(existing.lineType)) {
+                        dieselLinePresent = true;
+                        break;
+                    }
+                }
+                if (!dieselLinePresent && isDieselVehicle(req.vehicleId)) {
+                    QuoteLine dieselLine = new QuoteLine();
+                    dieselLine.lineType = LT_DIESEL_FEE;
+                    dieselLine.description = 'Diesel Fee';
+                    dieselLine.amount = money(dieselFee);
+                    dieselLine.taxable = true; // user decision: the fee is taxable
+                    dieselLine.quantity = 1;
+                    dieselLine.provenanceTermId = term.Package_Term__c;
+                    lines.add(dieselLine);
+                }
+            }
+        }
+
         // ---- 3b. Option lines (optional selections at dealer retail) ----
         // (suppressed under a pre-tax custom-price override — the override is
         // the full customer price; the with-tax formula taxes only it)
@@ -334,6 +381,14 @@ public without sharing class PricingEngineService {
             noTaxTotal = money(noTaxTotal + line.amount);
             if (line.taxable) {
                 taxableSubtotal = money(taxableSubtotal + line.amount);
+            }
+            if (LT_DIESEL_FEE.equals(line.lineType)) {
+                // Audit value for Application_Package__c.Diesel_Fee__c — the
+                // single source the Contract Premium summary formulas add on
+                // top of the premium-model fee. Sums every diesel line (the
+                // term-field path above and any legacy schedule-resolved line)
+                // so it never double counts.
+                result.dieselFee = money(result.dieselFee + line.amount);
             }
         }
         result.noTaxTotal = noTaxTotal;
@@ -386,6 +441,7 @@ public without sharing class PricingEngineService {
         pkg.Add_Ons_Price__c = result.addOnsNet;
         pkg.Add_Ons_Markup__c = result.addOnsMarkup;
         pkg.Premium_Model_Fee__c = result.premiumFee;
+        pkg.Diesel_Fee__c = result.dieselFee;
         pkg.Dealer_Price_Override__c = result.dealerOverrideApplied ? req.dealerPriceOverride : null;
         if (result.taxRate != null) {
             pkg.Tax_Percentage__c = result.taxRate;
@@ -417,15 +473,72 @@ public without sharing class PricingEngineService {
                    Dealer_Package__r.Dealer__c, Dealer_Package__r.Package__c,
                    Original_Package_Term_Cost__c,
                    Premium_Model_Fee__c,
+                   Diesel_Fee__c,
                    Discount_Type__c, Discount_Value__c,
                    Markup__c, Markup_Type__c,
-                   Package_Term__r.Premium_Model_Fee__c
+                   Package_Term__r.Premium_Model_Fee__c,
+                   Package_Term__r.Diesel_Fee__c
             FROM Dealer_Package_Term__c
             WHERE Id = :termId
             WITH SYSTEM_MODE
             LIMIT 1
         ];
         return terms.isEmpty() ? null : terms[0];
+    }
+
+    /**
+     * True when the vehicle's fuel type is Diesel.
+     *
+     * Vehicle__c.Fuel_Type__c is a RESTRICTED picklist whose active API value is
+     * exactly 'Diesel'; the comparison is case-insensitive so a legacy/stored
+     * casing never silently drops the mandatory fee. SYSTEM_MODE (v67
+     * secure-by-default): the dealer-portal profile carries no FLS on the
+     * vehicle pricing fields — the same mode every selector in this class uses.
+     */
+    private static Boolean isDieselVehicle(Id vehicleId) {
+        if (vehicleId == null) {
+            return false;
+        }
+        List<Vehicle__c> vehicles = [
+            SELECT Id, Fuel_Type__c
+            FROM Vehicle__c
+            WHERE Id = :vehicleId
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        if (vehicles.isEmpty()) {
+            return false;
+        }
+        return 'Diesel'.equalsIgnoreCase(vehicles[0].Fuel_Type__c);
+    }
+
+    /**
+     * Mandatory Diesel Fee amount — DEALER-term-first, MASTER-term fallback,
+     * else 0 (no fee). Identical rule and order to
+     * DealerPortalController.resolveDieselFee (parity tests exist to catch any
+     * divergence):
+     *   1. dealer term  Diesel_Fee__c            when populated and > 0
+     *   2. master term  Package_Term__r.Diesel_Fee__c when populated and > 0
+     *   3. 0 — no fee
+     * Currency is rounded to 2dp HALF_UP (money()). The dealer value is seeded
+     * once from the master at dealer-package creation, so a dealer-local edit
+     * survives every later sync; the master term is the fallback when the dealer
+     * value is blank/zero.
+     */
+    private static Decimal resolveDieselFee(Dealer_Package_Term__c term) {
+        if (term == null) {
+            return 0;
+        }
+        Decimal dealerDiesel = term.Diesel_Fee__c;
+        if (dealerDiesel != null && dealerDiesel > 0) {
+            return money(dealerDiesel);
+        }
+        Decimal masterDiesel = term.Package_Term__r != null
+            ? term.Package_Term__r.Diesel_Fee__c : null;
+        if (masterDiesel != null && masterDiesel > 0) {
+            return money(masterDiesel);
+        }
+        return 0;
     }
 
     private static Account selectDealerAccount(Id dealerId) {

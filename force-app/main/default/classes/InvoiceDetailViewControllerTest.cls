@@ -475,6 +475,68 @@ private class InvoiceDetailViewControllerTest {
             'Line item status should be Due');
     }
 
+    /**
+     * Engine-priced Application_Package record shape: the master Package__c /
+     * Package_Term__c links are NULL (the create-time flow that wrote them is
+     * retired); only the dealer copy links (Dealer_Package__c /
+     * Dealer_Package_Term__c) are populated. Before the fix the line's
+     * DESCRIPTION (packageName) and TERM (packageTerm) rendered blank; they
+     * must now resolve through the dealer copy links — the same fallback the
+     * downloadable PDF already uses.
+     */
+    @isTest
+    static void testGetInvoiceDetail_enginePricedPackage_resolvesPlanAndTermFromDealerLinks() {
+        Account        dealer = TestDataFactory.createDealer(true);
+        Application__c app    = TestDataFactory.createApplicationWithDetails(dealer.Id, true);
+        Invoice__c     inv    = TestDataFactory.createInvoice(app.Id, true);
+
+        // Master catalogue records — the engine-priced record does NOT link
+        // these directly; it reaches them only through the dealer copy.
+        Package__c      srcPkg   = TestDataFactory.createPackage('Extended_Limited_Warranty', true);
+        Package_Term__c srcTerm  = TestDataFactory.createPackageTerm(srcPkg.Id, null, true);
+        Dealer_Package__c dealerPkg = TestDataFactory.createDealerPackage(
+            dealer.Id, srcPkg.Id, 'Extended_Limited_Warranty', true);
+        Dealer_Package_Term__c dealerTerm = TestDataFactory.createDealerPackageTerm(
+            dealerPkg.Id, srcTerm.Id, null, true);
+
+        Application_Package__c appPkg = TestDataFactory.createApplicationPackage(
+            app.Id, dealerPkg.Id, dealerTerm.Id, dealer.Id,
+            'Extended_Limited_Warranty', 979.00, 5.00, true);
+
+        TestDataFactory.createInvoiceLineItem(inv.Id, appPkg.Id, true);
+
+        // Prove the fixture really is the engine shape (master links null).
+        Application_Package__c fresh = [
+            SELECT Id, Package__c, Package_Term__c, Dealer_Package__c, Dealer_Package_Term__c
+            FROM Application_Package__c
+            WHERE Id = :appPkg.Id
+        ];
+        System.assertEquals(null, fresh.Package__c,
+            'engine-priced fixture must have a null master Package__c link');
+        System.assertEquals(null, fresh.Package_Term__c,
+            'engine-priced fixture must have a null master Package_Term__c link');
+        System.assertNotEquals(null, fresh.Dealer_Package__c,
+            'engine-priced fixture carries the dealer copy link');
+        System.assertNotEquals(null, fresh.Dealer_Package_Term__c,
+            'engine-priced fixture carries the dealer copy term link');
+
+        Test.startTest();
+            InvoiceDetailViewController.InvoiceDetailData result =
+                InvoiceDetailViewController.getInvoiceDetail(inv.Id);
+        Test.stopTest();
+
+        System.assertEquals(1, result.packages.size(), 'should have 1 package');
+        InvoiceDetailViewController.PackageData pd = result.packages[0];
+
+        System.assertEquals(srcPkg.Name, pd.packageName,
+            'packageName resolves via Dealer_Package__r.Package__r.Name when the master link is null');
+        System.assertEquals(srcTerm.Name, pd.packageTerm,
+            'packageTerm resolves via Dealer_Package_Term__r.Package_Term__r.Name when the master link is null');
+        // Display-only fix: stored money fields untouched.
+        System.assertEquals(979.00, pd.baseCostPrice,
+            'base cost price (stored field) must be untouched by the display fix');
+    }
+
     @isTest
     static void testGetInvoiceDetail_lineItemNullPackage_notAddedToPackageMap() {
         // Line item with no Application_Package__c → excluded from pkgToLineItems

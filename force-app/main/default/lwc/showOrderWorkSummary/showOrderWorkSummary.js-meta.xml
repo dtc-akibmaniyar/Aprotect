@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <isExposed>false</isExposed>
+    <masterLabel>Work Order Summary</masterLabel>
+    <description>Work Order Summary for the scenario marked Use, rendered inside repairPriceScenarios. Preview only: it never creates a Work_Order__c, which stays with createWorkOrderAction. Takes the computed scenario as properties rather than querying. TASK-047.</description>
+</LightningComponentBundle>

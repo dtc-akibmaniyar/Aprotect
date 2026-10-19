@@ -1,7 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>63.0</apiVersion>
-    <isExposed>false</isExposed>
-    <masterLabel>Repair Price Scenarios</masterLabel>
-    <description>Multi-row estimate-entry grid, opened by the Estimates tab's New Estimate button. Enter several scenarios with live totals; highest P&amp;L is auto-flagged Best for A-Protect. Invoked as a lightning/modal, not placed on a page.</description>
+    <isExposed>true</isExposed>
+    <masterLabel>Manage Estimates</masterLabel>
+    <description>Manage Estimates: ancillary benefits, competing repair scenarios in one horizontal row with live percent and dollar markup pricing, and the work order summary for the scenario marked Use. Rebuilt TASK-047. Was a lightning/modal; now a full width page.</description>
+    <targets>
+        <target>lightning__AppPage</target>
+        <target>lightning__RecordPage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__RecordPage">
+            <objects>
+                <object>Claim__c</object>
+            </objects>
+        </targetConfig>
+    </targetConfigs>
 </LightningComponentBundle>

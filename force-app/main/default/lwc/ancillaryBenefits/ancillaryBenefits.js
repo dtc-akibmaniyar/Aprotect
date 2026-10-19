@@ -28,6 +28,7 @@ export default class AncillaryBenefits extends LightningElement {
         try {
             const data = await getBenefitBalancesForClaim({ claimId: this.recordId });
             this.rows = data.map((r) => this.toRow(r));
+            this.publishBenefits();
         } catch (error) {
             this.showError('Could Not Load Ancillary Benefits', error);
         } finally {
@@ -77,6 +78,7 @@ export default class AncillaryBenefits extends LightningElement {
         this.rows = this.rows.map((row) =>
             row.balanceId === balanceId ? this.recalc({ ...row, include: checked }) : row
         );
+        this.publishBenefits();
     }
 
     handleUseAmountChange(event) {
@@ -84,6 +86,38 @@ export default class AncillaryBenefits extends LightningElement {
         const value = event.target.value;
         this.rows = this.rows.map((row) =>
             row.balanceId === balanceId ? this.recalc({ ...row, useThisClaim: value }) : row
+        );
+        this.publishBenefits();
+    }
+
+    /**
+     * TASK-047 integration point, the only behavioural change this component
+     * needed to be reused inside Manage Estimates. It still owns and saves
+     * benefits exactly as before; it now also announces the approved total so
+     * repairPriceScenarios can credit it to every scenario as the agent
+     * types, which is the design's "set benefits once, they flow into every
+     * scenario". Harmless on the Work Order tab, where nothing listens.
+     */
+    publishBenefits() {
+        const approved = this.rows
+            .filter((row) => row.include && row.approved > 0)
+            .map((row) => ({ name: row.benefitType, amount: row.approved }));
+        this.dispatchEvent(
+            new CustomEvent('benefitschange', {
+                detail: {
+                    total: approved.reduce((a, b) => a + b.amount, 0),
+                    benefits: approved,
+                    balances: this.rows.map((row) => ({
+                        balanceId: row.balanceId,
+                        benefitType: row.benefitType,
+                        availableToUse: row.availableToUse,
+                        // TASK-051: repairPriceScenarios.reimbRoom works from
+                        // Remaining__c, not availableToUse, which adds back
+                        // the claim-level draw rather than the scenario's own.
+                        remaining: row.remaining
+                    }))
+                }
+            })
         );
     }
 
@@ -106,13 +140,24 @@ export default class AncillaryBenefits extends LightningElement {
             Amount_Used__c: row.useThisClaim
         }));
 
+        // Osama, 2026-10-08: unchecking a benefit and saving left it still
+        // counted. Only the checked rows are sent, so an unchecked benefit that
+        // already had a draw was absent from the payload and its
+        // Benefit_Usage__c row survived, keeping the balance consumed and the
+        // customer credited. Naming those rows is what lets Apex remove them.
+        const removedUsageIds = this.rows
+            .filter((row) => !row.include && row.usageId)
+            .map((row) => row.usageId);
+
         this.isSaving = true;
         try {
-            await saveBenefitUsage({ claimId: this.recordId, usages });
+            await saveBenefitUsage({ claimId: this.recordId, usages, removedUsageIds });
+            const parts = [`${usages.length} benefit(s) recorded`];
+            if (removedUsageIds.length) parts.push(`${removedUsageIds.length} removed`);
             this.dispatchEvent(
                 new ShowToastEvent({
                     title: 'Ancillary Benefits Saved',
-                    message: `${usages.length} benefit(s) recorded for this claim.`,
+                    message: `${parts.join(', ')} for this claim.`,
                     variant: 'success'
                 })
             );

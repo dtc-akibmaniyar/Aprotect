@@ -490,29 +490,37 @@ private class ClaimEstimateServiceTest {
             'selecting one estimate clears its sibling on the same claim');
     }
 
+    /**
+     * REWRITTEN TASK-049. This was written on Sep 24 against the legacy
+     * pricing path (`updateEstimate` -> `ClaimPricingService.calculate`),
+     * where Coverage_Applied__c was PRE-TAX and the expected split was
+     * 2071.43 / 828.57. Decision 8 made coverage TAX-INCLUSIVE, and no LWC
+     * calls the legacy path any more, so the test now prices through
+     * `saveManageEstimates` like the live screen does.
+     *
+     * Option C from the design, deliberately: 1 part at 1,700 wholesale with
+     * a 300 dollar markup, 5 h labour at 140 wholesale and 160 retail, and
+     * 160 of supplies marked up to 200. Cap 3,000, deductible 100, tax 13%.
+     *
+     * The arithmetic this pins down:
+     *   retail repair 2,800 -> incl. tax 3,164 -> coverage 2,900 (capped)
+     *   coverage converted to pre-tax: 2,900 / 1.13 = 2,566.37
+     *   Part takes 2,000/2,800 of that = 1,833.12
+     *   Labour absorbs the remainder                = 733.25
+     *   customer pays 166.88 + 66.75 = 233.63 pre-tax, x 1.13 = 264.00,
+     *   which is exactly repair incl. tax less coverage. That reconciliation
+     *   is the real point of the test.
+     * Without the pre-tax conversion both lines went NEGATIVE (-71.43, -28.57).
+     */
     @IsTest
     static void createWorkOrderSplitsCoverageAcrossLinesByRetailShare() {
-        // "Work Order - Approved Repairs" table (Sep 24, Claim Review Record Page -
-        // From Noelle.html): Coverage_Applied__c (2900, from cap 3000 - ded 100 on
-        // retail 4000) is split proportionally across the Part/Labour lines by their
-        // own retail share (2857.14 / 1142.86, from the existing wholesale-share
-        // split), with the Labour line (the last non-Supplies line) absorbing the
-        // rounding remainder so the lines sum back to exactly 2900. Supplies is
-        // never covered.
-        Estimate__c created = TestDataFactory.createEstimateWithClaim('Warranty_Claim', true);
-        Estimate__c e = [SELECT Id FROM Estimate__c WHERE Id = :created.Id];
-        e.Parts_Cost__c          = 1500;
-        e.Labour_Hours__c        = 8;
-        e.Labour_Rate__c         = 75;
-        e.Shop_Supplies__c       = 150;
-        e.Shop_Supplies_Retail__c = 300;
-        e.Retail_Price__c        = 4000;
-        e.Deductable__c          = 100;
-        update e;
-        ClaimEstimateService.updateEstimate(e, 3000);
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ManageEstimatesData saved = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ optionC(ctx.shopId) }, null, null);
+        Id estimateId = saved.scenarios[0].id;
 
         Test.startTest();
-        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(e.Id);
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(estimateId);
         Test.stopTest();
 
         Map<String, Work_Order_Line_Item__c> byType = new Map<String, Work_Order_Line_Item__c>();
@@ -523,22 +531,512 @@ private class ClaimEstimateServiceTest {
             byType.put(wl.Claim_Line_Item__r.Line_Type__c, wl);
         }
 
-        System.assertEquals(2857.14, byType.get('Part').Retail__c);
-        System.assertEquals(2071.43, byType.get('Part').Covered_Amount__c);
-        System.assertEquals(785.71,  byType.get('Part').Customer_Pay_Amount__c);
+        System.assertEquals(2000.00, byType.get('Part').Retail__c, 'its own retail, no proportional allocation');
+        System.assertEquals(1833.12, byType.get('Part').Covered_Amount__c);
+        System.assertEquals(166.88,  byType.get('Part').Customer_Pay_Amount__c, 'positive, not the old -71.43');
 
-        System.assertEquals(1142.86, byType.get('Labour').Retail__c);
-        System.assertEquals(828.57,  byType.get('Labour').Covered_Amount__c, 'absorbs the rounding remainder');
-        System.assertEquals(314.29,  byType.get('Labour').Customer_Pay_Amount__c);
+        System.assertEquals(800.00, byType.get('Labour').Retail__c);
+        System.assertEquals(733.25, byType.get('Labour').Covered_Amount__c, 'absorbs the rounding remainder');
+        System.assertEquals(66.75,  byType.get('Labour').Customer_Pay_Amount__c);
 
-        System.assertEquals(300, byType.get('Supplies').Retail__c);
-        System.assertEquals(0,   byType.get('Supplies').Covered_Amount__c, 'shop supplies are never covered');
-        System.assertEquals(300, byType.get('Supplies').Customer_Pay_Amount__c);
+        System.assertEquals(200.00, byType.get('Supplies').Retail__c);
+        System.assertEquals(0,      byType.get('Supplies').Covered_Amount__c, 'shop supplies are never covered');
+        System.assertEquals(200.00, byType.get('Supplies').Customer_Pay_Amount__c);
 
         Decimal totalCovered = byType.get('Part').Covered_Amount__c
             + byType.get('Labour').Covered_Amount__c
             + byType.get('Supplies').Covered_Amount__c;
-        System.assertEquals(2900, totalCovered, 'sums back to exactly Coverage_Applied__c, no rounding drift');
+        System.assertEquals(2566.37, totalCovered,
+            'sums back to exactly the pre-tax equivalent of Coverage_Applied__c, no rounding drift');
+
+        Decimal customerRepairPreTax = byType.get('Part').Customer_Pay_Amount__c
+            + byType.get('Labour').Customer_Pay_Amount__c;
+        System.assertEquals(264.00, (customerRepairPreTax * 1.13).setScale(2, RoundingMode.HALF_UP),
+            'reconciles to repair incl. tax 3,164.00 less coverage 2,900.00');
+    }
+
+    /**
+     * Osama, 2026-10-07: the live screen inserted three blank estimates on
+     * CL ID - 00054 (E-0053, E-0056, E-0057) from cards that had never been
+     * filled in - every scalar null and no child rows. recalculateRollups then
+     * stamped a deductible and a negative customer-pays onto them, so they read
+     * like real estimates in the related list and the agent saw a blank
+     * estimate appear on every save.
+     *
+     * An untouched card is exactly this payload: the generated placeholder
+     * name, the seeded 'In-Network'/'Repair' defaults the LWC applies the
+     * moment a card is added, and the one blank labour row it always seeds.
+     * None of that is content, so none of it may create an Estimate__c.
+     */
+    @IsTest
+    static void saveSkipsScenarioThatWasNeverFilledIn() {
+        ManageContext ctx = seedManageContext();
+
+        ClaimEstimateService.ScenarioRow untouched = new ClaimEstimateService.ScenarioRow();
+        untouched.name           = 'Repair Shop 1 - Option A';
+        untouched.network        = 'In-Network';
+        untouched.claimType      = 'Repair';
+        untouched.parts          = new List<ClaimEstimateService.PartRow>();
+        untouched.supplies       = new List<ClaimEstimateService.SupplyRow>();
+        untouched.reimbursements = new List<ClaimEstimateService.ReimbursementRow>();
+        untouched.labour         = new List<ClaimEstimateService.LabourRow>{
+            new ClaimEstimateService.LabourRow()
+        };
+
+        Test.startTest();
+        ClaimEstimateService.ManageEstimatesData saved = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ untouched }, null, null);
+        Test.stopTest();
+
+        System.assertEquals(0, saved.scenarios.size(),
+            'an untouched card must not come back as a saved scenario');
+        System.assertEquals(0, [SELECT COUNT() FROM Estimate__c WHERE Claim__c = :ctx.claimId],
+            'no blank Estimate__c may be inserted for a card that was never filled in');
+    }
+
+    /**
+     * The guard must not swing too far the other way: the moment the agent
+     * picks a repair shop, that card is real and must save, even though it
+     * still has no parts, no labour and only the placeholder name.
+     */
+    @IsTest
+    static void saveKeepsScenarioOnceShopIsChosen() {
+        ManageContext ctx = seedManageContext();
+
+        ClaimEstimateService.ScenarioRow started = new ClaimEstimateService.ScenarioRow();
+        started.name           = 'Repair Shop 1 - Option A';
+        started.network        = 'In-Network';
+        started.claimType      = 'Repair';
+        started.repairShopId   = ctx.shopId;
+        started.parts          = new List<ClaimEstimateService.PartRow>();
+        started.supplies       = new List<ClaimEstimateService.SupplyRow>();
+        started.reimbursements = new List<ClaimEstimateService.ReimbursementRow>();
+        started.labour         = new List<ClaimEstimateService.LabourRow>{
+            new ClaimEstimateService.LabourRow()
+        };
+
+        Test.startTest();
+        ClaimEstimateService.ManageEstimatesData saved = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ started }, null, null);
+        Test.stopTest();
+
+        System.assertEquals(1, saved.scenarios.size(), 'a card with a shop chosen is real work');
+        Estimate__c e = [SELECT Repair_Shop__c, Network__c FROM Estimate__c WHERE Claim__c = :ctx.claimId];
+        System.assertEquals(ctx.shopId, e.Repair_Shop__c);
+        System.assertEquals('In-Network', e.Network__c, 'the seeded default is written, not left null');
+    }
+
+    /**
+     * Osama, 2026-10-08: the screen sent a filled-in scenario and Apex received
+     * a ScenarioRow with every field null and no child rows. The Aura layer
+     * mapping LWC objects onto a custom Apex type was losing it silently, so
+     * the LWC now sends JSON and saveManageEstimatesFromJson deserialises it.
+     *
+     * This is the real regression test for that: the literal JSON below is the
+     * shape repairPriceScenarios.handleSave builds, property for property.
+     *
+     * It has to be spelled out literally, because JSON.deserialize silently
+     * IGNORES properties it has no field for rather than throwing. So nothing
+     * at runtime would catch the LWC payload and these wrapper classes drifting
+     * apart: a renamed property would just arrive null, which is the original
+     * bug all over again. Pinning the shape here is the guard. Keep this JSON
+     * in step with handleSave whenever either side changes.
+     */
+    @IsTest
+    static void saveFromJsonRoundTripsTheScreenPayload() {
+        ManageContext ctx = seedManageContext();
+
+        String json = '[{'
+            + '"id":null,"name":"LKQ used engine","repairShopId":"' + ctx.shopId + '",'
+            + '"network":"In-Network","claimType":"Repair","taxPercent":13,"deductible":100,'
+            + '"isSelected":true,'
+            + '"parts":[{"id":null,"name":"Engine","partNumber":"ENG-1","category":"Engine",'
+            + '"condition":"RECONDITIONED","supplierId":null,"stockNumber":"SN-1","kms":90000,'
+            + '"qty":1,"unitWholesale":1700,"markupType":"Amount","markupValue":300,"coreCharge":0,'
+            + '"warrantySource":"Supplier","includedWarranty":true,'
+            + '"includedWarrantyCovers":"Parts and Labour","includedWarrantyMonths":12,'
+            + '"includedWarrantyKm":20000,"extendedWarranty":false,"extendedWarrantyMonths":null,'
+            + '"extendedWarrantyKm":null,"extendedWarrantyCost":null,'
+            + '"extendedWarrantyMarkupType":"Percent","extendedWarrantyMarkupValue":null,'
+            + '"warrantyNotes":""}],'
+            + '"labour":[{"id":null,"description":"Engine R and R","wholesaleHours":5,'
+            + '"wholesaleRate":140,"retailHours":5,"retailRate":160,"guideMitchell":5,'
+            + '"guideAllData":6}],'
+            + '"supplies":[{"id":null,"description":"Oil and fluids","wholesaleCost":160,'
+            + '"markupType":"Amount","markupValue":40}],'
+            + '"reimbursements":[]}]';
+
+        Test.startTest();
+        ClaimEstimateService.ManageEstimatesData saved =
+            ClaimEstimateService.saveManageEstimatesFromJson(ctx.claimId, json, null, null);
+        Test.stopTest();
+
+        System.assertEquals(0, saved.skippedEmptyScenarios,
+            'a filled-in card must never be read as empty');
+        System.assertEquals(1, saved.scenarios.size());
+
+        ClaimEstimateService.ScenarioRow r = saved.scenarios[0];
+        System.assertEquals('LKQ used engine', r.name, 'the name must survive the JSON hop');
+        System.assertEquals(ctx.shopId, r.repairShopId);
+        System.assertEquals('In-Network', r.network);
+        System.assertEquals('Repair', r.claimType);
+        System.assertEquals(13, r.taxPercent);
+
+        System.assertEquals(1, r.parts.size(), 'the part must be saved, not dropped');
+        System.assertEquals('Engine', r.parts[0].name);
+        System.assertEquals(1, r.labour.size(), 'the labour line must be saved, not dropped');
+        System.assertEquals(1, r.supplies.size(), 'the supply line must be saved, not dropped');
+
+        System.assertEquals(1, [SELECT COUNT() FROM Part__c WHERE Estimate__c = :r.id],
+            'a real Part__c row, which is what was missing entirely before');
+        System.assertEquals(1, [SELECT COUNT() FROM Service__c WHERE Estimate__c = :r.id]);
+        System.assertEquals(1, [SELECT COUNT() FROM Shop_Supply__c WHERE Estimate__c = :r.id]);
+    }
+
+    /**
+     * The parse must name its own failure. Silence here is exactly what let a
+     * blank estimate look like a successful save.
+     *
+     * Malformed JSON, deliberately, not an unknown property: a first version of
+     * this test used an unknown property and FAILED, because JSON.deserialize
+     * ignores those instead of throwing. Worth knowing, and worth not
+     * mis-stating in a comment.
+     */
+    @IsTest
+    static void saveFromJsonNamesABadPayloadRatherThanSavingNothing() {
+        ManageContext ctx = seedManageContext();
+        String bad = '[{"name":"Option A","taxPercent":';
+
+        String message;
+        try {
+            ClaimEstimateService.saveManageEstimatesFromJson(ctx.claimId, bad, null, null);
+        } catch (Exception ex) {
+            message = ex.getMessage();
+        }
+
+        System.assert(message != null, 'a payload Apex cannot read must throw, not save nothing');
+        System.assert(message.contains('could not read the data the screen sent'),
+            'and the message must say so plainly, not "Script-thrown exception": ' + message);
+        System.assertEquals(0, [SELECT COUNT() FROM Estimate__c WHERE Claim__c = :ctx.claimId],
+            'and nothing may be left behind');
+    }
+
+    /**
+     * TASK-050. Osama chose a snapshot over live formulas on 2026-10-08: a work
+     * order goes to the customer and the repair shop for authorization, so it
+     * has to say what was true when it was issued. Every Claim__c source field
+     * is itself a formula reaching through Application__r or Vehicle__r, so a
+     * live reference would let the other team's edits silently rewrite a
+     * document that had already been sent out. That the snapshot cannot drift
+     * is structural, because these are plain fields and not formulas.
+     *
+     * Asserts the mechanism rather than hard-coded names and VINs: whatever the
+     * claim's formulas resolve to, the work order must have captured exactly
+     * that. That keeps the test honest regardless of what TestDataFactory
+     * happens to wire up, and it will not break when the factory changes.
+     */
+    @IsTest
+    static void createWorkOrderSnapshotsTheApplicationCustomerAndVehicle() {
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ManageEstimatesData saved = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ optionC(ctx.shopId) }, null, null);
+        Id estimateId = saved.scenarios[0].id;
+
+        Claim__c claim = [
+            SELECT Application__r.Name, Customer_Name__c, Customer_Address__c, Customer_Email__c,
+                   Customer_Home_Phone__c, Customer_Business_Phone__c,
+                   Vehicle_Identification_Number_VIN__c, Vehicle_Year__c, Vehicle_Make__c,
+                   Vehicle_Model__c, Vehicle_Trim__c, Current_Odometer__c, Current_Odometer_Unit__c
+            FROM Claim__c WHERE Id = :ctx.claimId
+        ];
+
+        Test.startTest();
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(estimateId);
+        Test.stopTest();
+
+        Work_Order__c wo = [
+            SELECT Application_Number__c, Customer_Name__c, Customer_Address__c, Customer_Phone__c,
+                   Customer_Email__c, VIN__c, Vehicle_Year__c, Vehicle_Make__c, Vehicle_Model__c,
+                   Vehicle_Trim__c, Odometer_In__c, Odometer_In_Unit__c
+            FROM Work_Order__c WHERE Id = :r.workOrderId
+        ];
+
+        System.assertEquals(claim.Application__r?.Name, wo.Application_Number__c);
+        System.assertEquals(claim.Customer_Name__c, wo.Customer_Name__c);
+        System.assertEquals(claim.Customer_Address__c, wo.Customer_Address__c);
+        System.assertEquals(claim.Customer_Email__c, wo.Customer_Email__c);
+        System.assertEquals(claim.Vehicle_Identification_Number_VIN__c, wo.VIN__c);
+        System.assertEquals(claim.Vehicle_Year__c, wo.Vehicle_Year__c);
+        System.assertEquals(claim.Vehicle_Make__c, wo.Vehicle_Make__c);
+        System.assertEquals(claim.Vehicle_Model__c, wo.Vehicle_Model__c);
+        System.assertEquals(claim.Vehicle_Trim__c, wo.Vehicle_Trim__c);
+        System.assertEquals(claim.Current_Odometer_Unit__c, wo.Odometer_In_Unit__c,
+            'restricted picklist matching the Claim value set, so the stamp cannot invent a unit');
+        System.assertEquals(claim.Current_Odometer__c, wo.Odometer_In__c,
+            'precision and scale match the Claim source exactly, so the snapshot never rounds it');
+
+        String expectedPhone = String.isNotBlank(claim.Customer_Home_Phone__c)
+            ? claim.Customer_Home_Phone__c
+            : claim.Customer_Business_Phone__c;
+        System.assertEquals(expectedPhone, wo.Customer_Phone__c,
+            'home phone is the line the shop should call, business phone is the fallback');
+    }
+
+    /**
+     * TASK-050. Labour detail was being lost on its way to the work order.
+     * Claim_Line_Item__c has a single Hours__c and Rate__c, so routing labour
+     * through it could only carry the WHOLESALE pair: the retail rate, the
+     * retail hours and both guide times were dropped, and the wholesale hours
+     * were written into Repair_Time_Adj__c, which means the ADJUSTED (retail)
+     * time on both objects.
+     *
+     * The wholesale and retail hours are DELIBERATELY DIFFERENT here (5 and 6).
+     * With equal hours the old mislabelling was invisible, which is exactly why
+     * it survived: optionC uses 5 and 5, so a test built on it would have
+     * passed either way.
+     */
+    @IsTest
+    static void createWorkOrderCarriesEveryLabourFieldToTheLine() {
+        ManageContext ctx = seedManageContext();
+
+        ClaimEstimateService.LabourRow labour = new ClaimEstimateService.LabourRow();
+        labour.description    = 'Engine R and R';
+        labour.wholesaleHours = 5;
+        labour.wholesaleRate  = 140;
+        labour.retailHours    = 6;
+        labour.retailRate     = 160;
+        labour.guideMitchell  = 5;
+        labour.guideAllData   = 7;
+
+        ClaimEstimateService.ScenarioRow s = new ClaimEstimateService.ScenarioRow();
+        s.name           = 'Labour detail';
+        s.repairShopId   = ctx.shopId;
+        s.network        = 'In-Network';
+        s.claimType      = 'Repair';
+        s.isSelected     = true;
+        s.parts          = new List<ClaimEstimateService.PartRow>();
+        s.supplies       = new List<ClaimEstimateService.SupplyRow>();
+        s.reimbursements = new List<ClaimEstimateService.ReimbursementRow>();
+        s.labour         = new List<ClaimEstimateService.LabourRow>{ labour };
+
+        ClaimEstimateService.ManageEstimatesData saved = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null);
+        Id estimateId = saved.scenarios[0].id;
+
+        Test.startTest();
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(estimateId);
+        Test.stopTest();
+
+        Work_Order_Line_Item__c wl = [
+            SELECT Repair_Time_EST__c, Wholesale_Labour_Rate_HR__c,
+                   Repair_Time_Adj__c, Retail_Labour_Rate__c,
+                   Labour_Guide_Time_Mitchell__c, Labour_Guide_Time_All_Data__c
+            FROM Work_Order_Line_Item__c
+            WHERE Customer_Work_Order__c = :r.workOrderId
+              AND Claim_Line_Item__r.Line_Type__c = 'Labour'
+        ];
+
+        System.assertEquals(5, wl.Repair_Time_EST__c,
+            'wholesale hours belong in the EST field, which used to be left empty');
+        System.assertEquals(6, wl.Repair_Time_Adj__c,
+            'retail hours belong in the Adj field, which used to hold the WHOLESALE hours');
+        System.assertEquals(140, wl.Wholesale_Labour_Rate_HR__c);
+        System.assertEquals(160, wl.Retail_Labour_Rate__c,
+            'the retail rate had nowhere to travel through Claim_Line_Item__c and was lost');
+        System.assertEquals(5, wl.Labour_Guide_Time_Mitchell__c, 'guide times were lost too');
+        System.assertEquals(7, wl.Labour_Guide_Time_All_Data__c);
+    }
+
+    /**
+     * TASK-050 PRIMARY RULE. The Estimate is the source of truth for the
+     * structure, and every downstream line item must be traceable back to the
+     * Estimate and to the Estimate CHILD it came from, through
+     * Estimate -> Claim Line Item -> Work Order Line Item -> Invoice Line Item.
+     *
+     * Claim_Line_Item__c used to hold Claim__c, Parts_Supplier__c and
+     * Repair_Shop__c only, so the chain broke at its very first hop:
+     * Line_Type__c said 'Part' but nothing said WHICH Part__c. Work Order Line
+     * Item and Invoice Line Item already chained correctly, which is why
+     * repairing this one object restores traceability for the whole workflow.
+     *
+     * This test walks the chain in the direction a reader would: from the work
+     * order line back to the estimate child.
+     */
+    @IsTest
+    static void everyDownstreamLineTracesBackToItsEstimateChild() {
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ManageEstimatesData saved = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ optionC(ctx.shopId) }, null, null);
+        Id estimateId = saved.scenarios[0].id;
+
+        Id partId   = [SELECT Id FROM Part__c        WHERE Estimate__c = :estimateId LIMIT 1].Id;
+        Id svcId    = [SELECT Id FROM Service__c     WHERE Estimate__c = :estimateId LIMIT 1].Id;
+        Id supplyId = [SELECT Id FROM Shop_Supply__c WHERE Estimate__c = :estimateId LIMIT 1].Id;
+
+        Test.startTest();
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(estimateId);
+        Test.stopTest();
+
+        Map<String, Work_Order_Line_Item__c> byType = new Map<String, Work_Order_Line_Item__c>();
+        for (Work_Order_Line_Item__c wl : [
+            SELECT Claim_Line_Item__r.Line_Type__c,
+                   Claim_Line_Item__r.Estimate__c, Claim_Line_Item__r.Part__c,
+                   Claim_Line_Item__r.Service__c, Claim_Line_Item__r.Shop_Supply__c
+            FROM Work_Order_Line_Item__c
+            WHERE Customer_Work_Order__c = :r.workOrderId
+        ]) {
+            byType.put(wl.Claim_Line_Item__r.Line_Type__c, wl);
+        }
+        System.assertEquals(3, byType.size(), 'one line per estimate child: part, labour, supplies');
+
+        // Every line traces to the estimate.
+        for (String type : byType.keySet()) {
+            System.assertEquals(estimateId, byType.get(type).Claim_Line_Item__r.Estimate__c,
+                type + ' must trace back to the estimate');
+        }
+
+        // And each traces to the specific child it was generated from.
+        System.assertEquals(partId, byType.get('Part').Claim_Line_Item__r.Part__c,
+            'the Part line must name WHICH Part__c, not merely that it is a part');
+        System.assertEquals(svcId, byType.get('Labour').Claim_Line_Item__r.Service__c);
+        System.assertEquals(supplyId, byType.get('Supplies').Claim_Line_Item__r.Shop_Supply__c);
+
+        // Cross-contamination check: a labour line must not claim a part.
+        System.assertEquals(null, byType.get('Labour').Claim_Line_Item__r.Part__c);
+        System.assertEquals(null, byType.get('Supplies').Claim_Line_Item__r.Service__c);
+    }
+
+    /**
+     * An extended warranty is sold against a part, so its line traces to the
+     * same Part__c as the part line beside it. Both must still be separate
+     * lines, which is what TASK-049 established.
+     */
+    @IsTest
+    static void extendedWarrantyLineTracesToThePartItWasSoldAgainst() {
+        ManageContext ctx = seedManageContext();
+
+        ClaimEstimateService.PartRow part = new ClaimEstimateService.PartRow();
+        part.name = 'Engine';
+        part.qty = 1;
+        part.unitWholesale = 1700;
+        part.markupType = 'Amount';
+        part.markupValue = 300;
+        part.extendedWarranty = true;
+        part.extendedWarrantyCost = 145;
+        part.extendedWarrantyMarkupType = 'Percent';
+        part.extendedWarrantyMarkupValue = 30;
+        part.extendedWarrantyMonths = 12;
+
+        ClaimEstimateService.ScenarioRow s = new ClaimEstimateService.ScenarioRow();
+        s.name = 'With warranty';
+        s.repairShopId = ctx.shopId;
+        s.network = 'In-Network';
+        s.claimType = 'Repair';
+        s.isSelected = true;
+        s.parts = new List<ClaimEstimateService.PartRow>{ part };
+        s.labour = new List<ClaimEstimateService.LabourRow>();
+        s.supplies = new List<ClaimEstimateService.SupplyRow>();
+        s.reimbursements = new List<ClaimEstimateService.ReimbursementRow>();
+
+        ClaimEstimateService.ManageEstimatesData saved = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null);
+        Id estimateId = saved.scenarios[0].id;
+        Id partId = [SELECT Id FROM Part__c WHERE Estimate__c = :estimateId LIMIT 1].Id;
+
+        Test.startTest();
+        ClaimEstimateService.createWorkOrder(estimateId);
+        Test.stopTest();
+
+        List<Claim_Line_Item__c> warranty = [
+            SELECT Estimate__c, Part__c FROM Claim_Line_Item__c
+            WHERE Estimate__c = :estimateId AND Line_Type__c = 'Extended Warranty'];
+        System.assertEquals(1, warranty.size(), 'its own line, per TASK-049');
+        System.assertEquals(partId, warranty[0].Part__c,
+            'and it traces to the part it was sold against');
+        System.assertEquals(estimateId, warranty[0].Estimate__c);
+    }
+
+    /** Requirement 9: a purchased extended warranty gets its OWN line, never merged into the part. */
+    @IsTest
+    static void createWorkOrderGivesTheExtendedWarrantyItsOwnLine() {
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ScenarioRow s = optionC(ctx.shopId);
+        s.parts[0].extendedWarranty = true;
+        s.parts[0].extendedWarrantyCost = 145;
+        s.parts[0].extendedWarrantyMarkupType = 'Percent';
+        s.parts[0].extendedWarrantyMarkupValue = 30;
+        s.parts[0].extendedWarrantyMonths = 12;
+        s.parts[0].extendedWarrantyKm = 20000;
+
+        ClaimEstimateService.ManageEstimatesData saved = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null);
+
+        Test.startTest();
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(saved.scenarios[0].id);
+        Test.stopTest();
+
+        List<Claim_Line_Item__c> warrantyLines = [
+            SELECT Description__c, Amount__c, Retail_Amount__c
+            FROM Claim_Line_Item__c
+            WHERE Claim__c = :ctx.claimId AND Line_Type__c = 'Extended Warranty'
+        ];
+        System.assertEquals(1, warrantyLines.size(), 'exactly one extended warranty line');
+        System.assertEquals(145.00, warrantyLines[0].Amount__c, 'its own wholesale, not merged into the part');
+        System.assertEquals(188.50, warrantyLines[0].Retail_Amount__c, '145 plus 30 percent');
+        System.assert(warrantyLines[0].Description__c.startsWith('Extended Warranty: Engine'),
+            'named after the part it belongs to, got: ' + warrantyLines[0].Description__c);
+        System.assert(warrantyLines[0].Description__c.contains('12 mo'),
+            'carries its term, got: ' + warrantyLines[0].Description__c);
+
+        System.assertEquals(1, [SELECT COUNT() FROM Claim_Line_Item__c
+                                WHERE Claim__c = :ctx.claimId AND Line_Type__c = 'Part'],
+            'the part itself is still its own separate line');
+    }
+
+    /** Requirement 9: many children produce many lines, not the old hardcoded three. */
+    @IsTest
+    static void createWorkOrderBuildsOneLinePerChildRatherThanThree() {
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ScenarioRow s = optionC(ctx.shopId);
+
+        ClaimEstimateService.PartRow gasket = new ClaimEstimateService.PartRow();
+        gasket.name = 'Gasket kit';
+        gasket.qty = 1;
+        gasket.unitWholesale = 120;
+        gasket.markupType = 'Percent';
+        gasket.markupValue = 35;
+        s.parts.add(gasket);
+
+        ClaimEstimateService.SupplyRow rags = new ClaimEstimateService.SupplyRow();
+        rags.description = 'Shop rags';
+        rags.wholesaleCost = 40;
+        rags.markupType = 'Amount';
+        rags.markupValue = 10;
+        s.supplies.add(rags);
+
+        ClaimEstimateService.ManageEstimatesData saved = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null);
+
+        Test.startTest();
+        ClaimEstimateService.createWorkOrder(saved.scenarios[0].id);
+        Test.stopTest();
+
+        System.assertEquals(2, [SELECT COUNT() FROM Claim_Line_Item__c
+                                WHERE Claim__c = :ctx.claimId AND Line_Type__c = 'Part'],
+            'two parts, two lines, no longer lumped under the first part name');
+        System.assertEquals(2, [SELECT COUNT() FROM Claim_Line_Item__c
+                                WHERE Claim__c = :ctx.claimId AND Line_Type__c = 'Supplies'],
+            'two supply lines, not one merged Shop Supplies');
+        System.assertEquals(1, [SELECT COUNT() FROM Claim_Line_Item__c
+                                WHERE Claim__c = :ctx.claimId AND Line_Type__c = 'Labour']);
+
+        Set<String> names = new Set<String>();
+        for (Claim_Line_Item__c cli : [SELECT Description__c FROM Claim_Line_Item__c
+                                       WHERE Claim__c = :ctx.claimId AND Line_Type__c = 'Part']) {
+            names.add(cli.Description__c);
+        }
+        System.assert(names.contains('Engine') && names.contains('Gasket kit'),
+            'each part is named on its own line, got: ' + names);
     }
 
     @IsTest
@@ -664,6 +1162,42 @@ private class ClaimEstimateServiceTest {
     }
 
     // ─────────────── Invoice And Wrap Up: generateInvoicesForWrapUp ───────────────
+
+    /**
+     * Osama, 2026-10-09: every invoice line this trigger created showed its
+     * record id instead of a name. Invoice_Line_Item__c.Name is a TEXT name
+     * field, not an auto number, and nothing ever set it.
+     *
+     * The Name must come from the same source as Description__c so the two can
+     * never disagree about one line, and it must carry the SPECIFIC child's
+     * name rather than a generic type, because TASK-049 already put that
+     * specificity in the data.
+     */
+    @IsTest
+    static void wrapUpInvoiceLinesAreNamedNotLeftBlank() {
+        Estimate__c e = seedEstimateWithLineData();
+        ClaimEstimateService.createWorkOrder(e.Id);
+
+        Test.startTest();
+        update new Claim__c(Id = e.Claim__c, Claim_Status__c = 'Invoice And Wrap Up');
+        Test.stopTest();
+
+        List<Invoice_Line_Item__c> lines = [
+            SELECT Name, Description__c
+            FROM Invoice_Line_Item__c
+            WHERE Invoice__r.Claim__c = :e.Claim__c
+        ];
+        System.assertNotEquals(0, lines.size(), 'the trigger must have produced lines to check');
+
+        for (Invoice_Line_Item__c line : lines) {
+            System.assert(String.isNotBlank(line.Name),
+                'a blank Name is why these records displayed their record id');
+            System.assertEquals(line.Description__c, line.Name,
+                'Name and Description come from one source, so they cannot drift apart');
+            System.assert(!line.Name.startsWith('a'),
+                'and the name is a business name, not an id: ' + line.Name);
+        }
+    }
 
     @IsTest
     static void wrapUpStatusChangeGeneratesInvoiceMatchingWorkOrder() {
@@ -830,7 +1364,7 @@ private class ClaimEstimateServiceTest {
         Test.startTest();
         ClaimEstimateService.saveBenefitUsage(ctx.claimId, new List<Benefit_Usage__c>{
             new Benefit_Usage__c(Benefit_Balance__c = ctx.balanceId, Amount_Used__c = 100)
-        });
+        }, null);
         Test.stopTest();
 
         List<Benefit_Usage__c> usages = [
@@ -845,6 +1379,51 @@ private class ClaimEstimateServiceTest {
         System.assertEquals(400, balance.Remaining__c);
     }
 
+    /**
+     * Osama, 2026-10-08: "Ancillary Benefits - Capped per Term is showing two
+     * benefits even I uncheck a benefit and save". The editor sends only the
+     * CHECKED rows, so an unchecked benefit was absent from the payload and its
+     * Benefit_Usage__c row simply survived. Not a display problem: the draw kept
+     * consuming the balance and kept crediting the customer. The balance
+     * assertions below are the real point of this test.
+     */
+    @IsTest
+    static void saveBenefitUsageRemovesADrawWhenTheBenefitIsUnchecked() {
+        BenefitTestContext ctx = seedBenefitBalance(500, 'Car Rental');
+        Benefit_Usage__c existing = new Benefit_Usage__c(
+            Benefit_Balance__c = ctx.balanceId, Claim__c = ctx.claimId,
+            Amount_Used__c = 100, Date__c = Date.today(),
+            Counts_Toward_Balance__c = true);
+        insert existing;
+
+        Benefit_Balance__c before = [
+            SELECT Used_To_Date__c, Remaining__c FROM Benefit_Balance__c WHERE Id = :ctx.balanceId];
+        System.assertEquals(100, before.Used_To_Date__c, 'the draw is consuming the balance to begin with');
+
+        Test.startTest();
+        // Unchecking the only benefit: nothing included, that one draw removed.
+        ClaimEstimateService.saveBenefitUsage(
+            ctx.claimId, new List<Benefit_Usage__c>(), new List<Id>{ existing.Id });
+        Test.stopTest();
+
+        System.assertEquals(0, [SELECT COUNT() FROM Benefit_Usage__c WHERE Id = :existing.Id],
+            'unchecking must actually remove the draw, not leave it behind');
+
+        Benefit_Balance__c after = [
+            SELECT Used_To_Date__c, Remaining__c FROM Benefit_Balance__c WHERE Id = :ctx.balanceId];
+        System.assertEquals(0, after.Used_To_Date__c, 'and the balance must be given back');
+        System.assertEquals(500, after.Remaining__c);
+    }
+
+    /**
+     * A removal must not reach a draw belonging to some other claim. The
+     * `AND Claim__c = :claimId` filter on the delete query in saveBenefitUsage
+     * is what enforces that. NOT covered by a test: building a second claim
+     * through TestDataFactory trips a duplicate rule on the Account it creates
+     * (DUPLICATES_DETECTED), and working around that was not worth more
+     * machinery than the one-line filter it would be guarding. If a second
+     * claim ever becomes cheap to seed here, this is worth adding.
+     */
     @IsTest
     static void saveBenefitUsageUpdatesExistingDrawInPlaceNotDuplicated() {
         BenefitTestContext ctx = seedBenefitBalance(500, 'Roadside Assistance');
@@ -858,7 +1437,7 @@ private class ClaimEstimateServiceTest {
         // already-existing draw - must edit that one row, not insert a second.
         ClaimEstimateService.saveBenefitUsage(ctx.claimId, new List<Benefit_Usage__c>{
             new Benefit_Usage__c(Id = existing.Id, Benefit_Balance__c = ctx.balanceId, Amount_Used__c = 250)
-        });
+        }, null);
         Test.stopTest();
 
         List<Benefit_Usage__c> usages = [SELECT Amount_Used__c FROM Benefit_Usage__c WHERE Benefit_Balance__c = :ctx.balanceId];
@@ -880,7 +1459,7 @@ private class ClaimEstimateServiceTest {
         Test.startTest();
         ClaimEstimateService.saveBenefitUsage(ctx.claimId, new List<Benefit_Usage__c>{
             new Benefit_Usage__c(Id = existing.Id, Benefit_Balance__c = ctx.balanceId, Amount_Used__c = 500)
-        });
+        }, null);
         Test.stopTest();
 
         System.assertEquals(500, [SELECT Amount_Used__c FROM Benefit_Usage__c WHERE Id = :existing.Id].Amount_Used__c);
@@ -894,7 +1473,7 @@ private class ClaimEstimateServiceTest {
         try {
             ClaimEstimateService.saveBenefitUsage(ctx.claimId, new List<Benefit_Usage__c>{
                 new Benefit_Usage__c(Benefit_Balance__c = ctx.balanceId, Amount_Used__c = 600)
-            });
+            }, null);
             System.assert(false, 'expected an exception - 600 exceeds the 500 cap with nothing used yet');
         } catch (AuraHandledException ex) {
             System.assert(ex.getMessage().contains('remaining'), 'error should explain why, not just fail silently');
@@ -930,7 +1509,7 @@ private class ClaimEstimateServiceTest {
         Test.startTest();
         ClaimEstimateService.saveBenefitUsage(chosen.Claim__c, new List<Benefit_Usage__c>{
             new Benefit_Usage__c(Benefit_Balance__c = balanceId, Amount_Used__c = 100)
-        });
+        }, null);
         Test.stopTest();
 
         System.assertEquals(-1070, [SELECT Total_Profit__c FROM Claim__c WHERE Id = :chosen.Claim__c].Total_Profit__c,
@@ -945,7 +1524,7 @@ private class ClaimEstimateServiceTest {
         Test.startTest();
         ClaimEstimateService.saveBenefitUsage(e.Claim__c, new List<Benefit_Usage__c>{
             new Benefit_Usage__c(Benefit_Balance__c = balanceId, Amount_Used__c = 100)
-        });
+        }, null);
         Test.stopTest();
 
         System.assertEquals(null, [SELECT Total_Profit__c FROM Claim__c WHERE Id = :e.Claim__c].Total_Profit__c,
@@ -1263,5 +1842,759 @@ private class ClaimEstimateServiceTest {
 
         System.assertEquals(1, suppliers.size());
         System.assertEquals(supplier.Id, suppliers[0].Id);
+    }
+
+    // =====================================================================
+    // TASK-047: Manage Estimates
+    // =====================================================================
+    //
+    // The architectural change these cover is that Part__c / Service__c /
+    // Shop_Supply__c are now the source of truth, MANY of each per Estimate,
+    // where syncEstimateChildren above allowed exactly one of each and
+    // derived them from the Estimate's own scalars.
+    //
+    // The existing tests in this class are deliberately untouched and must
+    // keep passing: saveEstimates and ClaimPricingService.calculate were not
+    // modified, so the old path still behaves exactly as it always did.
+    // Osama's decision 8 (the cap now covers tax) reaches only the new
+    // saveManageEstimates path, and decision 10 means no historical record is
+    // restated.
+
+    private class ManageContext {
+        Id claimId;
+        Id shopId;
+        Id balanceId;
+    }
+
+    /**
+     * A claim whose purchased contract carries a real per-claim limit and
+     * deductible, plus one Car Rental benefit balance. Cap 3,000 and
+     * deductible 100 are the settings every figure in Noelle's design and in
+     * ClaimPricingServiceTest is worked against.
+     */
+    private static ManageContext seedManageContext() {
+        Estimate__c seed = TestDataFactory.createEstimateWithClaim('Warranty_Claim', true);
+        Claim__c claim = [SELECT Id, Application__c FROM Claim__c WHERE Id = :seed.Claim__c];
+
+        Application_Package__c pkg = new Application_Package__c(
+            Application__c      = claim.Application__c,
+            Payment_Status__c   = 'Not Paid',
+            Per_Claim_Limit__c  = 3000,
+            Deductible__c       = 100
+        );
+        insert pkg;
+        claim.Application_Package__c = pkg.Id;
+        update claim;
+
+        Benefit_Balance__c balance = new Benefit_Balance__c(
+            Application_Package__c = pkg.Id,
+            Benefit_Type__c        = 'Car Rental',
+            Cap_Amount__c          = 500
+        );
+        insert balance;
+
+        // The factory estimate is not wanted here: these tests build their
+        // scenarios through saveManageEstimates so the whole path is exercised.
+        delete seed;
+
+        ManageContext ctx = new ManageContext();
+        ctx.claimId   = claim.Id;
+        ctx.shopId    = seed.Repair_Shop__c;
+        ctx.balanceId = balance.Id;
+        return ctx;
+    }
+
+    /** Option C from the design: 1 engine at 1,700 + $300, 5 h labour, 160 supplies + $40. */
+    private static ClaimEstimateService.ScenarioRow optionC(Id shopId) {
+        ClaimEstimateService.PartRow part = new ClaimEstimateService.PartRow();
+        part.name = 'Engine';
+        part.condition = 'RECONDITIONED';
+        part.qty = 1;
+        part.unitWholesale = 1700;
+        part.markupType = 'Amount';
+        part.markupValue = 300;
+
+        ClaimEstimateService.LabourRow labour = new ClaimEstimateService.LabourRow();
+        labour.description = 'Engine R and R';
+        labour.wholesaleHours = 5;
+        labour.wholesaleRate = 140;
+        labour.retailHours = 5;
+        labour.retailRate = 160;
+        labour.guideMitchell = 5;
+        labour.guideAllData = 6;
+
+        ClaimEstimateService.SupplyRow supply = new ClaimEstimateService.SupplyRow();
+        supply.description = 'Oil and fluids';
+        supply.wholesaleCost = 160;
+        supply.markupType = 'Amount';
+        supply.markupValue = 40;
+
+        ClaimEstimateService.ScenarioRow s = new ClaimEstimateService.ScenarioRow();
+        s.name = 'Repair Shop 3 - Option C';
+        s.repairShopId = shopId;
+        s.network = 'In-Network';
+        s.claimType = 'Repair';
+        s.taxPercent = 13;
+        s.isSelected = true;
+        s.parts = new List<ClaimEstimateService.PartRow>{ part };
+        s.labour = new List<ClaimEstimateService.LabourRow>{ labour };
+        s.supplies = new List<ClaimEstimateService.SupplyRow>{ supply };
+        s.reimbursements = new List<ClaimEstimateService.ReimbursementRow>();
+        return s;
+    }
+
+    private static void approveClaimBenefit(ManageContext ctx, Decimal amount) {
+        insert new Benefit_Usage__c(
+            Benefit_Balance__c = ctx.balanceId,
+            Claim__c           = ctx.claimId,
+            Amount_Used__c     = amount,
+            Date__c            = Date.today()
+        );
+    }
+
+    @IsTest
+    static void getManageEstimatesDataReturnsTheClaimBarFromTheContract() {
+        ManageContext ctx = seedManageContext();
+
+        Test.startTest();
+        ClaimEstimateService.ManageEstimatesData d =
+            ClaimEstimateService.getManageEstimatesData(ctx.claimId);
+        Test.stopTest();
+
+        System.assertEquals(3000, d.cap, 'cap comes from Application_Package__c.Per_Claim_Limit__c, not the agent');
+        System.assertEquals(100, d.deductible, 'deductible comes from the contract too (decision 4)');
+        System.assertNotEquals(null, d.claimNumber);
+        System.assertEquals(1, d.benefits.size(), 'the Car Rental balance is offered');
+        System.assertEquals(0, d.scenarios.size(), 'no estimates on this claim yet');
+        System.assertNotEquals(null, d.shops, 'the network shop list is returned for the picker');
+    }
+
+    /**
+     * THE architectural test. One Estimate, three Parts, two Labour lines and
+     * two Shop Supplies, which the old one-child-per-type model could not
+     * represent at all.
+     */
+    @IsTest
+    static void saveManageEstimatesCreatesManyChildrenOfEachType() {
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ScenarioRow s = optionC(ctx.shopId);
+
+        ClaimEstimateService.PartRow gasket = new ClaimEstimateService.PartRow();
+        gasket.name = 'Gasket kit';
+        gasket.qty = 2;
+        gasket.unitWholesale = 120;
+        gasket.markupType = 'Percent';
+        gasket.markupValue = 35;
+
+        ClaimEstimateService.PartRow filter = new ClaimEstimateService.PartRow();
+        filter.name = 'Oil filter';
+        filter.qty = 1;
+        filter.unitWholesale = 40;
+        filter.markupType = 'Percent';
+        filter.markupValue = 25;
+
+        s.parts.add(gasket);
+        s.parts.add(filter);
+
+        ClaimEstimateService.LabourRow diag = new ClaimEstimateService.LabourRow();
+        diag.description = 'Diagnostic';
+        diag.wholesaleHours = 1;
+        diag.wholesaleRate = 100;
+        diag.retailHours = 1;
+        diag.retailRate = 120;
+        s.labour.add(diag);
+
+        ClaimEstimateService.SupplyRow rags = new ClaimEstimateService.SupplyRow();
+        rags.description = 'Shop rags';
+        rags.wholesaleCost = 40;
+        rags.markupType = 'Amount';
+        rags.markupValue = 10;
+        s.supplies.add(rags);
+
+        Test.startTest();
+        ClaimEstimateService.ManageEstimatesData d = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null);
+        Test.stopTest();
+
+        System.assertEquals(1, d.scenarios.size(), 'one estimate');
+        System.assertEquals(3, d.scenarios[0].parts.size(), 'three Part__c children under one Estimate');
+        System.assertEquals(2, d.scenarios[0].labour.size(), 'two Service__c children under one Estimate');
+        System.assertEquals(2, d.scenarios[0].supplies.size(), 'two Shop_Supply__c children under one Estimate');
+
+        Estimate__c saved = [SELECT Parts_Cost__c, Parts_Retail__c, Labour_Cost__c, Labour_Retail__c
+                             FROM Estimate__c WHERE Claim__c = :ctx.claimId LIMIT 1];
+        System.assertEquals(1980, saved.Parts_Cost__c, '1700 + (2 x 120) + 40');
+        System.assertEquals(2374, saved.Parts_Retail__c, '2000 + (2 x 162) + 50');
+        System.assertEquals(800, saved.Labour_Cost__c, '(5 x 140) + (1 x 100)');
+        System.assertEquals(920, saved.Labour_Retail__c, '(5 x 160) + (1 x 120)');
+    }
+
+    /**
+     * Option C end to end, asserted against the exact figures validated
+     * against Formulas.dc.html before any of this was written. This is the
+     * single strongest check that the children, the rollups and
+     * calculateScenario all agree.
+     */
+    @IsTest
+    static void saveManageEstimatesStampsTheFullOptionCScenario() {
+        ManageContext ctx = seedManageContext();
+        approveClaimBenefit(ctx, 100);
+
+        Test.startTest();
+        ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ optionC(ctx.shopId) }, null, null);
+        Test.stopTest();
+
+        Estimate__c e = [
+            SELECT Parts_Cost__c, Parts_Retail__c, Labour_Cost__c, Labour_Retail__c,
+                   Shop_Supplies__c, Shop_Supplies_Retail__c, Retail_Price__c, Retail_Total__c,
+                   Wholesale_Cost__c, Tax_Amount__c, Coverage_Applied__c, Customer_Pays__c,
+                   Customer_Pays_With_Tax__c, Profit_Loss__c, Deductable__c,
+                   Ancillary_Benefits_Paid__c, A_Protect_P_L_Incl_Benefits__c, Profit_Loss_Incl_Tax__c
+            FROM Estimate__c WHERE Claim__c = :ctx.claimId LIMIT 1
+        ];
+
+        // existing scalars, same names and same meanings as before TASK-047
+        System.assertEquals(1700.00, e.Parts_Cost__c);
+        System.assertEquals(2000.00, e.Parts_Retail__c,   'card 1: 1,700 + 300 dollar markup');
+        System.assertEquals(700.00,  e.Labour_Cost__c,    'card 4: 5 h x 140');
+        System.assertEquals(800.00,  e.Labour_Retail__c,  'card 4: 5 h x 160');
+        System.assertEquals(160.00,  e.Shop_Supplies__c);
+        System.assertEquals(200.00,  e.Shop_Supplies_Retail__c, 'card 5: 160 + 40');
+        System.assertEquals(2800.00, e.Retail_Price__c,   'card 7: retail repair, supplies excluded');
+        System.assertEquals(3000.00, e.Retail_Total__c,   'retail including supplies');
+        System.assertEquals(2560.00, e.Wholesale_Cost__c, 'card 6: the A-Protect claim cost');
+        // Tax_Amount__c is a FORMULA (Customer_Pays_With_Tax__c - Customer_Pays__c)
+        // and has been since Sep 22, so it is the tax sitting INSIDE what the
+        // customer pays, not the total tax charged across repair and supplies.
+        // 390.00 - 345.13 = 44.87, which is exactly calculateScenario's
+        // customerTaxAmount and card 10 of the formula reference. The agreement
+        // between the platform formula and the Apex model is the real check here.
+        System.assertEquals(44.87,  e.Tax_Amount__c,
+            'formula: tax inside the customer payment, 390.00 less 345.13');
+        System.assertEquals(100.00,  e.Deductable__c,     'falls back to the contract deductible');
+        System.assertEquals(2900.00, e.Coverage_Applied__c,
+            'card 8 AND decision 8: min(3,164 tax-inclusive repair, 3,000 cap) - 100');
+        System.assertEquals(390.00,  e.Customer_Pays_With_Tax__c, 'card 9: 264 + 226 - 100 benefit');
+        System.assertEquals(345.13,  e.Customer_Pays__c,  'card 10: 390 / 1.13');
+
+        // TASK-047 additions
+        System.assertEquals(100.00,   e.Ancillary_Benefits_Paid__c, 'benefits are now recorded on the Estimate');
+        System.assertEquals(-2214.87, e.A_Protect_P_L_Incl_Benefits__c, 'card 11: 345.13 - 2,560');
+        System.assertEquals(-2502.80, e.Profit_Loss_Incl_Tax__c, 'card 11: 390 - 2,892.80');
+        System.assertEquals(-2126.37, e.Profit_Loss__c,
+            'Profit_Loss__c stays the repair-only P&L with no benefit term (decision 9)');
+    }
+
+    /**
+     * The browser is not trusted on money. A payload claiming a retail price
+     * the markup rule would never produce is recomputed server side.
+     */
+    @IsTest
+    static void saveManageEstimatesRecomputesRetailAndIgnoresABadPayload() {
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ScenarioRow s = optionC(ctx.shopId);
+        s.parts[0].unitRetail = 999999;          // tampered or stale
+        s.supplies[0].retailPrice = 1;
+
+        Test.startTest();
+        ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null);
+        Test.stopTest();
+
+        Part__c p = [SELECT Price__c FROM Part__c WHERE Estimate__r.Claim__c = :ctx.claimId LIMIT 1];
+        Shop_Supply__c x = [SELECT Price__c FROM Shop_Supply__c WHERE Estimate__r.Claim__c = :ctx.claimId LIMIT 1];
+        System.assertEquals(2000, p.Price__c, 'recomputed from 1,700 + 300, not taken from the payload');
+        System.assertEquals(200, x.Price__c, 'recomputed from 160 + 40, not taken from the payload');
+    }
+
+    /** Card 3: only the ticked optional extension costs anything. */
+    @IsTest
+    static void extendedWarrantyCountsOnlyWhenTicked() {
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ScenarioRow s = optionC(ctx.shopId);
+        s.parts[0].extendedWarrantyCost = 145;
+        s.parts[0].extendedWarrantyMarkupType = 'Percent';
+        s.parts[0].extendedWarrantyMarkupValue = 30;
+        s.parts[0].extendedWarranty = false;     // priced but not taken
+
+        Test.startTest();
+        ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null);
+        Test.stopTest();
+
+        Estimate__c e = [SELECT Extended_Warranty_Cost__c, Extended_Warranty_Retail__c, Wholesale_Cost__c
+                         FROM Estimate__c WHERE Claim__c = :ctx.claimId LIMIT 1];
+        System.assertEquals(0, e.Extended_Warranty_Cost__c, 'an untaken extension adds nothing');
+        System.assertEquals(0, e.Extended_Warranty_Retail__c);
+        System.assertEquals(2560, e.Wholesale_Cost__c, 'the claim cost is unchanged by an untaken extension');
+    }
+
+    /** Card 2: a core charge is reported but never enters a total or the P&L. */
+    @IsTest
+    static void coreChargeIsRolledUpButExcludedFromTotalsAndProfit() {
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ScenarioRow s = optionC(ctx.shopId);
+        s.parts[0].coreCharge = 400;
+
+        Test.startTest();
+        ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null);
+        Test.stopTest();
+
+        Estimate__c e = [SELECT Core_Charge__c, Wholesale_Cost__c, Parts_Cost__c, Profit_Loss__c
+                         FROM Estimate__c WHERE Claim__c = :ctx.claimId LIMIT 1];
+        System.assertEquals(400, e.Core_Charge__c, 'reported for the record');
+        System.assertEquals(1700, e.Parts_Cost__c, 'and left out of the parts total');
+        System.assertEquals(2560, e.Wholesale_Cost__c, 'and left out of the claim cost');
+        System.assertEquals(-2126.37, e.Profit_Loss__c, 'and left out of the P&L');
+    }
+
+    /** Removing a line in the UI actually deletes the record, not just blanks it. */
+    @IsTest
+    static void saveManageEstimatesDeletesRemovedChildren() {
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ManageEstimatesData first = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ optionC(ctx.shopId) }, null, null);
+
+        ClaimEstimateService.ScenarioRow s = first.scenarios[0];
+        Id doomedSupplyId = s.supplies[0].id;
+        s.supplies = new List<ClaimEstimateService.SupplyRow>();
+
+        Test.startTest();
+        ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s },
+            null, new List<Id>{ doomedSupplyId });
+        Test.stopTest();
+
+        System.assertEquals(0, [SELECT COUNT() FROM Shop_Supply__c WHERE Id = :doomedSupplyId],
+            'the removed supply is deleted, not orphaned');
+        Estimate__c e = [SELECT Shop_Supplies__c, Shop_Supplies_Retail__c
+                         FROM Estimate__c WHERE Claim__c = :ctx.claimId LIMIT 1];
+        System.assertEquals(0, e.Shop_Supplies__c, 'and the rollup drops with it');
+        System.assertEquals(0, e.Shop_Supplies_Retail__c);
+    }
+
+    /** Card 15: no repair, no deductible, no supplies, customer pays nothing. */
+    @IsTest
+    static void reimbursementScenarioStoresItsLinesAgainstTheEstimate() {
+        ManageContext ctx = seedManageContext();
+
+        ClaimEstimateService.ReimbursementRow line = new ClaimEstimateService.ReimbursementRow();
+        line.benefitBalanceId = ctx.balanceId;
+        line.receiptAmount = 120;
+
+        ClaimEstimateService.ScenarioRow s = new ClaimEstimateService.ScenarioRow();
+        s.name = 'Car rental reimbursement';
+        s.claimType = 'Reimbursement Only';
+        s.taxPercent = 13;
+        s.isSelected = true;
+        s.parts = new List<ClaimEstimateService.PartRow>();
+        s.labour = new List<ClaimEstimateService.LabourRow>();
+        s.supplies = new List<ClaimEstimateService.SupplyRow>();
+        s.reimbursements = new List<ClaimEstimateService.ReimbursementRow>{ line };
+
+        Test.startTest();
+        ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null);
+        Test.stopTest();
+
+        Estimate__c e = [SELECT Reimbursement_Total__c, Customer_Pays_With_Tax__c, Coverage_Applied__c,
+                                A_Protect_P_L_Incl_Benefits__c
+                         FROM Estimate__c WHERE Claim__c = :ctx.claimId LIMIT 1];
+        System.assertEquals(120, e.Reimbursement_Total__c);
+        System.assertEquals(0, e.Customer_Pays_With_Tax__c, 'the customer pays nothing on a reimbursement');
+        System.assertEquals(0, e.Coverage_Applied__c, 'no repair, so no coverage applies');
+        System.assertEquals(-120, e.A_Protect_P_L_Incl_Benefits__c, 'A-Protect is out the reimbursement');
+
+        Benefit_Usage__c u = [SELECT Estimate__c, Claim__c, Amount_Used__c, Counts_Toward_Balance__c
+                              FROM Benefit_Usage__c LIMIT 1];
+        System.assertNotEquals(null, u.Estimate__c,
+            'a reimbursement line is scoped to its own scenario, not to the claim as a whole');
+        System.assertEquals(true, u.Counts_Toward_Balance__c,
+            'this scenario IS the one marked Use, so its receipt does consume the balance');
+
+        Benefit_Balance__c bal = [SELECT Used_To_Date__c, Remaining__c
+                                  FROM Benefit_Balance__c WHERE Id = :ctx.balanceId];
+        System.assertEquals(120, bal.Used_To_Date__c);
+        System.assertEquals(380, bal.Remaining__c, '500 cap less the 120 approved');
+    }
+
+    /** TASK-051: How you will be paid is saved with the scenario and read back. */
+    @IsTest
+    static void reimbursementScenarioRoundTripsItsPaymentDetails() {
+        ManageContext ctx = seedManageContext();
+
+        ClaimEstimateService.ReimbursementRow line = new ClaimEstimateService.ReimbursementRow();
+        line.benefitBalanceId = ctx.balanceId;
+        line.receiptAmount = 120;
+
+        ClaimEstimateService.ScenarioRow s = new ClaimEstimateService.ScenarioRow();
+        s.name = 'Car rental reimbursement';
+        s.claimType = 'Reimbursement Only';
+        s.isSelected = true;
+        s.paymentMethod = 'Interac e-Transfer to the e-mail above';
+        s.expectedPaymentDate = Date.newInstance(2026, 10, 27);
+        s.parts = new List<ClaimEstimateService.PartRow>();
+        s.labour = new List<ClaimEstimateService.LabourRow>();
+        s.supplies = new List<ClaimEstimateService.SupplyRow>();
+        s.reimbursements = new List<ClaimEstimateService.ReimbursementRow>{ line };
+
+        Test.startTest();
+        ClaimEstimateService.ManageEstimatesData d = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null);
+        Test.stopTest();
+
+        ClaimEstimateService.ScenarioRow back = d.scenarios[0];
+        System.assertEquals('Interac e-Transfer to the e-mail above', back.paymentMethod);
+        System.assertEquals(Date.newInstance(2026, 10, 27), back.expectedPaymentDate);
+
+        List<String> values = new List<String>();
+        for (ClaimEstimateService.ValueOption o : d.paymentMethodOptions) values.add(o.value);
+        System.assertEquals(new List<String>{
+            'Cheque mailed to the address above',
+            'Interac e-Transfer to the e-mail above',
+            'Direct deposit (banking details on file)'
+        }, values, 'options come from the picklist, in the reference order');
+    }
+
+    /**
+     * TASK-051. The CL ID - 00054 shape that printed 305 on CWO-0044: a
+     * claim-level Car Rental draw of 100 on the same balance as the chosen
+     * reimbursement scenario's own 120 receipt. Saves and then a work order.
+     */
+    private static Id seedChosenReimbursement(ManageContext ctx, Decimal receipt) {
+        insert new Benefit_Usage__c(
+            Benefit_Balance__c = ctx.balanceId, Claim__c = ctx.claimId, Amount_Used__c = 100,
+            Date__c = Date.today(), Counts_Toward_Balance__c = true);
+
+        ClaimEstimateService.ReimbursementRow line = new ClaimEstimateService.ReimbursementRow();
+        line.benefitBalanceId = ctx.balanceId;
+        line.receiptAmount = receipt;
+
+        ClaimEstimateService.ScenarioRow s = new ClaimEstimateService.ScenarioRow();
+        s.name = 'Car rental reimbursement';
+        s.claimType = 'Reimbursement Only';
+        s.isSelected = true;
+        s.paymentMethod = 'Cheque mailed to the address above';
+        s.expectedPaymentDate = Date.newInstance(2026, 10, 27);
+        s.parts = new List<ClaimEstimateService.PartRow>();
+        s.labour = new List<ClaimEstimateService.LabourRow>();
+        s.supplies = new List<ClaimEstimateService.SupplyRow>();
+        s.reimbursements = new List<ClaimEstimateService.ReimbursementRow>{ line };
+
+        return ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null).scenarios[0].id;
+    }
+
+    /**
+     * Left on term is the term's real balance after this approval, 500 less
+     * the 100 claim draw less the 120 receipt. The old LWC figure subtracted
+     * the scenario's own saved receipt twice and added the claim draw back.
+     */
+    @IsTest
+    static void approvedReimbursementLeavesTheTrueBalanceOnTheTerm() {
+        ManageContext ctx = seedManageContext();
+        Id estimateId = seedChosenReimbursement(ctx, 120);
+
+        Test.startTest();
+        List<ClaimEstimateService.ApprovedReimbursement> lines =
+            ClaimEstimateService.getApprovedReimbursements(new Set<Id>{ estimateId }).get(estimateId);
+        Test.stopTest();
+
+        System.assertEquals(1, lines.size(), 'only the scenario receipt, never the claim-level draw');
+        System.assertEquals(120, lines[0].receipts);
+        System.assertEquals(120, lines[0].approved);
+        System.assertEquals(280, lines[0].leftOnTerm, '500 - 100 claim draw - 120 receipt');
+        System.assertEquals(0, lines[0].over);
+
+        Claim__c claim = [SELECT Total_Benefits_Used__c FROM Claim__c WHERE Id = :ctx.claimId];
+        System.assertEquals(120, claim.Total_Benefits_Used__c,
+            'a chosen reimbursement pays its receipts only; the 100 claim draw is for repair scenarios');
+    }
+
+    /** A receipt over what the term has left is saved capped, as the preview shows it. */
+    @IsTest
+    static void receiptOverTheTermIsApprovedOnlyUpToWhatIsLeft() {
+        ManageContext ctx = seedManageContext();
+
+        Test.startTest();
+        Id estimateId = seedChosenReimbursement(ctx, 450);
+        Test.stopTest();
+
+        ClaimEstimateService.ApprovedReimbursement a =
+            ClaimEstimateService.getApprovedReimbursements(new Set<Id>{ estimateId }).get(estimateId)[0];
+        System.assertEquals(400, a.approved, '500 cap less the 100 claim draw');
+        System.assertEquals(50, a.over);
+        System.assertEquals(0, a.leftOnTerm);
+
+        Estimate__c e = [SELECT Reimbursement_Total__c FROM Estimate__c WHERE Id = :estimateId];
+        System.assertEquals(400, e.Reimbursement_Total__c,
+            'the saved total is the approved figure, not the raw 450 receipt');
+    }
+
+    /**
+     * The work order for a reimbursement: payment snapshot stamped, one
+     * Reimbursement claim line item payable to the Customer, no work order
+     * line items, and Wrap Up raises an empty $0 invoice (Osama, 2026-10-13).
+     */
+    @IsTest
+    static void reimbursementWorkOrderRecordsThePayoutWithAnEmptyInvoice() {
+        ManageContext ctx = seedManageContext();
+        Id estimateId = seedChosenReimbursement(ctx, 120);
+
+        Test.startTest();
+        ClaimEstimateService.WorkOrderResult r = ClaimEstimateService.createWorkOrder(estimateId);
+        update new Claim__c(Id = ctx.claimId, Claim_Status__c = 'Invoice And Wrap Up');
+        Test.stopTest();
+
+        Work_Order__c wo = [
+            SELECT Reimbursement_Payment_Method__c, Reimbursement_Expected_Payment_Date__c, Benefits_Used__c,
+                   (SELECT Id FROM Customer_Work_Order_Line_Items__r)
+            FROM Work_Order__c WHERE Id = :r.workOrderId
+        ];
+        System.assertEquals('Cheque mailed to the address above', wo.Reimbursement_Payment_Method__c);
+        System.assertEquals(Date.newInstance(2026, 10, 27), wo.Reimbursement_Expected_Payment_Date__c);
+        System.assertEquals(120, wo.Benefits_Used__c, 'not 220: the claim draw does not apply');
+        System.assertEquals(0, wo.Customer_Work_Order_Line_Items__r.size(),
+            'no repair work, so nothing the customer is charged for');
+
+        List<Claim_Line_Item__c> cli = [
+            SELECT Line_Type__c, Role__c, Description__c, Amount__c, Estimate__c
+            FROM Claim_Line_Item__c WHERE Claim__c = :ctx.claimId
+        ];
+        System.assertEquals(1, cli.size());
+        System.assertEquals('Reimbursement', cli[0].Line_Type__c);
+        System.assertEquals('Customer', cli[0].Role__c);
+        System.assertEquals('Car Rental reimbursement', cli[0].Description__c);
+        System.assertEquals(120, cli[0].Amount__c);
+        System.assertEquals(estimateId, cli[0].Estimate__c);
+        System.assertEquals(1, r.claimLineItems);
+
+        List<Invoice__c> invoices = [
+            SELECT Net_Amount_Due__c, (SELECT Id FROM Invoice_Line_Items__r)
+            FROM Invoice__c WHERE Claim__c = :ctx.claimId
+        ];
+        System.assertEquals(1, invoices.size(), 'Wrap Up still closes the claim with an invoice');
+        System.assertEquals(0, invoices[0].Invoice_Line_Items__r.size(),
+            'no work order lines, so no invoice lines');
+        System.assertEquals(0, invoices[0].Net_Amount_Due__c, 'the customer owes nothing');
+    }
+
+    /** TASK-051: payment details mean nothing on a repair, so they are not kept. */
+    @IsTest
+    static void repairScenarioDoesNotKeepPaymentDetails() {
+        ManageContext ctx = seedManageContext();
+
+        ClaimEstimateService.ScenarioRow s = new ClaimEstimateService.ScenarioRow();
+        s.name = 'Alternator replacement';
+        s.claimType = 'Repair';
+        s.paymentMethod = 'Cheque mailed to the address above';
+        s.expectedPaymentDate = Date.newInstance(2026, 10, 27);
+        s.parts = new List<ClaimEstimateService.PartRow>();
+        s.labour = new List<ClaimEstimateService.LabourRow>();
+        s.supplies = new List<ClaimEstimateService.SupplyRow>();
+        s.reimbursements = new List<ClaimEstimateService.ReimbursementRow>();
+
+        Test.startTest();
+        ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null);
+        Test.stopTest();
+
+        Estimate__c e = [SELECT Reimbursement_Payment_Method__c, Reimbursement_Expected_Payment_Date__c
+                         FROM Estimate__c WHERE Claim__c = :ctx.claimId LIMIT 1];
+        System.assertEquals(null, e.Reimbursement_Payment_Method__c);
+        System.assertEquals(null, e.Reimbursement_Expected_Payment_Date__c);
+    }
+
+    /**
+     * Regression for the leak found writing these tests: a receipt typed into
+     * a competing scenario that was never marked Use must be recorded without
+     * eating the customer's remaining benefit for the term. Pricing two
+     * reimbursement options used to drain the balance by both.
+     */
+    @IsTest
+    static void unchosenReimbursementIsRecordedWithoutConsumingTheBalance() {
+        ManageContext ctx = seedManageContext();
+
+        ClaimEstimateService.ReimbursementRow chosenLine = new ClaimEstimateService.ReimbursementRow();
+        chosenLine.benefitBalanceId = ctx.balanceId;
+        chosenLine.receiptAmount = 120;
+
+        ClaimEstimateService.ReimbursementRow rejectedLine = new ClaimEstimateService.ReimbursementRow();
+        rejectedLine.benefitBalanceId = ctx.balanceId;
+        rejectedLine.receiptAmount = 300;
+
+        ClaimEstimateService.ScenarioRow chosen = reimbursementScenario('Chosen rental', true, chosenLine);
+        ClaimEstimateService.ScenarioRow rejected = reimbursementScenario('Pricier rental, not chosen', false, rejectedLine);
+
+        Test.startTest();
+        ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ chosen, rejected }, null, null);
+        Test.stopTest();
+
+        System.assertEquals(2, [SELECT COUNT() FROM Benefit_Usage__c WHERE Claim__c = :ctx.claimId],
+            'both receipts are stored, nothing is silently discarded');
+
+        Benefit_Balance__c bal = [SELECT Used_To_Date__c, Remaining__c
+                                  FROM Benefit_Balance__c WHERE Id = :ctx.balanceId];
+        System.assertEquals(120, bal.Used_To_Date__c,
+            'only the chosen scenario consumes the balance, not 120 + 300');
+        System.assertEquals(380, bal.Remaining__c,
+            'the customer still has 380 left on the term, not 80');
+    }
+
+    /** Moving Use between scenarios must move which receipt consumes the balance. */
+    @IsTest
+    static void movingUseMovesWhichReimbursementConsumesTheBalance() {
+        ManageContext ctx = seedManageContext();
+
+        ClaimEstimateService.ReimbursementRow a = new ClaimEstimateService.ReimbursementRow();
+        a.benefitBalanceId = ctx.balanceId;
+        a.receiptAmount = 120;
+        ClaimEstimateService.ReimbursementRow b = new ClaimEstimateService.ReimbursementRow();
+        b.benefitBalanceId = ctx.balanceId;
+        b.receiptAmount = 300;
+
+        ClaimEstimateService.ManageEstimatesData saved = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId,
+            new List<ClaimEstimateService.ScenarioRow>{
+                reimbursementScenario('First', true, a),
+                reimbursementScenario('Second', false, b)
+            }, null, null);
+
+        // the agent changes their mind and marks the second one Use instead
+        saved.scenarios[0].isSelected = false;
+        saved.scenarios[1].isSelected = true;
+
+        Test.startTest();
+        ClaimEstimateService.saveManageEstimates(ctx.claimId, saved.scenarios, null, null);
+        Test.stopTest();
+
+        Benefit_Balance__c bal = [SELECT Used_To_Date__c FROM Benefit_Balance__c WHERE Id = :ctx.balanceId];
+        System.assertEquals(300, bal.Used_To_Date__c,
+            'the balance now follows the second scenario, and the first has released its hold');
+    }
+
+    private static ClaimEstimateService.ScenarioRow reimbursementScenario(
+            String name, Boolean selected, ClaimEstimateService.ReimbursementRow line) {
+        ClaimEstimateService.ScenarioRow s = new ClaimEstimateService.ScenarioRow();
+        s.name = name;
+        s.claimType = 'Reimbursement Only';
+        s.taxPercent = 13;
+        s.isSelected = selected;
+        s.parts = new List<ClaimEstimateService.PartRow>();
+        s.labour = new List<ClaimEstimateService.LabourRow>();
+        s.supplies = new List<ClaimEstimateService.SupplyRow>();
+        s.reimbursements = new List<ClaimEstimateService.ReimbursementRow>{ line };
+        return s;
+    }
+
+    /**
+     * Regression for the first of the two fixes the estimate-scoped benefit
+     * rows forced. Without the Estimate__c = null filter a reimbursement line
+     * would surface here as the claim's own ancillary draw and be counted twice.
+     */
+    @IsTest
+    static void getBenefitBalancesIgnoresEstimateScopedReimbursementLines() {
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ManageEstimatesData d = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ optionC(ctx.shopId) }, null, null);
+
+        insert new Benefit_Usage__c(
+            Benefit_Balance__c = ctx.balanceId, Claim__c = ctx.claimId,
+            Estimate__c = d.scenarios[0].id, Amount_Used__c = 75,
+            Counts_Toward_Balance__c = false, Date__c = Date.today());
+
+        Test.startTest();
+        List<ClaimEstimateService.BenefitBalanceRow> rows =
+            ClaimEstimateService.getBenefitBalancesForClaim(ctx.claimId);
+        Test.stopTest();
+
+        System.assertEquals(1, rows.size());
+        System.assertEquals(null, rows[0].usageId,
+            'the estimate-scoped line is not the claim-level draw and must not be shown as one');
+    }
+
+    /**
+     * Regression for the second fix. A reimbursement typed into a scenario
+     * the agent never marked Use must not move the claim's P&L.
+     */
+    @IsTest
+    static void claimProfitIgnoresReimbursementsOnScenariosNotMarkedUse() {
+        ManageContext ctx = seedManageContext();
+
+        ClaimEstimateService.ReimbursementRow line = new ClaimEstimateService.ReimbursementRow();
+        line.benefitBalanceId = ctx.balanceId;
+        line.receiptAmount = 200;
+
+        ClaimEstimateService.ScenarioRow losing = new ClaimEstimateService.ScenarioRow();
+        losing.name = 'Rental reimbursement, not chosen';
+        losing.claimType = 'Reimbursement Only';
+        losing.taxPercent = 13;
+        losing.isSelected = false;
+        losing.parts = new List<ClaimEstimateService.PartRow>();
+        losing.labour = new List<ClaimEstimateService.LabourRow>();
+        losing.supplies = new List<ClaimEstimateService.SupplyRow>();
+        losing.reimbursements = new List<ClaimEstimateService.ReimbursementRow>{ line };
+
+        Test.startTest();
+        ClaimEstimateService.saveManageEstimates(
+            ctx.claimId,
+            new List<ClaimEstimateService.ScenarioRow>{ optionC(ctx.shopId), losing },
+            null, null);
+        Test.stopTest();
+
+        Claim__c claim = [SELECT Total_Benefits_Used__c, Total_Profit__c FROM Claim__c WHERE Id = :ctx.claimId];
+        System.assertEquals(0, claim.Total_Benefits_Used__c,
+            'the 200 belongs to the unchosen scenario and must not reach the claim');
+        System.assertEquals(-2126.37, claim.Total_Profit__c,
+            'claim profit is the chosen scenario repair-only P&L, with no stray reimbursement');
+    }
+
+    /** An edit must update the existing children, never duplicate them. */
+    @IsTest
+    static void resavingEditsChildrenInPlaceRatherThanDuplicatingThem() {
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ManageEstimatesData first = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ optionC(ctx.shopId) }, null, null);
+
+        ClaimEstimateService.ScenarioRow s = first.scenarios[0];
+        s.parts[0].unitWholesale = 1800;
+
+        Test.startTest();
+        ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ s }, null, null);
+        Test.stopTest();
+
+        System.assertEquals(1, [SELECT COUNT() FROM Estimate__c WHERE Claim__c = :ctx.claimId],
+            'still one estimate');
+        System.assertEquals(1, [SELECT COUNT() FROM Part__c WHERE Estimate__r.Claim__c = :ctx.claimId],
+            'still one part, edited in place');
+        Estimate__c e = [SELECT Parts_Cost__c, Parts_Retail__c
+                         FROM Estimate__c WHERE Claim__c = :ctx.claimId LIMIT 1];
+        System.assertEquals(1800, e.Parts_Cost__c);
+        System.assertEquals(2100, e.Parts_Retail__c, '1,800 + the same 300 dollar markup');
+    }
+
+    /** Removing a whole scenario takes its children with it rather than orphaning them. */
+    @IsTest
+    static void deletingAScenarioRemovesItsChildren() {
+        ManageContext ctx = seedManageContext();
+        ClaimEstimateService.ManageEstimatesData first = ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>{ optionC(ctx.shopId) }, null, null);
+        Id estimateId = first.scenarios[0].id;
+
+        Test.startTest();
+        ClaimEstimateService.saveManageEstimates(
+            ctx.claimId, new List<ClaimEstimateService.ScenarioRow>(),
+            new List<Id>{ estimateId }, null);
+        Test.stopTest();
+
+        System.assertEquals(0, [SELECT COUNT() FROM Estimate__c WHERE Id = :estimateId]);
+        System.assertEquals(0, [SELECT COUNT() FROM Part__c WHERE Estimate__c = :estimateId],
+            'Part__c looks up to Estimate__c with SetNull, so it has to be deleted explicitly');
+        System.assertEquals(0, [SELECT COUNT() FROM Service__c WHERE Estimate__c = :estimateId]);
+        System.assertEquals(0, [SELECT COUNT() FROM Shop_Supply__c WHERE Estimate__c = :estimateId]);
     }
 }

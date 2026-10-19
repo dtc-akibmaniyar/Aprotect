@@ -627,7 +627,7 @@ public without sharing class VinDecoderService {
         vehicleData.driveType = getStringValueFromMap(jsonMap, 'drivetrain'); // 'FWD' = Front Wheel Drive
         
         // Fuel system - Map Blackbook field names
-        vehicleData.fuelType = getStringValueFromMap(jsonMap, 'fuel_type');
+        vehicleData.fuelType = normalizeFuelType(getStringValueFromMap(jsonMap, 'fuel_type'));
         vehicleData.fuelDeliveryType = getStringValueFromMap(jsonMap, 'fuel_delivery');
         vehicleData.fuelTankType = getStringValueFromMap(jsonMap, 'fuel_cap') != null ? 
                                    'Capacity: ' + getStringValueFromMap(jsonMap, 'fuel_cap') + 'L' : null;
@@ -1104,6 +1104,81 @@ public without sharing class VinDecoderService {
         return vehicleData;
     }
     
+    /**
+     * Normalise a Canadian Black Book fuel_type token to a value that is valid
+     * for the restricted Vehicle__c.Fuel_Type__c picklist.
+     *
+     * Black Book returns fuel_type free-form (e.g. 'Diesel Fuel', 'diesel',
+     * 'Gas', 'Gasoline', 'Electric'). Vehicle__c.Fuel_Type__c is a RESTRICTED
+     * picklist, so a token that is not an exact active value fails the vehicle
+     * save -- and a diesel vehicle that never saves never receives the
+     * mandatory Diesel Fee. This routine maps the incoming token, conservatively,
+     * onto one of the nine active picklist values, and leaves anything it cannot
+     * confidently classify UNCHANGED (it never invents or blanks a value, so
+     * behaviour for unrecognised tokens is identical to before).
+     *
+     * Rules, in order:
+     *   1. Exact, case-insensitive match against the active picklist values ->
+     *      the canonical value (e.g. 'gas' -> 'Gas', 'diesel' -> 'Diesel').
+     *   2. A small, conservative variant map / substring rule for known CBB
+     *      spellings (anything clearly diesel -> 'Diesel'; a plain gas/gasoline
+     *      -> 'Gas'; obvious EV / plug-in / hybrid / hydrogen / flex variants ->
+     *      their matching picklist value).
+     *   3. No confident match -> the raw value, unchanged (same as today).
+     *
+     * @param rawFuelType The Black Book fuel_type token (may be null/blank).
+     * @return A canonical picklist value, or the raw value when unmatched.
+     */
+    private static final List<String> FUEL_PICKLIST_VALUES = new List<String>{
+        'Gas', 'Diesel', 'Electric Vehicle', 'Hybrid', 'Gasoline',
+        'Electric', 'Plug-in Hybrid', 'Hydrogen', 'Flex Fuel'
+    };
+
+    public static String normalizeFuelType(String rawFuelType) {
+        if (String.isBlank(rawFuelType)) {
+            return rawFuelType; // preserve null / blank exactly as-is
+        }
+        String trimmed = rawFuelType.trim();
+
+        // 1) Exact, case-insensitive match against the active picklist values.
+        for (String picklistValue : FUEL_PICKLIST_VALUES) {
+            if (picklistValue.equalsIgnoreCase(trimmed)) {
+                return picklistValue;
+            }
+        }
+
+        // 2) Conservative variant map for known CBB spellings.
+        //    Reduce to letters+digits so punctuation/spacing variants collapse.
+        String key = trimmed.toLowerCase().replaceAll('[^a-z0-9]', '');
+        if (key.contains('diesel')) {
+            return 'Diesel';
+        }
+        if (key.contains('hybrid')) {
+            if (key.contains('plug')) {
+                return 'Plug-in Hybrid';
+            }
+            return 'Hybrid';
+        }
+        if (key.contains('hydrogen') || key.contains('fuelcell')) {
+            return 'Hydrogen';
+        }
+        if (key.contains('flexfuel') || key.contains('flex')) {
+            return 'Flex Fuel';
+        }
+        if (key.contains('electric') || key.contains('battery') || key.equals('ev')) {
+            return 'Electric Vehicle';
+        }
+        if (key.contains('gasoline') || key.contains('petrol') || key.contains('unleaded')) {
+            return 'Gas';
+        }
+        if (key.startsWith('gas')) {
+            return 'Gas';
+        }
+
+        // 3) No confident match -> leave the raw value unchanged.
+        return rawFuelType;
+    }
+
     /**
      * Validate VIN format
      * @param vin The VIN to validate

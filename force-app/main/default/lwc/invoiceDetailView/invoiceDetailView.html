@@ -34,6 +34,8 @@
                 </template>
                 <lightning-button variant="brand" label="Download Invoice" icon-name="utility:download"
                     disabled={isLoading} onclick={handleDownloadPDF}></lightning-button>
+                <lightning-button variant="neutral" label="Print" icon-name="utility:print"
+                    disabled={isLoading} onclick={handlePrint}></lightning-button>
             </div>
 
             <template if:true={hasPaymentInitiated}>
@@ -163,8 +165,14 @@
 
                                 </td>
                                 <td class="li-td li-td-term">{pkg.packageTerm}</td>
-                                <td class="li-td li-td-price">{pkg.formattedWarrantyPackageCost}</td>
-                                <td class="li-td li-td-sub">{pkg.formattedLineTotal}</td>
+                                <td class="li-td li-td-price">
+                                    <template if:false={pkg.isOptionRow}>{pkg.formattedWarrantyPackageCost}</template>
+                                    <template if:true={pkg.isOptionRow}>—</template>
+                                </td>
+                                <td class="li-td li-td-sub">
+                                    <template if:false={pkg.isOptionRow}>{pkg.formattedLineTotal}</template>
+                                    <template if:true={pkg.isOptionRow}>—</template>
+                                </td>
                             </tr>
                             <!-- Add-on rows -->
                             <template for:each={pkg.additionalOptions} for:item="opt">
@@ -174,8 +182,13 @@
                                         <span class="opt-tag">({opt.selectionType})</span>
                                     </td>
                                     <td class="li-td li-td-term">-</td>
-                                    <td class="li-td li-td-price">{opt.formattedCostPrice}</td>
-                                    <td class="li-td li-td-sub"></td>
+                                    <td class="li-td li-td-price">
+                                        <template if:false={opt.isBilledOption}>{opt.formattedCostPrice}</template>
+                                        <template if:true={opt.isBilledOption}>—</template>
+                                    </td>
+                                    <td class="li-td li-td-sub">
+                                        <template if:true={opt.isBilledOption}>—</template>
+                                    </td>
                                 </tr>
                             </template>
                         </template>

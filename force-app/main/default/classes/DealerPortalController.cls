@@ -1824,7 +1824,16 @@ public without sharing class DealerPortalController {
             String vehicleModel,
             Id applicationPackageId,
             Boolean priceOverrideActive) {
-        return resolvePremium(dealerTermId, vehicleId, vehicleMake, applicationPackageId, priceOverrideActive);
+        PremiumPreviewDTO dto = resolvePremium(
+            dealerTermId, vehicleId, vehicleMake, applicationPackageId, priceOverrideActive);
+        // Mandatory Diesel Fee — the SAME rule the engine save path uses
+        // (PricingEngineService.resolveDieselFee), surfaced on the preview so
+        // preview totals equal saved totals. Charged whenever the vehicle is
+        // Diesel, independent of the "Diesel Components" OPTION and of the
+        // premium eligibility gate; suppressed under a pre-tax price override
+        // exactly as the engine suppresses its fee lines.
+        dto.dieselFee = resolveDieselFee(dealerTermId, vehicleId, priceOverrideActive);
+        return dto;
     }
 
     /**
@@ -1951,8 +1960,10 @@ public without sharing class DealerPortalController {
         }
         List<Dealer_Package_Term__c> rows = [
             SELECT Id, Dealer_Package__c, Package_Term__c, Premium_Model_Fee__c,
+                   Diesel_Fee__c,
                    Dealer_Package__r.Dealer__c, Dealer_Package__r.Package__c,
-                   Package_Term__r.Premium_Model_Fee__c
+                   Package_Term__r.Premium_Model_Fee__c,
+                   Package_Term__r.Diesel_Fee__c
             FROM Dealer_Package_Term__c
             WHERE Id = :dealerTermId
             LIMIT 1
@@ -1971,6 +1982,74 @@ public without sharing class DealerPortalController {
             LIMIT 1
         ];
         return rows.isEmpty() ? null : rows[0];
+    }
+
+    /**
+     * Shared Diesel-fee resolution — the SINGLE implementation of the mandatory
+     * Diesel Fee, mirroring resolvePremium's dealer-first, term-anchored pattern
+     * and IDENTICAL (rule and order) to the engine
+     * PricingEngineService.resolveDieselFee, so the live preview amount and the
+     * engine-computed (saved) Diesel_Fee line can never diverge:
+     *   1. dealer term  Diesel_Fee__c                 when populated and > 0
+     *   2. master term  Package_Term__r.Diesel_Fee__c when populated and > 0
+     *   3. 0 — no fee
+     * Charged whenever the vehicle is Diesel, independent of whether the
+     * "Diesel Components" OPTION is selected; suppressed under a pre-tax
+     * Dealer_Price_Override__c (the override is the full customer price), exactly
+     * as the engine suppresses its fee lines. Currency is rounded 2dp HALF_UP via
+     * PricingEngineService.money.
+     *
+     * The engine (PricingEngineService.computeQuote) is the save-path authority;
+     * this method is its preview mirror, exactly as resolvePremium mirrors the
+     * engine's premium rule (the preview/save parity the parity tests guard).
+     */
+    private static Decimal resolveDieselFee(
+            String dealerTermId, Id vehicleId, Boolean priceOverrideActive) {
+        if (priceOverrideActive == true || vehicleId == null) {
+            return 0;
+        }
+        Dealer_Package_Term__c term = selectDealerTermForPremium(dealerTermId);
+        if (term == null) {
+            return 0;
+        }
+        // Term fee first (a pure field read). Only when a fee is configured do
+        // we read the vehicle's fuel type, so a preview whose term carries no
+        // diesel fee costs no extra SOQL (governor-limit safety).
+        Decimal fee = 0;
+        Decimal dealerDiesel = term.Diesel_Fee__c;
+        if (dealerDiesel != null && dealerDiesel > 0) {
+            fee = PricingEngineService.money(dealerDiesel);
+        } else {
+            Decimal masterDiesel = term.Package_Term__r != null
+                ? term.Package_Term__r.Diesel_Fee__c : null;
+            if (masterDiesel != null && masterDiesel > 0) {
+                fee = PricingEngineService.money(masterDiesel);
+            }
+        }
+        if (fee <= 0) {
+            return 0;
+        }
+        return isDieselVehicleForPreview(vehicleId) ? fee : 0;
+    }
+
+    /**
+     * True when the vehicle's fuel type is Diesel. Vehicle__c.Fuel_Type__c is a
+     * RESTRICTED picklist whose active API value is exactly 'Diesel'; the
+     * comparison is case-insensitive so a legacy/stored casing never silently
+     * drops the mandatory fee. Plain SOQL (this class is API v64 + `without
+     * sharing`, i.e. system mode — the same mode the premium selectors rely on).
+     */
+    private static Boolean isDieselVehicleForPreview(Id vehicleId) {
+        if (vehicleId == null) {
+            return false;
+        }
+        List<Vehicle__c> rows = [
+            SELECT Id, Fuel_Type__c
+            FROM Vehicle__c
+            WHERE Id = :vehicleId
+            LIMIT 1
+        ];
+        return !rows.isEmpty() && 'Diesel'.equalsIgnoreCase(rows[0].Fuel_Type__c);
     }
 
     /** Premium-make metadata match by name — the source saveVehicleData uses. */
@@ -2124,20 +2203,26 @@ public without sharing class DealerPortalController {
     }
 
     /**
-     * FEATURE A — live premium preview payload. Return-only DTO: exactly the
-     * four keys the LWC needs — never schedule/member ids or wholesale cost.
+     * FEATURE A — live premium preview payload. Return-only DTO: the engine
+     * preview keys the LWC needs — never schedule/member ids or wholesale cost.
+     * `dieselFee` carries the mandatory Diesel Fee resolved by the SAME rule the
+     * engine save path uses (charged whenever the vehicle is Diesel, independent
+     * of the "Diesel Components" OPTION), so the preview and the saved totals
+     * agree.
      */
     public class PremiumPreviewDTO {
         @AuraEnabled public Boolean isPremiumVehicle { get; set; }
         @AuraEnabled public Decimal premiumFee { get; set; }
         @AuraEnabled public Boolean waived { get; set; }
         @AuraEnabled public Boolean overrideApplied { get; set; }
+        @AuraEnabled public Decimal dieselFee { get; set; }
 
         public PremiumPreviewDTO() {
             this.isPremiumVehicle = false;
             this.premiumFee = 0;
             this.waived = false;
             this.overrideApplied = false;
+            this.dieselFee = 0;
         }
     }
 

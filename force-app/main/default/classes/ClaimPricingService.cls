@@ -52,6 +52,202 @@ public with sharing class ClaimPricingService {
         @AuraEnabled public Decimal retailTotal  { get; set; }
     }
 
+    // =====================================================================
+    // TASK-047 scenario model (Noelle, Repair Price Scenarios Feedback 1.0)
+    // =====================================================================
+    //
+    // This is calcEst() from Main.dc.html, line for line, cross-checked
+    // against all 15 cards of Formulas.dc.html. It REPLACES the coverage and
+    // tax sequence in calculate() above for everything built from TASK-047
+    // onward. The two differ on real money, which is why the switch was
+    // raised with Osama before any of this was written:
+    //
+    //   calculate()      tests the cap against the PRE-TAX retail repair and
+    //                    taxes the customer's leftover share at the very end,
+    //                    so a $3,000 cap actually pays out $3,390 all in.
+    //   calculateScenario() tests the cap against the TAX-INCLUSIVE repair,
+    //                    so a $3,000 cap means $3,000 all in, and subtracts
+    //                    approved ancillary benefits from the customer's bill.
+    //
+    // calculate() is deliberately left in place and untouched: its callers,
+    // its own tests, and every Estimate__c stamped before this deploy still
+    // depend on it, and Osama's decision was that historical records are not
+    // restated (forward only, no backfill).
+    //
+    // Pure math, no SOQL and no DML, so the LWC can call it on every
+    // keystroke and get exactly what a save would stamp.
+
+    /** Percent or flat-dollar markup. One rule, shared by parts, extended warranties and supplies. */
+    public static Decimal applyMarkup(Decimal base, String markupType, Decimal markupValue) {
+        Decimal b = nz(base), m = nz(markupValue);
+        return markupType == 'Amount' ? b + m : b * (1 + m / 100);
+    }
+
+    /**
+     * Already-aggregated scenario figures. Rolling the Part__c/Service__c/
+     * Shop_Supply__c children up into these totals is ClaimEstimateService's
+     * job; this class stays pure arithmetic, same split calculate() already has.
+     */
+    public class ScenarioInput {
+        @AuraEnabled public Decimal partsWholesale     { get; set; }
+        @AuraEnabled public Decimal partsRetail        { get; set; }
+        @AuraEnabled public Decimal warrantyWholesale  { get; set; }
+        @AuraEnabled public Decimal warrantyRetail     { get; set; }
+        @AuraEnabled public Decimal labourWholesale    { get; set; }
+        @AuraEnabled public Decimal labourRetail       { get; set; }
+        @AuraEnabled public Decimal suppliesWholesale  { get; set; }
+        @AuraEnabled public Decimal suppliesRetail     { get; set; }
+        @AuraEnabled public Decimal coreTotal          { get; set; }
+        @AuraEnabled public Decimal cap                { get; set; }
+        @AuraEnabled public Decimal deductible         { get; set; }
+        @AuraEnabled public Decimal taxPercent         { get; set; }
+        @AuraEnabled public Decimal benefitsApproved   { get; set; }
+        @AuraEnabled public Boolean isReimbursement    { get; set; }
+        @AuraEnabled public Decimal reimbursementTotal { get; set; }
+    }
+
+    public class ScenarioResult {
+        @AuraEnabled public Decimal partsWholesale    { get; set; }
+        @AuraEnabled public Decimal partsRetail       { get; set; }
+        @AuraEnabled public Decimal warrantyWholesale { get; set; }
+        @AuraEnabled public Decimal warrantyRetail    { get; set; }
+        @AuraEnabled public Decimal labourWholesale   { get; set; }
+        @AuraEnabled public Decimal labourRetail      { get; set; }
+        @AuraEnabled public Decimal suppliesWholesale { get; set; }
+        @AuraEnabled public Decimal suppliesRetail    { get; set; }
+        /** Tracked for the record, never in a total and never in P&L. */
+        @AuraEnabled public Decimal coreTotal         { get; set; }
+        @AuraEnabled public Decimal subtotalWholesale { get; set; }
+        @AuraEnabled public Decimal subtotalRetail    { get; set; }
+        @AuraEnabled public Decimal retailRepair      { get; set; }
+        @AuraEnabled public Decimal repairTax         { get; set; }
+        @AuraEnabled public Decimal repairInclTax     { get; set; }
+        @AuraEnabled public Decimal suppliesTax       { get; set; }
+        @AuraEnabled public Decimal suppliesInclTax   { get; set; }
+        @AuraEnabled public Decimal taxTotal          { get; set; }
+        @AuraEnabled public Decimal wholesaleTax      { get; set; }
+        @AuraEnabled public Decimal costInclTax       { get; set; }
+        @AuraEnabled public Decimal coverageApplied   { get; set; }
+        @AuraEnabled public Decimal overLimit         { get; set; }
+        @AuraEnabled public Decimal customerPays      { get; set; }
+        @AuraEnabled public Decimal customerPaysPreTax{ get; set; }
+        @AuraEnabled public Decimal customerTaxAmount { get; set; }
+        @AuraEnabled public Decimal reimbursedToCustomer { get; set; }
+        @AuraEnabled public Decimal claimCost         { get; set; }
+        @AuraEnabled public Decimal benefitsApproved  { get; set; }
+        /** Repair-only P&L with no benefit term. Keeps Estimate__c.Profit_Loss__c meaning what it always meant. */
+        @AuraEnabled public Decimal profitLossRepairOnly { get; set; }
+        /** Pre-tax P&L WITH benefits. Estimate__c.A_Protect_P_L_Incl_Benefits__c. */
+        @AuraEnabled public Decimal profitLossInclBenefits { get; set; }
+        /** Tax-inclusive P&L. Estimate__c.Profit_Loss_Incl_Tax__c. */
+        @AuraEnabled public Decimal profitLossInclTax { get; set; }
+        /** Loss as a positive number, the BEST ranking key. */
+        @AuraEnabled public Decimal apLoss            { get; set; }
+        @AuraEnabled public Boolean fullyCovered      { get; set; }
+        @AuraEnabled public Boolean isReimbursement   { get; set; }
+    }
+
+    /** calcEst() from Main.dc.html, line for line. */
+    public static ScenarioResult calculateScenario(ScenarioInput i) {
+        Boolean isR = i.isReimbursement == true;
+
+        Decimal partsW = nz(i.partsWholesale), partsR = nz(i.partsRetail);
+        Decimal warrW  = nz(i.warrantyWholesale), warrR = nz(i.warrantyRetail);
+        Decimal labW   = nz(i.labourWholesale), labR = nz(i.labourRetail);
+        Decimal supW   = nz(i.suppliesWholesale), supR = nz(i.suppliesRetail);
+        Decimal core   = nz(i.coreTotal);
+        Decimal cap    = nz(i.cap);
+        Decimal ded    = nz(i.deductible);
+        Decimal ben    = nz(i.benefitsApproved);
+
+        // A reimbursement-only scenario has no repair, no deductible and no
+        // shop supplies. Its benefit total is the sum of its approved
+        // receipts, not the claim-level ancillary benefits.
+        if (isR) {
+            partsW = 0; partsR = 0; warrW = 0; warrR = 0;
+            labW = 0; labR = 0; supW = 0; supR = 0; core = 0;
+            ded = 0;
+            ben = nz(i.reimbursementTotal);
+        }
+
+        Decimal t = nz(i.taxPercent) / 100;
+
+        Decimal subW = partsW + warrW + labW + supW;
+        Decimal subR = partsR + warrR + labR + supR;
+
+        // Supplies are excluded so the warranty cap is tested against the repair only.
+        Decimal retailRepair = partsR + warrR + labR;
+        Decimal repairTax    = retailRepair * t;
+        Decimal repairInc    = retailRepair + repairTax;
+
+        Decimal covApplied = Math.max(0, Math.min(repairInc, cap) - ded);
+        Decimal overLimit  = Math.max(0, repairInc - cap);
+        Decimal custRepair = repairInc - covApplied;
+
+        Decimal supTax = supR * t;
+        Decimal supInc = supR + supTax;
+
+        Decimal rawPay   = custRepair + supInc - ben;
+        Decimal custPay  = Math.max(0, rawPay);
+        Decimal reimbOut = Math.max(0, -rawPay);
+
+        Decimal custPreTaxPortion = divide(custPay, 1 + t);
+        Decimal custSub    = custPreTaxPortion - reimbOut;
+        Decimal custTaxAmt = custPay - custPreTaxPortion;
+
+        Decimal claimCost = subW;
+        Decimal whTax     = claimCost * t;
+        Decimal costInc   = claimCost + whTax;
+
+        // Repair-only P&L: the same arithmetic with the benefit term removed,
+        // so Profit_Loss__c keeps meaning exactly what it has always meant.
+        Decimal rawPayNoBen = custRepair + supInc;
+        Decimal custSubNoBen = divide(Math.max(0, rawPayNoBen), 1 + t);
+
+        ScenarioResult r = new ScenarioResult();
+        r.partsWholesale    = money(partsW);
+        r.partsRetail       = money(partsR);
+        r.warrantyWholesale = money(warrW);
+        r.warrantyRetail    = money(warrR);
+        r.labourWholesale   = money(labW);
+        r.labourRetail      = money(labR);
+        r.suppliesWholesale = money(supW);
+        r.suppliesRetail    = money(supR);
+        r.coreTotal         = money(core);
+        r.subtotalWholesale = money(subW);
+        r.subtotalRetail    = money(subR);
+        r.retailRepair      = money(retailRepair);
+        r.repairTax         = money(repairTax);
+        r.repairInclTax     = money(repairInc);
+        r.suppliesTax       = money(supTax);
+        r.suppliesInclTax   = money(supInc);
+        r.taxTotal          = money(repairTax + supTax);
+        r.wholesaleTax      = money(whTax);
+        r.costInclTax       = money(costInc);
+        r.coverageApplied   = money(covApplied);
+        r.overLimit         = money(overLimit);
+        r.customerPays      = money(custPay);
+        r.customerPaysPreTax= money(custSub);
+        r.customerTaxAmount = money(custTaxAmt);
+        r.reimbursedToCustomer = money(reimbOut);
+        r.claimCost         = money(claimCost);
+        r.benefitsApproved  = money(ben);
+        r.profitLossRepairOnly   = money(custSubNoBen - claimCost);
+        r.profitLossInclBenefits = money(custSub - claimCost);
+        r.profitLossInclTax      = money(custPay - reimbOut - costInc);
+        r.apLoss            = money(claimCost - custSub);
+        // "Fully covered" is a repair state. A scenario with nothing priced is
+        // neither covered nor over limit, and a reimbursement is neither.
+        r.fullyCovered      = !isR && retailRepair > 0 && overLimit <= 0;
+        r.isReimbursement   = isR;
+        return r;
+    }
+
+    @AuraEnabled(cacheable=false)
+    public static ScenarioResult calculateScenarioLive(ScenarioInput input) {
+        return calculateScenario(input);
+    }
+
     /** calc(s) from warranty_claims_dashboard (2).html, line for line. */
     public static PricingResult calculate(PricingInput i) {
         Decimal parts  = nz(i.parts);
@@ -193,6 +389,18 @@ public with sharing class ClaimPricingService {
 
     private static Decimal nz(Decimal d) { return d == null ? 0 : d; }
     private static Decimal money(Decimal d) { return d.setScale(2, RoundingMode.HALF_UP); }
+
+    /**
+     * Apex Decimal division needs an explicit scale, unlike the JavaScript the
+     * scenario model is ported from. 6 decimal places keeps the intermediate
+     * precision well clear of the 2 the results are rounded to, so
+     * customerPaysPreTax and customerTaxAmount still add back up to
+     * customerPays exactly. Guards divide-by-zero, which only arises if a tax
+     * rate of -100% were ever entered.
+     */
+    private static Decimal divide(Decimal n, Decimal d) {
+        return d == 0 ? 0 : n.divide(d, 6, RoundingMode.HALF_UP);
+    }
 
     /** "CL ID - 00043 · 2015 BMW 6-Series", skipping any blank vehicle part. */
     private static String buildClaimRef(Claim__c c) {

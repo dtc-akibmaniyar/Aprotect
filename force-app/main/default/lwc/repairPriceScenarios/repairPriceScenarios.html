@@ -1,183 +1,595 @@
 <template>
-    <lightning-modal-header label="Manage Estimates"></lightning-modal-header>
-    <lightning-modal-body>
-        <template lwc:if={errorMessage}>
-            <div class="slds-p-bottom_small">
-                <div class="slds-notify slds-notify_alert slds-theme_alert-texture slds-theme_error" role="alert">
-                    {errorMessage}
-                </div>
-            </div>
-        </template>
-
-        <div class="rp-settings slds-m-bottom_small">
-            <div class="rp-set-field">
-                <span>Coverage Cap</span>
-                <lightning-formatted-number value={capDisplay} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
-            </div>
-            <div class="rp-set-field">
-                <span>Deductible</span>
-                <lightning-formatted-number value={deductibleDisplay} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
-            </div>
-            <div class="rp-set-field">
-                <span>Claim</span>
-                <span class="rp-claim-ref">{claimNumberDisplay}</span>
-            </div>
-            <template lwc:if={vehicleDisplay}>
-                <div class="rp-set-field wide">
-                    <span>Vehicle</span>
-                    <span class="rp-claim-ref">{vehicleDisplay}</span>
-                </div>
-            </template>
-            <div class="rp-set-note">applies to every estimate below; tax is per repair shop</div>
-            <lightning-button label="+ Add Estimate" icon-name="utility:add" variant="brand" class="rp-add" onclick={handleAddRow}></lightning-button>
-        </div>
+    <div class="rp-page">
+        <header class="rp-header">
+            <div class="rp-eyebrow">A-Protect claims</div>
+            <h1 class="rp-title">Manage Estimates</h1>
+        </header>
 
         <template lwc:if={isLoading}>
-            <lightning-spinner alternative-text="Loading estimates" size="small"></lightning-spinner>
+            <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
         </template>
-        <template lwc:else>
-        <div class="cmp-wrap">
-            <div class="cmp-grid" style={gridStyle}>
 
-                <div class="cmp-label corner"></div>
-                <div class="cmp-label">Estimate Name</div>
-                <div class="cmp-label">Repair Shop</div>
-                <div class="cmp-label">Source</div>
-                <div class="cmp-label">Part / Component</div>
-                <div class="cmp-label">Job Type</div>
-                <div class="cmp-label">Parts Supplier</div>
-                <div class="cmp-label">Part #</div>
-                <div class="cmp-label">Stock # (Ordered)</div>
-                <div class="cmp-label">Condition</div>
-                <div class="cmp-label">KMs</div>
-                <div class="cmp-label">Warranty Source</div>
-                <div class="cmp-label">Warranty $</div>
-                <div class="cmp-label">Parts (Wholesale $)</div>
-                <div class="cmp-label">Labour Hours</div>
-                <div class="cmp-label">Rate ($/hr)</div>
-                <div class="cmp-label">Labour $</div>
-                <div class="cmp-label">Supplies (Retail)</div>
-                <div class="cmp-label">Supplies (Cost)</div>
-                <div class="cmp-label">Retail Work Order</div>
-                <div class="cmp-label total tstart">Wholesale Cost</div>
-                <div class="cmp-label total">Customer Pays (+tax)</div>
-                <div class="cmp-label total">A-Protect P&amp;L</div>
+        <main class="rp-main">
+            <c-ancillary-benefits record-id={claimId}
+                                  onbenefitschange={handleBenefitsChange}></c-ancillary-benefits>
 
-                <template for:each={rows} for:item="row">
-                <div key={row.id} class="cmp-col">
-
-                    <div class="cmp-head" style={row.headerStyle}>
-                        <lightning-input type="radio" name="scnsel" label="Use" class="cmp-use"
-                            checked={row.isUse} data-row-id={row.id} onchange={handleUseChange}></lightning-input>
-                        <div class="cmp-head-right">
-                            <template lwc:if={row.isBest}>
-                                <span class="badge">BEST</span>
-                            </template>
-                            <lightning-button-icon icon-name="utility:close" variant="bare" size="small"
-                                alternative-text="Remove this estimate" class="cmp-del"
-                                data-row-id={row.id} onclick={handleRemoveRow} disabled={removeRowDisabled}></lightning-button-icon>
-                        </div>
-                    </div>
-
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-input label="Estimate Name" variant="label-hidden" value={row.estimateName}
-                            placeholder="Estimate name" data-row-id={row.id} data-field="estimateName" onchange={handleRowFieldChange}></lightning-input>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-record-picker label="Repair Shop" variant="label-hidden" object-api-name="Repair_Shop__c"
-                            value={row.repairShopId} data-row-id={row.id} onchange={handleRowShopChange}></lightning-record-picker>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-combobox label="Source" variant="label-hidden" placeholder="Source"
-                            value={row.source} options={sourceOptions}
-                            data-row-id={row.id} data-field="source" onchange={handleRowComboChange}></lightning-combobox>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-combobox label="Part / Component" variant="label-hidden" placeholder="Part / Component"
-                            value={row.partComponent} options={partComponentOptions}
-                            data-row-id={row.id} data-field="partComponent" onchange={handleRowComboChange}></lightning-combobox>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-combobox label="Job Type" variant="label-hidden" value={row.jobType} options={jobTypeOptions}
-                            data-row-id={row.id} data-field="jobType" onchange={handleRowComboChange}></lightning-combobox>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-record-picker label="Parts Supplier" variant="label-hidden" object-api-name="Account"
-                            value={row.partsSupplierId} data-row-id={row.id} onchange={handleRowPartsSupplierChange}></lightning-record-picker>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-input label="Part #" variant="label-hidden" value={row.partCode}
-                            data-row-id={row.id} data-field="partCode" onchange={handleRowFieldChange}></lightning-input>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-input label="Stock # (Ordered)" variant="label-hidden" value={row.stockNumber}
-                            data-row-id={row.id} data-field="stockNumber" onchange={handleRowFieldChange}></lightning-input>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-combobox label="Condition" variant="label-hidden" value={row.condition} options={conditionOptions}
-                            data-row-id={row.id} data-field="condition" onchange={handleRowComboChange}></lightning-combobox>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-input type="number" label="KMs" variant="label-hidden" value={row.kms}
-                            data-row-id={row.id} data-field="kms" onchange={handleRowFieldChange}></lightning-input>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-combobox label="Warranty Source" variant="label-hidden" value={row.insuranceSource} options={insuranceSourceOptions}
-                            data-row-id={row.id} data-field="insuranceSource" onchange={handleRowComboChange}></lightning-combobox>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-input type="number" step="0.01" label="Warranty $" variant="label-hidden" value={row.ins}
-                            data-row-id={row.id} data-field="ins" onchange={handleRowFieldChange}></lightning-input>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-input type="number" step="0.01" label="Parts (Wholesale $)" variant="label-hidden" value={row.partsCost}
-                            data-row-id={row.id} data-field="partsCost" onchange={handleRowFieldChange}></lightning-input>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-input type="number" step="0.1" label="Labour Hours" variant="label-hidden" value={row.hrs}
-                            data-row-id={row.id} data-field="hrs" onchange={handleRowFieldChange}></lightning-input>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-input type="number" step="0.01" label="Rate ($/hr)" variant="label-hidden" value={row.rate}
-                            data-row-id={row.id} data-field="rate" onchange={handleRowFieldChange}></lightning-input>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-formatted-number value={row.result.labour} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-input type="number" step="0.01" label="Supplies (Retail)" variant="label-hidden" value={row.supR}
-                            data-row-id={row.id} data-field="supR" onchange={handleRowFieldChange}></lightning-input>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-input type="number" step="0.01" label="Supplies (Cost)" variant="label-hidden" value={row.supC}
-                            data-row-id={row.id} data-field="supC" onchange={handleRowFieldChange}></lightning-input>
-                    </div>
-                    <div class="cmp-cell" style={row.cellStyle}>
-                        <lightning-input type="number" step="0.01" label="Retail Work Order" variant="label-hidden" value={row.retail}
-                            data-row-id={row.id} data-field="retail" onchange={handleRowFieldChange}></lightning-input>
-                    </div>
-
-                    <div class="cmp-cell total tstart" style={row.cellStyle}>
-                        <lightning-formatted-number class="v" value={row.result.wsTotal} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
-                    </div>
-                    <div class="cmp-cell total" style={row.cellStyle}>
-                        <lightning-formatted-number class="v" value={row.result.custTax} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
-                    </div>
-                    <div class="cmp-cell total plcell" style={row.plStyle}>
-                        <lightning-formatted-number class={row.plClass} value={row.result.pl} format-style="currency" maximum-fraction-digits="0"></lightning-formatted-number>
-                    </div>
-
-                </div>
-                </template>
+            <div class="rp-claimbar">
+                <span class="rp-cb-item">
+                    <span class="rp-cb-label">Coverage cap</span><b>{capDisplay}</b>
+                </span>
+                <span class="rp-cb-item">
+                    <span class="rp-cb-label">Deductible</span><b>{deductibleDisplay}</b>
+                </span>
+                <span class="rp-cb-item">
+                    <span class="rp-cb-label">Claim</span><b>{claimNumber}</b>
+                </span>
+                <span class="rp-cb-item">
+                    <span class="rp-cb-label">Vehicle</span><b>{vehicle}</b>
+                </span>
+                <span class="rp-cb-item">
+                    <span class="rp-cb-label">Benefits approved</span><b>{benefitsTotalDisplay}</b>
+                </span>
+                <span class="rp-cb-note">
+                    Cap and deductible come from the purchased contract. Tax is per repair shop.
+                </span>
+                <lightning-button variant="neutral" label="Add Estimate" icon-name="utility:add"
+                                  onclick={handleAddScenario} disabled={isBusy}
+                                  class="rp-cb-btn"></lightning-button>
+                <lightning-button variant="brand" label="Save" onclick={handleSave}
+                                  disabled={isBusy}></lightning-button>
             </div>
-        </div>
-        </template>
-    </lightning-modal-body>
-    <lightning-modal-footer>
-        <lightning-button label="Cancel" onclick={handleCancel} class="slds-m-right_x-small"></lightning-button>
-        <lightning-button variant="brand" label="Save" onclick={handleSaveAll} disabled={isSaveDisabled}></lightning-button>
-        <template lwc:if={isSaving}>
-            <lightning-spinner alternative-text="Saving" size="small"></lightning-spinner>
-        </template>
-    </lightning-modal-footer>
+
+            <template lwc:if={hasScenarios}>
+                <div class="rp-row">
+                    <template for:each={cards} for:item="c">
+                        <section class={c.cardClass} key={c.id} aria-label={c.name}>
+
+                            <div class="rp-card-head">
+                                <label class="rp-use">
+                                    <input type="radio" name="useScenario" checked={c.isSelected}
+                                           data-scenario={c.id} onchange={handleUseScenario}
+                                           aria-label="Use this scenario" />
+                                    <span>Use</span>
+                                </label>
+                                <span class="rp-card-title">{c.name}</span>
+                                <template lwc:if={c.isBest}><span class="rp-pill rp-pill-best">BEST</span></template>
+                                <template lwc:if={c.showDelta}><span class="rp-pill rp-pill-delta">{c.deltaText}</span></template>
+                                <template lwc:if={c.isCovered}><span class="rp-pill rp-pill-ok">Fully covered</span></template>
+                                <template lwc:if={c.isOver}><span class="rp-pill rp-pill-over">{c.overPill}</span></template>
+                                <template lwc:if={c.isReimbursement}><span class="rp-pill rp-pill-net">Reimbursement only</span></template>
+                                <lightning-button-icon icon-name="utility:close" variant="bare"
+                                                       alternative-text="Remove estimate" data-scenario={c.id}
+                                                       onclick={handleRemoveScenario}></lightning-button-icon>
+                            </div>
+
+                            <div class="rp-sec">
+                                <lightning-input label="Estimate name" value={c.nameValue}
+                                                 data-scenario={c.id} data-field="name"
+                                                 onchange={handleScenarioField}></lightning-input>
+                                <lightning-combobox label="Repair shop" value={c.repairShopId}
+                                                    options={c.shopOptions} placeholder="Search network shops"
+                                                    data-scenario={c.id} data-field="repairShopId"
+                                                    onchange={handleScenarioField}></lightning-combobox>
+                                <div class="rp-shopinfo">{c.shopInfo}</div>
+                                <div class="rp-field">
+                                    <span class="rp-field-label">Network</span>
+                                    <div class="rp-seg" role="group" aria-label="Network">
+                                        <button type="button" class={c.netInClass} aria-pressed={c.isNetIn}
+                                                data-scenario={c.id} data-field="network" data-value="In-Network"
+                                                onclick={handleScenarioSegment}>In-Network</button>
+                                        <button type="button" class={c.netOutClass} aria-pressed={c.isNetOut}
+                                                data-scenario={c.id} data-field="network" data-value="Out-of-Network"
+                                                onclick={handleScenarioSegment}>Out-of-Network</button>
+                                    </div>
+                                </div>
+                                <lightning-input type="number" step="0.01" label="Shop tax %" value={c.taxPercent}
+                                                 data-scenario={c.id} data-field="taxPercent"
+                                                 onchange={handleScenarioField}></lightning-input>
+                                <div class="rp-field">
+                                    <span class="rp-field-label">Claim type</span>
+                                    <div class="rp-seg" role="group" aria-label="Claim type">
+                                        <button type="button" class={c.ctRepairClass} aria-pressed={c.isCtRepair}
+                                                data-scenario={c.id} data-field="claimType" data-value="Repair"
+                                                onclick={handleScenarioSegment}>Repair</button>
+                                        <button type="button" class={c.ctReimbClass} aria-pressed={c.isCtReimb}
+                                                data-scenario={c.id} data-field="claimType"
+                                                data-value="Reimbursement Only"
+                                                onclick={handleScenarioSegment}>Reimbursement Only</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <template lwc:if={c.isRepair}>
+                                <div class="rp-sec rp-tint">
+                                    <div class="rp-sech">
+                                        <b>{c.partsTitle}</b>
+                                        <span class="rp-pair">
+                                            <span class="rp-pp rp-pp-w"><i>Wholesale</i>{c.partsW}</span>
+                                            <span class="rp-pp rp-pp-r"><i>Retail</i>{c.partsR}</span>
+                                        </span>
+                                    </div>
+
+                                    <template for:each={c.parts} for:item="p">
+                                        <div class={p.partClass} key={p.id}>
+                                            <div class="rp-ptop">
+                                                <button type="button" class="rp-ptog" data-scenario={c.id}
+                                                        data-child={p.id} onclick={handleTogglePart}
+                                                        aria-expanded={p.open}>
+                                                    <span class="rp-ps">{p.summary}</span>
+                                                    <span class="rp-pl">{p.lineText}</span>
+                                                </button>
+                                                <lightning-button-icon icon-name="utility:close" variant="bare"
+                                                                       alternative-text="Remove part"
+                                                                       data-scenario={c.id} data-collection="parts"
+                                                                       data-child={p.id}
+                                                                       onclick={handleRemoveChild}></lightning-button-icon>
+                                            </div>
+
+                                            <template lwc:if={p.open}>
+                                                <div class="rp-pbody">
+                                                    <div class="rp-g2">
+                                                        <lightning-input label="Part name" value={p.name}
+                                                            data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                            data-field="name" onchange={handleChildField}></lightning-input>
+                                                        <lightning-input label="Part #" value={p.partNumber}
+                                                            data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                            data-field="partNumber" onchange={handleChildField}></lightning-input>
+                                                        <lightning-input label="Category" value={p.category}
+                                                            data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                            data-field="category" onchange={handleChildField}></lightning-input>
+                                                        <lightning-combobox label="Condition" value={p.condition}
+                                                            options={p.conditionOptions}
+                                                            data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                            data-field="condition" onchange={handleChildField}></lightning-combobox>
+                                                        <lightning-combobox label="Parts supplier" value={p.supplierId}
+                                                            options={p.supplierOptions}
+                                                            data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                            data-field="supplierId" onchange={handleChildField}></lightning-combobox>
+                                                        <lightning-input label="Stock # (Ordered)" value={p.stockNumber}
+                                                            data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                            data-field="stockNumber" onchange={handleChildField}></lightning-input>
+                                                        <lightning-input type="number" label="KMs" value={p.kms}
+                                                            data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                            data-field="kms" onchange={handleChildField}></lightning-input>
+                                                        <lightning-input type="number" step="0.01" label="Qty" value={p.qty}
+                                                            data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                            data-field="qty" onchange={handleChildField}></lightning-input>
+                                                    </div>
+
+                                                    <div class="rp-flow">
+                                                        <div class="rp-fc rp-fw">
+                                                            <span class="rp-fl">Unit wholesale $</span>
+                                                            <lightning-input type="number" step="0.01" variant="label-hidden"
+                                                                label="Unit wholesale" value={p.unitWholesale}
+                                                                data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                                data-field="unitWholesale" onchange={handleChildField}></lightning-input>
+                                                        </div>
+                                                        <div class="rp-fc rp-fm">
+                                                            <span class="rp-fl">+ Markup</span>
+                                                            <div class="rp-mkr">
+                                                                <div class="rp-seg">
+                                                                    <button type="button" class={p.pctClass}
+                                                                        data-scenario={c.id} data-collection="parts"
+                                                                        data-child={p.id} data-field="markupType"
+                                                                        data-value="Percent" onclick={handleMarkupType}>%</button>
+                                                                    <button type="button" class={p.dolClass}
+                                                                        data-scenario={c.id} data-collection="parts"
+                                                                        data-child={p.id} data-field="markupType"
+                                                                        data-value="Amount" onclick={handleMarkupType}>$</button>
+                                                                </div>
+                                                                <lightning-input type="number" step="0.01" variant="label-hidden"
+                                                                    label="Part markup" value={p.markupValue}
+                                                                    data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                                    data-field="markupValue" onchange={handleChildField}></lightning-input>
+                                                            </div>
+                                                        </div>
+                                                        <div class="rp-fc rp-fr">
+                                                            <span class="rp-fl">= Unit retail</span>
+                                                            <b>{p.unitRetailText}</b>
+                                                            <small>{p.markupText}</small>
+                                                        </div>
+                                                    </div>
+
+                                                    <lightning-input type="number" step="0.01" label="Core charge $"
+                                                        value={p.coreCharge} field-level-help="Wholesale. No markup is applied, and it is excluded from every total and from P&amp;L."
+                                                        data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                        data-field="coreCharge" onchange={handleChildField}></lightning-input>
+
+                                                    <div class="rp-warr">
+                                                        <div class="rp-warr-head">
+                                                            <span>Warranty</span><span class="rp-muted">{p.warrantySummary}</span>
+                                                        </div>
+                                                        <div class="rp-field">
+                                                            <span class="rp-field-label">Warranty source</span>
+                                                            <div class="rp-seg" role="group" aria-label="Warranty source">
+                                                                <button type="button" class={p.srcSupplierClass}
+                                                                    aria-pressed={p.isSrcSupplier}
+                                                                    data-scenario={c.id} data-collection="parts"
+                                                                    data-child={p.id} data-field="warrantySource"
+                                                                    data-value="Supplier"
+                                                                    onclick={handleMarkupType}>Supplier</button>
+                                                                <button type="button" class={p.srcAProtectClass}
+                                                                    aria-pressed={p.isSrcAProtect}
+                                                                    data-scenario={c.id} data-collection="parts"
+                                                                    data-child={p.id} data-field="warrantySource"
+                                                                    data-value="A-Protect"
+                                                                    onclick={handleMarkupType}>A-Protect</button>
+                                                                <button type="button" class={p.srcGarageClass}
+                                                                    aria-pressed={p.isSrcGarage}
+                                                                    data-scenario={c.id} data-collection="parts"
+                                                                    data-child={p.id} data-field="warrantySource"
+                                                                    data-value="Garage"
+                                                                    onclick={handleMarkupType}>Garage</button>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="rp-warr-box">
+                                                            <lightning-input type="checkbox" label="Warranty included with the part / repair"
+                                                                checked={p.includedWarranty}
+                                                                data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                                data-field="includedWarranty" onchange={handleChildField}></lightning-input>
+                                                            <template lwc:if={p.includedWarranty}>
+                                                                <div class="rp-field">
+                                                                    <span class="rp-field-label">Covers</span>
+                                                                    <div class="rp-seg" role="group" aria-label="Included warranty covers">
+                                                                        <button type="button" class={p.coversPlClass}
+                                                                            aria-pressed={p.isCoversPl}
+                                                                            data-scenario={c.id} data-collection="parts"
+                                                                            data-child={p.id}
+                                                                            data-field="includedWarrantyCovers"
+                                                                            data-value="Parts and Labour"
+                                                                            onclick={handleMarkupType}>Parts and Labour</button>
+                                                                        <button type="button" class={p.coversPClass}
+                                                                            aria-pressed={p.isCoversP}
+                                                                            data-scenario={c.id} data-collection="parts"
+                                                                            data-child={p.id}
+                                                                            data-field="includedWarrantyCovers"
+                                                                            data-value="Parts Only"
+                                                                            onclick={handleMarkupType}>Parts Only</button>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="rp-g2">
+                                                                    <lightning-input type="number" label="Term (months)"
+                                                                        value={p.includedWarrantyMonths}
+                                                                        data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                                        data-field="includedWarrantyMonths" onchange={handleChildField}></lightning-input>
+                                                                    <lightning-input type="number" label="Term (km)"
+                                                                        value={p.includedWarrantyKm}
+                                                                        data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                                        data-field="includedWarrantyKm" onchange={handleChildField}></lightning-input>
+                                                                </div>
+                                                                <div class="rp-kv"><span>Included expires</span><b>{p.includedExpiry}</b></div>
+                                                            </template>
+                                                            <div class="rp-muted">No extra cost. Comes with the part and repair.</div>
+                                                        </div>
+
+                                                        <div class="rp-warr-box">
+                                                            <lightning-input type="checkbox" label="Optional extended warranty"
+                                                                checked={p.extendedWarranty}
+                                                                data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                                data-field="extendedWarranty" onchange={handleChildField}></lightning-input>
+                                                            <template lwc:if={p.extendedWarranty}>
+                                                                <div class="rp-g2">
+                                                                    <lightning-input type="number" label="Term (months)"
+                                                                        value={p.extendedWarrantyMonths}
+                                                                        data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                                        data-field="extendedWarrantyMonths" onchange={handleChildField}></lightning-input>
+                                                                    <lightning-input type="number" label="Term (km)"
+                                                                        value={p.extendedWarrantyKm}
+                                                                        data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                                        data-field="extendedWarrantyKm" onchange={handleChildField}></lightning-input>
+                                                                </div>
+                                                                <div class="rp-kv"><span>Extended expires</span><b>{p.extendedExpiry}</b></div>
+                                                                <div class="rp-flow">
+                                                                    <div class="rp-fc rp-fw">
+                                                                        <span class="rp-fl">Wholesale $</span>
+                                                                        <lightning-input type="number" step="0.01" variant="label-hidden"
+                                                                            label="Extended warranty wholesale" value={p.extendedWarrantyCost}
+                                                                            data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                                            data-field="extendedWarrantyCost" onchange={handleChildField}></lightning-input>
+                                                                    </div>
+                                                                    <div class="rp-fc rp-fm">
+                                                                        <span class="rp-fl">+ Markup</span>
+                                                                        <div class="rp-mkr">
+                                                                            <div class="rp-seg">
+                                                                                <button type="button" class={p.extPctClass}
+                                                                                    data-scenario={c.id} data-collection="parts"
+                                                                                    data-child={p.id} data-field="extendedWarrantyMarkupType"
+                                                                                    data-value="Percent" onclick={handleMarkupType}>%</button>
+                                                                                <button type="button" class={p.extDolClass}
+                                                                                    data-scenario={c.id} data-collection="parts"
+                                                                                    data-child={p.id} data-field="extendedWarrantyMarkupType"
+                                                                                    data-value="Amount" onclick={handleMarkupType}>$</button>
+                                                                            </div>
+                                                                            <lightning-input type="number" step="0.01" variant="label-hidden"
+                                                                                label="Warranty markup" value={p.extendedWarrantyMarkupValue}
+                                                                                data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                                                data-field="extendedWarrantyMarkupValue" onchange={handleChildField}></lightning-input>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="rp-fc rp-fr">
+                                                                        <span class="rp-fl">= Retail</span>
+                                                                        <b>{p.extendedRetailText}</b>
+                                                                        <small>{p.extendedMarkupText}</small>
+                                                                    </div>
+                                                                </div>
+                                                            </template>
+                                                            <div class="rp-muted">Only the extended warranty adds cost to the estimate.</div>
+                                                        </div>
+
+                                                        <lightning-input label="Warranty notes" value={p.warrantyNotes}
+                                                            data-scenario={c.id} data-collection="parts" data-child={p.id}
+                                                            data-field="warrantyNotes" onchange={handleChildField}></lightning-input>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+
+                                    <button type="button" class="rp-add" data-scenario={c.id}
+                                            onclick={handleAddPart}>+ Add Part</button>
+                                </div>
+
+                                <div class="rp-sec">
+                                    <div class="rp-sech">
+                                        <b>Labour</b>
+                                        <span class="rp-pair">
+                                            <span class="rp-pp rp-pp-w"><i>Wholesale</i>{c.labourW}</span>
+                                            <span class="rp-pp rp-pp-r"><i>Retail</i>{c.labourR}</span>
+                                        </span>
+                                    </div>
+                                    <template for:each={c.labour} for:item="l">
+                                        <div class="rp-lab" key={l.id}>
+                                            <div class="rp-g2">
+                                                <div class="rp-lbox rp-lbox-w">
+                                                    <div class="rp-lh"><span>Wholesale</span></div>
+                                                    <div class="rp-g2">
+                                                        <lightning-input type="number" step="0.01" label="Hours"
+                                                            value={l.wholesaleHours}
+                                                            data-scenario={c.id} data-collection="labour" data-child={l.id}
+                                                            data-field="wholesaleHours" onchange={handleChildField}></lightning-input>
+                                                        <lightning-input type="number" step="0.01" label="Rate $/h"
+                                                            value={l.wholesaleRate}
+                                                            data-scenario={c.id} data-collection="labour" data-child={l.id}
+                                                            data-field="wholesaleRate" onchange={handleChildField}></lightning-input>
+                                                    </div>
+                                                    <div class="rp-lt"><span>Wholesale labour</span><b>{l.wholesaleTotal}</b></div>
+                                                </div>
+                                                <div class="rp-lbox rp-lbox-r">
+                                                    <div class="rp-lh"><span>Retail</span></div>
+                                                    <div class="rp-g2">
+                                                        <lightning-input type="number" step="0.01" label="Hours"
+                                                            value={l.retailHours}
+                                                            data-scenario={c.id} data-collection="labour" data-child={l.id}
+                                                            data-field="retailHours" onchange={handleChildField}></lightning-input>
+                                                        <lightning-input type="number" step="0.01" label="Rate $/h"
+                                                            value={l.retailRate}
+                                                            data-scenario={c.id} data-collection="labour" data-child={l.id}
+                                                            data-field="retailRate" onchange={handleChildField}></lightning-input>
+                                                    </div>
+                                                    <div class="rp-lt"><span>Retail labour</span><b>{l.retailTotal}</b></div>
+                                                </div>
+                                            </div>
+                                            <div class="rp-lcmp">
+                                                <div><span>Labour difference</span><b class={c.labourDiffClass}>{c.labourDiff}</b></div>
+                                                <div><span>Hours</span><b>{l.hoursDiff}</b></div>
+                                                <div><span>Rate</span><b>{l.rateDiff}</b></div>
+                                            </div>
+                                            <div class="rp-guides">
+                                                <div class="rp-muted">Guide hours considered: for reference, not charged</div>
+                                                <div class="rp-g2">
+                                                    <lightning-input type="number" step="0.01" label="Mitchell"
+                                                        value={l.guideMitchell}
+                                                        data-scenario={c.id} data-collection="labour" data-child={l.id}
+                                                        data-field="guideMitchell" onchange={handleChildField}></lightning-input>
+                                                    <lightning-input type="number" step="0.01" label="All Data"
+                                                        value={l.guideAllData}
+                                                        data-scenario={c.id} data-collection="labour" data-child={l.id}
+                                                        data-field="guideAllData" onchange={handleChildField}></lightning-input>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <template lwc:if={c.guideFlag}>
+                                        <div class="rp-warnbox">{c.guideText}</div>
+                                    </template>
+                                    <template lwc:if={c.showRateHint}>
+                                        <div class="rp-ratehint">
+                                            <span>{c.rateHint}</span>
+                                            <button type="button" class="rp-link" data-scenario={c.id}
+                                                    onclick={handleUseNetworkRate}>Use it</button>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                <div class="rp-sec">
+                                    <div class="rp-sech">
+                                        <b>{c.supTitle}</b>
+                                        <span class="rp-pair">
+                                            <span class="rp-pp rp-pp-w"><i>Wholesale</i>{c.supW}</span>
+                                            <span class="rp-pp rp-pp-r"><i>Retail</i>{c.supR}</span>
+                                        </span>
+                                    </div>
+                                    <template for:each={c.supplies} for:item="x">
+                                        <div class="rp-supply" key={x.id}>
+                                            <div class="rp-supply-top">
+                                                <lightning-input variant="label-hidden" label="Supply description"
+                                                    placeholder="Description" value={x.description}
+                                                    data-scenario={c.id} data-collection="supplies" data-child={x.id}
+                                                    data-field="description" onchange={handleChildField}></lightning-input>
+                                                <lightning-button-icon icon-name="utility:close" variant="bare"
+                                                    alternative-text="Remove supply"
+                                                    data-scenario={c.id} data-collection="supplies" data-child={x.id}
+                                                    onclick={handleRemoveChild}></lightning-button-icon>
+                                            </div>
+                                            <div class="rp-flow">
+                                                <div class="rp-fc rp-fw">
+                                                    <span class="rp-fl">Wholesale $</span>
+                                                    <lightning-input type="number" step="0.01" variant="label-hidden"
+                                                        label="Supply wholesale" value={x.wholesaleCost}
+                                                        data-scenario={c.id} data-collection="supplies" data-child={x.id}
+                                                        data-field="wholesaleCost" onchange={handleChildField}></lightning-input>
+                                                </div>
+                                                <div class="rp-fc rp-fm">
+                                                    <span class="rp-fl">+ Markup</span>
+                                                    <div class="rp-mkr">
+                                                        <div class="rp-seg">
+                                                            <button type="button" class={x.pctClass}
+                                                                data-scenario={c.id} data-collection="supplies"
+                                                                data-child={x.id} data-field="markupType"
+                                                                data-value="Percent" onclick={handleMarkupType}>%</button>
+                                                            <button type="button" class={x.dolClass}
+                                                                data-scenario={c.id} data-collection="supplies"
+                                                                data-child={x.id} data-field="markupType"
+                                                                data-value="Amount" onclick={handleMarkupType}>$</button>
+                                                        </div>
+                                                        <lightning-input type="number" step="0.01" variant="label-hidden"
+                                                            label="Supply markup" value={x.markupValue}
+                                                            data-scenario={c.id} data-collection="supplies" data-child={x.id}
+                                                            data-field="markupValue" onchange={handleChildField}></lightning-input>
+                                                    </div>
+                                                </div>
+                                                <div class="rp-fc rp-fr">
+                                                    <span class="rp-fl">= Retail</span>
+                                                    <b>{x.retailText}</b>
+                                                    <small>{x.markupText}</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <button type="button" class="rp-add" data-scenario={c.id}
+                                            onclick={handleAddSupply}>+ Add Shop Supply</button>
+                                </div>
+                            </template>
+
+                            <template lwc:if={c.isReimbursement}>
+                                <div class="rp-sec rp-tint">
+                                    <div class="rp-sech"><b>{c.reimbTitle}</b><span>{c.reimbTotal}</span></div>
+                                    <div class="rp-muted">No repair, no deductible, no shop supplies. A-Protect
+                                        reimburses the customer's receipts, up to what is left on each benefit's
+                                        term cap.</div>
+                                    <template for:each={c.reimbursements} for:item="r">
+                                        <div class="rp-reimb" key={r.id}>
+                                            <div class="rp-reimb-top">
+                                                <lightning-combobox variant="label-hidden" label="Benefit"
+                                                    value={r.benefitBalanceId} options={c.benefitOptions}
+                                                    data-scenario={c.id} data-collection="reimbursements" data-child={r.id}
+                                                    data-field="benefitBalanceId" onchange={handleChildField}></lightning-combobox>
+                                                <lightning-input type="number" step="0.01" variant="label-hidden"
+                                                    label="Receipt amount" placeholder="Receipt $" value={r.receiptAmount}
+                                                    data-scenario={c.id} data-collection="reimbursements" data-child={r.id}
+                                                    data-field="receiptAmount" onchange={handleChildField}></lightning-input>
+                                                <lightning-button-icon icon-name="utility:close" variant="bare"
+                                                    alternative-text="Remove reimbursement"
+                                                    data-scenario={c.id} data-collection="reimbursements" data-child={r.id}
+                                                    onclick={handleRemoveChild}></lightning-button-icon>
+                                            </div>
+                                            <div class="rp-muted">{r.info}</div>
+                                        </div>
+                                    </template>
+                                    <button type="button" class="rp-add" data-scenario={c.id}
+                                            onclick={handleAddReimbursement}>+ Add Reimbursement</button>
+
+                                    <div class="rp-sech rp-pay-h"><b>How you will be paid</b></div>
+                                    <div class="rp-pay">
+                                        <lightning-combobox label="Payment method" placeholder="Choose a payment method"
+                                            value={c.paymentMethod} options={c.paymentMethodOptions}
+                                            data-scenario={c.id} data-field="paymentMethod"
+                                            onchange={handleScenarioField}></lightning-combobox>
+                                        <lightning-input type="date" label="Expected payment"
+                                            value={c.expectedPaymentDate}
+                                            data-scenario={c.id} data-field="expectedPaymentDate"
+                                            onchange={handleScenarioField}></lightning-input>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <div class="rp-res">
+                                <div class="rp-rh">Scenario Summary</div>
+                                <div class="rp-stw">
+                                    <div class="rp-shead">
+                                        <div></div>
+                                        <div class="rp-cw">Wholesale</div>
+                                        <div class="rp-cd">+ Markup</div>
+                                        <div class="rp-cr">Retail</div>
+                                    </div>
+                                    <template for:each={c.rows} for:item="r">
+                                        <div key={r.key}>
+                                            <template lwc:if={r.isSection}>
+                                                <div class="rp-ssec">{r.label}</div>
+                                            </template>
+                                            <template lwc:else>
+                                                <div class={r.rowClass}>
+                                                    <div><span>{r.label}</span><small>{r.sub}</small></div>
+                                                    <div class="rp-cw">{r.w}</div>
+                                                    <div class={r.dClass}>{r.d}</div>
+                                                    <div class="rp-cr">{r.r}</div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                <template lwc:if={c.isCovered}>
+                                    <div class="rp-fcbox">
+                                        <div class="rp-fct">{c.fcTitle}</div>
+                                        <div class="rp-fcs">Customer is only responsible for the deductible and
+                                            shop supplies.</div>
+                                        <template for:each={c.fcRows} for:item="q">
+                                            <div class="rp-fcr" key={q.key}><span>{q.label}</span><b>{q.value}</b></div>
+                                        </template>
+                                        <div class="rp-fcr rp-fcr-tot"><span>Customer pays</span><b>{c.customerPays}</b></div>
+                                    </div>
+                                </template>
+
+                                <template lwc:if={c.isReimbursement}>
+                                    <div class="rp-fcbox rp-fcbox-reimb">
+                                        <div class="rp-fct">Reimbursement only</div>
+                                        <div class="rp-fcs">No deductible and no shop supplies apply. A-Protect
+                                            pays the customer back for approved receipts.</div>
+                                        <div class="rp-fcr rp-fcr-tot">
+                                            <span>A-Protect reimburses customer</span><b>{c.reimbursedOut}</b>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <div class={c.pnlClass}>
+                                    <div class="rp-pnl-t">{c.pnlTitle}</div>
+                                    <div class="rp-pl2">
+                                        <div>
+                                            <span>Incl. tax</span>
+                                            <b class={c.pnlInclTaxClass}>{c.pnlInclTax}</b>
+                                            <small>{c.pnlInclTaxSub}</small>
+                                        </div>
+                                        <div>
+                                            <span>Net of tax (pre-tax)</span>
+                                            <b class={c.pnlPreTaxClass}>{c.pnlPreTax}</b>
+                                            <small>{c.pnlPreTaxSub}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </template>
+                </div>
+            </template>
+
+            <template lwc:else>
+                <div class="rp-empty">
+                    No estimates on this claim yet. Choose <b>Add Estimate</b> to price the first scenario.
+                </div>
+            </template>
+
+            <c-show-order-work-summary
+                claim-number={claimNumber}
+                vehicle={vehicle}
+                scenario-name={selectedScenarioName}
+                shop-name={selectedShopName}
+                shop-contact={selectedShopContact}
+                cap={cap}
+                deductible={deductible}
+                summary={workOrderSummary}
+                header={woHeader}></c-show-order-work-summary>
+        </main>
+    </div>
 </template>

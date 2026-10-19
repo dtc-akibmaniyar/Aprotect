@@ -1,0 +1,151 @@
+/* Work order PDF preview (TASK-050).
+   Styling taken from the design reference, "Colors and styling-html" /
+   Style.dc.html, rather than invented: page #e9edf2, cards #ffffff with
+   radius 8px and a 0 1px 6px rgba(22,50,92,.12) navy shadow, a 4px #0b5cab
+   top rule, eyebrow #0b5cab 800 at .1em uppercase, muted #5c6675, borders
+   #dde3ea, inputs 1px #aeb8c6 at radius 4px, primary #0b5cab, focus a 2px
+   blue ring, tabular numerals throughout. Radii follow the reference exactly:
+   4px on controls, 6px on inner panels, 8px on cards.
+
+   Wholesale blue (#e6edf7 on #1f4b8a) is reused for the recipients panel
+   because the reference is strict that blue carries A-Protect's own side of a
+   transaction; nothing here is a customer retail price, so purple would be
+   wrong.
+
+   Font sizes follow repairPriceScenarios rather than the raw mockup. Osama
+   asked on 2026-10-07 for the whole ramp to be larger because the mockup's
+   9.5 to 13px scale is unreadable in a real Lightning console, so matching the
+   mockup numerically would reintroduce the problem he reported. */
+
+.wop {
+    background: #e9edf2;
+    font-variant-numeric: tabular-nums;
+    color: #181b25;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+}
+
+.wop-err {
+    background: #fdecea;
+    border: 1px solid #ba0517;
+    border-radius: 6px;
+    color: #ba0517;
+    font-size: 14.5px;
+    padding: 10px 12px;
+}
+
+/* ───────────────────────── recipients, above the document ───────────────────────── */
+
+.wop-to {
+    background: #e6edf7;
+    border: 1px solid #aec4e4;
+    border-radius: 8px;
+    border-top: 4px solid #0b5cab;
+    box-shadow: 0 1px 6px rgba(22, 50, 92, .12);
+    padding: 16px 18px;
+}
+
+.wop-to-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.wop-to-title {
+    font-size: 13.5px;
+    font-weight: 800;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: #0b5cab;
+}
+
+.wop-to-sub {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: #1f4b8a;
+}
+
+.wop-to-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 18px;
+}
+
+.wop-note {
+    font-size: 13.5px;
+    color: #5c6675;
+    margin: 10px 0 0;
+}
+
+.wop-warn {
+    background: #fef1e6;
+    border-radius: 4px;
+    color: #8c4b02;
+    font-size: 13.5px;
+    font-weight: 600;
+    margin: 10px 0 0;
+    padding: 6px 10px;
+}
+
+/* ───────────────────────────── the document ───────────────────────────── */
+
+.wop-doc {
+    background: #ffffff;
+    border: 1px solid #dde3ea;
+    border-radius: 8px;
+    box-shadow: 0 1px 6px rgba(22, 50, 92, .12);
+    overflow: hidden;
+}
+
+.wop-frame {
+    display: block;
+    width: 100%;
+    height: 62vh;
+    min-height: 420px;
+    border: 0;
+    background: #ffffff;
+}
+
+/* ───────────────────────────── actions ───────────────────────────── */
+
+.wop-bar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.wop-bar lightning-button {
+    --slds-c-button-radius-border: 4px;
+    --slds-c-button-brand-color-background: #0b5cab;
+    --slds-c-button-brand-color-border: #0b5cab;
+    --slds-c-button-brand-color-background-hover: #16325c;
+    --slds-c-button-brand-color-border-hover: #16325c;
+}
+
+.wop-to lightning-input {
+    --slds-c-input-radius-border: 4px;
+    --slds-c-input-color-border: #aeb8c6;
+}
+
+@media (max-width: 600px) {
+    .wop { padding: 12px; }
+    .wop-to-grid { grid-template-columns: 1fr; }
+    .wop-frame { height: 50vh; }
+    .wop-bar { flex-wrap: wrap; }
+}
+
+/* The reference also ships a dark theme that follows the system setting:
+   page #10151d, card #19202b, text #e8edf4, accent #4c9be8. */
+@media (prefers-color-scheme: dark) {
+    .wop { background: #10151d; color: #e8edf4; }
+    .wop-doc { background: #19202b; border-color: #2a3542; }
+    .wop-to { background: #19202b; border-color: #2a3542; border-top-color: #4c9be8; }
+    .wop-to-title { color: #4c9be8; }
+    .wop-to-sub { color: #e8edf4; }
+    .wop-note { color: #aeb8c6; }
+}

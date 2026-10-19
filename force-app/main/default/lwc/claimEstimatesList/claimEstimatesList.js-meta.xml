@@ -3,7 +3,7 @@
     <apiVersion>63.0</apiVersion>
     <isExposed>true</isExposed>
     <masterLabel>Claim Estimates List</masterLabel>
-    <description>Estimates tab related list: Estimate / Repair Shop / Source / Retail Total, with a New Estimate button that opens Repair Price Scenarios.</description>
+    <description>Estimates tab related list: Estimate / Repair Shop / Retail Total / Customer Pays (+tax) / Selected, with a New Estimate button that opens Repair Price Scenarios.</description>
     <targets>
         <target>lightning__RecordPage</target>
     </targets>

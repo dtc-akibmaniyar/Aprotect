@@ -748,4 +748,46 @@ private class DealerPackageSyncServiceTest {
         System.assertEquals(999.00, after.Commercial_Vehicle_Surcharge_Fee__c,
             'The dealer commercial price is dealer-owned and never refreshed from the master');
     }
+
+    // ---------------------------------------------------------------------
+    // Formula guard: the Net/Retail formulas only apply when the discount /
+    // markup TYPE is present. A value with a blank type leaves the price
+    // unmoved (the exact console symptom); a value WITH its type moves it.
+    // Locks in the behaviour the console fix relies on.
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_priceFormulas_requireTheDiscountMarkupType() {
+        Account dealer = createDistinctDealer(9);
+        Package__c pkg = getMasterPackage();
+        Dealer_Package__c dp = TestDataFactory.createDealerPackage(
+            dealer.Id, pkg.Id, 'Extended_Limited_Warranty', true);
+        Dealer_Package_Term__c dt = soleDealerTerm(dp.Id);
+        Decimal anchor = [
+            SELECT Original_Package_Term_Cost__c FROM Dealer_Package_Term__c WHERE Id = :dt.Id
+        ].Original_Package_Term_Cost__c;
+        System.assertNotEquals(null, anchor, 'Fixture sanity: the term carries an anchor');
+
+        // Value supplied, type BLANK → the formulas ignore the discount/markup.
+        update new Dealer_Package_Term__c(
+            Id = dt.Id, Discount_Value__c = 10, Markup__c = 100,
+            Discount_Type__c = null, Markup_Type__c = null);
+        Dealer_Package_Term__c blank = [
+            SELECT Net_Cost__c, Retail_Price__c FROM Dealer_Package_Term__c WHERE Id = :dt.Id
+        ];
+        System.assertEquals(anchor, blank.Net_Cost__c,
+            'Blank discount type → the discount is not applied to Net');
+        System.assertEquals(anchor, blank.Retail_Price__c,
+            'Blank markup type → the markup is not applied to Retail');
+
+        // Same values WITH their types → both formulas move.
+        update new Dealer_Package_Term__c(
+            Id = dt.Id, Discount_Type__c = '%', Markup_Type__c = '$');
+        Dealer_Package_Term__c typed = [
+            SELECT Net_Cost__c, Retail_Price__c FROM Dealer_Package_Term__c WHERE Id = :dt.Id
+        ];
+        System.assert(typed.Net_Cost__c < anchor, 'The % discount now moves Net');
+        System.assertEquals(typed.Net_Cost__c + 100, typed.Retail_Price__c,
+            'The $ markup now moves Retail');
+    }
 }

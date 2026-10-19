@@ -1,6 +1,6 @@
 import { LightningElement, api } from 'lwc';
+import { NavigationMixin } from 'lightning/navigation';
 import getEstimatesForClaim from '@salesforce/apex/ClaimEstimateService.getEstimatesForClaim';
-import RepairPriceScenarios from 'c/repairPriceScenarios';
 
 const COLUMNS = [
     {
@@ -11,8 +11,11 @@ const COLUMNS = [
         wrapText: true
     },
     { label: 'Repair Shop', fieldName: 'repairShopName' },
-    { label: 'Source', fieldName: 'source' },
     { label: 'Retail Total', fieldName: 'retailTotal', type: 'currency', typeAttributes: { currencyCode: 'CAD' } },
+    // Osama, 2026-10-09: Source removed, Customer Pays (+tax) added after
+    // Retail Total. The label matches Estimate__c.Customer_Pays_With_Tax__c's
+    // own label, and the value is that stamped field read as-is.
+    { label: 'Customer Pays (+tax)', fieldName: 'customerPaysWithTax', type: 'currency', typeAttributes: { currencyCode: 'CAD' } },
     { label: 'Selected', fieldName: 'isSelected', type: 'boolean' }
 ];
 
@@ -23,7 +26,7 @@ const COLUMNS = [
  * a just-completed Manage Estimates save, with no wire/refreshApex/cache
  * subtlety to reason about.
  */
-export default class ClaimEstimatesList extends LightningElement {
+export default class ClaimEstimatesList extends NavigationMixin(LightningElement) {
     @api recordId;
 
     columns = COLUMNS;
@@ -43,8 +46,8 @@ export default class ClaimEstimatesList extends LightningElement {
                 estimateUrl: '/' + e.Id,
                 estimateName: e.Estimate_Name__c || e.Name,
                 repairShopName: e.Repair_Shop__r ? e.Repair_Shop__r.Name : '',
-                source: e.Source__c,
                 retailTotal: e.Retail_Total__c,
+                customerPaysWithTax: e.Customer_Pays_With_Tax__c,
                 isSelected: e.Is_Selected__c
             }));
         } finally {
@@ -56,14 +59,22 @@ export default class ClaimEstimatesList extends LightningElement {
         return this.estimates.length > 0;
     }
 
-    async handleNewEstimate() {
-        const result = await RepairPriceScenarios.open({
-            size: 'large',
-            label: 'Repair Price Scenarios',
-            claimId: this.recordId
+    /**
+     * TASK-047: this used to open repairPriceScenarios as a lightning/modal.
+     * The rebuilt Manage Estimates screen needs considerably more room than a
+     * modal can give it (Osama's decision 2), so it now navigates to the
+     * standalone Manage Estimates tab instead, carrying the claim in page
+     * state because an App Page has no record context of its own.
+     *
+     * The list refreshes on the way back through connectedCallback, which is
+     * why getEstimatesForClaim is deliberately not cacheable. There is no
+     * modal result to await any more.
+     */
+    handleNewEstimate() {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__navItemPage',
+            attributes: { apiName: 'Manage_Estimates' },
+            state: { c__claimId: this.recordId }
         });
-        if (result === 'saved') {
-            await this.loadEstimates();
-        }
     }
 }

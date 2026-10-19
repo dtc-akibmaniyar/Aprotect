@@ -630,6 +630,24 @@
                                         </div>
                                     </template>
 
+                                    <!-- Fees Section (Diesel Fee) -->
+                                    <template if:true={hasDieselFee}>
+                                        <div class="dcs-section-label">Fees</div>
+                                        <div class="dcs-row dcs-row-fee">
+                                            <div class="dcs-row-left">
+                                                <span class="dcs-item-name">Diesel Fee</span>
+                                                <span class="dcs-item-badge">Auto-applied</span>
+                                            </div>
+                                            <div class="dcs-fee-price-wrap">
+                                                <span class="dcs-item-price">+{formattedDieselFee}</span>
+                                                <span class="dcs-info-icon" tabindex="0">
+                                                    &#9432;
+                                                    <span class="dcs-info-tooltip">Mandatory fee applies to Diesel vehicles.</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </template>
+
                                     <!-- Fees Section (Commercial Vehicle Surcharge Fee) -->
                                     <template if:true={hasCommercialSurchargeFee}>
                                         <div class="dcs-section-label">Fees</div>

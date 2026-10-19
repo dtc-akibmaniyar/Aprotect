@@ -3,11 +3,7 @@ import { NavigationMixin } from 'lightning/navigation';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import createWorkOrderForSelectedEstimate from '@salesforce/apex/ClaimEstimateService.createWorkOrderForSelectedEstimate';
 import getActiveWorkOrderDetailsForClaim from '@salesforce/apex/ClaimEstimateService.getActiveWorkOrderDetailsForClaim';
-
-function fmt(n) {
-    const v = n || 0;
-    return `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+import getSelectedEstimateForClaim from '@salesforce/apex/ClaimEstimateService.getSelectedEstimateForClaim';
 
 /**
  * The Work Order tab's single component (Sep 22, extended in place rather
@@ -17,11 +13,13 @@ function fmt(n) {
  * Work_Order__c record - both the action and the result now live on this
  * same tab.
  *
- * Sep 24: detail view extended to the full "Selected Scenario" breakdown
- * from warranty_claims_dashboard (2).html (Customer Work Order / a-Protect
- * Internal Cost two-column card), sourced from Work_Order__c's own mirrored
- * formula fields plus a few purely descriptive fields read through the
- * Estimate lookup - see ClaimEstimateService.getActiveWorkOrderDetailsForClaim.
+ * Sep 24 added a two-column "Customer Work Order / A-Protect Internal Cost"
+ * breakdown here. TASK-050 REMOVED it on Osama's instruction, 2026-10-08: the
+ * work order PDF is now the customer-facing document and opens from the Work
+ * Order PDF button on this card, so the breakdown was duplicating it. The card
+ * now shows the header figures, the approved-repairs table and that button.
+ * getActiveWorkOrderDetailsForClaim still returns the breakdown fields; they
+ * are simply no longer rendered.
  *
  * Deliberately NOT automatic on the Claim_Status__c change to "Work Order" -
  * see the header comment history in ClaimEstimateService.cls for why.
@@ -33,6 +31,70 @@ export default class CreateWorkOrderAction extends NavigationMixin(LightningElem
     isCreating = false;
     workOrderDetail = null;
 
+    /**
+     * TASK-050 item 5. The claim's estimate marked Use, or null when there is
+     * none. The button is disabled until there is one, so the agent is told
+     * what to do instead of being refused after the click.
+     * createWorkOrderForSelectedEstimate still refuses server side, and that
+     * remains the authoritative check: this only moves the message earlier.
+     *
+     * Osama, 2026-10-09: it holds the record rather than a Boolean because the
+     * tab now names the estimate above the button, so the agent can see which
+     * one they are about to commit to before an action that is hard to undo.
+     */
+    selectedEstimate = null;
+
+    get estimateSelected() {
+        return !!this.selectedEstimate;
+    }
+
+    get noEstimateSelected() {
+        return !this.isLoading && !this.estimateSelected;
+    }
+
+    get cannotCreate() {
+        return this.isCreating || !this.estimateSelected;
+    }
+
+    /** Estimate_Name__c is the name agents use; Name is the auto-number. */
+    get selectedEstimateName() {
+        if (!this.selectedEstimate) return '';
+        return this.selectedEstimate.Estimate_Name__c || this.selectedEstimate.Name;
+    }
+
+    get selectedEstimateShop() {
+        return this.selectedEstimate &&
+            this.selectedEstimate.Repair_Shop__r &&
+            this.selectedEstimate.Repair_Shop__r.Name;
+    }
+
+    get selectedEstimateUrl() {
+        return this.selectedEstimate ? '/' + this.selectedEstimate.Id : '';
+    }
+
+    get selectedEstimateRetail() {
+        return this.selectedEstimate && this.selectedEstimate.Retail_Total__c;
+    }
+
+    get selectedEstimateCustomerPays() {
+        return this.selectedEstimate && this.selectedEstimate.Customer_Pays_With_Tax__c;
+    }
+
+    /**
+     * TASK-050. Whether the Work Order PDF preview modal is open. Opening it
+     * saves nothing; workOrderPdfPreview writes only on Save PDF or Save and
+     * Send PDF, so closing with Cancel leaves no trace on the record.
+     */
+    showPdf = false;
+
+    handleShowPdf() {
+        this.showPdf = true;
+    }
+
+    handlePdfClose() {
+        this.showPdf = false;
+    }
+
     connectedCallback() {
         this.loadDetail();
     }
@@ -41,6 +103,10 @@ export default class CreateWorkOrderAction extends NavigationMixin(LightningElem
         this.isLoading = true;
         try {
             this.workOrderDetail = await getActiveWorkOrderDetailsForClaim({ claimId: this.recordId });
+            if (!this.workOrderDetail) {
+                // Only matters on the branch that offers the button.
+                this.selectedEstimate = await getSelectedEstimateForClaim({ claimId: this.recordId });
+            }
         } catch (error) {
             this.showError('Could Not Load Work Order', error);
         } finally {
@@ -54,56 +120,6 @@ export default class CreateWorkOrderAction extends NavigationMixin(LightningElem
 
     get isDisabled() {
         return this.isCreating;
-    }
-
-    get partSummary() {
-        const d = this.workOrderDetail;
-        if (!d) return '';
-        const kmsPart = d.condition === 'USED' && d.kms ? ` ${Number(d.kms).toLocaleString()} km` : '';
-        return `Part: ${d.partComponent || '-'} · ${d.jobType || ''} · ${d.condition || ''}${kmsPart}`;
-    }
-
-    get supplierSummary() {
-        const d = this.workOrderDetail;
-        if (!d) return '';
-        return `Supplier: ${d.partsSupplierName || '-'} · part# ${d.partCode || '-'} · stock# ${d.stockNumber || '-'} · ${d.repairShopName || ''}`;
-    }
-
-    get coverageLabel() {
-        const d = this.workOrderDetail;
-        if (!d) return 'Less warranty coverage applied';
-        return `Less warranty coverage applied (cap ${fmt(d.capAmount)} − ded ${fmt(d.deductible)})`;
-    }
-
-    get labourLabel() {
-        const d = this.workOrderDetail;
-        if (!d) return 'Labour';
-        return `Labour (${d.labourHours || 0} hrs × ${fmt(d.labourRate)})`;
-    }
-
-    get insuranceLabel() {
-        const d = this.workOrderDetail;
-        if (!d) return 'Part warranty';
-        return `Part warranty (${d.insuranceSource || 'None'})`;
-    }
-
-    get taxLabel() {
-        const d = this.workOrderDetail;
-        if (!d || !d.customerPaysPreTax) return 'Tax';
-        const pct = (d.taxAmount / d.customerPaysPreTax) * 100;
-        return `Tax (${pct.toFixed(2)}%)`;
-    }
-
-    get plClass() {
-        const d = this.workOrderDetail;
-        if (!d || d.finalProfitLoss == null) return 'pl-value';
-        return d.finalProfitLoss >= 0 ? 'pl-value pl-profit' : 'pl-value pl-loss';
-    }
-
-    get plLabel() {
-        const d = this.workOrderDetail;
-        if (!d || d.finalProfitLoss == null) return '';
-        return d.finalProfitLoss >= 0 ? 'A-Protect PROFIT on this claim' : 'A-Protect LOSS on this claim';
     }
 
     async handleCreateWorkOrder() {
@@ -143,6 +159,10 @@ export default class CreateWorkOrderAction extends NavigationMixin(LightningElem
 
     handleLineClick(event) {
         this.navigateToRecord(event, 'Work_Order_Line_Item__c');
+    }
+
+    handleEstimateClick(event) {
+        this.navigateToRecord(event, 'Estimate__c');
     }
 
     showError(title, error, mode) {

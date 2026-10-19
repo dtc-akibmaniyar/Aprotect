@@ -79,6 +79,9 @@ export default class DealerPortalWarranty extends LightningElement {
     // FEATURE A — live premium preview (read-only Apex; no save required).
     @track livePremiumFee = 0;
     @track premiumWaived = false;
+    // LIVE Diesel Fee (same read-only preview call; getPremiumPreview already
+    // returns dieselFee from the shared resolveDieselFee rule the save path uses).
+    @track liveDieselFee = 0;
     // Reactive wire inputs for getPremiumPreview — refreshed on vehicle entry
     // (make/model/vehicleId) and on every term selection (dealerTermId).
     @track premiumPreviewTermId = null;
@@ -88,6 +91,7 @@ export default class DealerPortalWarranty extends LightningElement {
     @track premiumPreviewApplicationPackageId = null;
     @track isCommercialVehicle = false;
     @track modalCommercialSurchargeFee = 0;
+    @track modalDieselFee = 0;
     @track vehicleConfigChangedMessage = '';
     @track availableAdditionalOptionsData = []; // Raw additional options data
     @track existingAdditionalOptions = []; // Already selected options (from Salesforce)
@@ -336,6 +340,8 @@ export default class DealerPortalWarranty extends LightningElement {
         this.premiumFeeAmount = 0;
         this.modalPremiumFee = 0;
         this.premiumWaived = false;
+        this.liveDieselFee = 0;
+        this.modalDieselFee = 0;
         this.vehicleConfigChangedMessage = 'Vehicle details have been updated. Reloading available packages...';
         // Reload packages (new eligibility/terms), then reload the vehicle context
         // (make/model/id drive the premium-preview inputs) and force a fresh
@@ -1581,11 +1587,16 @@ export default class DealerPortalWarranty extends LightningElement {
             // fee rule the save path resolves — so the line updates live.
             const premiumFee = this.isPremiumVehicle && this.livePremiumFee > 0 ? this.livePremiumFee : 0;
             
+            // Mandatory Diesel Fee — from the same live read-only preview
+            // (getPremiumPreview.dieselFee). Charged whenever the vehicle is
+            // Diesel, independent of the premium gate.
+            const dieselFee = this.liveDieselFee > 0 ? this.liveDieselFee : 0;
+            
             // Calculate commercial vehicle surcharge fee
             const commercialSurchargeFee = this.isCommercialVehicle && this.selectedDealerPackage && this.selectedDealerPackage.commercialVehicleSurchargeFee ? this.selectedDealerPackage.commercialVehicleSurchargeFee : 0;
             
-            // Calculate total taxable amount (term retail price + additional options + premium vehicle fee + commercial surcharge)
-            const totalTaxableAmount = priceWithMarkup + newOptionsPrice + premiumFee + commercialSurchargeFee;
+            // Calculate total taxable amount (term retail price + additional options + premium vehicle fee + diesel fee + commercial surcharge)
+            const totalTaxableAmount = priceWithMarkup + newOptionsPrice + premiumFee + dieselFee + commercialSurchargeFee;
             
             // Calculate tax on total taxable amount - use taxRate (term taxAmount is only for term, recalculate for total)
             let taxAmount = 0;
@@ -1709,6 +1720,10 @@ export default class DealerPortalWarranty extends LightningElement {
         const premiumFee = this.isPremiumVehicle && this.livePremiumFee > 0 ? this.livePremiumFee : 0;
         this.modalPremiumFee = premiumFee;
 
+        // Mandatory Diesel Fee from the same live read-only preview.
+        const dieselFee = this.liveDieselFee > 0 ? this.liveDieselFee : 0;
+        this.modalDieselFee = dieselFee;
+
         // Commercial vehicle surcharge fee (per-package, from DealerPackageDTO)
         const commercialSurcharge = this.isCommercialVehicle && this.selectedDealerPackage && this.selectedDealerPackage.commercialVehicleSurchargeFee ? this.selectedDealerPackage.commercialVehicleSurchargeFee : 0;
         this.modalCommercialSurchargeFee = commercialSurcharge;
@@ -1716,8 +1731,8 @@ export default class DealerPortalWarranty extends LightningElement {
         this.modalDealerPrice = netCost;
         this.modalTaxRate = taxRate;
         
-        // Recalculate total with premium fee and commercial surcharge included
-        const totalBeforeTax = totalDealerBeforeTax + premiumFee + commercialSurcharge;
+        // Recalculate total with premium fee, diesel fee and commercial surcharge included
+        const totalBeforeTax = totalDealerBeforeTax + premiumFee + dieselFee + commercialSurcharge;
         const recalcTaxAmount = taxRate > 0 ? totalBeforeTax * (taxRate / 100) : taxAmount;
         this.modalTaxAmount = recalcTaxAmount;
         this.modalTotalWithTax = totalBeforeTax + recalcTaxAmount;
@@ -1833,6 +1848,18 @@ export default class DealerPortalWarranty extends LightningElement {
         return '$0.00';
     }
 
+    // Mandatory Diesel Fee row (Dealer Cost Summary — Fees section).
+    get hasDieselFee() {
+        return this.modalDieselFee != null && this.modalDieselFee > 0;
+    }
+
+    get formattedDieselFee() {
+        if (this.modalDieselFee != null && this.modalDieselFee > 0) {
+            return '$' + this.modalDieselFee.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        return '$0.00';
+    }
+
     // ------------------------------------------------------------------
     // FEATURE A — LIVE premium indication (read-only, pre-save).
     //
@@ -1858,11 +1885,15 @@ export default class DealerPortalWarranty extends LightningElement {
             this.isPremiumVehicle = data.isPremiumVehicle === true;
             this.livePremiumFee = data.premiumFee != null ? data.premiumFee : 0;
             this.premiumWaived = data.waived === true;
+            // Mandatory Diesel Fee — same rule the save path uses; 0 when the
+            // vehicle is not Diesel (or a pre-tax override is active).
+            this.liveDieselFee = data.dieselFee != null ? data.dieselFee : 0;
         } else if (error) {
             // Fail safe: never show a premium we could not resolve server-side.
             this.isPremiumVehicle = false;
             this.livePremiumFee = 0;
             this.premiumWaived = false;
+            this.liveDieselFee = 0;
         }
         this.updatePrice();
     }
@@ -2462,13 +2493,43 @@ export default class DealerPortalWarranty extends LightningElement {
     }
 
     get selectedTermName() {
-        if (this.isExistingApplication && this.existingApplicationPackage && this.existingApplicationPackage.selectedTermName) {
-            return this.existingApplicationPackage.selectedTermName;
+        // "COVERAGE TERM SELECTED" must show the application's ACTUAL selected
+        // term. Resolve it from the stored selection — the active
+        // Application_Package's Dealer_Package_Term__c (payload selectedTermId)
+        // mapped to its loaded term DTO — so a stale term from a different /
+        // previously-active package can never be displayed. Falls back to the
+        // server-resolved payload name, then to the live term selection.
+        if (this.isExistingApplication && this.existingApplicationPackage) {
+            const storedTermId = this.existingApplicationPackage.selectedTermId;
+            const matched = this._termNameForId(storedTermId);
+            if (matched) {
+                return matched;
+            }
+            if (this.existingApplicationPackage.selectedTermName) {
+                return this.existingApplicationPackage.selectedTermName;
+            }
         }
         if (this.selectedWarrantyTerm) {
             return this.selectedWarrantyTerm.packageTermName || this.selectedWarrantyTerm.Name || 'No term selected';
         }
         return 'No term selected';
+    }
+
+    /** Resolve a term display name from the loaded dealer packages by term Id. */
+    _termNameForId(termId) {
+        if (!termId) {
+            return null;
+        }
+        const packages = this.dealerPackages || [];
+        for (const pkg of packages) {
+            const terms = pkg.warrantyTerms || pkg.terms || [];
+            for (const term of terms) {
+                if (term.Id === termId) {
+                    return term.packageTermName || term.Name || null;
+                }
+            }
+        }
+        return null;
     }
 
     get selectedTermDuration() {

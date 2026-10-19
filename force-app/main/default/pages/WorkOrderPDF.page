@@ -1,0 +1,320 @@
+<apex:page standardController="Work_Order__c"
+    extensions="WorkOrderPDFController"
+    applyBodyTag="false"
+    applyHtmlTag="false"
+    showHeader="false"
+    sidebar="false"
+    renderAs="pdf">
+<!--
+  The work order document, for the customer and the repair shop to authorize.
+  TASK-050 requirement 3.
+
+  MIRRORS showOrderWorkSummary SECTION FOR SECTION, on Osama's instruction of
+  2026-10-08, so that what an agent checks on Manage Estimates is what the
+  customer receives. The order of sections, the row labels and the wording are
+  taken from that component and should be changed in both places or neither.
+  Styling follows the design reference "Colors and styling-html" / Style.dc.html,
+  the same source the component uses: navy #16325c section bars, #eef3fa on the
+  Customer Pays line, #eaf5ee on the fully-covered note, 3px navy rule under the
+  company block.
+
+  Two deliberate differences, both because this is the document rather than a
+  preview of one. The component's "Preview of what the Work Order document will
+  show. Nothing here is saved." paragraph is omitted, since it would be false
+  here. And every figure comes from the saved work order instead of unsaved
+  scenario input.
+
+  Every customer and vehicle value comes from the work order's own snapshot
+  fields, never from Claim__r, so a document already sent out cannot change
+  when somebody later corrects the application.
+-->
+<html>
+<head>
+    <style type="text/css">
+        @page {
+            size: letter portrait;
+            margin: 11mm 12mm 12mm 12mm;
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-family: Arial, sans-serif; font-size: 8pt; color: #666666;
+            }
+        }
+        body { font-family: Arial, sans-serif; font-size: 9.5pt; color: #1a1a1a; }
+
+        /* company block, a 3px navy rule beneath it as in the component */
+        table.co { width: 100%; border-collapse: collapse;
+                   border-bottom: 3px solid #16325c; padding-bottom: 6pt; }
+        table.co td { vertical-align: top; padding-bottom: 6pt; }
+        .co-name { font-size: 13pt; font-weight: bold; color: #16325c; display: block; }
+        .co-left { font-size: 8.5pt; color: #333333; line-height: 1.45; }
+        .co-right { text-align: right; font-size: 8.5pt; color: #333333; }
+
+        h1.doc { font-size: 13.5pt; color: #16325c; text-align: center;
+                 margin: 9pt 0 2pt; letter-spacing: .02em; }
+        p.note { font-size: 8pt; color: #555555; text-align: center; margin: 0 0 9pt; }
+
+        /* section bar */
+        .gh { background-color: #16325c; page-break-after: avoid; color: #ffffff; font-weight: bold;
+              font-size: 8pt; letter-spacing: .06em; text-transform: uppercase;
+              padding: 3.5pt 6pt; margin-top: 9pt; }
+
+        /* label / value rows */
+        table.kv { width: 100%; border-collapse: collapse; }
+        table.kv td { padding: 2.5pt 0; border-bottom: 0.5pt solid #eeeeee;
+                      font-size: 9.5pt; vertical-align: top; }
+        /* 18% matches the component, whose label column is 150px on ~900px of
+           paper. At 42% the value sat halfway across the page. */
+        table.kv td.k { color: #555555; }
+        /* only the full-width tables need a fixed label column; the paired
+           table takes its widths from its colgroup. */
+        table.kv.wide td.k { width: 18%; }
+        /* the vehicle labels are longer than the customer ones and were
+           being squeezed against their values */
+        /* widths live on the colgroup so the bar row and the data rows cannot
+           disagree. k2 and ghright share the same left padding, which is what
+           keeps the join in the navy bar over the column boundary. */
+        table.kv.pair td.k2 { padding-left: 10pt; }
+        table.kv.pair td.ghcell { padding: 0; border-bottom: none; }
+        table.kv.pair td.ghright { padding-left: 10pt; }
+        table.kv td.v { font-weight: bold; }
+
+        /* two columns, Customer Information beside Vehicle Information */
+
+        /* amount rows */
+        table.rows { width: 100%; border-collapse: collapse; }
+        table.rows td { padding: 3.5pt 6pt; border-bottom: 0.5pt solid #e5e5e5; font-size: 9.5pt; }
+        table.rows td.n { text-align: right; }
+        table.rows tr.hd td { background-color: #f2f4f7; font-weight: bold; font-size: 8pt;
+                              text-transform: uppercase; letter-spacing: .05em; color: #444444; }
+        table.rows tr.t td { font-weight: bold; border-top: 1.5pt solid #16325c; }
+        table.rows tr.pay td { font-size: 12pt; font-weight: bold; color: #16325c;
+                               background-color: #eef3fa; }
+
+        .covered { padding: 4pt 6pt; color: #1d5e34; font-weight: bold;
+                   background-color: #eaf5ee; font-size: 9pt; }
+        .reimb { padding: 4pt 6pt; color: #1f4b8a; font-weight: bold;
+                 background-color: #eef4ff; font-size: 9pt; }
+        p.fine { font-size: 8pt; color: #666666; margin: 5pt 0 0; }
+        /* TASK-051, the per-receipt over-limit line, as .wos-over in the preview */
+        .over { font-size: 7.5pt; color: #8c4b02; }
+        p.ack { font-size: 8.5pt; line-height: 1.5; color: #333333; margin: 5pt 0 0; }
+        table.sig { width: 100%; margin-top: 16pt; border-collapse: collapse; }
+        table.sig td { border-top: 0.5pt solid #333333; padding-top: 3pt;
+                       font-size: 8.5pt; color: #555555; }
+        .empty { border: 0.5pt dashed #aeb8c6; background-color: #f5f7fa;
+                 padding: 9pt; text-align: center; font-size: 9.5pt; color: #5c6675; }
+    </style>
+</head>
+<body>
+
+    <table class="co">
+        <tr>
+            <td class="co-left">
+                <span class="co-name">A-Protect Warranty Corporation</span>
+                8800 Dufferin St. Suite 302B, Concord, ON L4K 0C5<br/>
+                Phone: 1-866-660-7444 | (416) 661-7444<br/>
+                E-mail: info@a-protectwarranty.com
+            </td>
+            <td class="co-right">
+                Claim: {!Work_Order__c.Claim__r.Name}<br/>
+                Work order: {!Work_Order__c.Name}
+                <!-- Scenario line removed, Osama 2026-10-13: the scenario name
+                     is internal and does not belong on the customer document. -->
+            </td>
+        </tr>
+    </table>
+
+    <h1 class="doc">{!title}</h1>
+    <!-- Repair only, Osama 2026-10-13: a reimbursement reserves no parts. -->
+    <apex:outputPanel rendered="{!isRepair}" layout="none">
+        <p class="note">
+            Estimates: if the repair requires parts that must be reserved, A-Protect will only honor
+            this estimate for 24 to 48 hours from the date above. Otherwise, the price may be subject
+            to change.
+        </p>
+    </apex:outputPanel>
+
+    <table class="kv wide">
+        <tr>
+            <td class="k" style="width: 11%;">Date:</td>
+            <td class="v" style="width: 40%;"><apex:outputText value="{0,date,MMMM d, yyyy}">
+                              <apex:param value="{!today}"/>
+                          </apex:outputText></td>
+            <td class="k" style="width: 22%;">Application # (AP#):</td>
+            <td class="v" style="width: 27%;">{!Work_Order__c.Application_Number__c}</td>
+        </tr>
+    </table>
+
+    <!--
+      Customer and Vehicle share ONE table, INCLUDING their section bars.
+      Two earlier attempts each fixed one axis and broke the other: separate
+      tables per column let the renderer lay them out independently so the rows
+      sat at different heights, and moving the bars into their own table made
+      the bars split at 50% while the data columns split elsewhere, so the join
+      in the navy bar no longer lined up with the column beneath it. With the
+      bars as a colspan row of the same four-column table, both axes are fixed
+      by construction: 15 + 35 is exactly 50, so the right-hand bar and the
+      right-hand label start at the same x.
+    -->
+    <table class="kv pair">
+        <colgroup>
+            <col style="width: 15%;"/>
+            <col style="width: 35%;"/>
+            <col style="width: 21%;"/>
+            <col style="width: 29%;"/>
+        </colgroup>
+        <tr class="ghrow">
+            <td colspan="2" class="ghcell"><div class="gh">Customer Information</div></td>
+            <td colspan="2" class="ghcell ghright"><div class="gh">Vehicle Information</div></td>
+        </tr>
+        <tr>
+            <td class="k">Customer Name:</td>
+            <td class="v">{!Work_Order__c.Customer_Name__c}</td>
+            <td class="k k2">Year/Make/Model/Trim:</td>
+            <td class="v">{!vehicleDisplay}</td>
+        </tr>
+        <tr>
+            <td class="k">Address:</td>
+            <td><apex:repeat value="{!customerAddressLines}" var="al">{!al}<br/></apex:repeat></td>
+            <td class="k k2">VIN #:</td>
+            <td class="v">{!Work_Order__c.VIN__c}</td>
+        </tr>
+        <tr>
+            <td class="k">Email:</td>
+            <td>{!Work_Order__c.Customer_Email__c}</td>
+            <td class="k k2">Odometer In:</td>
+            <td class="v">{!odometerDisplay}</td>
+        </tr>
+        <tr>
+            <td class="k">Phone #:</td>
+            <td class="v">{!Work_Order__c.Customer_Phone__c}</td>
+            <td class="k k2"></td>
+            <td></td>
+        </tr>
+    </table>
+
+    <div class="gh">Authorized Repair Facility</div>
+    <table class="kv wide">
+        <tr><td class="k">Repair shop:</td><td class="v">{!shopDisplay}</td></tr>
+        <tr><td class="k">Address / contact:</td><td>{!shopContactDisplay}</td></tr>
+    </table>
+
+    <apex:outputPanel rendered="{!isRepair}" layout="none">
+        <div class="gh">Service / Description</div>
+        <apex:outputPanel rendered="{!hasLines}" layout="none">
+            <table class="rows">
+                <tr class="hd"><td>Service/Description</td><td class="n">Amount</td></tr>
+                <apex:repeat value="{!lines}" var="l">
+                    <tr>
+                        <td>{!l.description}</td>
+                        <td class="n">{!l.amountDisplay}</td>
+                    </tr>
+                </apex:repeat>
+                <tr class="t"><td>Sub-Total:</td>
+                    <td class="n">{!subTotalDisplay}</td></tr>
+                <tr><td>{!taxLabel}</td>
+                    <td class="n">{!taxDisplay}</td></tr>
+                <tr class="t"><td>Total Due:</td>
+                    <td class="n">{!totalDueDisplay}</td></tr>
+            </table>
+        </apex:outputPanel>
+        <apex:outputPanel rendered="{!NOT(hasLines)}" layout="none">
+            <div class="empty">This work order has no line items yet.</div>
+        </apex:outputPanel>
+
+        <div class="gh">Warranty Coverage</div>
+        <table class="rows">
+            <tr><td>Warranty Coverage</td>
+                <td class="n">{!capDisplay}</td></tr>
+            <tr><td>Deductible</td>
+                <td class="n">{!deductibleCreditDisplay}</td></tr>
+            <tr class="t"><td>A-Protect Coverage:</td>
+                <td class="n">{!coverageCreditDisplay}</td></tr>
+            <apex:repeat value="{!benefitLines}" var="b">
+                <tr><td>{!b.label}</td>
+                    <td class="n">{!b.creditDisplay}</td></tr>
+            </apex:repeat>
+        </table>
+        <apex:outputPanel rendered="{!isFullyCovered}" layout="none">
+            <div class="covered">{!fullyCoveredNote}</div>
+        </apex:outputPanel>
+        <table class="rows">
+            <tr class="pay"><td>Customer Pays:</td>
+                <td class="n">{!customerPaysDisplay}</td></tr>
+        </table>
+    </apex:outputPanel>
+
+    <!-- TASK-051. Mirrors the Reimbursement Only block of showOrderWorkSummary,
+         itself laid out after the reimbursement notice (openRN) in Repair
+         Price Scenarios Feedback 1.0. -->
+    <apex:outputPanel rendered="{!isReimbursement}" layout="none">
+        <div class="gh">Approved reimbursement</div>
+        <table class="rows">
+            <tr class="hd">
+                <td>Benefit</td><td class="n">Receipts submitted</td>
+                <td class="n">Approved</td><td class="n">Left on term</td>
+            </tr>
+            <apex:repeat value="{!benefitLines}" var="b">
+                <tr>
+                    <td>{!b.benefitType}
+                        <apex:outputPanel rendered="{!b.hasOver}" layout="none">
+                            <div class="over">{!b.overNote}</div>
+                        </apex:outputPanel>
+                    </td>
+                    <td class="n">{!b.receiptsDisplay}</td>
+                    <td class="n">{!b.amountDisplay}</td>
+                    <td class="n">{!b.leftOnTermDisplay}</td>
+                </tr>
+            </apex:repeat>
+            <tr class="t"><td>Total</td>
+                <td class="n">{!receiptsTotalDisplay}</td>
+                <td class="n">{!reimbursedTotalDisplay}</td>
+                <td class="n"></td></tr>
+            <tr class="pay"><td colspan="2">Amount to be reimbursed to you:</td>
+                <td class="n" colspan="2">{!reimbursedTotalDisplay}</td></tr>
+        </table>
+        <apex:outputPanel rendered="{!anyOver}" layout="none">
+            <p class="fine">Amounts above your remaining benefit limit for the term are not eligible for reimbursement.</p>
+        </apex:outputPanel>
+        <div class="reimb">Reimbursement only: no deductible and no shop supplies apply.</div>
+        <table class="rows">
+            <tr class="t"><td>Customer Pays:</td><td class="n">$0.00</td></tr>
+        </table>
+
+        <div class="gh">How you will be paid</div>
+        <table class="kv wide">
+            <tr><td class="k">Payment method:</td><td class="v">{!paymentMethodDisplay}</td></tr>
+            <tr><td class="k">Expected payment:</td><td class="v">{!expectedPaymentDisplay}</td></tr>
+        </table>
+        <p class="ack">
+            If any of your details above are incorrect, please contact us before the payment date so we
+            can update them. Keep your original receipts until you have received your payment.
+        </p>
+        <p class="ack">{!questionsLine}</p>
+        <p class="ack">Thank you for choosing A-Protect Warranty.</p>
+    </apex:outputPanel>
+
+    <p class="fine">
+        Prior to vehicle release, this is the estimated amount that the customer must pay.
+    </p>
+
+    <div class="gh">Customer Acknowledgement</div>
+    <p class="ack">
+        I, the Customer, hereby authorize the above repair work to be done along with necessary
+        materials. You and your employees may operate the above vehicle for purposes of testing,
+        inspection, or delivery at my risk. An express mechanic's lien is acknowledged on the above
+        vehicle to secure the amount of repairs thereto. We will not be held responsible for the
+        loss or damage to the vehicle or articles left in the vehicle in case of fire, theft,
+        accident or any other cause beyond our control.
+    </p>
+    <table class="sig">
+        <tr>
+            <td style="width: 62%;">Customer Authorization</td>
+            <td style="width: 6%;">&nbsp;</td>
+            <td style="width: 32%;">Date</td>
+        </tr>
+    </table>
+
+</body>
+</html>
+</apex:page>

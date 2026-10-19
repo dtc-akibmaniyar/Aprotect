@@ -1,0 +1,251 @@
+/* Work Order Summary (TASK-047).
+   Palette and type scale taken from Noelle's Style.dc.html: navy #16325c,
+   accent #0b5cab, page #e9edf2, wholesale blue #e6edf7 on #1f4b8a, retail
+   purple #f0eafb on #5b36a8, good tint #e3f3e8 on #1d5e34.
+   Radii: 4px controls, 6px inner panels, 8px cards. */
+
+.wos {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 1px 6px rgba(22, 50, 92, .12);
+    overflow: hidden;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.wos-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid #dde3ea;
+    flex-wrap: wrap;
+}
+.wos-bar b {
+    font-size: 17px;
+    color: #181b25;
+}
+.wos-src {
+    font-size: 14.5px;
+    color: #5c6675;
+    margin-right: auto;
+}
+
+.wos-paper {
+    padding: 28px 32px;
+    background: #ffffff;
+    color: #1a1a1a;
+    font-size: 15px;
+}
+
+.wos-co {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    border-bottom: 3px solid #16325c;
+    padding-bottom: 12px;
+}
+.wos-co-left {
+    line-height: 1.5;
+    font-size: 14.5px;
+    color: #333333;
+}
+.wos-co-left b {
+    font-size: 19.5px;
+    color: #16325c;
+    display: block;
+}
+.wos-co-right {
+    text-align: right;
+    font-size: 14.5px;
+    color: #333333;
+}
+
+.wos-h2 {
+    margin: 16px 0 4px;
+    font-size: 22px;
+    color: #16325c;
+    text-align: center;
+    letter-spacing: .02em;
+}
+.wos-note {
+    font-size: 13.5px;
+    color: #555555;
+    text-align: center;
+    margin: 0 0 14px;
+}
+
+/* Osama, 2026-10-07: he likes seeing the work order here, but was clear that
+   this screen is NOT where the document belongs. The real Work Order and its
+   line items live on Work_Order__c, and the PDF should be generated from that
+   record. This block says so on the page itself, so nobody mistakes the
+   preview for the document. */
+.wos-preview-note {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: #1f4b8a;
+    background: #e6edf7;
+    border: 1px solid #aec4e4;
+    border-radius: 4px;
+    padding: 8px 12px;
+    text-align: center;
+    margin: 0 0 14px;
+}
+
+.wos-g2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 24px;
+}
+
+.wos-kv {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    /* start, not center: the address runs to three lines and centring pushed
+       its label halfway down the block. The PDF top-aligns for the same reason. */
+    align-items: start;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid #eeeeee;
+    font-size: 15px;
+}
+.wos-kv > span:first-child {
+    color: #555555;
+}
+/* The header rows used to be lightning-inputs tinted to look fillable. TASK-050
+   made them read values from the claim, so the tint is gone with them. */
+
+.wos-gh {
+    background: #16325c;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 13.5px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 6px 10px;
+    margin-top: 14px;
+}
+
+.wos-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 10px;
+    border-bottom: 1px solid #e5e5e5;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+}
+.wos-row.wos-hd {
+    font-weight: 700;
+    background: #f2f4f7;
+    font-size: 13.5px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #444444;
+}
+.wos-row.wos-t {
+    font-weight: 700;
+    border-top: 2px solid #16325c;
+}
+.wos-row.wos-pay {
+    font-size: 18.5px;
+    font-weight: 800;
+    color: #16325c;
+    background: #eef3fa;
+}
+
+/* TASK-051. Reimbursement table: Benefit | Receipts submitted | Approved |
+   Left on term, figures right-aligned as in Feedback 1.0. Shares the row
+   rule, header and total styles with .wos-row. */
+.wos-row4 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(3, 130px);
+    gap: 12px;
+    padding: 7px 10px;
+    border-bottom: 1px solid #e5e5e5;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+}
+.wos-row4 > span:not(:first-child) {
+    text-align: right;
+}
+.wos-row4.wos-hd {
+    font-weight: 700;
+    background: #f2f4f7;
+    font-size: 13.5px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #444444;
+}
+.wos-row4.wos-t {
+    font-weight: 700;
+    border-top: 2px solid #16325c;
+}
+.wos-over {
+    display: block;
+    font-size: 12.5px;
+    color: #8c4b02;
+}
+
+.wos-covered {
+    padding: 7px 10px;
+    color: #1d5e34;
+    font-weight: 600;
+    background: #eaf5ee;
+    font-size: 15px;
+}
+.wos-reimb {
+    padding: 7px 10px;
+    color: #1f4b8a;
+    font-weight: 600;
+    background: #eef4ff;
+    font-size: 15px;
+}
+
+.wos-fine {
+    font-size: 13px;
+    color: #666666;
+    margin: 6px 0 0;
+}
+.wos-ack {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: #333333;
+    margin: 8px 0 0;
+}
+.wos-sig {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 24px;
+    margin-top: 26px;
+}
+.wos-sig > div {
+    border-top: 1px solid #333333;
+    padding-top: 4px;
+    font-size: 13.5px;
+    color: #555555;
+}
+
+.wos-empty {
+    background: #f5f7fa;
+    border: 1px dashed #aeb8c6;
+    border-radius: 6px;
+    padding: 16px;
+    text-align: center;
+    font-size: 14.5px;
+    color: #5c6675;
+}
+
+@media (max-width: 600px) {
+    .wos-paper { padding: 18px 14px; }
+    .wos-g2 { grid-template-columns: 1fr; }
+    .wos-kv { grid-template-columns: 120px minmax(0, 1fr); }
+    .wos-row4 { grid-template-columns: minmax(0, 1fr) repeat(3, 84px); gap: 8px; }
+}
+
+/* One address line per row. The claim formula embeds <br> tags, which are
+   split out in customerAddressLines rather than injected as markup. */
+.wos-addr {
+    display: block;
+}

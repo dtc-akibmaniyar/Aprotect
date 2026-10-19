@@ -1,0 +1,166 @@
+<template>
+    <template lwc:if={hasSummary}>
+        <section class="wos" aria-labelledby="wos-title">
+            <div class="wos-bar">
+                <b id="wos-title">Work Order Summary, preview only</b>
+                <span class="wos-src">{sourceLabel}</span>
+            </div>
+
+            <div class="wos-paper">
+                <div class="wos-co">
+                    <div class="wos-co-left">
+                        <b>A-Protect Warranty Corporation</b>
+                        <div>8800 Dufferin St. Suite 302B, Concord, ON L4K 0C5</div>
+                        <div>Phone: 1-866-660-7444 | (416) 661-7444</div>
+                        <div>E-mail: info@a-protectwarranty.com</div>
+                    </div>
+                    <div class="wos-co-right">
+                        <div>Claim: {claimNumber}</div>
+                        <!-- Scenario line removed, Osama 2026-10-13, as on the
+                             work order PDF. The bar above still names it. -->
+                    </div>
+                </div>
+
+                <h2 class="wos-h2">{title}</h2>
+                <!-- Repair only, Osama 2026-10-13: a reimbursement reserves no parts. -->
+                <template lwc:if={isRepair}>
+                    <p class="wos-note">
+                        Estimates: if the repair requires parts that must be reserved, A-Protect will only honor
+                        this estimate for 24 to 48 hours from the date above. Otherwise, the price may be subject
+                        to change.
+                    </p>
+                </template>
+                <p class="wos-preview-note">
+                    Preview of what the Work Order document will show. Nothing here is saved. The Work Order
+                    and its line items are created from the Work Order tab, and the document is produced from
+                    the Work Order record.
+                </p>
+
+                <div class="wos-g2">
+                    <div class="wos-kv"><span>Date:</span><b>{today}</b></div>
+                    <div class="wos-kv"><span>Application # (AP#):</span><b>{applicationNumber}</b></div>
+                </div>
+
+                <div class="wos-g2">
+                    <div>
+                        <div class="wos-gh">Customer Information</div>
+                        <div class="wos-kv"><span>Customer Name:</span><b>{customerName}</b></div>
+                        <div class="wos-kv"><span>Address:</span><span>
+                            <template for:each={customerAddressLines} for:item="al">
+                                <span key={al.key} class="wos-addr">{al.text}</span>
+                            </template>
+                        </span></div>
+                        <div class="wos-kv"><span>Email:</span><span>{customerEmail}</span></div>
+                        <div class="wos-kv"><span>Phone #:</span><b>{customerPhone}</b></div>
+                    </div>
+                    <div>
+                        <div class="wos-gh">Vehicle Information</div>
+                        <div class="wos-kv"><span>Year/Make/Model/Trim:</span><b>{vehicleDisplay}</b></div>
+                        <div class="wos-kv"><span>VIN #:</span><b>{vin}</b></div>
+                        <div class="wos-kv"><span>Odometer In:</span><b>{odometerDisplay}</b></div>
+                    </div>
+                </div>
+
+                <div class="wos-gh">Authorized Repair Facility</div>
+                <div class="wos-kv"><span>Repair shop:</span><b>{shopDisplay}</b></div>
+                <div class="wos-kv"><span>Address / contact:</span><span>{shopContactDisplay}</span></div>
+
+                <template lwc:if={isRepair}>
+                    <div class="wos-gh">Service / Description</div>
+                    <div class="wos-row wos-hd"><span>Service/Description</span><span>Amount</span></div>
+                    <template for:each={lines} for:item="line">
+                        <div class="wos-row" key={line.key}>
+                            <span>{line.description}</span><span>{line.amount}</span>
+                        </div>
+                    </template>
+                    <div class="wos-row wos-t"><span>Sub-Total:</span><span>{subTotal}</span></div>
+                    <div class="wos-row"><span>{taxLabel}</span><span>{tax}</span></div>
+                    <div class="wos-row wos-t"><span>Total Due:</span><span>{totalDue}</span></div>
+
+                    <div class="wos-gh">Warranty Coverage</div>
+                    <div class="wos-row"><span>Warranty Coverage</span><span>{capDisplay}</span></div>
+                    <div class="wos-row"><span>Deductible</span><span>{deductibleCredit}</span></div>
+                    <div class="wos-row wos-t"><span>A-Protect Coverage:</span><span>{coverageCredit}</span></div>
+                    <template for:each={benefitLines} for:item="benefit">
+                        <div class="wos-row" key={benefit.key}>
+                            <span>{benefit.label}</span><span>{benefit.credit}</span>
+                        </div>
+                    </template>
+                    <template lwc:if={isFullyCovered}>
+                        <div class="wos-covered">{fullyCoveredNote}</div>
+                    </template>
+                    <div class="wos-row wos-pay"><span>Customer Pays:</span><span>{customerPays}</span></div>
+                </template>
+
+                <!-- TASK-051. Laid out after the reimbursement notice in
+                     Repair Price Scenarios Feedback 1.0 (openRN). -->
+                <template lwc:if={isReimbursement}>
+                    <div class="wos-gh">Approved reimbursement</div>
+                    <div class="wos-row4 wos-hd">
+                        <span>Benefit</span><span>Receipts submitted</span><span>Approved</span><span>Left on term</span>
+                    </div>
+                    <template for:each={benefitLines} for:item="benefit">
+                        <div class="wos-row4" key={benefit.key}>
+                            <span>
+                                {benefit.name}
+                                <template lwc:if={benefit.overNote}>
+                                    <span class="wos-over">{benefit.overNote}</span>
+                                </template>
+                            </span>
+                            <span>{benefit.receipts}</span><span>{benefit.amount}</span><span>{benefit.leftOnTerm}</span>
+                        </div>
+                    </template>
+                    <div class="wos-row4 wos-t">
+                        <span>Total</span><span>{receiptsTotal}</span><span>{approvedTotal}</span><span></span>
+                    </div>
+                    <div class="wos-row wos-pay">
+                        <span>Amount to be reimbursed to you:</span><span>{reimbursedTotal}</span>
+                    </div>
+                    <template lwc:if={anyOver}>
+                        <p class="wos-fine">
+                            Amounts above your remaining benefit limit for the term are not eligible for reimbursement.
+                        </p>
+                    </template>
+                    <div class="wos-reimb">
+                        Reimbursement only: no deductible and no shop supplies apply.
+                    </div>
+                    <div class="wos-row wos-t"><span>Customer Pays:</span><span>{zero}</span></div>
+
+                    <div class="wos-gh">How you will be paid</div>
+                    <div class="wos-kv"><span>Payment method:</span><b>{paymentMethodDisplay}</b></div>
+                    <div class="wos-kv"><span>Expected payment:</span><b>{expectedPaymentDisplay}</b></div>
+                    <p class="wos-ack">
+                        If any of your details above are incorrect, please contact us before the payment date so we
+                        can update them. Keep your original receipts until you have received your payment.
+                    </p>
+                    <p class="wos-ack">{questionsLine}</p>
+                    <p class="wos-ack">Thank you for choosing A-Protect Warranty.</p>
+                </template>
+
+                <p class="wos-fine">
+                    Prior to vehicle release, this is the estimated amount that the customer must pay.
+                </p>
+
+                <div class="wos-gh">Customer Acknowledgement</div>
+                <p class="wos-ack">
+                    I, the Customer, hereby authorize the above repair work to be done along with necessary
+                    materials. You and your employees may operate the above vehicle for purposes of testing,
+                    inspection, or delivery at my risk. An express mechanic's lien is acknowledged on the above
+                    vehicle to secure the amount of repairs thereto. We will not be held responsible for the
+                    loss or damage to the vehicle or articles left in the vehicle in case of fire, theft,
+                    accident or any other cause beyond our control.
+                </p>
+                <div class="wos-sig">
+                    <div>Customer Authorization</div>
+                    <div>Date</div>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <template lwc:else>
+        <div class="wos-empty">
+            Mark a scenario <b>Use</b> to see its work order summary here.
+        </div>
+    </template>
+</template>

@@ -1393,4 +1393,161 @@ private class DealerPackageSyncControllerTest {
         System.assertEquals(false, unknown.success);
         assertNoApiNames(unknown.message);
     }
+
+    // ---------------------------------------------------------------------
+    // Defensive type default (P7 fix) — the console can send a value with a
+    // BLANK type (its dropdown shows a default the underlying value never
+    // carried). A blank type makes the Net_Cost__c / Retail_Price__c formulas
+    // ignore the amount, so the backend now stores the displayed default type
+    // ('%' discount, '$' markup) whenever a value is supplied.
+    // ---------------------------------------------------------------------
+
+    @isTest
+    static void test_termPricing_blankTypeStoresDefault_andPricesMove() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = [SELECT Id FROM Package__c
+                          WHERE RecordType.DeveloperName = 'Extended_Limited_Warranty' LIMIT 1];
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+        Dealer_Package_Term__c seed = dealerTermOf(dp.Id);
+        Id termId = seed.Id;
+        System.assertEquals(1500.00, seed.Original_Package_Term_Cost__c,
+            'Fixture sanity: the mirrored term anchors on the master price');
+
+        // Value typed, type left BLANK (the console bug).
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.saveDealerTermPricing(termId, null, 10, null, 100, null);
+        System.assertEquals(true, r.success, r.message);
+        assertNoApiNames(r.message);
+
+        Dealer_Package_Term__c t = [
+            SELECT Discount_Type__c, Discount_Value__c, Markup_Type__c, Markup__c,
+                   Net_Cost__c, Retail_Price__c
+            FROM Dealer_Package_Term__c WHERE Id = :termId
+        ];
+        System.assertEquals('%', t.Discount_Type__c,
+            'A discount value with a blank type stores the default % type');
+        System.assertEquals('$', t.Markup_Type__c,
+            'A markup value with a blank type stores the default $ type');
+        // Formula-driven: Net = 1500 − 10% = 1350; Retail = 1350 + $100 = 1450.
+        System.assertEquals(1350.00, t.Net_Cost__c,
+            'Net Price must move once the discount type is present');
+        System.assertEquals(1450.00, t.Retail_Price__c,
+            'Retail Price must move once the markup type is present');
+    }
+
+    @isTest
+    static void test_termPricing_nullValueWithBlankType_staysBlank() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = [SELECT Id FROM Package__c
+                          WHERE RecordType.DeveloperName = 'Extended_Limited_Warranty' LIMIT 1];
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+        Id termId = dealerTermOf(dp.Id).Id;
+
+        // No value supplied → no default type is forced; a genuine no-op.
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.saveDealerTermPricing(termId, null, null, null, null, null);
+        System.assertEquals(true, r.success, r.message);
+        Dealer_Package_Term__c t = [
+            SELECT Discount_Type__c, Discount_Value__c, Markup_Type__c, Markup__c,
+                   Original_Package_Term_Cost__c, Net_Cost__c
+            FROM Dealer_Package_Term__c WHERE Id = :termId
+        ];
+        System.assertEquals(null, t.Discount_Type__c,
+            'No value → no default discount type is forced');
+        System.assertEquals(null, t.Markup_Type__c,
+            'No value → no default markup type is forced');
+        System.assertEquals(t.Original_Package_Term_Cost__c, t.Net_Cost__c,
+            'With no discount the Net Price equals the stored anchor');
+    }
+
+    @isTest
+    static void test_optionPricing_blankTypeStoresDefault_andPricesMove() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = activePackage('Extended_Limited_Warranty');
+        Package_Tier__c tier = TestDataFactory.createPackageTier(elw.Id, true);
+        Package_Term__c term = TestDataFactory.createPackageTerm(elw.Id, tier.Id, true);
+        Package_Option__c masterOpt =
+            TestDataFactory.createPackageOption(elw.Id, term.Id, 'Optional', true);
+        update new Package_Option__c(Id = masterOpt.Id, Price__c = 200.00);
+
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+        Dealer_Package_Option__c dopt = [
+            SELECT Id, Original_Package_Option_Price__c FROM Dealer_Package_Option__c
+            WHERE Dealer_Package__c = :dp.Id AND Package_Option__c = :masterOpt.Id LIMIT 1
+        ];
+        System.assertEquals(200.00, dopt.Original_Package_Option_Price__c,
+            'The dealer option anchors on the master option price');
+
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.saveDealerOptionPricing(dopt.Id, null, 10, null, 50);
+        System.assertEquals(true, r.success, r.message);
+        assertNoApiNames(r.message);
+
+        Dealer_Package_Option__c o = [
+            SELECT Discount_Type__c, Discount_Value__c, Markup_Type__c, Dealer_Markup__c,
+                   Net_Cost__c, Retail_Price__c
+            FROM Dealer_Package_Option__c WHERE Id = :dopt.Id
+        ];
+        System.assertEquals('%', o.Discount_Type__c,
+            'A discount value with a blank type stores the default % type');
+        System.assertEquals('$', o.Markup_Type__c,
+            'A markup value with a blank type stores the default $ type');
+        // Net = 200 − 10% = 180; Retail = 180 + $50 = 230.
+        System.assertEquals(180.00, o.Net_Cost__c,
+            'Option Net Price moves once the type is present');
+        System.assertEquals(230.00, o.Retail_Price__c,
+            'Option Retail Price moves once the type is present');
+    }
+
+    @isTest
+    static void test_bulkDiscount_blankTypeSetsPercentOnEveryTerm_andClearRemovesIt() {
+        Account dealer = dealer();
+        setSyncFlag(true);
+        Package__c elw = activePackage('Extended_Limited_Warranty');
+        Package_Tier__c tier = TestDataFactory.createPackageTier(elw.Id, true);
+        Package_Term__c t1 = TestDataFactory.createPackageTerm(elw.Id, tier.Id, true);
+        Package_Term__c t2 = TestDataFactory.createPackageTerm(elw.Id, null, true);
+        update new List<Package_Term__c>{
+            new Package_Term__c(Id = t1.Id, Price__c = 1000.00),
+            new Package_Term__c(Id = t2.Id, Price__c = 500.00)
+        };
+
+        Dealer_Package__c dp = mirrorFor(dealer.Id, elw.Id);
+        System.assertEquals(2, [SELECT COUNT() FROM Dealer_Package_Term__c
+                                WHERE Dealer_Package__c = :dp.Id],
+            'Both the tiered and the tier-less term mirror');
+
+        // Bulk apply with a BLANK type — the backend defaults it to '%' on every term.
+        DealerPackageSyncController.AuthoringResult r =
+            DealerPackageSyncController.applyDealerPackageTermDiscount(dp.Id, null, 10.00);
+        System.assertEquals(true, r.success, r.message);
+        System.assertEquals(2, r.updatedCount, r.message);
+        assertNoApiNames(r.message);
+        System.assertEquals(2, [SELECT COUNT() FROM Dealer_Package_Term__c
+                                WHERE Dealer_Package__c = :dp.Id
+                                  AND Discount_Type__c = '%' AND Discount_Value__c = 10.00],
+            'Bulk apply sets the default % type on every term');
+
+        // The formula-driven Net Price moves on every touched term.
+        for (Dealer_Package_Term__c t : [
+            SELECT Original_Package_Term_Cost__c, Net_Cost__c
+            FROM Dealer_Package_Term__c WHERE Dealer_Package__c = :dp.Id
+        ]) {
+            System.assertNotEquals(null, t.Original_Package_Term_Cost__c, 'Anchor present');
+            System.assert(t.Net_Cost__c < t.Original_Package_Term_Cost__c,
+                'A 10% discount moves the Net Price below the stored anchor');
+        }
+
+        // Clear removes the discount — and its type — from every term.
+        DealerPackageSyncController.AuthoringResult c =
+            DealerPackageSyncController.clearDealerPackageTermDiscounts(dp.Id);
+        System.assertEquals(true, c.success, c.message);
+        System.assertEquals(0, [SELECT COUNT() FROM Dealer_Package_Term__c
+                                WHERE Dealer_Package__c = :dp.Id
+                                  AND (Discount_Type__c != null OR Discount_Value__c != null)],
+            'Clear removes the discount and its type from every term');
+    }
 }

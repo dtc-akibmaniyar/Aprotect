@@ -6,6 +6,12 @@
     </template>
     <template lwc:elseif={hasActiveWorkOrder}>
         <lightning-card title="Work Order" icon-name="standard:work_order">
+            <!-- TASK-050. The same Work Order PDF action as on the Work Order
+                 record, offered here too because this tab is where an agent is
+                 already looking at the work order from the claim. -->
+            <lightning-button slot="actions" label="Work Order PDF" icon-name="utility:page"
+                              onclick={handleShowPdf}></lightning-button>
+
             <div class="slds-p-horizontal_medium slds-p-bottom_small">
                 <div class="slds-grid slds-wrap slds-gutters">
                     <div class="slds-col slds-size_1-of-3">
@@ -23,38 +29,14 @@
                 </div>
             </div>
 
-            <div class="slds-p-horizontal_medium slds-p-bottom_medium">
-                <div class="slds-grid slds-wrap slds-gutters scn-grid">
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <div class="scn-col-head">Customer Work Order (What the Client Sees)</div>
-                        <div class="ln"><span>Retail work order (repair job)</span><lightning-formatted-number value={workOrderDetail.retailPrice} format-style="currency"></lightning-formatted-number></div>
-                        <div class="ln"><span>{coverageLabel}</span><span>− <lightning-formatted-number value={workOrderDetail.coverageApplied} format-style="currency"></lightning-formatted-number></span></div>
-                        <div class="ln"><span>Customer portion of repair</span><lightning-formatted-number value={workOrderDetail.customerRepairPortion} format-style="currency"></lightning-formatted-number></div>
-                        <div class="ln"><span>Plus shop supplies (after coverage, not covered)</span><span>+ <lightning-formatted-number value={workOrderDetail.shopSuppliesRetail} format-style="currency"></lightning-formatted-number></span></div>
-                        <div class="ln ln-tot"><span>Customer subtotal (pre-tax)</span><lightning-formatted-number value={workOrderDetail.customerPaysPreTax} format-style="currency"></lightning-formatted-number></div>
-                        <div class="ln"><span>{taxLabel}</span><lightning-formatted-number value={workOrderDetail.taxAmount} format-style="currency"></lightning-formatted-number></div>
-                        <div class="ln ln-tot"><span>Customer pays A-Protect (with tax)</span><lightning-formatted-number value={workOrderDetail.customerPaysWithTax} format-style="currency"></lightning-formatted-number></div>
-                    </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <div class="scn-col-head">A-Protect Internal Cost (What It Costs Us)</div>
-                        <div class="ln ln-desc"><span>{partSummary}</span></div>
-                        <div class="ln ln-desc"><span>{supplierSummary}</span></div>
-                        <div class="ln"><span>Parts (wholesale)</span><lightning-formatted-number value={workOrderDetail.partsCost} format-style="currency"></lightning-formatted-number></div>
-                        <div class="ln"><span>{labourLabel}</span><lightning-formatted-number value={workOrderDetail.labourCost} format-style="currency"></lightning-formatted-number></div>
-                        <div class="ln"><span>Shop supplies (our cost)</span><lightning-formatted-number value={workOrderDetail.shopSuppliesCost} format-style="currency"></lightning-formatted-number></div>
-                        <div class="ln"><span>{insuranceLabel}</span><lightning-formatted-number value={workOrderDetail.insuranceAmount} format-style="currency"></lightning-formatted-number></div>
-                        <div class="ln ln-tot"><span>Repair wholesale subtotal</span><lightning-formatted-number value={workOrderDetail.wholesaleCost} format-style="currency"></lightning-formatted-number></div>
-                        <div class="ln"><span>Ancillary benefits paid (rental, roadside, towing, trip)</span><span>+ <lightning-formatted-number value={workOrderDetail.benefitsUsed} format-style="currency"></lightning-formatted-number></span></div>
-                        <div class="ln ln-tot"><span>Total claim cost</span><lightning-formatted-number value={workOrderDetail.totalClaimCost} format-style="currency"></lightning-formatted-number></div>
-                        <div class="ln"><span>Customer collected (pre-tax)</span><span>+ <lightning-formatted-number value={workOrderDetail.customerPaysPreTax} format-style="currency"></lightning-formatted-number></span></div>
-                    </div>
-                </div>
-
-                <div class={plClass}>
-                    <span>{plLabel}</span>
-                    <lightning-formatted-number value={workOrderDetail.finalProfitLoss} format-style="currency"></lightning-formatted-number>
-                </div>
-            </div>
+            <!-- TASK-050. The "What the Client Sees / A-Protect Internal Cost"
+                 two-column breakdown and the profit and loss banner were removed
+                 on Osama's instruction, 2026-10-08: the work order PDF is now the
+                 customer-facing document and is reachable from the button above,
+                 so this summary is no longer needed. It also displayed
+                 Customer_Repair_Portion__c, which reads blank under the TASK-047
+                 structure because nothing stamps the legacy Estimate field it
+                 points at. -->
 
             <div class="slds-p-horizontal_medium slds-p-bottom_medium slds-scrollable_x">
                 <h3 class="scn-title">Work Order - Approved Repairs</h3>
@@ -62,6 +44,7 @@
                     <thead>
                         <tr class="slds-line-height_reset">
                             <th scope="col">Item</th>
+                            <th scope="col">Retail</th>
                             <th scope="col">Covered</th>
                             <th scope="col">Customer Pay</th>
                             <th scope="col">Ordered</th>
@@ -71,6 +54,7 @@
                         <template for:each={workOrderDetail.lines} for:item="line">
                             <tr key={line.id}>
                                 <td><a href="javascript:void(0);" data-id={line.id} onclick={handleLineClick}>{line.description}</a></td>
+                                <td><lightning-formatted-number value={line.retail} format-style="currency"></lightning-formatted-number></td>
                                 <td><lightning-formatted-number value={line.covered} format-style="currency"></lightning-formatted-number></td>
                                 <td><lightning-formatted-number value={line.customerPay} format-style="currency"></lightning-formatted-number></td>
                                 <td>
@@ -84,14 +68,89 @@
                 </table>
             </div>
         </lightning-card>
+
+        <!-- Work Order PDF preview. Opening it saves nothing: the component
+             writes only when Save PDF or Save and Send PDF is pressed, so
+             Cancel leaves no trace. -->
+        <template lwc:if={showPdf}>
+            <section role="dialog" tabindex="-1" aria-modal="true"
+                     aria-label="Work order PDF" class="slds-modal slds-fade-in-open slds-modal_large">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header">
+                        <lightning-button-icon icon-name="utility:close" variant="bare-inverse"
+                                               alternative-text="Close" class="slds-modal__close"
+                                               onclick={handlePdfClose}></lightning-button-icon>
+                        <h2 class="slds-modal__title slds-hyphenate">Work Order PDF</h2>
+                    </header>
+                    <div class="slds-modal__content" id="wo-pdf-content">
+                        <c-work-order-pdf-preview work-order-id={workOrderDetail.workOrderId}
+                                                  onclose={handlePdfClose}></c-work-order-pdf-preview>
+                    </div>
+                </div>
+            </section>
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
     </template>
     <template lwc:else>
         <div class="slds-p-bottom_small">
+            <!-- TASK-050 item 5. The instructions sit immediately before the
+                 button because creating a work order is hard to undo: it
+                 stamps the customer and vehicle snapshot, generates the claim
+                 and work order line items, and marks the estimate as the
+                 chosen one. -->
+            <!-- Osama, 2026-10-13: only while no estimate is selected. Once the
+                 green Selected Estimate panel shows one, "Please select the
+                 Estimate" contradicted it. -->
+            <template lwc:if={noEstimateSelected}>
+                <div class="cwo-note">
+                    <h3>Before Creating a Work Order</h3>
+                    <p>Please select the Estimate before clicking Create Work Order.</p>
+                </div>
+            </template>
+            <div class="cwo-warn">
+                <h3>Important Reminder</h3>
+                <p>
+                    Double-check the selected Estimate and review the Work Order preview
+                    carefully before clicking Create Work Order. Make sure the approved
+                    repairs, line items, and financial amounts are correct.
+                </p>
+            </div>
+            <template lwc:if={noEstimateSelected}>
+                <div class="cwo-block" role="alert">
+                    No Estimate is selected for this claim. Open Manage Estimates, mark the
+                    estimate you want with <b>Use</b>, save it, then return here.
+                </div>
+            </template>
+            <!-- Osama, 2026-10-09. Naming the estimate here is the point of the
+                 panel: creating a work order is hard to undo, so the agent must
+                 be able to confirm WHICH estimate they are committing to without
+                 leaving the tab. -->
+            <template lwc:if={estimateSelected}>
+                <div class="cwo-selected">
+                    <h3>Selected Estimate</h3>
+                    <p class="cwo-selected-name">
+                        <a href={selectedEstimateUrl} data-id={selectedEstimate.Id}
+                           onclick={handleEstimateClick}>{selectedEstimateName}</a>
+                        <template lwc:if={selectedEstimateShop}>
+                            <span class="cwo-selected-shop">{selectedEstimateShop}</span>
+                        </template>
+                    </p>
+                    <p class="cwo-selected-figures">
+                        Retail Total
+                        <b><lightning-formatted-number value={selectedEstimateRetail}
+                            format-style="currency" currency-code="CAD"></lightning-formatted-number></b>
+                        <span class="cwo-selected-sep">&middot;</span>
+                        Customer Pays (+tax)
+                        <b><lightning-formatted-number value={selectedEstimateCustomerPays}
+                            format-style="currency" currency-code="CAD"></lightning-formatted-number></b>
+                    </p>
+                </div>
+            </template>
             <lightning-button
                 variant="brand"
                 label="Create Work Order"
                 icon-name="utility:file"
-                disabled={isDisabled}
+                disabled={cannotCreate}
                 onclick={handleCreateWorkOrder}
             ></lightning-button>
             <template lwc:if={isCreating}>

@@ -53,8 +53,12 @@ public with sharing class ClaimEstimateService {
     @AuraEnabled
     public static List<Estimate__c> getEstimatesForClaim(Id claimId) {
         return [
+            // Osama, 2026-10-09: Source dropped from the Estimates related list
+            // and Customer Pays (+tax) added after Retail Total. The figure is
+            // READ from Customer_Pays_With_Tax__c, the calc() custTax output the
+            // pricing service stamps, not recomputed here.
             SELECT Id, Name, Estimate_Name__c, Repair_Shop__c, Repair_Shop__r.Name,
-                   Source__c, Retail_Total__c, Is_Selected__c
+                   Retail_Total__c, Customer_Pays_With_Tax__c, Is_Selected__c
             FROM Estimate__c
             WHERE Claim__c = :claimId
             WITH USER_MODE
@@ -432,6 +436,1055 @@ public with sharing class ClaimEstimateService {
         if (!toDelete.isEmpty()) deleteSecured(toDelete);
     }
 
+    // ═══════════════════ Manage Estimates (TASK-047) ══════════════════════
+    //
+    // Noelle's Repair Price Scenarios Feedback 1.0. The architectural change
+    // here is that Part__c / Service__c / Shop_Supply__c become the SOURCE OF
+    // TRUTH, many of each per Estimate__c, where syncEstimateChildren above
+    // treated them as derived copies of the Estimate's own scalars and
+    // allowed exactly one of each.
+    //
+    // The Estimate__c scalars do not go away. recalculateRollups below
+    // recomputes every one of them from the children on each save, so
+    // ClaimPricingService.calculate's consumers, the nine Work_Order__c
+    // formula fields, claimsWorksheet and both screen flows keep reading the
+    // field names they have always read (Osama's decision 1). Native roll-up
+    // summary fields are not an option: the three children are Lookup to
+    // Estimate__c, not master-detail.
+    //
+    // Pricing runs through ClaimPricingService.calculateScenario, which
+    // replaces the older calculate() coverage and tax sequence: the cap is
+    // now tested against the TAX-INCLUSIVE repair, and approved ancillary
+    // benefits are subtracted from the customer's bill (Osama's decision 8).
+    // Historical records are not restated (decision 10).
+
+    public class ManageEstimatesData {
+        @AuraEnabled public String claimNumber;
+        @AuraEnabled public String vehicle;
+        /** Read-only, from the purchased contract. Decision 4: not an input. */
+        @AuraEnabled public Decimal cap;
+        @AuraEnabled public Decimal deductible;
+        @AuraEnabled public List<BenefitBalanceRow> benefits;
+        @AuraEnabled public List<ScenarioRow> scenarios;
+        @AuraEnabled public List<ShopOption> shops;
+        @AuraEnabled public List<NamedOption> suppliers;
+        /**
+         * TASK-050. The work order header, read from the claim rather than
+         * typed into the preview by hand as it was before. Every one of these
+         * is an existing field: no value here is derived in Apex, per Osama's
+         * rule of 2026-10-08.
+         */
+        @AuraEnabled public String applicationNumber;
+        @AuraEnabled public String customerName;
+        @AuraEnabled public String customerAddress;
+        @AuraEnabled public String customerPhone;
+        @AuraEnabled public String customerEmail;
+        @AuraEnabled public String vin;
+        @AuraEnabled public Decimal odometer;
+        @AuraEnabled public String odometerUnit;
+        /**
+         * TASK-051. Options for Estimate__c.Reimbursement_Payment_Method__c,
+         * read from the field so the picklist stays the one definition.
+         */
+        @AuraEnabled public List<ValueOption> paymentMethodOptions;
+        /**
+         * How many payload rows saveManageEstimates refused because they
+         * carried no content. Always 0 on a plain read. The screen reports a
+         * non-zero count rather than claiming a successful save, because
+         * skipping silently is what made the original problem so hard to see:
+         * the agent clicked Save, nothing persisted, and nothing said why.
+         */
+        @AuraEnabled public Integer skippedEmptyScenarios = 0;
+    }
+
+    public class ShopOption {
+        @AuraEnabled public Id id;
+        @AuraEnabled public String name;
+        /** Composed from the structured parts, falling back to the legacy single-line Address__c. */
+        @AuraEnabled public String address;
+        @AuraEnabled public String city;
+        /** The design calls this "Area": the metro the shop is worked as part of, which can differ from city. */
+        @AuraEnabled public String region;
+        @AuraEnabled public String phone;
+        @AuraEnabled public Decimal postedRate;
+        @AuraEnabled public Decimal taxPercent;
+        /** "Pays by", already expanded from the multi-select into a readable list. */
+        @AuraEnabled public String paysBy;
+    }
+
+    public class NamedOption {
+        @AuraEnabled public Id id;
+        @AuraEnabled public String name;
+    }
+
+    /** A picklist value in the shape lightning-combobox takes. */
+    public class ValueOption {
+        @AuraEnabled public String value;
+        @AuraEnabled public String label;
+    }
+
+    public class ScenarioRow {
+        @AuraEnabled public Id id;
+        @AuraEnabled public String name;
+        @AuraEnabled public Id repairShopId;
+        @AuraEnabled public String repairShopName;
+        @AuraEnabled public String network;
+        @AuraEnabled public String claimType;
+        @AuraEnabled public Decimal taxPercent;
+        @AuraEnabled public Decimal deductible;
+        @AuraEnabled public Boolean isSelected;
+        /** TASK-051. Reimbursement Only only; saved as null on a Repair scenario. */
+        @AuraEnabled public String paymentMethod;
+        @AuraEnabled public Date expectedPaymentDate;
+        @AuraEnabled public List<PartRow> parts;
+        @AuraEnabled public List<LabourRow> labour;
+        @AuraEnabled public List<SupplyRow> supplies;
+        @AuraEnabled public List<ReimbursementRow> reimbursements;
+    }
+
+    public class PartRow {
+        @AuraEnabled public Id id;
+        @AuraEnabled public String name;
+        @AuraEnabled public String partNumber;
+        @AuraEnabled public String category;
+        @AuraEnabled public String condition;
+        @AuraEnabled public Id supplierId;
+        @AuraEnabled public String supplierName;
+        @AuraEnabled public String stockNumber;
+        @AuraEnabled public Decimal kms;
+        @AuraEnabled public Decimal qty;
+        @AuraEnabled public Decimal unitWholesale;
+        @AuraEnabled public String markupType;
+        @AuraEnabled public Decimal markupValue;
+        @AuraEnabled public Decimal unitRetail;
+        @AuraEnabled public Decimal coreCharge;
+        @AuraEnabled public String warrantySource;
+        @AuraEnabled public Boolean includedWarranty;
+        @AuraEnabled public String includedWarrantyCovers;
+        @AuraEnabled public Decimal includedWarrantyMonths;
+        @AuraEnabled public Decimal includedWarrantyKm;
+        @AuraEnabled public Boolean extendedWarranty;
+        @AuraEnabled public Decimal extendedWarrantyMonths;
+        @AuraEnabled public Decimal extendedWarrantyKm;
+        @AuraEnabled public Decimal extendedWarrantyCost;
+        @AuraEnabled public String extendedWarrantyMarkupType;
+        @AuraEnabled public Decimal extendedWarrantyMarkupValue;
+        @AuraEnabled public Decimal extendedWarrantyRetail;
+        @AuraEnabled public String warrantyNotes;
+    }
+
+    public class LabourRow {
+        @AuraEnabled public Id id;
+        @AuraEnabled public String description;
+        @AuraEnabled public Decimal wholesaleHours;
+        @AuraEnabled public Decimal wholesaleRate;
+        @AuraEnabled public Decimal wholesaleTotal;
+        @AuraEnabled public Decimal retailHours;
+        @AuraEnabled public Decimal retailRate;
+        @AuraEnabled public Decimal retailTotal;
+        @AuraEnabled public Decimal guideMitchell;
+        @AuraEnabled public Decimal guideAllData;
+    }
+
+    public class SupplyRow {
+        @AuraEnabled public Id id;
+        @AuraEnabled public String description;
+        @AuraEnabled public Decimal wholesaleCost;
+        @AuraEnabled public String markupType;
+        @AuraEnabled public Decimal markupValue;
+        @AuraEnabled public Decimal retailPrice;
+    }
+
+    public class ReimbursementRow {
+        @AuraEnabled public Id id;            // Benefit_Usage__c
+        @AuraEnabled public Id benefitBalanceId;
+        @AuraEnabled public String benefitType;
+        @AuraEnabled public Decimal receiptAmount;
+        /**
+         * TASK-051. How much of this saved line Benefit_Balance__c.Remaining__c
+         * already has subtracted: the amount when the line counts toward the
+         * balance (its scenario is marked Use), otherwise 0. The LWC adds it
+         * back to find the room this scenario really has, exactly as
+         * getApprovedReimbursements does.
+         */
+        @AuraEnabled public Decimal countedAmount;
+    }
+
+    /**
+     * TASK-051. One saved reimbursement receipt and what A-Protect approves
+     * for it, in the columns of the Feedback 1.0 reimbursement notice.
+     */
+    public class ApprovedReimbursement {
+        public Id usageId;
+        public Id estimateId;
+        public Id balanceId;
+        public String benefitType;
+        public Decimal receipts;
+        public Decimal approved;
+        public Decimal leftOnTerm;
+        public Decimal over;
+    }
+
+    /**
+     * TASK-051. THE approval rule for reimbursement receipts, in one place:
+     * a receipt is approved only up to the room left on its benefit for the
+     * term, and Left on term is that room less the approval.
+     *
+     * Room is Benefit_Balance__c.Remaining__c PLUS this estimate's own draws
+     * on the same balance that are already counted in it (a scenario marked
+     * Use writes its receipts with Counts_Toward_Balance__c = true, so the
+     * roll-up has subtracted them). Without the add-back a selected scenario
+     * would be capped against itself and its receipts subtracted twice. The
+     * claim-level ancillary draw (Estimate__c blank) is NOT added back: it is
+     * a real, separate use of the term (Osama, 2026-10-13).
+     *
+     * Each line is capped independently, the same as the live mirror in
+     * repairPriceScenarios.approvedReceipt. Readers: recalculateRollups
+     * (Reimbursement_Total__c), recalculateClaimTotalProfit, createWorkOrder
+     * (the Reimbursement claim line items) and WorkOrderPDFController.
+     */
+    public static Map<Id, List<ApprovedReimbursement>> getApprovedReimbursements(Set<Id> estimateIds) {
+        Map<Id, List<ApprovedReimbursement>> out = new Map<Id, List<ApprovedReimbursement>>();
+        if (estimateIds == null || estimateIds.isEmpty()) return out;
+
+        List<Benefit_Usage__c> usages = [
+            SELECT Id, Estimate__c, Benefit_Balance__c, Benefit_Balance__r.Benefit_Type__c,
+                   Benefit_Balance__r.Remaining__c, Amount_Used__c, Counts_Toward_Balance__c
+            FROM Benefit_Usage__c
+            WHERE Estimate__c IN :estimateIds
+            WITH USER_MODE
+            ORDER BY CreatedDate ASC, Id ASC
+        ];
+
+        Map<String, Decimal> ownCounted = new Map<String, Decimal>();
+        for (Benefit_Usage__c u : usages) {
+            if (u.Counts_Toward_Balance__c != true) continue;
+            String key = u.Estimate__c + '|' + u.Benefit_Balance__c;
+            ownCounted.put(key, nz(ownCounted.get(key)) + nz(u.Amount_Used__c));
+        }
+
+        for (Benefit_Usage__c u : usages) {
+            String key = u.Estimate__c + '|' + u.Benefit_Balance__c;
+            Decimal room = Math.max(0, nz(u.Benefit_Balance__r?.Remaining__c) + nz(ownCounted.get(key)));
+            ApprovedReimbursement a = new ApprovedReimbursement();
+            a.usageId     = u.Id;
+            a.estimateId  = u.Estimate__c;
+            a.balanceId   = u.Benefit_Balance__c;
+            a.benefitType = u.Benefit_Balance__r?.Benefit_Type__c;
+            a.receipts    = nz(u.Amount_Used__c);
+            a.approved    = Math.max(0, Math.min(a.receipts, room));
+            a.leftOnTerm  = Math.max(0, room - a.approved);
+            a.over        = a.receipts - a.approved;
+            if (!out.containsKey(u.Estimate__c)) out.put(u.Estimate__c, new List<ApprovedReimbursement>());
+            out.get(u.Estimate__c).add(a);
+        }
+        return out;
+    }
+
+    private static Decimal approvedTotal(List<ApprovedReimbursement> lines) {
+        Decimal total = 0;
+        if (lines != null) for (ApprovedReimbursement a : lines) total += a.approved;
+        return total;
+    }
+
+    /**
+     * Everything the Manage Estimates page needs, in ONE call: the claim bar,
+     * the claim-level ancillary benefits, and every scenario with its full
+     * Part / Labour / Shop Supply / reimbursement child list.
+     *
+     * Deliberately NOT cacheable, same reason as getEstimatesForClaim: the
+     * page must show the result of its own just-completed save.
+     */
+    @AuraEnabled
+    public static ManageEstimatesData getManageEstimatesData(Id claimId) {
+        ManageEstimatesData d = new ManageEstimatesData();
+
+        Claim__c claim = [
+            SELECT Id, Name, Vehicle_Description__c,
+                   Application__r.Name, Customer_Name__c, Customer_Address__c,
+                   Customer_Phone__c, Customer_Email__c,
+                   Vehicle_Identification_Number_VIN__c,
+                   Current_Odometer__c, Current_Odometer_Unit__c,
+                   Application_Package__r.Per_Claim_Limit__c,
+                   Application_Package__r.Deductible__c
+            FROM Claim__c WHERE Id = :claimId
+            WITH USER_MODE
+        ];
+        d.claimNumber = claim.Name;
+        // Vehicle_Description__c is a formula field composing year, make, model
+        // and trim. It replaced a String.join of year, make and model here,
+        // which also silently dropped the trim even though the preview was
+        // labelled Year/Make/Model/Trim. One definition, editable in
+        // configuration: Osama's rule, 2026-10-08.
+        d.vehicle    = claim.Vehicle_Description__c;
+
+        // TASK-050. The work order header, read rather than typed.
+        d.applicationNumber = claim.Application__r?.Name;
+        d.customerName      = claim.Customer_Name__c;
+        d.customerAddress   = claim.Customer_Address__c;
+        d.customerPhone     = claim.Customer_Phone__c;
+        d.customerEmail     = claim.Customer_Email__c;
+        d.vin               = claim.Vehicle_Identification_Number_VIN__c;
+        d.odometer          = claim.Current_Odometer__c;
+        d.odometerUnit      = claim.Current_Odometer_Unit__c;
+        d.cap        = claim.Application_Package__r?.Per_Claim_Limit__c;
+        d.deductible = claim.Application_Package__r?.Deductible__c;
+        d.benefits   = getBenefitBalancesForClaim(claimId);
+
+        d.paymentMethodOptions = new List<ValueOption>();
+        for (Schema.PicklistEntry p : Estimate__c.Reimbursement_Payment_Method__c.getDescribe().getPicklistValues()) {
+            if (!p.isActive()) continue;
+            ValueOption o = new ValueOption();
+            o.value = p.getValue(); o.label = p.getLabel();
+            d.paymentMethodOptions.add(o);
+        }
+
+        d.shops = new List<ShopOption>();
+        for (Repair_Shop__c s : [
+            SELECT Id, Name, Address__c, Street__c, City__c, State_Province__c, Postal_Code__c,
+                   Country__c, Region__c, Payment_Method__c, Phone__c,
+                   Labour_Rate_On_File__c, Tax_Percentage__c
+            FROM Repair_Shop__c
+            WHERE Unauthorized__c = false
+            WITH USER_MODE
+            ORDER BY Name
+        ]) {
+            ShopOption o = new ShopOption();
+            o.id = s.Id; o.name = s.Name; o.phone = s.Phone__c;
+            o.city = s.City__c; o.region = s.Region__c;
+            o.address = composeAddress(s);
+            o.postedRate = s.Labour_Rate_On_File__c; o.taxPercent = s.Tax_Percentage__c;
+            o.paysBy = s.Payment_Method__c == null ? null : s.Payment_Method__c.replace(';', ', ');
+            d.shops.add(o);
+        }
+
+        d.suppliers = new List<NamedOption>();
+        for (Account a : getSupplierAccounts()) {
+            NamedOption o = new NamedOption();
+            o.id = a.Id; o.name = a.Name;
+            d.suppliers.add(o);
+        }
+
+        List<Estimate__c> estimates = [
+            SELECT Id, Estimate_Name__c, Repair_Shop__c, Repair_Shop__r.Name,
+                   Network__c, Claim_Type__c, Tax_Percentage__c, Deductable__c, Is_Selected__c,
+                   Reimbursement_Payment_Method__c, Reimbursement_Expected_Payment_Date__c
+            FROM Estimate__c
+            WHERE Claim__c = :claimId
+            WITH USER_MODE
+            ORDER BY CreatedDate ASC
+        ];
+        d.scenarios = new List<ScenarioRow>();
+        if (estimates.isEmpty()) return d;
+
+        Set<Id> estimateIds = new Map<Id, Estimate__c>(estimates).keySet();
+        Map<Id, List<PartRow>> partsByEstimate     = new Map<Id, List<PartRow>>();
+        Map<Id, List<LabourRow>> labourByEstimate  = new Map<Id, List<LabourRow>>();
+        Map<Id, List<SupplyRow>> suppliesByEstimate= new Map<Id, List<SupplyRow>>();
+        Map<Id, List<ReimbursementRow>> reimbByEstimate = new Map<Id, List<ReimbursementRow>>();
+        for (Id eid : estimateIds) {
+            partsByEstimate.put(eid, new List<PartRow>());
+            labourByEstimate.put(eid, new List<LabourRow>());
+            suppliesByEstimate.put(eid, new List<SupplyRow>());
+            reimbByEstimate.put(eid, new List<ReimbursementRow>());
+        }
+
+        for (Part__c p : [
+            SELECT Id, Estimate__c, Part_Name__c, Part_Code__c, Part_Category__c, Part_Type__c,
+                   Supplier__c, Supplier__r.Name, Stock_Number__c, KMS__c, Quantity__c,
+                   Part_Cost_Wholesale__c, Markup_Type__c, Markup_Value__c, Price__c, Core_Charge__c,
+                   Warranty_Source__c, Included_Warranty__c, Included_Warranty_Covers__c,
+                   Included_Warranty_Months__c, Included_Warranty_Km__c,
+                   Extended_Warranty__c, Extended_Warranty_Months__c, Extended_Warranty_Km__c,
+                   Extended_Warranty_Cost__c, Extended_Warranty_Markup_Type__c,
+                   Extended_Warranty_Markup_Value__c, Extended_Warranty_Retail__c, Warranty_Notes__c
+            FROM Part__c WHERE Estimate__c IN :estimateIds
+            WITH USER_MODE
+            ORDER BY CreatedDate ASC
+        ]) {
+            PartRow r = new PartRow();
+            r.id = p.Id; r.name = p.Part_Name__c; r.partNumber = p.Part_Code__c;
+            r.category = p.Part_Category__c; r.condition = p.Part_Type__c;
+            r.supplierId = p.Supplier__c; r.supplierName = p.Supplier__r?.Name;
+            r.stockNumber = p.Stock_Number__c; r.kms = p.KMS__c; r.qty = p.Quantity__c;
+            r.unitWholesale = p.Part_Cost_Wholesale__c;
+            r.markupType = p.Markup_Type__c; r.markupValue = p.Markup_Value__c;
+            r.unitRetail = p.Price__c; r.coreCharge = p.Core_Charge__c;
+            r.warrantySource = p.Warranty_Source__c;
+            r.includedWarranty = p.Included_Warranty__c;
+            r.includedWarrantyCovers = p.Included_Warranty_Covers__c;
+            r.includedWarrantyMonths = p.Included_Warranty_Months__c;
+            r.includedWarrantyKm = p.Included_Warranty_Km__c;
+            r.extendedWarranty = p.Extended_Warranty__c;
+            r.extendedWarrantyMonths = p.Extended_Warranty_Months__c;
+            r.extendedWarrantyKm = p.Extended_Warranty_Km__c;
+            r.extendedWarrantyCost = p.Extended_Warranty_Cost__c;
+            r.extendedWarrantyMarkupType = p.Extended_Warranty_Markup_Type__c;
+            r.extendedWarrantyMarkupValue = p.Extended_Warranty_Markup_Value__c;
+            r.extendedWarrantyRetail = p.Extended_Warranty_Retail__c;
+            r.warrantyNotes = p.Warranty_Notes__c;
+            partsByEstimate.get(p.Estimate__c).add(r);
+        }
+
+        for (Service__c s : [
+            SELECT Id, Estimate__c, Item_Desription__c, Repair_Time_EST__c, Wholesale_Labour_Rate_HR__c,
+                   Wholesale__c, Repair_Time_Adj__c, Retail_Labour_Rate__c, Retail__c,
+                   Labour_Guide_Time_Mitchell__c, Labour_Guide_Time_All_Data__c
+            FROM Service__c WHERE Estimate__c IN :estimateIds
+            WITH USER_MODE
+            ORDER BY CreatedDate ASC
+        ]) {
+            LabourRow r = new LabourRow();
+            r.id = s.Id; r.description = s.Item_Desription__c;
+            r.wholesaleHours = s.Repair_Time_EST__c; r.wholesaleRate = s.Wholesale_Labour_Rate_HR__c;
+            r.wholesaleTotal = s.Wholesale__c;
+            r.retailHours = s.Repair_Time_Adj__c; r.retailRate = s.Retail_Labour_Rate__c;
+            r.retailTotal = s.Retail__c;
+            r.guideMitchell = s.Labour_Guide_Time_Mitchell__c;
+            r.guideAllData = s.Labour_Guide_Time_All_Data__c;
+            labourByEstimate.get(s.Estimate__c).add(r);
+        }
+
+        for (Shop_Supply__c x : [
+            SELECT Id, Estimate__c, Item_Description__c, Cost__c, Markup_Type__c, Markup_Value__c, Price__c
+            FROM Shop_Supply__c WHERE Estimate__c IN :estimateIds
+            WITH USER_MODE
+            ORDER BY CreatedDate ASC
+        ]) {
+            SupplyRow r = new SupplyRow();
+            r.id = x.Id; r.description = x.Item_Description__c; r.wholesaleCost = x.Cost__c;
+            r.markupType = x.Markup_Type__c; r.markupValue = x.Markup_Value__c; r.retailPrice = x.Price__c;
+            suppliesByEstimate.get(x.Estimate__c).add(r);
+        }
+
+        for (Benefit_Usage__c u : [
+            SELECT Id, Estimate__c, Benefit_Balance__c, Benefit_Balance__r.Benefit_Type__c, Amount_Used__c,
+                   Counts_Toward_Balance__c
+            FROM Benefit_Usage__c WHERE Estimate__c IN :estimateIds
+            WITH USER_MODE
+            ORDER BY CreatedDate ASC
+        ]) {
+            ReimbursementRow r = new ReimbursementRow();
+            r.id = u.Id; r.benefitBalanceId = u.Benefit_Balance__c;
+            r.benefitType = u.Benefit_Balance__r?.Benefit_Type__c;
+            r.receiptAmount = u.Amount_Used__c;
+            r.countedAmount = u.Counts_Toward_Balance__c == true ? u.Amount_Used__c : 0;
+            reimbByEstimate.get(u.Estimate__c).add(r);
+        }
+
+        for (Estimate__c e : estimates) {
+            ScenarioRow r = new ScenarioRow();
+            r.id = e.Id; r.name = e.Estimate_Name__c;
+            r.repairShopId = e.Repair_Shop__c; r.repairShopName = e.Repair_Shop__r?.Name;
+            r.network = e.Network__c; r.claimType = e.Claim_Type__c;
+            r.taxPercent = e.Tax_Percentage__c; r.deductible = e.Deductable__c;
+            r.isSelected = e.Is_Selected__c;
+            r.paymentMethod = e.Reimbursement_Payment_Method__c;
+            r.expectedPaymentDate = e.Reimbursement_Expected_Payment_Date__c;
+            r.parts = partsByEstimate.get(e.Id);
+            r.labour = labourByEstimate.get(e.Id);
+            r.supplies = suppliesByEstimate.get(e.Id);
+            r.reimbursements = reimbByEstimate.get(e.Id);
+            d.scenarios.add(r);
+        }
+        return d;
+    }
+
+    /**
+     * Saves every scenario on the claim, children and all, in one transaction.
+     *
+     * Deliberately NOT a call to saveEstimates above: that method's whole
+     * model is "scalars on the Estimate drive one child of each type," which
+     * is exactly the assumption TASK-047 removes. saveEstimates stays in place
+     * untouched for the older grid and its tests.
+     *
+     * deletedChildIds carries ids removed in the UI since the page loaded,
+     * across all three child types plus reimbursement lines, so a part the
+     * agent removed is actually deleted rather than silently left behind.
+     */
+    @AuraEnabled
+    public static ManageEstimatesData saveManageEstimates(
+            Id claimId, List<ScenarioRow> scenarios, List<Id> deletedEstimateIds, List<Id> deletedChildIds) {
+        Savepoint sp = Database.setSavepoint();
+        try {
+            if (deletedEstimateIds != null && !deletedEstimateIds.isEmpty()) {
+                deleteSecured([SELECT Id FROM Benefit_Usage__c WHERE Estimate__c IN :deletedEstimateIds WITH USER_MODE]);
+                deleteSecured([SELECT Id FROM Part__c          WHERE Estimate__c IN :deletedEstimateIds WITH USER_MODE]);
+                deleteSecured([SELECT Id FROM Service__c       WHERE Estimate__c IN :deletedEstimateIds WITH USER_MODE]);
+                deleteSecured([SELECT Id FROM Shop_Supply__c   WHERE Estimate__c IN :deletedEstimateIds WITH USER_MODE]);
+                deleteSecured([SELECT Id FROM Estimate__c      WHERE Id IN :deletedEstimateIds          WITH USER_MODE]);
+            }
+            if (deletedChildIds != null && !deletedChildIds.isEmpty()) {
+                deleteSecured([SELECT Id FROM Part__c        WHERE Id IN :deletedChildIds WITH USER_MODE]);
+                deleteSecured([SELECT Id FROM Service__c     WHERE Id IN :deletedChildIds WITH USER_MODE]);
+                deleteSecured([SELECT Id FROM Shop_Supply__c WHERE Id IN :deletedChildIds WITH USER_MODE]);
+                deleteSecured([SELECT Id FROM Benefit_Usage__c WHERE Id IN :deletedChildIds WITH USER_MODE]);
+            }
+            if (scenarios == null || scenarios.isEmpty()) return getManageEstimatesData(claimId);
+
+            // ---- 1. the Estimate__c rows themselves ----
+            Set<Id> shopIds = new Set<Id>();
+            for (ScenarioRow s : scenarios) if (s.repairShopId != null) shopIds.add(s.repairShopId);
+            Map<Id, Repair_Shop__c> shopsById = new Map<Id, Repair_Shop__c>([
+                SELECT Id, Labour_Rate_On_File__c, Tax_Percentage__c
+                FROM Repair_Shop__c WHERE Id IN :shopIds
+                WITH USER_MODE
+            ]);
+
+            List<Estimate__c> toInsert = new List<Estimate__c>();
+            List<Estimate__c> toUpdate = new List<Estimate__c>();
+            List<ScenarioRow> newRows = new List<ScenarioRow>();
+            Integer skippedEmpty = 0;
+            for (ScenarioRow s : scenarios) {
+                Decimal taxPct = s.taxPercent != null
+                    ? s.taxPercent
+                    : (s.repairShopId != null ? shopsById.get(s.repairShopId)?.Tax_Percentage__c : null);
+                // TASK-051. Payment details only mean something on a
+                // reimbursement, so a card switched back to Repair drops them
+                // rather than carrying hidden values.
+                Boolean isReimb = s.claimType == 'Reimbursement Only';
+                String payMethod = isReimb ? s.paymentMethod : null;
+                Date payDate = isReimb ? s.expectedPaymentDate : null;
+                if (s.id == null) {
+                    // Osama, 2026-10-07: a scenario the agent never filled in
+                    // must not become an Estimate__c. Three blank estimates
+                    // (E-0053, E-0056, E-0057) were inserted on CL ID - 00054
+                    // exactly this way: every scalar null and no child rows.
+                    // recalculateRollups then stamped a deductible and a
+                    // negative customer-pays onto them, so they looked like
+                    // real estimates in the related list. Refusing the insert
+                    // here is authoritative - it holds for a stale browser
+                    // bundle and for any future caller, not just this LWC.
+                    if (isEmptyScenario(s)) { skippedEmpty++; continue; }
+                    toInsert.add(new Estimate__c(
+                        Claim__c         = claimId,
+                        Estimate_Name__c = s.name,
+                        Repair_Shop__c   = s.repairShopId,
+                        Network__c       = s.network,
+                        Claim_Type__c    = s.claimType,
+                        Tax_Percentage__c= taxPct,
+                        Deductable__c    = s.deductible,
+                        Reimbursement_Payment_Method__c        = payMethod,
+                        Reimbursement_Expected_Payment_Date__c = payDate
+                    ));
+                    newRows.add(s);
+                } else {
+                    // Claim__c is a non-reparentable master-detail. Never resend
+                    // it on an update, even unchanged: USER_MODE refuses the
+                    // whole DML as an edit to a structurally uneditable field.
+                    toUpdate.add(new Estimate__c(
+                        Id               = s.id,
+                        Estimate_Name__c = s.name,
+                        Repair_Shop__c   = s.repairShopId,
+                        Network__c       = s.network,
+                        Claim_Type__c    = s.claimType,
+                        Tax_Percentage__c= taxPct,
+                        Deductable__c    = s.deductible,
+                        Reimbursement_Payment_Method__c        = payMethod,
+                        Reimbursement_Expected_Payment_Date__c = payDate
+                    ));
+                }
+            }
+            insertSecured(toInsert);
+            updateSecured(toUpdate);
+            // insertSecured populates Id in order, so the new rows can now be
+            // matched back to their payload for the child save below.
+            for (Integer i = 0; i < toInsert.size(); i++) newRows[i].id = toInsert[i].Id;
+
+            // ---- 2. the children ----
+            saveScenarioChildren(claimId, scenarios);
+
+            // ---- 3. rollups and pricing ----
+            Set<Id> estimateIds = new Set<Id>();
+            for (ScenarioRow s : scenarios) if (s.id != null) estimateIds.add(s.id);
+            recalculateRollups(claimId, estimateIds);
+
+            // ---- 4. selection ----
+            Id selectedId = null;
+            for (ScenarioRow s : scenarios) if (s.isSelected == true) selectedId = s.id;
+            if (selectedId != null) markSelected(selectedId, claimId);
+
+            recalculateClaimTotalProfit(claimId);
+            ManageEstimatesData out = getManageEstimatesData(claimId);
+            out.skippedEmptyScenarios = skippedEmpty;
+            return out;
+        } catch (Exception ex) {
+            Database.rollback(sp);
+            // AuraHandledException.getMessage() returns the useless
+            // "Script-thrown exception" unless setMessage is called explicitly,
+            // which hides the real cause from the LWC and from test output
+            // alike. saveBenefitUsage already does this correctly; this does
+            // now too. Type and line number are included because a failed save
+            // here is almost always a field-level or DML problem worth naming.
+            String detail = 'Could not save estimates: ' + ex.getTypeName()
+                + ': ' + ex.getMessage() + ' (line ' + ex.getLineNumber() + ')';
+            System.debug(LoggingLevel.ERROR, detail + '\n' + ex.getStackTraceString());
+            AuraHandledException wrapped = new AuraHandledException(detail);
+            wrapped.setMessage(detail);
+            throw wrapped;
+        }
+    }
+
+    /**
+     * JSON entry point for the Manage Estimates screen, and the one the LWC
+     * actually calls.
+     *
+     * Why this exists. Osama, 2026-10-08: the screen sent a filled-in scenario
+     * and Apex received a ScenarioRow with every field null and no child rows
+     * at all. Proven both ways in one run: the LWC's own isEmptyScenarioRow
+     * judged the card NOT empty and sent it, while isEmptyScenario here judged
+     * the very same row empty. The debug log confirmed it, showing
+     * `scenarios|[{}]` and not one PartRow or LabourRow constructed during
+     * deserialization. The data was being lost by the Aura layer that maps
+     * LWC objects onto a custom Apex type, which does not reliably enumerate
+     * objects originating from an LWC reactive proxy (`@track`). It fails
+     * silently, which is why the browser console looked correct: JSON.stringify
+     * reads through the proxy traps and is unaffected.
+     *
+     * Passing the payload as a JSON string removes that layer from the path
+     * entirely, which is the fix. One thing it does NOT give us, contrary to
+     * what this comment first claimed: JSON.deserialize silently IGNORES
+     * properties with no matching Apex field, it does not throw on them. So
+     * this is no defence against the LWC payload and these wrapper classes
+     * drifting apart. A renamed property would simply arrive null again. What
+     * guards that is saveFromJsonRoundTripsTheScreenPayload, which pins the
+     * exact payload shape, plus isEmptyScenario refusing a contentless row.
+     * It does throw on malformed JSON and on a value that cannot convert to
+     * the field's type, and the catch below names those.
+     *
+     * The typed saveManageEstimates below is unchanged and still carries all
+     * the behaviour and every test.
+     */
+    @AuraEnabled
+    public static ManageEstimatesData saveManageEstimatesFromJson(
+            Id claimId, String scenariosJson, List<Id> deletedEstimateIds, List<Id> deletedChildIds) {
+        List<ScenarioRow> rows;
+        try {
+            rows = String.isBlank(scenariosJson)
+                ? new List<ScenarioRow>()
+                : (List<ScenarioRow>) JSON.deserialize(scenariosJson, List<ScenarioRow>.class);
+        } catch (Exception ex) {
+            // Never fail silently here. A shape mismatch between the LWC
+            // payload and these wrapper classes is a developer error, and it
+            // must name itself rather than reappear as an empty estimate.
+            String detail = 'Manage Estimates could not read the data the screen sent: '
+                + ex.getTypeName() + ': ' + ex.getMessage();
+            System.debug(LoggingLevel.ERROR, detail + '\nPayload was: ' + scenariosJson);
+            AuraHandledException wrapped = new AuraHandledException(detail);
+            wrapped.setMessage(detail);
+            throw wrapped;
+        }
+        return saveManageEstimates(claimId, rows, deletedEstimateIds, deletedChildIds);
+    }
+
+    /**
+     * True when a payload row carries nothing worth saving.
+     *
+     * Network__c and Claim_Type__c are deliberately NOT consulted. The LWC
+     * seeds both with a default the moment a card is added ('In-Network' and
+     * 'Repair'), so counting them would make every row look filled in and
+     * defeat the guard entirely. Same reasoning for the estimate name when it
+     * still holds the generated "Repair Shop 1 - Option A" placeholder: that
+     * is a suggestion, not content, so a row carrying only the placeholder and
+     * nothing else is still empty.
+     *
+     * The LWC also always seeds one blank labour row, so an untouched scenario
+     * arrives with labour.size() == 1 and every field on it null. That counts
+     * as empty, which is why labour is inspected field by field rather than by
+     * list size the way parts and supplies are.
+     */
+    private static Boolean isEmptyScenario(ScenarioRow s) {
+        if (String.isNotBlank(s.name) && !isPlaceholderName(s.name)) return false;
+        if (s.repairShopId != null || s.taxPercent != null || s.deductible != null) return false;
+        if (s.parts != null && !s.parts.isEmpty()) return false;
+        if (s.supplies != null && !s.supplies.isEmpty()) return false;
+        if (s.reimbursements != null && !s.reimbursements.isEmpty()) return false;
+        if (s.labour != null) {
+            for (LabourRow l : s.labour) {
+                if (String.isNotBlank(l.description)
+                        || l.wholesaleHours != null || l.wholesaleRate != null
+                        || l.retailHours != null   || l.retailRate != null) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /** Matches the name handleAddScenario generates: "Repair Shop 2 - Option B". */
+    private static Boolean isPlaceholderName(String name) {
+        return Pattern.matches('(?i)^repair shop \\d+ - option [a-z]$', name.trim());
+    }
+
+    /**
+     * Upserts every Part__c / Service__c / Shop_Supply__c / reimbursement row
+     * the page sent, many per Estimate. Retail figures are computed here with
+     * ClaimPricingService.applyMarkup rather than trusted from the browser, so
+     * a tampered or stale payload can never write a price the markup rule does
+     * not produce.
+     *
+     * Bulk-safe: two DML statements per child type regardless of how many
+     * scenarios or lines are being saved.
+     */
+    private static void saveScenarioChildren(Id claimId, List<ScenarioRow> scenarios) {
+        List<Part__c> partIns = new List<Part__c>(), partUpd = new List<Part__c>();
+        List<Service__c> svcIns = new List<Service__c>(), svcUpd = new List<Service__c>();
+        List<Shop_Supply__c> supIns = new List<Shop_Supply__c>(), supUpd = new List<Shop_Supply__c>();
+        List<Benefit_Usage__c> benIns = new List<Benefit_Usage__c>(), benUpd = new List<Benefit_Usage__c>();
+
+        for (ScenarioRow s : scenarios) {
+            if (s.id == null) continue;
+            Boolean isReimb = s.claimType == 'Reimbursement Only';
+
+            for (PartRow p : safeParts(s)) {
+                Decimal unitRetail = ClaimPricingService.applyMarkup(p.unitWholesale, p.markupType, p.markupValue);
+                Decimal qty = nz(p.qty) == 0 ? 1 : p.qty;
+                Decimal extRetail = p.extendedWarranty == true
+                    ? ClaimPricingService.applyMarkup(p.extendedWarrantyCost, p.extendedWarrantyMarkupType, p.extendedWarrantyMarkupValue)
+                    : 0;
+                Part__c rec = new Part__c(
+                    Part_Name__c                      = p.name,
+                    Part_Code__c                      = p.partNumber,
+                    Part_Category__c                  = p.category,
+                    Part_Type__c                      = p.condition,
+                    Supplier__c                       = p.supplierId,
+                    Stock_Number__c                   = p.stockNumber,
+                    KMS__c                            = p.kms,
+                    Quantity__c                       = qty,
+                    Part_Cost_Wholesale__c            = p.unitWholesale,
+                    Markup_Type__c                    = p.markupType,
+                    Markup_Value__c                   = p.markupValue,
+                    Price__c                          = unitRetail,
+                    Part_Cost__c                      = qty * nz(p.unitWholesale),
+                    Core_Charge__c                    = p.coreCharge,
+                    Warranty_Source__c                = p.warrantySource,
+                    Included_Warranty__c              = p.includedWarranty == true,
+                    Included_Warranty_Covers__c       = p.includedWarrantyCovers,
+                    Included_Warranty_Months__c       = p.includedWarrantyMonths,
+                    Included_Warranty_Km__c           = p.includedWarrantyKm,
+                    Extended_Warranty__c              = p.extendedWarranty == true,
+                    Extended_Warranty_Months__c       = p.extendedWarrantyMonths,
+                    Extended_Warranty_Km__c           = p.extendedWarrantyKm,
+                    Extended_Warranty_Cost__c         = p.extendedWarrantyCost,
+                    Extended_Warranty_Markup_Type__c  = p.extendedWarrantyMarkupType,
+                    Extended_Warranty_Markup_Value__c = p.extendedWarrantyMarkupValue,
+                    Extended_Warranty_Retail__c       = extRetail
+                );
+                rec.Warranty_Notes__c = p.warrantyNotes;
+                if (p.id == null) {
+                    rec.Estimate__c = s.id;
+                    rec.Claim__c = claimId;
+                    rec.Repair_Shop__c = s.repairShopId;
+                    // HARD RULE, carried over from syncEstimateChildren:
+                    // Export_to_Work_Order__c is never set true here. Setting it
+                    // would let the dormant legacy WorkOrderCreatorController
+                    // pick these up and build a second, conflicting Work_Order__c.
+                    partIns.add(rec);
+                } else {
+                    rec.Id = p.id;
+                    partUpd.add(rec);
+                }
+            }
+
+            for (LabourRow l : safeLabour(s)) {
+                Service__c rec = new Service__c(
+                    Item_Desription__c           = l.description,
+                    Repair_Time_EST__c           = l.wholesaleHours,
+                    Wholesale_Labour_Rate_HR__c  = l.wholesaleRate,
+                    Wholesale__c                 = nz(l.wholesaleHours) * nz(l.wholesaleRate),
+                    Repair_Time_Adj__c           = l.retailHours,
+                    Retail_Labour_Rate__c        = l.retailRate,
+                    Retail__c                    = nz(l.retailHours) * nz(l.retailRate),
+                    Labour_Guide_Time_Mitchell__c= l.guideMitchell,
+                    Labour_Guide_Time_All_Data__c= l.guideAllData
+                );
+                if (l.id == null) {
+                    rec.Estimate__c = s.id;
+                    rec.Repair_Shop__c = s.repairShopId;
+                    svcIns.add(rec);
+                } else {
+                    rec.Id = l.id;
+                    svcUpd.add(rec);
+                }
+            }
+
+            for (SupplyRow x : safeSupplies(s)) {
+                // Item_Name__c is REQUIRED on Shop_Supply__c (the only required
+                // field across the three children), so it can never be left
+                // blank. The design only gives the agent one supply text box,
+                // which maps to Item_Description__c, so the name is derived
+                // from it and falls back to the same literal the older
+                // syncEstimateChildren uses. Truncated to the field's 255,
+                // because Item_Description__c is a TextArea and can be longer.
+                String supplyName = 'Shop Supplies';
+                if (String.isNotBlank(x.description)) {
+                    supplyName = x.description.length() > 255
+                        ? x.description.substring(0, 255)
+                        : x.description;
+                }
+                Shop_Supply__c rec = new Shop_Supply__c(
+                    Item_Name__c        = supplyName,
+                    Item_Description__c = x.description,
+                    Cost__c             = x.wholesaleCost,
+                    Markup_Type__c      = x.markupType,
+                    Markup_Value__c     = x.markupValue,
+                    Price__c            = ClaimPricingService.applyMarkup(x.wholesaleCost, x.markupType, x.markupValue)
+                );
+                if (x.id == null) {
+                    rec.Estimate__c = s.id;
+                    rec.Repair_Shop__c = s.repairShopId;
+                    supIns.add(rec);
+                } else {
+                    rec.Id = x.id;
+                    supUpd.add(rec);
+                }
+            }
+
+            // Reimbursement lines belong to ONE scenario, so they carry
+            // Estimate__c. Claim-level ancillary benefits leave it blank and
+            // are saved by saveBenefitUsage instead. Only a Reimbursement Only
+            // scenario keeps them, so flipping a scenario back to Repair drops
+            // them rather than quietly reimbursing on a repair claim.
+            //
+            // Counts_Toward_Balance__c is the scenario's own Use flag.
+            // Benefit_Balance__c.Used_To_Date__c filters its roll-up on it, so
+            // a receipt typed into a competing scenario is recorded but does
+            // NOT eat the customer's remaining benefit for the term. Because
+            // every scenario is rewritten on every save, a scenario losing Use
+            // automatically flips its own lines back off.
+            if (isReimb) {
+                Boolean counts = s.isSelected == true;
+                for (ReimbursementRow r : safeReimbursements(s)) {
+                    if (r.benefitBalanceId == null) continue;
+                    if (r.id == null) {
+                        benIns.add(new Benefit_Usage__c(
+                            Benefit_Balance__c       = r.benefitBalanceId,
+                            Claim__c                 = claimId,
+                            Estimate__c              = s.id,
+                            Amount_Used__c           = r.receiptAmount,
+                            Counts_Toward_Balance__c = counts,
+                            Date__c                  = Date.today()
+                        ));
+                    } else {
+                        // Benefit_Balance__c is non-reparentable master-detail:
+                        // same rule as saveBenefitUsage, never resend it.
+                        benUpd.add(new Benefit_Usage__c(
+                            Id                       = r.id,
+                            Amount_Used__c           = r.receiptAmount,
+                            Claim__c                 = claimId,
+                            Estimate__c              = s.id,
+                            Counts_Toward_Balance__c = counts
+                        ));
+                    }
+                }
+            }
+        }
+
+        insertSecured(partIns);  updateSecured(partUpd);
+        insertSecured(svcIns);   updateSecured(svcUpd);
+        insertSecured(supIns);   updateSecured(supUpd);
+        insertSecured(benIns);   updateSecured(benUpd);
+    }
+
+    /**
+     * One display address from the structured parts, falling back to the
+     * legacy single-line Address__c when none of them are populated.
+     *
+     * The fallback matters: Address__c is the only address the org holds
+     * today and it still backs RepairShopIntakeFormController, the customer
+     * e-mail flow and Claim__c.Repair_Shop_Address__c, so it cannot be
+     * dropped. Shops keep showing their address correctly whether or not
+     * anyone has filled the structured fields in yet.
+     */
+    private static String composeAddress(Repair_Shop__c s) {
+        List<String> bits = new List<String>();
+        if (String.isNotBlank(s.Street__c))         bits.add(s.Street__c.trim());
+        if (String.isNotBlank(s.City__c))           bits.add(s.City__c.trim());
+        if (String.isNotBlank(s.State_Province__c)) bits.add(s.State_Province__c.trim());
+        if (String.isNotBlank(s.Postal_Code__c))    bits.add(s.Postal_Code__c.trim());
+        if (String.isNotBlank(s.Country__c))        bits.add(s.Country__c.trim());
+        return bits.isEmpty() ? s.Address__c : String.join(bits, ', ');
+    }
+
+    private static List<PartRow> safeParts(ScenarioRow s) {
+        return s.parts == null ? new List<PartRow>() : s.parts;
+    }
+    private static List<LabourRow> safeLabour(ScenarioRow s) {
+        return s.labour == null ? new List<LabourRow>() : s.labour;
+    }
+    private static List<SupplyRow> safeSupplies(ScenarioRow s) {
+        return s.supplies == null ? new List<SupplyRow>() : s.supplies;
+    }
+    private static List<ReimbursementRow> safeReimbursements(ScenarioRow s) {
+        return s.reimbursements == null ? new List<ReimbursementRow>() : s.reimbursements;
+    }
+
+    /**
+     * Rolls every child back up onto the Estimate__c scalars and stamps the
+     * TASK-047 scenario figures beside them.
+     *
+     * This is what keeps decision 1 true: Parts_Cost__c, Labour_Cost__c,
+     * Shop_Supplies__c, Retail_Price__c, Wholesale_Cost__c, Coverage_Applied__c,
+     * Customer_Pays__c, Profit_Loss__c and the rest all keep existing and keep
+     * meaning what they have always meant, so the nine Work_Order__c formula
+     * fields, claimsWorksheet, buildClaimLineItems and both screen flows carry
+     * on working untouched. What changes is HOW the numbers are reached: from
+     * the children, through calculateScenario, instead of from the Estimate's
+     * own scalars through calculate().
+     *
+     * Re-queries the children rather than trusting the caller's payload, for
+     * the same reason syncEstimateChildren does: Apex throws reading ANY
+     * unqueried field off a partial SOQL result, not just the one you assumed
+     * would be missing.
+     */
+    private static void recalculateRollups(Id claimId, Set<Id> estimateIds) {
+        if (estimateIds == null || estimateIds.isEmpty()) return;
+
+        Claim__c claim = [
+            SELECT Application_Package__r.Per_Claim_Limit__c,
+                   Application_Package__r.Deductible__c
+            FROM Claim__c WHERE Id = :claimId
+            WITH USER_MODE
+        ];
+        Decimal claimCap = claim.Application_Package__r?.Per_Claim_Limit__c;
+        Decimal claimDed = claim.Application_Package__r?.Deductible__c;
+
+        // Claim-level approved ancillary benefits, shared by every scenario,
+        // exactly as the design intends ("set benefits once"). Reimbursement
+        // lines are excluded here because they are scenario-specific.
+        Decimal benefitsApproved = 0;
+        for (Benefit_Usage__c u : [
+            SELECT Amount_Used__c FROM Benefit_Usage__c
+            WHERE Claim__c = :claimId AND Estimate__c = null
+            WITH USER_MODE
+        ]) {
+            benefitsApproved += nz(u.Amount_Used__c);
+        }
+
+        Map<Id, Estimate__c> estimates = new Map<Id, Estimate__c>([
+            SELECT Id, Claim_Type__c, Tax_Percentage__c, Deductable__c, Repair_Shop__r.Tax_Percentage__c
+            FROM Estimate__c WHERE Id IN :estimateIds
+            WITH USER_MODE
+        ]);
+
+        Map<Id, Decimal[]> agg = new Map<Id, Decimal[]>();
+        // [0] parts wholesale, [1] parts retail, [2] warranty wholesale,
+        // [3] warranty retail, [4] labour wholesale, [5] labour retail,
+        // [6] supplies wholesale, [7] supplies retail, [8] core, [9] reimbursement
+        for (Id eid : estimates.keySet()) {
+            agg.put(eid, new List<Decimal>{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+        }
+
+        for (Part__c p : [
+            SELECT Estimate__c, Quantity__c, Part_Cost_Wholesale__c, Price__c, Core_Charge__c,
+                   Extended_Warranty__c, Extended_Warranty_Cost__c, Extended_Warranty_Retail__c
+            FROM Part__c WHERE Estimate__c IN :estimateIds
+            WITH USER_MODE
+        ]) {
+            Decimal[] a = agg.get(p.Estimate__c);
+            Decimal q = nz(p.Quantity__c) == 0 ? 1 : p.Quantity__c;
+            a[0] += q * nz(p.Part_Cost_Wholesale__c);
+            a[1] += q * nz(p.Price__c);
+            a[8] += q * nz(p.Core_Charge__c);
+            if (p.Extended_Warranty__c == true) {
+                a[2] += nz(p.Extended_Warranty_Cost__c);
+                a[3] += nz(p.Extended_Warranty_Retail__c);
+            }
+        }
+        for (Service__c s : [
+            SELECT Estimate__c, Wholesale__c, Retail__c
+            FROM Service__c WHERE Estimate__c IN :estimateIds
+            WITH USER_MODE
+        ]) {
+            Decimal[] a = agg.get(s.Estimate__c);
+            a[4] += nz(s.Wholesale__c);
+            a[5] += nz(s.Retail__c);
+        }
+        for (Shop_Supply__c x : [
+            SELECT Estimate__c, Cost__c, Price__c
+            FROM Shop_Supply__c WHERE Estimate__c IN :estimateIds
+            WITH USER_MODE
+        ]) {
+            Decimal[] a = agg.get(x.Estimate__c);
+            a[6] += nz(x.Cost__c);
+            a[7] += nz(x.Price__c);
+        }
+        // TASK-051: the APPROVED amount, not the raw receipt. This used to sum
+        // Amount_Used__c, so a receipt over what was left on the term was
+        // saved in full while the Manage Estimates preview showed it capped.
+        Map<Id, List<ApprovedReimbursement>> approvedByEstimate = getApprovedReimbursements(estimates.keySet());
+        for (Id eid : approvedByEstimate.keySet()) {
+            if (agg.containsKey(eid)) agg.get(eid)[9] = approvedTotal(approvedByEstimate.get(eid));
+        }
+
+        List<Estimate__c> toStamp = new List<Estimate__c>();
+        for (Id eid : estimates.keySet()) {
+            Estimate__c e = estimates.get(eid);
+            Decimal[] a = agg.get(eid);
+            Boolean isReimb = e.Claim_Type__c == 'Reimbursement Only';
+
+            ClaimPricingService.ScenarioInput i = new ClaimPricingService.ScenarioInput();
+            i.partsWholesale    = a[0]; i.partsRetail       = a[1];
+            i.warrantyWholesale = a[2]; i.warrantyRetail    = a[3];
+            i.labourWholesale   = a[4]; i.labourRetail      = a[5];
+            i.suppliesWholesale = a[6]; i.suppliesRetail    = a[7];
+            i.coreTotal         = a[8];
+            i.cap               = claimCap;
+            i.deductible        = e.Deductable__c != null ? e.Deductable__c : claimDed;
+            i.taxPercent        = e.Tax_Percentage__c != null
+                                      ? e.Tax_Percentage__c
+                                      : e.Repair_Shop__r?.Tax_Percentage__c;
+            i.benefitsApproved  = benefitsApproved;
+            i.isReimbursement   = isReimb;
+            i.reimbursementTotal= a[9];
+
+            ClaimPricingService.ScenarioResult r = ClaimPricingService.calculateScenario(i);
+
+            // Fresh minimal record: the query above pulled Repair_Shop__r,
+            // and the master-detail Claim__c must never be resent on update.
+            toStamp.add(new Estimate__c(
+                Id                            = eid,
+                // existing scalars, same meaning as always
+                Parts_Cost__c                 = r.partsWholesale,
+                Labour_Cost__c                = r.labourWholesale,
+                Shop_Supplies__c              = r.suppliesWholesale,
+                Shop_Supplies_Retail__c       = r.suppliesRetail,
+                Core_Charge__c                = r.coreTotal,
+                Retail_Price__c               = r.retailRepair,
+                Retail_Total__c               = r.subtotalRetail,
+                Wholesale_Cost__c             = r.claimCost,
+                // Tax_Amount__c is NOT stamped: it has been a formula since
+                // Sep 22, Customer_Pays_With_Tax__c - Customer_Pays__c, so the
+                // platform derives it from the two fields below. Removing the
+                // assignment is also right on meaning: this field has always
+                // meant the tax sitting inside what the customer pays, which is
+                // calculateScenario's customerTaxAmount, not the taxTotal
+                // charged across repair and supplies that was being written here.
+                Coverage_Applied__c           = r.coverageApplied,
+                Customer_Pays__c              = r.customerPaysPreTax,
+                Customer_Pays_With_Tax__c     = r.customerPays,
+                Profit_Loss__c                = r.profitLossRepairOnly,
+                Deductable__c                 = i.deductible,
+                // TASK-048: Parts_Retail__c, Labour_Retail__c,
+                // Extended_Warranty_Cost__c and Extended_Warranty_Retail__c are
+                // NOT stamped here any more. They became native roll-up
+                // summaries once the children moved to master-detail, and Apex
+                // cannot write to a Summary field. The platform maintains them
+                // from Part__c.Line_Retail__c, Service__c.Labour_Retail_Calc__c
+                // and the two Extended_Warranty fields filtered on
+                // Extended_Warranty__c. calculateScenario still computes the
+                // same figures, and the LWC still uses them live; they simply
+                // no longer need persisting by hand.
+                // TASK-047 additions
+                Ancillary_Benefits_Paid__c    = r.benefitsApproved,
+                A_Protect_P_L_Incl_Benefits__c= r.profitLossInclBenefits,
+                Profit_Loss_Incl_Tax__c       = r.profitLossInclTax,
+                Reimbursement_Total__c        = isReimb ? a[9] : 0
+            ));
+        }
+        updateSecured(toStamp);
+    }
+
     // ───────────────────────── Create Work Order ──────────────────────────
 
     /**
@@ -445,6 +1498,33 @@ public with sharing class ClaimEstimateService {
      * every guard rail (one active work order per claim, no duplicate per
      * estimate).
      */
+    /**
+     * TASK-050 item 5 (Osama, 2026-10-09): the Work Order tab tells the agent
+     * to pick an estimate before creating a work order, and disables the
+     * button until one is. createWorkOrderForSelectedEstimate already refuses
+     * with a clear message, but only AFTER the click; this lets the screen say
+     * so beforehand. The server check stays exactly as it is and remains the
+     * authoritative one.
+     *
+     * Widened 2026-10-09 from a Boolean hasSelectedEstimate to return the
+     * estimate itself, because the tab now NAMES the selected estimate above
+     * the button so the agent can see what they are about to commit to. One
+     * round trip either way; a Boolean could not carry the name. Returns null
+     * when nothing is selected, which is the disabled case.
+     */
+    @AuraEnabled(cacheable=false)
+    public static Estimate__c getSelectedEstimateForClaim(Id claimId) {
+        List<Estimate__c> selected = [
+            SELECT Id, Name, Estimate_Name__c, Repair_Shop__r.Name,
+                   Retail_Total__c, Customer_Pays_With_Tax__c
+            FROM Estimate__c
+            WHERE Claim__c = :claimId AND Is_Selected__c = true
+            WITH USER_MODE
+            LIMIT 1
+        ];
+        return selected.isEmpty() ? null : selected[0];
+    }
+
     @AuraEnabled
     public static WorkOrderResult createWorkOrderForSelectedEstimate(Id claimId) {
         List<Estimate__c> selected = [
@@ -473,6 +1553,25 @@ public with sharing class ClaimEstimateService {
                    Part_Component__c, Job_Type__c, Part_Code__c, Parts_Supplier__c,
                    Parts_Cost__c, Labour_Hours__c, Labour_Rate__c,
                    Shop_Supplies__c, Shop_Supplies_Retail__c, Retail_Price__c, Coverage_Applied__c,
+                   // Claim_Type__c tells the coverage split which tax basis
+                   // Coverage_Applied__c is on: only the TASK-047 scenario
+                   // model writes it, and only that model stamps a
+                   // tax-inclusive coverage figure.
+                   Claim_Type__c,
+                   // TASK-051: How you will be paid, snapshotted below.
+                   Reimbursement_Payment_Method__c, Reimbursement_Expected_Payment_Date__c,
+                   // TASK-050: the application, customer and vehicle data the
+                   // work order snapshots below. All of these are FORMULA
+                   // fields on Claim__c reaching through to Application__r and
+                   // Vehicle__r, so reading them here never touches those
+                   // Application/Package-team objects directly.
+                   Claim__r.Application__r.Name,
+                   Claim__r.Customer_Name__c, Claim__r.Customer_Address__c,
+                   Claim__r.Customer_Email__c, Claim__r.Customer_Phone__c,
+                   Claim__r.Vehicle_Identification_Number_VIN__c,
+                   Claim__r.Vehicle_Year__c, Claim__r.Vehicle_Make__c,
+                   Claim__r.Vehicle_Model__c, Claim__r.Vehicle_Trim__c,
+                   Claim__r.Current_Odometer__c, Claim__r.Current_Odometer_Unit__c,
                    (SELECT Id FROM Work_Orders__r LIMIT 1)
             FROM Estimate__c WHERE Id = :estimateId
             WITH USER_MODE
@@ -516,8 +1615,40 @@ public with sharing class ClaimEstimateService {
                 Estimate__c      = est.Id,
                 Repair_Shop__c   = est.Repair_Shop__c,
                 Tax_Region__c    = est.Repair_Shop__r?.Tax_Region__c,
-                Tax_Percentage__c = taxRate
+                Tax_Percentage__c = taxRate,
+
+                // TASK-050. Snapshot, same reasoning as Tax_Percentage__c just
+                // above: a work order goes out to the customer and the repair
+                // shop for authorization, so it has to say what was true when
+                // it was issued. Every Claim__c field read here is itself a
+                // formula over Application__r or Vehicle__r, so a live
+                // reference would let the other team's edits silently rewrite
+                // a document that had already been sent.
+                Application_Number__c = est.Claim__r?.Application__r?.Name,
+                Customer_Name__c      = est.Claim__r?.Customer_Name__c,
+                Customer_Address__c   = est.Claim__r?.Customer_Address__c,
+                // The home-then-business precedence lives in the
+                // Claim__c.Customer_Phone__c formula, not here, so it has one
+                // definition that stays editable in configuration. Osama's
+                // rule, 2026-10-08.
+                Customer_Phone__c     = est.Claim__r?.Customer_Phone__c,
+                Customer_Email__c     = est.Claim__r?.Customer_Email__c,
+                VIN__c                = est.Claim__r?.Vehicle_Identification_Number_VIN__c,
+                Vehicle_Year__c       = est.Claim__r?.Vehicle_Year__c,
+                Vehicle_Make__c       = est.Claim__r?.Vehicle_Make__c,
+                Vehicle_Model__c      = est.Claim__r?.Vehicle_Model__c,
+                Vehicle_Trim__c       = est.Claim__r?.Vehicle_Trim__c,
+                Odometer_In__c        = est.Claim__r?.Current_Odometer__c,
+                Odometer_In_Unit__c   = est.Claim__r?.Current_Odometer_Unit__c
             );
+            // TASK-051. Snapshot for the same reason as the header above: the
+            // payment method and date a reimbursement notice promised must not
+            // change after it was sent. Reimbursement Only work orders only.
+            Boolean isReimbursement = est.Claim_Type__c == 'Reimbursement Only';
+            if (isReimbursement) {
+                wo.Reimbursement_Payment_Method__c        = est.Reimbursement_Payment_Method__c;
+                wo.Reimbursement_Expected_Payment_Date__c = est.Reimbursement_Expected_Payment_Date__c;
+            }
             insertSecured(new List<Work_Order__c>{ wo });
 
             // 2. Selection flag: exactly one per claim.
@@ -527,8 +1658,41 @@ public with sharing class ClaimEstimateService {
             //     stays on the Estimate/Work Order - see recalculateClaimTotalProfit).
             recalculateClaimTotalProfit(est.Claim__c);
 
-            // 3. Claim line items, one per charge.
-            List<Claim_Line_Item__c> lines = buildClaimLineItems(est);
+            // 3. Claim line items, ONE PER CHILD RECORD (TASK-049), plus a
+            //    separate line for each optional extended warranty purchased.
+            //    Queried here rather than inside buildClaimLineItems so that
+            //    method stays pure and unit-testable, and so this stays one
+            //    query per child type regardless of how many lines result.
+            List<Part__c> estParts = [
+                SELECT Id, Part_Name__c, Part_Code__c, Stock_Number__c, Supplier__c, Quantity__c,
+                       Part_Cost_Wholesale__c, Price__c,
+                       Extended_Warranty__c, Extended_Warranty_Cost__c, Extended_Warranty_Retail__c,
+                       Extended_Warranty_Months__c, Extended_Warranty_Km__c
+                FROM Part__c WHERE Estimate__c = :est.Id
+                WITH USER_MODE
+                ORDER BY CreatedDate ASC
+            ];
+            List<Service__c> estServices = [
+                // TASK-050: the retail rate, the retail hours and both guide
+                // times were missing from this query, so they could not reach
+                // the work order line even though Work_Order_Line_Item__c has
+                // a field for each of them.
+                SELECT Id, Item_Desription__c, Repair_Time_EST__c, Wholesale_Labour_Rate_HR__c,
+                       Wholesale__c, Repair_Time_Adj__c, Retail_Labour_Rate__c, Retail__c,
+                       Labour_Guide_Time_Mitchell__c, Labour_Guide_Time_All_Data__c
+                FROM Service__c WHERE Estimate__c = :est.Id
+                WITH USER_MODE
+                ORDER BY CreatedDate ASC
+            ];
+            List<Shop_Supply__c> estSupplies = [
+                SELECT Id, Item_Name__c, Cost__c, Price__c
+                FROM Shop_Supply__c WHERE Estimate__c = :est.Id
+                WITH USER_MODE
+                ORDER BY CreatedDate ASC
+            ];
+            ClaimLineBuild build =
+                buildClaimLineItems(est, estParts, estServices, estSupplies);
+            List<Claim_Line_Item__c> lines = build.lines;
             insertSecured(lines);
 
             // 4. Work order line items generated from the claim line items.
@@ -543,17 +1707,61 @@ public with sharing class ClaimEstimateService {
             //    the LAST non-Supplies line absorbs the rounding remainder so the lines
             //    always sum back to exactly Coverage_Applied__c. Supplies is never covered,
             //    matching the pricing formula (shop supplies retail is added AFTER coverage).
-            Decimal coverageApplied = nz(est.Coverage_Applied__c);
-            Decimal jobRetail       = nz(est.Retail_Price__c);
+            // TASK-049 fix for a bug TASK-047 introduced and this surfaced.
+            // Decision 8 made Coverage_Applied__c TAX-INCLUSIVE (the cap is now
+            // tested against the tax-inclusive repair), but these line items
+            // carry PRE-TAX retail. Spreading a tax-inclusive coverage figure
+            // across pre-tax retail hands a line more coverage than it is
+            // worth: Option C would have produced Part -71.43 and Labour -28.57
+            // as NEGATIVE customer-pay amounts on a fully covered claim.
+            // Converting coverage to its pre-tax equivalent first reconciles
+            // exactly: for Option C the lines then total 233.63 pre-tax, which
+            // x 1.13 is 264.00, precisely repairInc less coverage.
+            // Coverage_Applied__c is TAX-INCLUSIVE under the TASK-047 scenario
+            // model (decision 8: the cap now covers tax), but these line items
+            // carry PRE-TAX retail, so it has to be converted before it can be
+            // spread across them. Without this, a fully covered claim writes
+            // NEGATIVE customer-pay amounts: Option C produced Part -71.43 and
+            // Labour -28.57. Converted, the lines total 233.63 pre-tax, which
+            // x 1.13 is exactly 264.00, the repair less coverage.
+            //
+            // This assumes the scenario model priced the estimate, which is
+            // true for everything the UI can now produce: no LWC calls
+            // saveEstimates, updateEstimate or recalculateAndStamp any more,
+            // and those legacy entry points survive only for their own tests.
+            // Two attempts to detect the basis instead both failed and are
+            // recorded so nobody retries them: comparing coverage against the
+            // pre-tax line total is wrong on an over-cap claim (Option A has
+            // coverage 2900 below a 4447.50 line total yet still needs
+            // converting), and Claim_Type__c is useless as a discriminator
+            // because 'Repair' is its picklist DEFAULT, so every estimate has
+            // it. Retiring the legacy pricing path would delete this comment
+            // and the conversion along with it.
+            Decimal taxFactor = 1 + (nz(taxRate) / 100);
+            Decimal coverageApplied = taxFactor > 0
+                ? nz(est.Coverage_Applied__c).divide(taxFactor, 2, RoundingMode.HALF_UP)
+                : nz(est.Coverage_Applied__c);
+
+            // Denominator from the lines themselves rather than the stamped
+            // Retail_Price__c, so the shares always sum to exactly 1 even if
+            // that scalar is stale relative to the children.
+            Decimal jobRetail = 0;
             Integer nonSuppliesCount = 0;
             for (Claim_Line_Item__c cli : lines) {
-                if (cli.Line_Type__c != 'Supplies') nonSuppliesCount++;
+                if (cli.Line_Type__c != 'Supplies') {
+                    nonSuppliesCount++;
+                    jobRetail += cli.Retail_Amount__c != null ? cli.Retail_Amount__c : nz(cli.Amount__c);
+                }
             }
+            // Coverage can never exceed what the covered lines are actually worth.
+            if (coverageApplied > jobRetail) coverageApplied = jobRetail;
 
             List<Work_Order_Line_Item__c> woLines = new List<Work_Order_Line_Item__c>();
             Integer nonSuppliesSeen  = 0;
             Decimal coverageAssigned = 0;
-            for (Claim_Line_Item__c cli : lines) {
+            for (Integer i = 0; i < lines.size(); i++) {
+                Claim_Line_Item__c cli = lines[i];
+                SObject source = build.sources[i];
                 Decimal retail = cli.Retail_Amount__c != null ? cli.Retail_Amount__c : cli.Amount__c;
 
                 Decimal covered = 0;
@@ -581,47 +1789,270 @@ public with sharing class ClaimEstimateService {
                     Covered_Amount__c             = covered,
                     Customer_Pay_Amount__c        = customerPay
                 );
-                if (cli.Line_Type__c == 'Labour') {
+                // TASK-050. Labour detail comes from the Service__c itself, not
+                // from the claim line item in between. That record has a single
+                // Hours__c and Rate__c, so routing labour through it could only
+                // ever carry the wholesale pair: the retail rate, the retail
+                // hours and both guide times were dropped, and the WHOLESALE
+                // hours were being written into Repair_Time_Adj__c, which means
+                // the ADJUSTED (retail) time on both objects. That mislabelling
+                // was invisible whenever the two hour figures happened to be
+                // equal, which is why it survived.
+                if (source instanceof Service__c) {
+                    Service__c s = (Service__c) source;
+                    wl.Repair_Time_EST__c            = s.Repair_Time_EST__c;
+                    wl.Wholesale_Labour_Rate_HR__c   = s.Wholesale_Labour_Rate_HR__c;
+                    wl.Repair_Time_Adj__c            = s.Repair_Time_Adj__c;
+                    wl.Retail_Labour_Rate__c         = s.Retail_Labour_Rate__c;
+                    wl.Labour_Guide_Time_Mitchell__c = s.Labour_Guide_Time_Mitchell__c;
+                    wl.Labour_Guide_Time_All_Data__c = s.Labour_Guide_Time_All_Data__c;
+                } else if (cli.Line_Type__c == 'Labour') {
+                    // Legacy estimates with no children, where the only hours
+                    // available are the old Estimate__c.Labour_Hours__c. Those
+                    // are wholesale hours, so they belong in Repair_Time_EST__c
+                    // rather than in the adjusted field they used to land in.
                     wl.Wholesale_Labour_Rate_HR__c = cli.Rate__c;
-                    if (cli.Hours__c != null) wl.Repair_Time_Adj__c = cli.Hours__c.setScale(0, RoundingMode.HALF_UP);
+                    wl.Repair_Time_EST__c = cli.Hours__c == null
+                        ? null : cli.Hours__c.setScale(0, RoundingMode.HALF_UP);
                 }
                 woLines.add(wl);
             }
             insertSecured(woLines);
 
+            // 5. TASK-051 (Osama, 2026-10-13). A reimbursement pays the
+            //    CUSTOMER, so it belongs in the payables ledger like any other
+            //    line A-Protect pays out: one Claim_Line_Item__c per approved
+            //    receipt, Role Customer. Before this the payout was recorded
+            //    nowhere. Deliberately NOT turned into Work_Order_Line_Item__c
+            //    rows: those are repair work the customer is charged for, and
+            //    Wrap Up builds the customer invoice from them.
+            List<Claim_Line_Item__c> reimbLines = new List<Claim_Line_Item__c>();
+            if (isReimbursement) {
+                List<ApprovedReimbursement> approved =
+                    getApprovedReimbursements(new Set<Id>{ est.Id }).get(est.Id);
+                if (approved != null) {
+                    for (ApprovedReimbursement a : approved) {
+                        if (a.approved <= 0) continue;
+                        reimbLines.add(new Claim_Line_Item__c(
+                            Claim__c       = est.Claim__c,
+                            Estimate__c    = est.Id,
+                            Line_Type__c   = 'Reimbursement',
+                            Role__c        = 'Customer',
+                            Description__c = a.benefitType + ' reimbursement',
+                            Amount__c      = a.approved
+                        ));
+                    }
+                }
+                insertSecured(reimbLines);
+            }
+
             WorkOrderResult r = new WorkOrderResult();
             r.workOrderId    = wo.Id;
-            r.claimLineItems = lines.size();
+            r.claimLineItems = lines.size() + reimbLines.size();
             r.workOrderLines = woLines.size();
             return r;
         } catch (Exception ex) {
             Database.rollback(sp);
-            throw new AuraHandledException('Could not create work order: ' + ex.getMessage());
+            // AuraHandledException.getMessage() returns the useless
+            // "Script-thrown exception" unless setMessage is called, which hid
+            // the real cause from the screen AND from test output. Seven tests
+            // failed with nothing but that string on 2026-10-08 while this was
+            // the only thing standing between me and the actual error.
+            // saveManageEstimates and saveBenefitUsage already do this.
+            String detail = 'Could not create work order: ' + ex.getTypeName()
+                + ': ' + ex.getMessage() + ' (line ' + ex.getLineNumber() + ')';
+            System.debug(LoggingLevel.ERROR, detail + '\n' + ex.getStackTraceString());
+            AuraHandledException wrapped = new AuraHandledException(detail);
+            wrapped.setMessage(detail);
+            throw wrapped;
         }
     }
 
     /**
-     * Rewritten Sep 22 (Osama): reads the winning Estimate__c's own scalar
-     * fields directly, instead of querying Part__c/Service__c/Shop_Supply__c
-     * children - the Repair Price Scenarios grid has never created those
-     * children (it only ever writes scalar fields onto Estimate__c, the
-     * Sep 16 architectural decision), so this used to silently generate an
-     * empty work order for every real, UI-created estimate. Still 3 lines
-     * (Part/Labour/Supplies), preserving the existing Vendor Payables and
-     * Claim Detail - Parts & Labour reports' assumption that Line_Type__c
-     * distinguishes Part from Labour.
+     * TASK-049 (requirement 9): ONE claim line item per real child record,
+     * plus a SEPARATE line for each optional extended warranty actually
+     * purchased, which the brief called out explicitly:
      *
-     * Wrinkle: Estimate__c has only ONE overall Retail_Price__c for the
-     * whole repair job (parts + labour combined), not a separate retail
-     * figure per part vs labour like the old child-object model did.
-     * Resolved by splitting it proportionally between the Part and Labour
-     * lines by their wholesale share, so the three lines' retail always
-     * sums back to exactly Retail_Total__c (Retail_Price__c +
-     * Shop_Supplies_Retail__c, already a real stamped field). Supplies
-     * keeps its own honest Shop_Supplies_Retail__c, no allocation needed.
-     * A line is only generated when it has a non-zero wholesale amount.
+     *   "If the customer purchased the Optional Extended Warranty, a separate
+     *    Work Order Line Item must be created for it. Make sure this is
+     *    represented separately and does not get incorrectly merged into
+     *    another line item."
+     *
+     * Before this, the work order always had exactly 3 hardcoded lines
+     * (Part/Labour/Supplies) no matter what the estimate contained, so an
+     * estimate with three parts produced one line labelled after the first
+     * part with all three lumped into it, and an extended warranty never
+     * appeared at all even though the customer was charged for it.
+     *
+     * The proportional retail split that used to live here is GONE. It only
+     * existed because the old Estimate had a single combined Retail_Price__c
+     * with no per-line retail; every child now carries its own honest figure.
+     *
+     * Falls back to the old scalar-driven behaviour when an estimate has no
+     * children, so work orders can still be created from estimates that
+     * predate TASK-047. Osama's decision 10 stands: nothing historical is
+     * restated or broken.
+     *
+     * Line_Type__c distinguishes Part / Labour / Supplies / Extended
+     * Warranty, which the Vendor Payables and Claim Detail reports rely on.
+     *
+     * OPEN QUESTION, deliberately left as-is (flagged 2026-10-06): whether an
+     * extended warranty should be covered by A-Protect or paid entirely by
+     * the customer. Noelle's design puts it INSIDE the retail repair that the
+     * cap is tested against (Formulas card 7: "retail repair = parts + ext.
+     * warranty + labour (supplies excluded)"), and the work order preview
+     * labels only Shop Supplies as "(Customer Responsibility)". That design
+     * is what is implemented here, so an Extended Warranty line takes a
+     * proportional share of coverage exactly like Part and Labour. On an
+     * over-cap claim this is identical to the customer paying in full, since
+     * coverage is pinned at the cap; the two readings only differ on a fully
+     * covered claim. Do not change this without Noelle and the client.
      */
-    private static List<Claim_Line_Item__c> buildClaimLineItems(Estimate__c est) {
+    /**
+     * The claim line items, each paired with the child record it came from.
+     *
+     * TASK-050: the pairing is the point. Claim_Line_Item__c has one Hours__c
+     * and one Rate__c, so a labour line could only ever carry the WHOLESALE
+     * pair through it; the retail rate, the retail hours and both guide times
+     * had nowhere to go and were silently dropped, even though
+     * Work_Order_Line_Item__c has a purpose-built field for every one of them.
+     * Keeping the source alongside each line lets the work order line be
+     * populated from Service__c directly, rather than from the lossy middle
+     * record. Index-aligned: sources[i] is where lines[i] came from, and it is
+     * null for the legacy no-children fallback.
+     */
+    private class ClaimLineBuild {
+        List<Claim_Line_Item__c> lines = new List<Claim_Line_Item__c>();
+        List<SObject> sources = new List<SObject>();
+
+        void add(Claim_Line_Item__c line, SObject source) {
+            lines.add(line);
+            sources.add(source);
+        }
+    }
+
+    private static ClaimLineBuild buildClaimLineItems(
+            Estimate__c est,
+            List<Part__c> parts,
+            List<Service__c> services,
+            List<Shop_Supply__c> supplies) {
+
+        Boolean hasChildren = !parts.isEmpty() || !services.isEmpty() || !supplies.isEmpty();
+        if (!hasChildren) {
+            ClaimLineBuild legacy = new ClaimLineBuild();
+            for (Claim_Line_Item__c cli : buildClaimLineItemsFromScalars(est)) {
+                legacy.add(cli, null);
+            }
+            return legacy;
+        }
+
+        ClaimLineBuild out = new ClaimLineBuild();
+
+        for (Part__c p : parts) {
+            Decimal qty       = nz(p.Quantity__c) == 0 ? 1 : p.Quantity__c;
+            Decimal wholesale = qty * nz(p.Part_Cost_Wholesale__c);
+            Decimal retail    = qty * nz(p.Price__c);
+            if (wholesale != 0 || retail != 0) {
+                out.add(new Claim_Line_Item__c(
+                    Claim__c          = est.Claim__c,
+                    // TASK-050 primary rule: every downstream line must be
+                    // traceable back to the Estimate AND to the child it came
+                    // from. Work Order Line Item and Invoice Line Item already
+                    // chain; this was the broken hop.
+                    Estimate__c       = est.Id,
+                    Part__c           = p.Id,
+                    Line_Type__c      = 'Part',
+                    Role__c           = 'Parts Supplier',
+                    Description__c    = String.isNotBlank(p.Part_Name__c) ? p.Part_Name__c : 'Part',
+                    Part_Code__c      = p.Part_Code__c,
+                    Stock_Number__c   = p.Stock_Number__c,
+                    Parts_Supplier__c = p.Supplier__c,
+                    Repair_Shop__c    = est.Repair_Shop__c,
+                    Amount__c         = wholesale,
+                    Retail_Amount__c  = retail
+                ), p);
+            }
+
+            // Its own line, never merged into the part it belongs to.
+            if (p.Extended_Warranty__c == true && nz(p.Extended_Warranty_Cost__c) != 0) {
+                out.add(new Claim_Line_Item__c(
+                    Claim__c         = est.Claim__c,
+                    Estimate__c      = est.Id,
+                    // The warranty is sold against a part, so it traces to the
+                    // same Part__c as the part line beside it.
+                    Part__c          = p.Id,
+                    Line_Type__c     = 'Extended Warranty',
+                    Role__c          = 'Parts Supplier',
+                    Description__c   = extendedWarrantyLabel(p),
+                    Repair_Shop__c   = est.Repair_Shop__c,
+                    Amount__c        = nz(p.Extended_Warranty_Cost__c),
+                    Retail_Amount__c = nz(p.Extended_Warranty_Retail__c)
+                ), p);
+            }
+        }
+
+        for (Service__c s : services) {
+            Decimal wholesale = nz(s.Wholesale__c);
+            Decimal retail    = nz(s.Retail__c);
+            if (wholesale != 0 || retail != 0) {
+                out.add(new Claim_Line_Item__c(
+                    Claim__c         = est.Claim__c,
+                    Estimate__c      = est.Id,
+                    Service__c       = s.Id,
+                    Line_Type__c     = 'Labour',
+                    Role__c          = 'Repair Shop',
+                    Description__c   = String.isNotBlank(s.Item_Desription__c) ? s.Item_Desription__c : 'Labour',
+                    Hours__c         = s.Repair_Time_EST__c,
+                    Rate__c          = s.Wholesale_Labour_Rate_HR__c,
+                    Repair_Shop__c   = est.Repair_Shop__c,
+                    Amount__c        = wholesale,
+                    Retail_Amount__c = retail
+                ), s);
+            }
+        }
+
+        for (Shop_Supply__c x : supplies) {
+            Decimal wholesale = nz(x.Cost__c);
+            Decimal retail    = nz(x.Price__c);
+            if (wholesale != 0 || retail != 0) {
+                out.add(new Claim_Line_Item__c(
+                    Claim__c         = est.Claim__c,
+                    Estimate__c      = est.Id,
+                    Shop_Supply__c   = x.Id,
+                    Line_Type__c     = 'Supplies',
+                    Role__c          = 'Repair Shop',
+                    Description__c   = String.isNotBlank(x.Item_Name__c) ? x.Item_Name__c : 'Shop Supplies',
+                    Repair_Shop__c   = est.Repair_Shop__c,
+                    Amount__c        = wholesale,
+                    Retail_Amount__c = retail
+                ), x);
+            }
+        }
+        return out;
+    }
+
+    /** "Extended Warranty: Engine (12 mo / 20,000 km)", matching the design's own wording. */
+    private static String extendedWarrantyLabel(Part__c p) {
+        List<String> term = new List<String>();
+        if (nz(p.Extended_Warranty_Months__c) > 0) {
+            term.add(String.valueOf(p.Extended_Warranty_Months__c.setScale(0, RoundingMode.HALF_UP)) + ' mo');
+        }
+        if (nz(p.Extended_Warranty_Km__c) > 0) {
+            term.add(String.valueOf(p.Extended_Warranty_Km__c.setScale(0, RoundingMode.HALF_UP)) + ' km');
+        }
+        String name = String.isNotBlank(p.Part_Name__c) ? p.Part_Name__c : 'part';
+        return 'Extended Warranty: ' + name + (term.isEmpty() ? '' : ' (' + String.join(term, ' / ') + ')');
+    }
+
+    /**
+     * The pre-TASK-049 behaviour, kept ONLY as a fallback for estimates with
+     * no children (anything created before TASK-047). Three lines at most,
+     * with the retail allocation that the child-driven path above no longer
+     * needs: the old Estimate had one combined Retail_Price__c for parts and
+     * labour together, split here proportionally by wholesale share so the
+     * lines still sum back to exactly Retail_Total__c.
+     */
+    private static List<Claim_Line_Item__c> buildClaimLineItemsFromScalars(Estimate__c est) {
         List<Claim_Line_Item__c> out = new List<Claim_Line_Item__c>();
 
         Decimal partsWholesale  = nz(est.Parts_Cost__c);
@@ -735,6 +2166,11 @@ public with sharing class ClaimEstimateService {
             SELECT Id, Benefit_Balance__c, Amount_Used__c
             FROM Benefit_Usage__c
             WHERE Claim__c = :claimId AND Benefit_Balance__c IN :balances
+              // TASK-047: a draw carrying an Estimate__c belongs to one
+              // Reimbursement Only scenario, not to the claim as a whole.
+              // Without this filter a reimbursement line would surface here
+              // as the claim's own ancillary draw and be double counted.
+              AND Estimate__c = null
             WITH USER_MODE
         ]) {
             usageByBalance.put(u.Benefit_Balance__c, u);
@@ -764,8 +2200,32 @@ public with sharing class ClaimEstimateService {
      * the LWC already blocks this live, this is the server-side backstop.
      */
     @AuraEnabled
-    public static void saveBenefitUsage(Id claimId, List<Benefit_Usage__c> usages) {
-        if (usages == null || usages.isEmpty()) return;
+    public static void saveBenefitUsage(Id claimId, List<Benefit_Usage__c> usages,
+            List<Id> removedUsageIds) {
+        // Osama, 2026-10-08: unchecking a benefit and saving left it still
+        // showing as drawn. The editor sends only the CHECKED rows, so an
+        // unchecked benefit was simply absent from the payload and its
+        // Benefit_Usage__c row survived untouched. That is a money bug, not a
+        // display one: the draw kept consuming Benefit_Balance__c.Used_To_Date__c
+        // and kept crediting the customer through Ancillary_Benefits_Paid__c.
+        // Deleting here is what makes unchecking mean anything.
+        if (removedUsageIds != null && !removedUsageIds.isEmpty()) {
+            deleteSecured([
+                SELECT Id FROM Benefit_Usage__c
+                WHERE Id IN :removedUsageIds AND Claim__c = :claimId
+                WITH USER_MODE
+            ]);
+        }
+
+        // Deliberately AFTER the delete, and it still recalculates: clearing
+        // the last benefit on a claim is a real change and the claim's total
+        // profit has to follow it. Returning early here was the same trap as
+        // in saveManageEstimates, where an early return would have swallowed
+        // pending deletions.
+        if (usages == null || usages.isEmpty()) {
+            recalculateClaimTotalProfit(claimId);
+            return;
+        }
 
         Set<Id> balanceIds = new Set<Id>();
         Set<Id> usageIds = new Set<Id>();
@@ -798,6 +2258,11 @@ public with sharing class ClaimEstimateService {
             if (u.Id == null) {
                 u.Claim__c = claimId;
                 if (u.Date__c == null) u.Date__c = Date.today();
+                // TASK-047: a claim-level ancillary draw always consumes the
+                // balance. Only an estimate-scoped reimbursement line on an
+                // unchosen scenario does not, and those are written by
+                // saveScenarioChildren, never here.
+                u.Counts_Toward_Balance__c = true;
                 toInsert.add(u);
             } else {
                 // Benefit_Balance__c is a non-reparentable master-detail -
@@ -805,10 +2270,11 @@ public with sharing class ClaimEstimateService {
                 // treats that as an edit to a field that structurally can
                 // never be edited and refuses the whole DML.
                 toUpdate.add(new Benefit_Usage__c(
-                    Id             = u.Id,
-                    Amount_Used__c = u.Amount_Used__c,
-                    Date__c        = u.Date__c != null ? u.Date__c : Date.today(),
-                    Claim__c       = claimId
+                    Id                       = u.Id,
+                    Amount_Used__c           = u.Amount_Used__c,
+                    Date__c                  = u.Date__c != null ? u.Date__c : Date.today(),
+                    Claim__c                 = claimId,
+                    Counts_Toward_Balance__c = true
                 ));
             }
         }
@@ -831,7 +2297,7 @@ public with sharing class ClaimEstimateService {
      */
     private static void recalculateClaimTotalProfit(Id claimId) {
         List<Estimate__c> selected = [
-            SELECT Id, Profit_Loss__c
+            SELECT Id, Profit_Loss__c, Claim_Type__c
             FROM Estimate__c
             WHERE Claim__c = :claimId AND Is_Selected__c = true
             WITH USER_MODE
@@ -839,10 +2305,38 @@ public with sharing class ClaimEstimateService {
         ];
         if (selected.isEmpty()) return;
 
+        // TASK-051 (Osama, 2026-10-13): when the chosen scenario is
+        // Reimbursement Only, the customer is paid its approved receipts and
+        // nothing else, exactly as calculateScenario prices it. The
+        // claim-level ancillary draws apply to repair scenarios only. This
+        // total feeds Work_Order__c.Benefits_Used__c, which showed 305 on
+        // CWO-0044 (a 100 claim-level draw plus 205 of receipts) while the
+        // customer was being reimbursed 205.
+        if (selected[0].Claim_Type__c == 'Reimbursement Only') {
+            Decimal reimbursed = approvedTotal(
+                getApprovedReimbursements(new Set<Id>{ selected[0].Id }).get(selected[0].Id));
+            updateSecured(new List<Claim__c>{
+                new Claim__c(
+                    Id = claimId,
+                    Total_Profit__c = nz(selected[0].Profit_Loss__c) - reimbursed,
+                    Total_Benefits_Used__c = reimbursed
+                )
+            });
+            return;
+        }
+
+        // TASK-047: a Benefit_Usage__c carrying an Estimate__c is a
+        // reimbursement line belonging to ONE scenario. Only the scenario
+        // actually marked Use may affect the claim's P&L, otherwise a
+        // reimbursement typed into a competing scenario the agent never chose
+        // would still be subtracted here. Claim-level draws (Estimate__c
+        // blank) always count, because they apply to every scenario.
+        Id selectedId = selected[0].Id;
         AggregateResult[] agg = [
             SELECT SUM(Amount_Used__c) total
             FROM Benefit_Usage__c
             WHERE Claim__c = :claimId
+              AND (Estimate__c = null OR Estimate__c = :selectedId)
             WITH USER_MODE
         ];
         Decimal benefitsUsed = agg.isEmpty() ? 0 : (Decimal) agg[0].get('total');
@@ -908,6 +2402,10 @@ public with sharing class ClaimEstimateService {
         @AuraEnabled public String name;
         @AuraEnabled public String description; // Service_Repair_Description__c
         @AuraEnabled public Decimal price;       // Price__c
+        // TASK-050 item 4: the Approved Repairs table shows Retail alongside
+        // Covered and Customer Pay. Retail__c is the existing field and the
+        // one the document uses; no new figure is introduced here.
+        @AuraEnabled public Decimal retail;      // Retail__c
         @AuraEnabled public Decimal covered;     // Covered_Amount__c
         @AuraEnabled public Decimal customerPay; // Customer_Pay_Amount__c
         @AuraEnabled public String orderedPartStatus; // Ordered_Part_Status__c
@@ -931,7 +2429,9 @@ public with sharing class ClaimEstimateService {
                    Estimate__r.Stock_Number__c, Estimate__r.Repair_Shop__r.Name,
                    Estimate__r.Labour_Hours__c, Estimate__r.Labour_Rate__c, Estimate__r.Insurance_Source__c,
                    Claim__r.Application_Package__r.Per_Claim_Limit__c,
-                   (SELECT Id, Name, Service_Repair_Description__c, Price__c, Covered_Amount__c, Customer_Pay_Amount__c,
+                   (SELECT Id, Name, Service_Repair_Description__c, Description__c,
+                           Claim_Line_Item__r.Description__c,
+                           Price__c, Retail__c, Covered_Amount__c, Customer_Pay_Amount__c,
                            Ordered_Part_Status__c
                     FROM Customer_Work_Order_Line_Items__r)
             FROM Work_Order__c
@@ -952,8 +2452,9 @@ public with sharing class ClaimEstimateService {
             WorkOrderLineRow row = new WorkOrderLineRow();
             row.id          = wl.Id;
             row.name        = wl.Name;
-            row.description = wl.Service_Repair_Description__c;
+            row.description = lineDescription(wl);
             row.price        = wl.Price__c;
+            row.retail       = wl.Retail__c;
             row.covered      = wl.Covered_Amount__c;
             row.customerPay  = wl.Customer_Pay_Amount__c;
             row.orderedPartStatus = wl.Ordered_Part_Status__c;
@@ -1364,7 +2865,9 @@ public with sharing class ClaimEstimateService {
         for (Work_Order__c wo : [
             SELECT Id, Name, Claim__c, Claim__r.Application__c, Total_Amount_Due__c,
                    (SELECT Id FROM Invoice__r LIMIT 1),
-                   (SELECT Id, Description__c, Price__c FROM Customer_Work_Order_Line_Items__r)
+                   (SELECT Id, Description__c, Service_Repair_Description__c, Price__c,
+                           Claim_Line_Item__r.Line_Type__c, Claim_Line_Item__r.Description__c
+                    FROM Customer_Work_Order_Line_Items__r)
             FROM Work_Order__c
             WHERE Claim__c IN :claimIds AND Status__c != 'Voided'
             WITH USER_MODE
@@ -1377,6 +2880,11 @@ public with sharing class ClaimEstimateService {
             Work_Order__c wo = activeWorkOrderByClaim.get(claimId);
             if (wo == null) continue;              // nothing to invoice yet
             if (!wo.Invoice__r.isEmpty()) continue; // already generated
+            // A Reimbursement Only work order is invoiced too, deliberately.
+            // It has no work order line items, so its invoice has no lines and
+            // Net_Amount_Due__c is 0; the payout itself is the Reimbursement
+            // claim line items. TASK-051 briefly skipped it, and Osama asked
+            // for the empty $0 invoice back as the middle ground (2026-10-13).
 
             invoicesToInsert.add(new Invoice__c(
                 Name          = 'INV-' + wo.Name,
@@ -1396,11 +2904,99 @@ public with sharing class ClaimEstimateService {
                 linesToInsert.add(new Invoice_Line_Item__c(
                     Invoice__c              = inv.Id,
                     Work_Order_Line_Item__c = wl.Id,
-                    Description__c          = wl.Description__c,
+                    // Osama, 2026-10-09: Name was never set here. It is a TEXT
+                    // name field, not an auto number, so every invoice line
+                    // this trigger created showed its record id instead of a
+                    // business name. It takes the same value Description__c
+                    // takes, from the same source, so the two stay consistent
+                    // by construction: "Engine", "Labour", "Shop supplies".
+                    Name                    = invoiceLineName(wl),
+                    // Plain text, not the rich text field: that one stores
+                    // "Oil &amp; fluids" for a supply named "Oil & fluids".
+                    Description__c          = lineDescription(wl),
                     Repair_Charge_Amount__c = wl.Price__c
                 ));
             }
         }
         if (!linesToInsert.isEmpty()) insertSecured(linesToInsert);
+    }
+
+    /**
+     * The plain-text description of a work order line, for anything a person
+     * reads: the Approved Repairs table, the work order PDF, and the invoice
+     * line's Name and Description.
+     *
+     * Work_Order_Line_Item__c.Description__c is type Html, a RICH TEXT field.
+     * Salesforce HTML-encodes plain text written into one, so a shop supply
+     * named "Oil & fluids" is stored there as "Oil &amp; fluids" and renders
+     * with the entity visible (Osama, 2026-10-09). Service_Repair_Description__c
+     * is a plain TextArea that createWorkOrder sets from the SAME source in the
+     * same statement, so it carries the identical text without the encoding.
+     *
+     * Reading the plain field is therefore strictly better, and this exists in
+     * one place so the four readers cannot disagree again. The Html field is
+     * still written exactly as before; nothing about the data model changed.
+     *
+     * The preference order keeps the behaviour the earlier tests pinned, that
+     * a line's OWN label beats its claim line item's more generic one. Only
+     * the source of that own label changed, from the rich text field to its
+     * plain twin.
+     */
+    public static String lineDescription(Work_Order_Line_Item__c wl) {
+        if (wl == null) return null;
+        // 1. The plain twin. Present on every record createWorkOrder makes.
+        if (String.isNotBlank(wl.Service_Repair_Description__c)) {
+            return wl.Service_Repair_Description__c.trim();
+        }
+        // 2. Records that predate that field still carry their own label in
+        //    the rich text one, so decode it rather than skipping it.
+        String ownLabel = htmlToPlainText(wl.Description__c);
+        if (String.isNotBlank(ownLabel)) return ownLabel;
+        // 3. Last resort, the claim line item's description.
+        return String.isBlank(wl.Claim_Line_Item__r?.Description__c)
+            ? null
+            : wl.Claim_Line_Item__r.Description__c.trim();
+    }
+
+    /**
+     * Turns the stored markup of a rich text field back into the text a person
+     * typed. Line breaks become newlines before tags are dropped, so two
+     * paragraphs do not run together into one word, and entities are decoded
+     * LAST, after tag removal, so that a literal "&lt;" in the content cannot
+     * become a tag the stripper then eats.
+     */
+    private static String htmlToPlainText(String html) {
+        if (String.isBlank(html)) return null;
+        String plain = html
+            .replaceAll('(?i)<br\\s*/?>', '\n')
+            .replaceAll('(?i)</(p|div|li)\\s*>', '\n')
+            .replaceAll('<[^>]*>', '')
+            .unescapeHtml4()
+            .trim();
+        return String.isBlank(plain) ? null : plain;
+    }
+
+    /**
+     * The business-facing name for an invoice line, derived from the work
+     * order line it was generated from.
+     *
+     * Deliberately the SAME source Description__c uses, so the two can never
+     * say different things about one line, which is what Osama asked for on
+     * 2026-10-09. The work order line's own description already carries the
+     * specific child record's name ("Engine" rather than "Part"), because
+     * TASK-049 names each line after its real child, so there is no mapping
+     * table to invent here: the specificity is already in the data.
+     *
+     * The fallbacks exist only so a line can never go back to showing a record
+     * id. Line_Type__c is the generic type, and a blank name is never written.
+     * Name is a Text field capped at 80 characters, so a long part description
+     * is truncated rather than failing the whole invoice.
+     */
+    private static String invoiceLineName(Work_Order_Line_Item__c wl) {
+        String name = lineDescription(wl);
+        if (String.isBlank(name)) name = wl.Claim_Line_Item__r?.Line_Type__c;
+        if (String.isBlank(name)) name = 'Invoice Line Item';
+        name = name.trim();
+        return name.length() > 80 ? name.left(80) : name;
     }
 }

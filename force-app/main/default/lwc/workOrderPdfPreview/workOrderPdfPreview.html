@@ -1,0 +1,51 @@
+<template>
+    <div class="wop">
+
+        <template lwc:if={isLoading}>
+            <lightning-spinner alternative-text="Loading the work order" size="small"></lightning-spinner>
+        </template>
+
+        <template lwc:if={error}>
+            <div class="wop-err" role="alert">{error}</div>
+        </template>
+
+        <!-- Recipients first, above the document. The agent should see who this
+             goes to before sending, not after. -->
+        <template lwc:if={hasDocument}>
+            <div class="wop-to">
+                <div class="wop-to-head">
+                    <span class="wop-to-title">Send to</span>
+                    <span class="wop-to-sub">{headerLabel}</span>
+                </div>
+                <div class="wop-to-grid">
+                    <lightning-input type="email" label="Customer email" value={customerEmail}
+                                     onchange={handleCustomerEmail}
+                                     disabled={isBusy}></lightning-input>
+                    <lightning-input type="email" label="Repair shop email" value={repairShopEmail}
+                                     onchange={handleShopEmail}
+                                     disabled={isBusy}></lightning-input>
+                </div>
+                <template lwc:if={missingShopEmailNote}>
+                    <p class="wop-note">{missingShopEmailNote}</p>
+                </template>
+                <template lwc:if={hasNoRecipients}>
+                    <p class="wop-warn">Add at least one email address to send this work order.</p>
+                </template>
+            </div>
+
+            <div class="wop-doc">
+                <iframe src={pdfUrl} title="Work order PDF preview" class="wop-frame"></iframe>
+            </div>
+        </template>
+
+        <div class="wop-bar">
+            <lightning-button label="Cancel" onclick={handleCancel}
+                              disabled={isWorking}></lightning-button>
+            <lightning-button label="Save PDF" variant="neutral" onclick={handleSave}
+                              disabled={isBusy}></lightning-button>
+            <lightning-button label="Save and Send PDF" variant="brand" onclick={handleSaveAndSend}
+                              disabled={cannotSend}></lightning-button>
+        </div>
+
+    </div>
+</template>

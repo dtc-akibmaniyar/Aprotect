@@ -10,6 +10,8 @@ import getDealerAuthoring from '@salesforce/apex/DealerPackageSyncController.get
 import saveDealerTermPricing from '@salesforce/apex/DealerPackageSyncController.saveDealerTermPricing';
 import saveDealerTermPremiumFee from '@salesforce/apex/DealerPackageSyncController.saveDealerTermPremiumFee';
 import clearDealerPackagePremiumFees from '@salesforce/apex/DealerPackageSyncController.clearDealerPackagePremiumFees';
+import applyDealerPackageTermDiscount from '@salesforce/apex/DealerPackageSyncController.applyDealerPackageTermDiscount';
+import clearDealerPackageTermDiscounts from '@salesforce/apex/DealerPackageSyncController.clearDealerPackageTermDiscounts';
 import saveDealerOptionPricing from '@salesforce/apex/DealerPackageSyncController.saveDealerOptionPricing';
 import setDealerOptionRemoved from '@salesforce/apex/DealerPackageSyncController.setDealerOptionRemoved';
 import saveDealerCommercialPrice from '@salesforce/apex/DealerPackageSyncController.saveDealerCommercialPrice';
@@ -1486,9 +1488,13 @@ export default class DealerPortalPackageSync extends LightningElement {
             kind: 'saveTerm',
             params: {
                 dealerTermId: termId,
-                discountType: found.term.discountType,
+                // Default the type when it is blank: the dropdown already shows
+                // a default ('%' / '$'), but the underlying value can be null.
+                // Sending a value with a blank type makes the Net/Retail formulas
+                // ignore the amount — so mirror the displayed default on save.
+                discountType: found.term.discountType || '%',
                 discountValue: this.parseNum(found.term.discountValue),
-                markupType: found.term.markupType,
+                markupType: found.term.markupType || '$',
                 markupValue: this.parseNum(found.term.markupValue),
                 salesRepIncentive: this.parseNum(found.term.salesRepIncentive),
                 // null = no premium fee (the stored field is blanked).
@@ -1622,9 +1628,11 @@ export default class DealerPortalPackageSync extends LightningElement {
             kind: 'saveOption',
             params: {
                 dealerOptionId: optId,
-                discountType: found.option.discountType,
+                // Same type default as the term save: a value with a blank type
+                // would be ignored by the option Net/Retail formulas.
+                discountType: found.option.discountType || '%',
                 discountValue: this.parseNum(found.option.discountValue),
-                markupType: found.option.markupType,
+                markupType: found.option.markupType || '$',
                 markupValue: this.parseNum(found.option.markupValue)
             },
             title: 'Save pricing for "' + found.option.optionName + '"?',
@@ -1805,6 +1813,10 @@ export default class DealerPortalPackageSync extends LightningElement {
                 return refreshDealerPriceAnchors(action.params);
             case 'toggleActive':
                 return setDealerPackageActive(action.params);
+            case 'bulkDiscount':
+                return applyDealerPackageTermDiscount(action.params);
+            case 'clearBulkDiscount':
+                return clearDealerPackageTermDiscounts(action.params);
             default:
                 return Promise.resolve({ success: false, message: 'Unknown action.' });
         }

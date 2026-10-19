@@ -1,66 +1,104 @@
+/* createWorkOrderAction. The rules for the two-column breakdown and the
+   profit and loss banner were removed with that markup in TASK-050; see the
+   component header comment. */
 .scn-title {
     font-size: 0.9375rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
 }
 
-.scn-grid {
-    border: 1px solid #dddbda;
-    border-radius: 0.25rem;
-    overflow: hidden;
-}
 
-.scn-col-head {
-    font-size: 0.75rem;
-    font-weight: 700;
+
+/* TASK-050 item 5. Instructions before the Create Work Order button. Palette
+   from the design reference Style.dc.html, the same one Manage Estimates uses:
+   accent #0b5cab, wholesale tint #e6edf7, warning #fef1e6 on #8c4b02, error
+   #fdecea on #ba0517. */
+.cwo-note,
+.cwo-warn,
+.cwo-block,
+.cwo-selected {
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.cwo-note h3,
+.cwo-warn h3,
+.cwo-selected h3 {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: .08em;
     text-transform: uppercase;
-    letter-spacing: 0.03125rem;
-    color: #514f4d;
-    background: #f3f3f3;
-    padding: 0.5rem 0.75rem;
+    margin: 0 0 4px;
+}
+.cwo-note {
+    background: #e6edf7;
+    border: 1px solid #aec4e4;
+    color: #1f4b8a;
+}
+.cwo-note h3 {
+    color: #0b5cab;
+}
+.cwo-warn {
+    background: #fef1e6;
+    border: 1px solid #e8c9a6;
+    color: #8c4b02;
+}
+.cwo-warn h3 {
+    color: #8c4b02;
+}
+.cwo-block {
+    background: #fdecea;
+    border: 1px solid #ea8f8a;
+    color: #ba0517;
+    font-weight: 600;
 }
 
-.ln {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 0.75rem;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.8125rem;
-    border-top: 1px solid #f0f0f0;
+/* The confirmed selection, sitting directly above the button. Green from the
+   same design reference, so it reads as settled rather than as another thing
+   to act on: the two panels above it are instructions, this one is a fact. */
+.cwo-selected {
+    background: #ebf7ee;
+    border: 1px solid #a9d9b8;
+    color: #1b5e34;
 }
-
-.ln span:first-child {
-    color: #3e3e3c;
+.cwo-selected h3 {
+    color: #1b5e34;
 }
-
-.ln-tot {
+.cwo-selected-name {
+    font-size: 15px;
     font-weight: 700;
-    background: #fafaf9;
 }
-
-.ln-desc {
-    color: #706e6b;
-    font-style: italic;
+.cwo-selected-name a {
+    color: #0b5cab;
 }
-
-.pl-value {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 0.75rem;
-    padding: 0.75rem 1rem;
-    border-radius: 0.25rem;
-    font-weight: 700;
-    font-size: 1rem;
+.cwo-selected-shop {
+    font-weight: 400;
+    color: #3d6b4d;
 }
-
-.pl-profit {
-    background: #e6f5ec;
-    color: #04844b;
+/* The repair shop is separated from the estimate name by a rule rather than a
+   dash: a dash between two facts has been misread on this project before. */
+.cwo-selected-shop::before {
+    content: '';
+    display: inline-block;
+    width: 1px;
+    height: 12px;
+    margin: 0 8px -1px;
+    background: #a9d9b8;
 }
-
-.pl-loss {
-    background: #fde9e9;
-    color: #c23934;
+.cwo-selected-figures {
+    margin-top: 2px;
+    font-size: 13px;
+    color: #3d6b4d;
+}
+.cwo-selected-figures b {
+    color: #1b5e34;
+    /* The template's space before the amount is dropped when the LWC compiles,
+       so "Retail Total$0.00" ran together (Osama, 2026-10-13). */
+    margin-left: 5px;
+}
+.cwo-selected-sep {
+    margin: 0 8px;
+    color: #a9d9b8;
 }
