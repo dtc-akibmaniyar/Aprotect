@@ -1,0 +1,10 @@
+<apex:component controller="ContractOptionsController">
+    <apex:attribute name="pkgId" type="String" assignTo="{!packageId}"
+        description="Application package whose included options are printed" />
+    <apex:repeat value="{!rows}" var="r">
+        <h4 class="cmp">{!r.label}</h4>
+        <apex:outputPanel rendered="{!r.hasInclusion}">
+            <p class="lead"><b>Includes:</b>&#160;<apex:outputText value="{!r.inclusion}" escape="false" /></p>
+        </apex:outputPanel>
+    </apex:repeat>
+</apex:component>

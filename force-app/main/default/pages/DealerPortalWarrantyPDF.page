@@ -1,0 +1,324 @@
+<apex:page standardController="Application__c" extensions="ApplicationPDFExtension"
+    renderAs="pdf" applyBodyTag="false" applyHtmlTag="false" showHeader="false"
+    standardStylesheets="false" cache="false" language="en-US">
+<body>
+<style>
+  @page { size: 8.5in 11in; }
+  body { margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; font-size: 6.7pt; color:#111111; line-height:1.22; }
+  p { margin: 0 0 3px 0; text-align: justify; }
+  .runhead { width:100%; border-bottom: 0.7pt solid #c9cfda; padding-bottom: 3px; margin-bottom: 6px; }
+  .runhead td { vertical-align: bottom; }
+  .rh1 { font-size: 5.4pt; letter-spacing: 0.9pt; color: #506590; font-weight: bold; text-transform: uppercase; }
+  .rh2 { font-size: 8.6pt; letter-spacing: 0.5pt; color: #506590; font-weight: bold; margin-top: 1px; }
+  .notice { background:#e2e6ee; border: 0.5pt solid #b9c0d0; padding: 5px 0; text-align:center;
+            font-size: 7.5pt; font-weight: bold; color:#506590; letter-spacing: 0.4pt; margin: 0 0 6px 0; }
+  h2.part { font-size: 8.1pt; font-weight: bold; color:#506590; margin: 8px 0 3px 0; padding-left: 6px;
+            border-left: 2.2pt solid #506590; line-height: 1.25; page-break-after: avoid; }
+  h3.ltr { font-size: 6.9pt; font-weight: bold; color:#111111; margin: 7px 0 3px 0; page-break-after: avoid; }
+  h4.cmp { font-size: 6.8pt; font-weight: bold; color:#111111; margin: 6px 0 2px 0; page-break-after: avoid; }
+  p.lead { margin-bottom: 3px; }
+  p.num { margin-bottom: 3px; }
+  p.sub { font-style: italic; margin-bottom: 2px; }
+  p.def { border-bottom: 0.5pt solid #dfe2e8; padding-bottom: 2.5px; margin-bottom: 2.5px; }
+  .bl { display:block; margin: 0 0 3px 0; }
+  .ind { padding-left: 10px; }
+  .ind2 { padding-left: 20px; }
+  .ind3 { padding-left: 34px; }
+  table.maint { width:100%; border-collapse: collapse; margin: 2px 0 6px 0; }
+  table.maint td { width:50%; vertical-align: top; padding: 3px 8px 3px 0; border-top: 0.5pt solid #c9cfda; }
+  table.contact { width:100%; border-collapse: collapse; border: 0.5pt solid #c9cfda; margin: 3px 0 7px 0; }
+  table.contact td { vertical-align: top; padding: 6px 8px; font-size: 6.5pt; }
+  table.contact td.c1 { border-right: 0.5pt solid #c9cfda; width: 26%; }
+  table.contact td.c2 { border-right: 0.5pt solid #c9cfda; width: 32%; }
+  .clab { font-size: 5.4pt; letter-spacing: 0.8pt; color:#506590; font-weight: bold; text-transform: uppercase; }
+  .cval { font-size: 9.2pt; font-weight: bold; color:#111111; }
+  .privacy { background:#e2e6ee; border-left: 2.2pt solid #506590; padding: 6px 8px; margin: 8px 0 8px 0; }
+  .privacy p { font-size: 6.1pt; margin: 0 0 2px 0; text-align: justify; }
+  .ack { font-size: 8.1pt; font-weight: bold; color:#111111; margin: 10px 0 3px 0; }
+  .rule { border-top: 0.7pt solid #c9cfda; margin: 0 0 5px 0; }
+  table.sig { width:100%; border-collapse: collapse; margin-top: 16px; }
+  table.sig td { width:50%; vertical-align: bottom; padding: 0 14px 0 0; }
+  .sigline { border-top: 0.6pt solid #111111; height: 15px; }
+  .siglab { font-size: 6.4pt; color:#3f4a5c; padding-top: 2px; }
+  .adminfoot { text-align:center; font-size: 6.2pt; color:#3f4a5c; margin-top: 12px; }
+  .adminfoot div { margin: 1px 0; }
+</style>
+<style>
+@page {
+  size: letter;
+  margin: 0.40in 0.50in 0.60in 0.50in;
+  @bottom-left {
+    content: "CONTRACT NUMBER: {!Application__c.Name}   |   APPLICATION NUMBER: {!Application__c.Name}   |   HST #: 83214 2467 RT0001";
+    font-family: Arial, Helvetica, sans-serif; font-size: 5.2pt; color: #3f4a5c;
+    vertical-align: top; border-top: 0.6pt solid #c9cfda; padding-top: 4px; width: 62%;
+  }
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages) "   |   Printed on: {!printedOn}";
+    font-family: Arial, Helvetica, sans-serif; font-size: 5.2pt; color: #3f4a5c;
+    vertical-align: top; border-top: 0.6pt solid #c9cfda; padding-top: 4px; text-align: right; width: 38%;
+  }
+}
+body { margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; font-size: 6.7pt; color:#111111; line-height:1.25; }
+table { border-collapse: collapse; }
+.hdr { width:100%; margin: 0 0 2px 0; table-layout: fixed; }
+.hdr td { vertical-align: top; }
+.doctitle { font-size: 11.5pt; font-weight: bold; color:#506590; letter-spacing: -0.1pt; line-height:1.12; }
+.doccontact { font-size: 5.9pt; color:#3f4a5c; margin-top: 2px; line-height:1.35; }
+.badge { background:#506590; color:#ffffff; padding: 4px 8px 5px 8px; text-align:center; }
+.badge .bl { font-size: 5.3pt; letter-spacing: 1.0pt; color:#eef1f6; }
+.badge .bv { font-size: 12.6pt; font-weight: bold; letter-spacing: 0.2pt; margin-top: 1px; }
+.hdrrule { border-top: 1.2pt solid #506590; margin: 4px 0 0 0; }
+.titlebar { background:#506590; color:#ffffff; text-align:center; font-size: 8.4pt; font-weight: bold;
+            letter-spacing: 3.2pt; padding: 3.5px 0 3.5px 0; margin: 4px 0 5px 0; }
+.sec { margin: 5px 0 1px 0; }
+.secnum { display:inline-block; width: 11px; height: 11px; background:#506590; color:#ffffff; border-radius: 6px;
+          text-align:center; font-size: 6.4pt; font-weight: bold; line-height: 11px; margin-right: 5px; }
+.sectitle { font-size: 8.4pt; font-weight: bold; color:#111111; letter-spacing: 0.2pt; }
+.secrule { border-top: 0.6pt solid #111111; margin: 2px 0 4px 0; }
+.note { font-size: 5.9pt; font-style: italic; color:#3f4a5c; margin: 3px 0 4px 0; }
+table.kv { width:100%; margin: 0; }
+table.kv td { vertical-align: top; padding: 2.3px 6px 2.3px 0; border-bottom: 0.5pt solid #dfe2e8; font-size: 6.7pt; }
+table.kv td.lb { color:#3f4a5c; width: 20%; }
+table.kv td.vl { font-weight: bold; width: 28%; }
+table.kv td.lb2 { color:#3f4a5c; width: 20%; }
+table.kv td.vl2 { font-weight: bold; width: 32%; }
+table.kv4 { width:100%; margin:0; }
+table.kv4 td { vertical-align: top; padding: 2.3px 6px 2.3px 0; border-bottom: 0.5pt solid #dfe2e8; font-size: 6.7pt; }
+table.kv4 td.lb { color:#3f4a5c; width: 10.5%; }
+table.kv4 td.vl { font-weight: bold; width: 15%; }
+table.kv6 { width:100%; margin:0; }
+table.kv6 td { vertical-align: top; padding: 2.3px 6px 2.3px 0; border-bottom: 0.5pt solid #dfe2e8; font-size: 6.7pt; }
+table.kv6 td.lb { color:#3f4a5c; width: 12%; }
+table.kv6 td.vl { font-weight: bold; width: 21%; }
+table.kv6 td.lb2 { color:#3f4a5c; width: 15%; }
+table.kv6 td.vl2 { font-weight: bold; width: 15%; }
+.premium { width:100%; margin: 5px 0 3px 0; border-top: 0.7pt solid #111111; border-bottom: 0.7pt solid #111111; }
+.premium td { padding: 3.4px 4px 3.4px 0; font-size: 6.7pt; }
+.premium td.total { text-align: right; font-weight: bold; font-size: 7.6pt; }
+.premium td.totlab { text-align: right; color:#111111; }
+div.box { background:#dcdcdc; padding: 3px 7px 4px 7px; margin: 2px 0 3px 0; }
+div.box .imp { color:#b42317; font-weight: bold; font-size: 6.7pt; }
+div.box p { margin: 0 0 2px 0; font-style: italic; font-size: 6.3pt; line-height:1.3; }
+div.box ol { margin: 2px 0 0 13px; padding: 0; }
+div.box li { font-size: 6.15pt; font-style: italic; line-height:1.3; margin-bottom: 1px; }
+.ck { font-size: 6.0pt; font-style: italic; color:#111111; margin: 3px 0 3px 0; line-height:1.27; }
+table.sig { width:100%; margin-top: 2px; }
+table.sig td { vertical-align: bottom; padding: 0 16px 0 0; }
+.sigline { border-top: 0.6pt solid #111111; height: 11px; }
+.siglab { font-size: 6.1pt; color:#3f4a5c; padding-top: 2px; letter-spacing: 0.3pt; }
+.ln2 { display:block; font-weight: normal; font-size: 6.1pt; color:#3f4a5c; line-height:1.25; }
+</style>
+<apex:repeat value="{!recordTypeWrappersList}" var="rw"><apex:repeat value="{!rw.packages}" var="w">
+
+<table class="hdr"><tr>
+  <td style="width:1.00in"><img src="{!$Resource.AProtectFullLogo}" style="width:0.93in" /></td>
+  <td>
+    <div class="doctitle">Extended Warranty Vehicle Service Contract</div>
+    <div class="doccontact">1-866-660-6444 &#183; Tel: 416-661-7444 &#183; info@a-protectwarranty.com</div>
+    <div class="doccontact">8800 Dufferin St. Suite 302B, Concord, ON L4K 0C5 &#183; HST #: 832142467RT0001</div>
+  </td>
+  <td style="width:1.15in; text-align:right;"><img src="{!$Resource.WarrantyHero}" style="width:1.05in" /></td>
+  <td style="width:1.75in; padding-left:10px;">
+    <div class="badge"><div class="bl">CONTRACT NO.</div><div class="bv">{!Application__c.Name}</div></div>
+  </td>
+</tr></table>
+<div class="hdrrule"></div>
+<div class="titlebar">APPLICATION</div>
+
+<div class="sec"><span class="secnum">1</span><span class="sectitle">CONTRACT INFORMATION</span></div>
+<div class="secrule"></div>
+<div class="note">It is the responsibility of the Contract Holder to check that the coverage listed on this document agrees with the original Application given to You by the Selling Dealer. Any discrepancies must be reported to A-Protect immediately.</div>
+<table class="kv">
+  <tr><td class="lb">Contract Number</td><td class="vl">{!Application__c.Name}</td>
+      <td class="lb2">Status</td><td class="vl2">{!Application__c.Application_Status__c}</td></tr>
+  <tr><td class="lb">Program</td><td class="vl">{!w.renderedPlanName}</td>
+      <td class="lb2">Term (months)</td><td class="vl2">{!w.renderedTermName}</td></tr>
+  <tr><td class="lb">Per Claim Limit</td><td class="vl">{!w.perClaimLimitDisplay}</td>
+      <td class="lb2">Deductible</td><td class="vl2">{!w.deductibleDisplay}</td></tr>
+  <tr><td class="lb">Liability Limit</td><td class="vl">{!w.liabilityDisplay}</td>
+      <td class="lb2">&#160;</td><td class="vl2">&#160;</td></tr>
+  <tr><td class="lb">&#160;</td><td colspan="3" style="font-size:5.9pt; color:#3f4a5c; font-weight:normal;">Total liability equals the purchase price of the vehicle before taxes.</td></tr>
+  <tr><td class="lb">Contract Start Date</td><td class="vl">{!w.contractStartDateDisplay}</td>
+      <td class="lb2">Contract Expiration Date</td><td class="vl2">{!w.contractEndDateDisplay}</td></tr>
+  <tr><td class="lb">Contract Start Odometer</td><td class="vl">{!w.odometerStartDisplay}</td>
+      <td class="lb2">Contract Expiration Odometer</td><td class="vl2">{!w.odometerEndDisplay}</td></tr>
+</table>
+<table class="premium"><tr>
+  <td>Contract Premium <b>{!w.premiumWithoutTaxDisplay}</b></td>
+  <td>GST/HST <b>{!w.taxDisplay}</b></td>
+  <td>PST/QST/RST <b>$0.00</b></td>
+  <td class="totlab">Total Premium</td><td class="total">{!w.totalPremiumDisplay}</td>
+</tr></table>
+<div class="note" style="font-style:normal;">Coverage begins on the Contract Start Date and odometer reading listed above, and ends on the Contract Expiration Date or when the vehicle reaches the Contract Expiration Odometer reading, whichever comes first.</div>
+
+<div class="sec"><span class="secnum">2</span><span class="sectitle">CUSTOMER / REGISTERED VEHICLE OWNER</span></div>
+<div class="secrule"></div>
+<table class="kv">
+  <tr><td class="lb">Customer Name</td>
+      <td class="vl"><apex:outputText value="{!UPPER(Application__c.Customer_Last_Name__c)}" /><apex:outputText value=", " rendered="{!NOT(ISBLANK(Application__c.Customer_First_Name__c))}" /><apex:outputText value="{!UPPER(Application__c.Customer_First_Name__c)}" /></td>
+      <td class="lb2">Company / Business Name</td><td class="vl2">{!Application__c.Company_Business__c}</td></tr>
+  <tr><td class="lb">Address</td><td colspan="3">{!Application__c.Customer_Address__c}</td></tr>
+  <tr><td class="lb">Primary Phone</td><td class="vl">{!Application__c.Customer_Phone__c}</td>
+      <td class="lb2">Secondary Phone</td><td class="vl2">{!Application__c.Customer_Business_Phone__c}</td></tr>
+  <tr><td class="lb">Email</td><td class="vl">{!Application__c.Customer_Email__c}</td>
+      <td class="lb2">Lienholder (if applicable)</td>
+      <td class="vl2">{!Application__c.Financial_Institution_Lender__c}<span class="ln2">{!Application__c.Lender_Address__c}</span></td></tr>
+  <tr><td class="lb">Secondary Owner Name</td><td class="vl">{!Application__c.Co_Buyer__r.Name}</td>
+      <td class="lb2">Secondary Owner Email</td><td class="vl2">&#160;</td></tr>
+</table>
+
+<div class="sec"><span class="secnum">3</span><span class="sectitle">VEHICLE</span></div>
+<div class="secrule"></div>
+<table class="kv4">
+  <tr><td class="lb">Year</td><td class="vl">{!Application__c.Vehicle_Year__c}</td>
+      <td class="lb">Make</td><td class="vl">{!Application__c.Vehicle_Make__c}</td>
+      <td class="lb">Model</td><td class="vl">{!Application__c.Vehicle_Model__c}</td>
+      <td class="lb">Trim</td><td class="vl">{!Application__c.Vehicle_Trim__c}</td></tr>
+  <tr><td class="lb">VIN</td><td class="vl">{!Application__c.Vehicle_VIN__c}</td>
+      <td class="lb">Purchase Price</td><td class="vl"><apex:outputText value="{0,number,$#,##0.00}"><apex:param value="{!Application__c.Vehicle_Purchase_Price__c}" /></apex:outputText></td>
+      <td class="lb">Odometer</td>
+      <td class="vl"><apex:outputText value="{!Application__c.Odometer__c}" /> <apex:outputText value="{!Application__c.Odometer_Unit__c}" /></td>
+      <td colspan="2">&#160;</td></tr>
+</table>
+<div class="note" style="font-size:5.7pt; margin:2px 0 0 0;">If your odometer is listed in miles, this reading reflects a conversion to kilometers.</div>
+
+<div class="sec"><span class="secnum">4</span><span class="sectitle">CUSTOMER OBLIGATIONS &amp; ACKNOWLEDGEMENT</span></div>
+<div class="box">
+  <div class="imp">IMPORTANT: Repairs to covered components require prior authorization from A-Protect (1-866-660-6444). Repairs performed without prior authorization will not be reimbursed. Refer to the Terms and Conditions for full details.</div>
+  <p style="margin-top:3px;">To keep this Contract valid, the Customer must:</p>
+  <ol>
+    <li>Maintain the vehicle. At the Customer's own expense, have the engine oil and filter changed and all other fluid levels checked by a licensed service provider, measured from the purchase or lease date: Conventional oil every 4 months or 8,000 km &#160;&#160; Synthetic oil every 8 months or 12,000 km whichever comes first. Oil changes done by the Customer are not accepted as proof of maintenance.</li>
+    <li>Report each service within 15 calendar days. Send a copy of the invoice, with the Contract number, by e-mail to maintenance@a-protectwarranty.com, or by mail to A-Protect Warranty Corporation, 8800 Dufferin St. Suite 302B, Concord, Ontario L4K 0C5.</li>
+    <li>Keep the original invoices. A-Protect may require them in support of a claim.</li>
+    <li>Stay within the grace period. A grace period of 1,000 km applies. Missing maintenance or reporting beyond this grace period is non-performance under this Contract and may void it.</li>
+  </ol>
+</div>
+<div class="ck">&#9744;&#160;&#160;I, the Customer acknowledge that I have read, reviewed, and understood all pages of the Terms and Conditions of this A-Protect Vehicle Service Agreement, including the exclusions, limitations, cancellations, and transfer provisions on the following page(s). I confirm that all information provided on this Application and Registration Page is true, complete, and accurate to the best of my knowledge, and I attest that this Application and Registration Page has been correctly and accurately completed by the selling dealer. I understand and agree that this Application and Registration Page, together with the following full Terms and Conditions, constitutes the entire Agreement between the parties. I understand that this Agreement is a Service Agreement, not an insurance product, and that all authorizations, approvals, and payments under it are administrative in nature and governed solely by the Terms and Conditions provided. I understand that this is an application only, and that coverage does not take effect until A-Protect has accepted this application and received payment of the Total Premium, including applicable taxes. I further acknowledge that no verbal promises or representations, other than those expressly stated in writing in this Agreement, shall be binding on A-Protect Warranty Corporation or its authorized representatives.</div>
+<table class="sig"><tr>
+  <td style="width:52%"><div class="sigline"></div><div class="siglab">CUSTOMER SIGNATURE</div></td>
+  <td><div class="sigline"></div><div class="siglab">SIGNED DATE</div></td>
+</tr></table>
+
+<div class="sec"><span class="secnum">5</span><span class="sectitle">DEALER INFORMATION &amp; ATTESTATION</span></div>
+<div class="secrule"></div>
+<table class="kv6">
+  <tr><td class="lb">Dealer Name</td><td class="vl">{!dealerName}</td>
+      <td class="lb2">Dealership Reg. #</td><td class="vl2">{!Application__c.Dealer_Name__r.Business_Registration__c}</td>
+      <td class="lb2">Salesperson</td><td class="vl2">{!Application__c.Sales_Person__r.Name}</td></tr>
+  <tr><td class="lb">Salesperson Reg. #</td><td class="vl">{!Application__c.Dealer_Sales_ID_License__c}</td>
+      <td class="lb2">Address</td><td colspan="3">{!dealerAddress}</td></tr>
+</table>
+<div class="ck" style="font-style:normal; margin-top:5px;"><b>DEALER ATTESTATION &#8211;</b> By signing this Agreement, the Dealership agrees to the following: This Application and Registration Page has been completed correctly and accurately on behalf of the Customer named above. The vehicle, coverage, and pricing details entered reflect what was disclosed to and selected by the customer. Together with the following full Terms and Conditions, this Application and Registration Page forms the entire Agreement between the parties. The Customer has been advised that this is an application only and coverage begins only once A-Protect accepts it and receives payment of the Total Premium, including applicable taxes.</div>
+<table class="sig" style="margin-top:10px;"><tr>
+  <td style="width:52%"><div class="sigline"></div><div class="siglab">DEALERSHIP REP. SIGNATURE</div></td>
+  <td><div class="sigline"></div><div class="siglab">SIGNED DATE</div></td>
+</tr></table>
+
+</apex:repeat></apex:repeat>
+<div style="page-break-before: always;"></div>
+
+<table class="runhead"><tr>
+  <td style="width:12px; border-left:2.2pt solid #506590;">&#160;</td>
+  <td style="width:34px; padding-left:6px;"><img src="{!$Resource.AProtectMark}" style="width:30px;" /></td>
+  <td style="padding-left:8px;">
+    <div class="rh1" style="color:#506590">A-Protect Extended Limited Warranty&#160;&#160;|&#160;&#160;Vehicle Service Contract</div>
+    <div class="rh2" style="color:#506590">TERMS AND CONDITIONS</div>
+  </td>
+</tr></table>
+<div class="notice">IMPORTANT: THIS SERVICE CONTRACT IS NOT AN INSURANCE POLICY.</div>
+<p>This Document constitutes a Service Contract administered by A-Protect Warranty Corporation. Any authorization, payment, benefit, reimbursement, or service provided hereunder shall be subject exclusively to the terms, conditions, limitations, exclusions, and eligibility requirements set forth in this Service Contract. This Service Contract does not constitute a policy of insurance, does not provide indemnity against loss, and does not provide collision, comprehensive, liability, or any other form of automobile insurance coverage. It is not intended to replace, supplement, or satisfy any insurance coverage required by applicable law.</p>
+<h2 class="part">PART 1: DEFINITIONS</h2>
+<p>Under this Service Contract, the following words will denote the meanings set forth below:</p>
+<p class="def">“A-Protect” means A-Protect Warranty Corporation, the administrator and service provider of this Service Contract.</p>
+<p class="def">“Service Contract” means the A-Protect Service Contract, which includes all Terms and Conditions, the Registration Page, the Application, and any addenda or amendments issued by A-Protect and accepted by the Customer.</p>
+<p class="def">“A-Protect Authorized Repair Facility” refers to the repair facilities designated and directly authorized by A-Protect to perform repairs and services on the Registered Vehicle as required under A-Protect Service Contract programs.</p>
+<p class="def">“Claim” means a customer service request for review and authorization of repairs to eligible components under this Service Contract. All claim handling performed by A-Protect is administrative in nature and does not constitute the payment of insurance benefits.</p>
+<p class="def">“Commercial Use” means any vehicle primarily used to generate income, perform services for compensation, transport goods or passengers for hire, or support business operations beyond incidental use. Commercial Use includes, but is not limited to: Ride-share, taxi, limousine, or driving instruction/Food, courier, or parcel delivery/Fleet or rental operations/Construction, industrial, oilfield, agricultural, or municipal service/ Snow plowing/ Commercial hauling or towing for compensation. A vehicle may be classified as Commercial Use based on its actual operation, frequency of use, average monthly mileage, equipment installed, or purpose of operation, regardless of registration status. Incidental business use (such as occasional travel between job sites or transporting tools not exceeding manufacturer payload limits) does not automatically constitute Commercial Use. Final classification of vehicle use shall be determined by A-Protect based on manufacturer specifications and documented usage patterns.</p>
+<p class="def">“Light-Duty Usage” means the vehicle is used primarily for personal transportation or ordinary business activities that do not involve carrying passengers or property for compensation, towing beyond manufacturer recommendations, or operating in severe commercial service. (driving up to 30,000 kms a year)</p>
+<p class="def">“Medium-Duty Usage” means a vehicle with a Gross Vehicle Weight Rating (GVWR) between 8,501 lbs and 14,000 lbs that is used for business or commercial purposes but is not engaged in heavy-duty hauling, long-haul transportation, mining, logging, emergency services, or other severe-duty operations.</p>
+<p class="def">“Heavy-Duty Vehicle” means a vehicle with a GVWR exceeding 14,000 lbs that is used for commercial, industrial, transportation, construction, agricultural, municipal, or other severe-duty operations.</p>
+<p class="def">“Customer” means the Registered Vehicle Owner or Purchaser identified on the A-Protect Vehicle Service Contract Application and Registration Page to which this Service Contract pertains.</p>
+<p class="def">“Mechanical Breakdown” means the sudden and accidental failure of a covered component due to defects in materials or workmanship, resulting in the component’s inability to perform its intended function.</p>
+<p class="def">“Pre-existing Condition(s)” means any mechanical failure, defect, or operating problem that existed before the purchase date.</p>
+<p class="def">“Selling Dealer” means the authorized retailer, dealership, or other duly authorized person through whom the Customer purchases the Service Contract.</p>
+<p class="def">“Unlimited Kilometres” Unlimited kilometres apply for the duration of the warranty term.</p>
+<h2 class="part">PART 2: EXTENDED LIMITED WARRANTY SERVICE AGREEMENT</h2>
+<p>This Service Contract provides mechanical breakdown service administration solely for the Registered Vehicle identified on the Application and Registration Page. Coverage applies only to the Coverage Plan and any optional benefits or additional coverage expressly selected and identified on the Application and Registration Page. Within the selected Coverage Plan, only those components and services specifically identified as covered under the applicable provisions of this Service Contract are eligible for authorization. All coverage is subject to the terms, conditions, eligibility requirements, limitations, exclusions, deductibles, maximum authorized repair limits, and Claims Procedures set forth in this Service Contract. Any component, repair, service, benefit, or option that is not expressly included within the selected Coverage Plan or identified as an applicable additional option is not covered and will not be eligible for authorization, reimbursement, or payment by A-Protect. No representation, description, brochure, advertisement, verbal statement, or other communication shall modify or expand the coverage provided under this Service Contract unless expressly incorporated into the Service Contract by a written addendum, endorsement, or amendment issued or approved by A-Protect.</p>
+<h2 class="part">PART 3: COVERED PARTS AND OPTIONS</h2>
+<p>Program Selected: Refer to the Application Page for the Coverage Plan, term, deductible, per-claim limit and any optional coverages selected. The following parts, components, benefits, and services are covered only where they are included within the Coverage Plan selected by the Customer or have been separately selected as an optional coverage and identified on the Application or Registration Page. The inclusion of any part, component, benefit, or service within this section does not, by itself, establish coverage. Coverage applies only where the applicable item is included in the Customer’s selected Coverage Plan or expressly identified as an additional selected option, and remains subject to all applicable terms, conditions, limitations, exclusions, and eligibility requirements of this Service Contract.</p>
+<h4 class="cmp">ENGINE</h4>
+<p class="sub">Applies only to internally lubricated parts</p>
+<p class="lead"><b>Includes:</b> Engine block; crankshaft; pistons; piston rings when broken as a result of a covered Mechanical Breakdown; connecting rods and bearings; wrist pins; cylinder heads; camshaft and camshaft bearings; engine main bearings; rocker arm assemblies; intake and exhaust valves; valve guides; valve lifters and pushrods; valve springs and retainers; sprockets and related gears; timing belt (covered only when replacement is required in connection with an authorized repair to another covered Engine component; not covered as a standalone repair or maintenance item); timing chain and tensioners (covered only following a verified Mechanical Breakdown; not covered for stretching, noise, preventative replacement, maintenance-related replacement, or where no Mechanical Breakdown has occurred); internal variable timing components; engine oil pump; and other internally lubricated Engine components contained within the Engine assembly.</p>
+<p class="lead"><b>Exclusions:</b> Rust; corrosion; overheating damage arising from any cause; oil filter housing; oil cooler; valve cover; worn piston rings resulting in oil consumption; seized piston rings; worn bearings that have not experienced a Mechanical Breakdown; and normal Wear and Tear unless Wear and Tear Coverage is expressly included in the selected Coverage Plan.</p>
+<h4 class="cmp">TRANSMISSION</h4>
+<p class="sub">Applies only to internally lubricated parts</p>
+<p class="num">1. Automatic Transmission: Transmission case, gear sets, input and output shafts, torque converter, solenoid packs, valve body, accumulator, fluid pump, countershaft, modulator valve (if applicable), bearings, bands, band apply servo, parking pawl.</p>
+<p class="num">2. Manual Transmission: Transmission housing, bearings, input and output shafts, countershaft, synchro assemblies, gear sets, selector shaft, shifter forks.</p>
+<p class="lead"><b>Exclusions:</b> Manual clutch components, external linkages, flex plate, fly wheels, transmission control module (TCM), and reprogramming.</p>
+<h4 class="cmp">DIFFERENTIAL</h4>
+<p class="num">1. Front Wheel Drive (FWD): Housing, bearings, crown and pinion.</p>
+<p class="num">2. Rear Wheel Drive (RWD): Housing, carrier gear and case, driver pinion and pinion gear, ring gear, differential cover, differential bearings, viscous couplers.</p>
+<h4 class="cmp">TRANSFER CASE/4X4</h4>
+<p class="lead"><b>Includes:</b> Auxiliary differential and transfer case housing (including gears, sprockets, and internal bearings).</p>
+<h4 class="cmp">TURBO/SUPERCHARGER</h4>
+<p class="lead"><b>Includes:</b> Turbo/supercharger assembly and housing, supercharger compressor, turbo internal bearings and lubricated parts, turbine wheels, turbine housing, clutch and pulley, wastegate and wastegate actuator, wastegate linkage, wastegate controller, blow-off valve, diverter valve, mechanical pressure release valve, bypass valve, intercooler, turbo/supercharger water pump.</p>
+<h4 class="cmp">TOWING</h4>
+<p>A-Protect will reimburse the Customer up to $60.00 per authorized repair for towing expenses incurred due to covered mechanical failure. Valid receipts must be provided at the time of the claim.</p>
+<h4 class="cmp">TRIP INTERRUPTION</h4>
+<p>For covered repairs, A-Protect will reimburse the Customer up to the maximum $150.00 for lodging, meals, bus, or taxi. If the authorized repair facility is unable to provide same-day service and is further away than 200 km (one-way) from the Customer’s home. Valid receipts must be provided within 7 days of the occurrence to be eligible for reimbursement.</p>
+<h4 class="cmp">AIR CONDITIONING</h4>
+<p class="lead"><b>Includes:</b> A/C compressor, A/C compressor clutch assembly, A/C condenser, evaporator core, expansion valve, receiver/dryer, accumulator, orifice tube, A/C seals and gaskets (within covered components), A/C lines, Schrader valves.</p>
+<p class="lead"><b>Exclusions:</b> Freon and recharge.</p>
+<h4 class="cmp">BRAKES</h4>
+<p class="lead"><b>Includes:</b> Master cylinder, brake calipers, brake vacuum booster, wheel cylinders, brake flex hoses, hydraulic steel lines and fittings, proportioning valve.</p>
+<p class="lead"><b>Exclusions:</b> ABS pump.</p>
+<h4 class="cmp">COOLING SYSTEM</h4>
+<p class="lead"><b>Includes:</b> Water pump, radiator, radiator cooling fan (electric/mechanical), auxiliary water pump, heater core, coolant reservoir (overflow/compression tank), heater control valve, cooling fan clutch (mechanical).</p>
+<p class="lead"><b>Exclusions:</b> Hoses, clamps, coolant, and reservoirs.</p>
+<h4 class="cmp">ELECTRICAL</h4>
+<p class="lead"><b>Includes:</b> Alternator, starter motor, starter motor solenoid, alternator voltage regulator, windshield washer pump (front &amp; rear), heater fan, electrical air conditioning condenser fan motor, horn assembly, electric radiator fan, motor &amp; assembly, windshield wiper motor (front &amp; rear).</p>
+<p class="lead"><b>Exclusions:</b> ABS sensor.</p>
+<h4 class="cmp">FRONT SUSPENSION</h4>
+<p class="lead"><b>Includes:</b> Control arms (upper and lower), control arm bushings, ball joints (upper and lower), steering knuckles.</p>
+<p class="lead"><b>Exclusions:</b> Struts, shocks, springs, sway bars and links, mounts, wheel hubs, and any other suspension component not specifically listed above.</p>
+<h4 class="cmp">REAR SUSPENSION</h4>
+<p class="lead"><b>Includes:</b> Control arms (upper and lower), control arm bushings, ball joints (upper and lower).</p>
+<p class="lead"><b>Exclusions:</b> Struts, shocks, springs, sway bars and links, sway bar mounts, wheel hubs, and any other suspension component not specifically listed above.</p>
+<h4 class="cmp">FUEL SYSTEM</h4>
+<p class="lead"><b>Includes:</b> Fuel injectors, fuel injector lines, fuel pressure regulator, fuel pump, direct injection fuel pump, fuel rails, fuel gauge sender (sending unit), fuel tank.</p>
+<h4 class="cmp">HYBRID COMPONENTS</h4>
+<p class="lead"><b>Includes:</b> Hybrid control module, inverter, hybrid electric motor(s)/ generator/ drive unit, hybrid specific transaxle and transmission housing, voltage inverter module, battery control module, battery pack cooling fan, DC/DC converter, onboard charger, and fan.</p>
+<p class="lead"><b>Exclusions:</b> Battery.</p>
+<h4 class="cmp">POWER STEERING</h4>
+<p class="lead"><b>Includes:</b> Power steering pump (including its seals and gaskets), rack and pinion (including its seals and gaskets), manual and power steering box, electric power assist motor.</p>
+<p class="lead"><b>Exclusions:</b> Clock spring.</p>
+<h4 class="cmp">SEALS &amp; GASKETS</h4>
+<p>Internal seals and gaskets used to contain fluids/lubricants within the covered parts only when required in connection with the repair or replacement of a covered internally lubricated component listed in this Service Contract.</p>
+<p class="lead"><b>Includes:</b> Crankshaft seal (front and rear), camshaft seals, cylinder head gaskets, oil pan gasket, timing cover gasket, valve cover gasket, intake manifold gaskets, valve guide seals, transmission/transaxle seals and gaskets, transfer case seals and gaskets, differential seals and gaskets.</p>
+<p class="lead"><b>Exclusions:</b> Axle seals.</p>
+<h4 class="cmp">SUPPLEMENTARY PARTS</h4>
+<p class="lead"><b>Includes:</b> Motor mounts, oil pan, harmonic balancer, intake and exhaust manifold, timing cover, oil pressure sending unit, temperature gauge sending unit, dipstick and tube, flywheel, engine cooling fan clutch and assembly, drive shafts &amp; universal joints, wheel bearings, CV axle shafts, cv joints and boots, transfer case mounts, transmission mounts, differential mounts, torque struts, hanger bearings, flex plate and flywheel ring/gear.</p>
+<h4 class="cmp">WEAR &amp; TEAR</h4>
+<p>Wear and Tear is not covered under this Service Contract unless expressly included in the specific coverage package selected on the front page of the application. Where Wear and Tear Coverage is included, it applies only to a factory-installed covered powertrain component specifically listed under the selected coverage package that has failed due to normal wear arising from ordinary use of the vehicle and has experienced a complete mechanical breakdown, rendering the component incapable of performing its intended function.</p>
+<p class="lead"><b>Exclusions:</b> Wear and Tear Coverage does not apply to gradual deterioration that has not resulted in complete mechanical breakdown, reduced performance, noise, vibration, minor seepage or leakage, carbon buildup, components operating within or exceeding manufacturer tolerances without actual failure, or parts recommended for replacement as part of routine maintenance, including but not limited to tires, brake friction materials and linings, clutch friction materials, belts, hoses, filters, fluids, batteries, spark plugs, light bulbs, and wiper blades.</p>
+<h4 class="cmp">ROADSIDE COVERAGE – REIMBURSEMENT ONLY</h4>
+<p>Roadside Coverage applies exclusively to the Registered Vehicle. The Customer is responsible for arranging roadside assistance through a third-party provider. A- Protect does not dispatch roadside service providers or arrange transportation of the Registered Vehicle. Eligible roadside services include towing, fuel delivery (excluding the cost of fuel), battery boost, lockout service (excluding locksmith charges), tire change using the vehicle’s available spare tire, and winching. A-Protect will reimburse the Customer up to $75.00 per occurrence, subject to a maximum aggregate reimbursement of $225.00 for the entire term of this Service Contract. Valid receipts and proof of payment must be submitted to A-Protect within fourteen (14) days of the occurrence to qualify for reimbursement.</p>
+<h4 class="cmp">CAR RENTAL – REIMBURSEMENT ONLY</h4>
+<p>In the event of a covered Mechanical Breakdown, where the authorized repairs require more than one (1) business day to complete, A-Protect will reimburse the Customer for eligible car rental expenses incurred, up to a maximum of $60.00 per day, subject to an aggregate maximum reimbursement of $300.00 for the entire term of this Service Contract. Reimbursement is subject to the submission of valid receipts and proof of payment at the time of the Claim.</p>
+<h4 class="cmp">HI-TECH COMPONENTS</h4>
+<p class="lead"><b>Includes:</b> Electronic instrument displays (speedometer, tachometer, odometer, fuel, oil, temperature, voltage), collision avoidance system sensors &amp; modules, adaptive cruise control components, display &amp; screen (including navigation, climate control &amp; media settings), GPS control module, power window motors, power door lock actuator motors, power seat motor, power sliding door motor, power window regulators, power window switches, blind spot monitoring sensors, cameras (front/rear/side), entertainment systems (radio/dvd/cd), exterior mirror motors, heated mirrors, heated seat components, heated steering wheel components, lane assist/collision avoidance system components, lift gate motor, parking assist sensors (front/rear), power mirror controllers.</p>
+<h4 class="cmp">HI-TECH ELITE</h4>
+<p class="lead"><b>Includes:</b> Electronic instrument displays (speedometer, tachometer, odometer, fuel, oil, temperature, voltage), collision avoidance system sensors &amp; modules, adaptive cruise control components, display &amp; screen (including navigation, climate control &amp; media settings), Bluetooth voice activation control module, GPS control module, power window motors, power door lock actuator motors, power seat motor, power sliding door motor, power window regulators, power window switches, blind spot monitoring sensors, bluetooth voice activation control module, cameras (front/rear/side), entertainment systems (radio/DVD/cd), exterior mirror motors, heated mirrors, heated seat components, heated steering wheel, lane assist/collision avoidance system components, lift gate motor, parking assist sensors (front/rear), power mirror controllers, anti-theft control module, auto lights sensors, auto wiper sensors, body/power control module, centre console lock actuators, child safety door lock mechanisms, convertible top motor, cruise control radar distance sensor, daytime running lights module, door keypad receiver, electric hood release actuator motor, electric trunk release actuator motor, glove box lock actuators, ignition switch, interior manually operated electrical switches (including ignition switch), keyless entry door handle sensor, keyless entry door keypad, keyless entry receiver, power antenna motor, sunroof motor, tailgate activation sensor, tire pressure warning control module (TPMS), wi-fi control module.</p>
+<p class="lead"><b>Exclusions:</b> Wiring harness.</p>
+<h4 class="cmp">POWERTRAIN PLUS</h4>
+<p class="num">1. Engine Management: Electronic control module (ECM); powertrain control module (PCM); engine management sensors; fuel injection management sensors; idle air control module and valve; and engine wiring harness.</p>
+<p class="num">2. 4X4/Drivetrain: 4x4 locking hubs; electronic and vacuum-operated transfer case and differential engagement components; transfer case control module; transmission control module; and transmission wiring harness.</p>
+<p class="num">3. Suspension &amp; Safety Systems: Front and rear air ride/load-levelling compressors; air ride/load-levelling control module; airbag module and controllers; ABS pump and pressure modulator assembly; anti-lock brake sensor rings; and anti-lock brake/traction control module.</p>
+<p class="num">4. Sensors: Crankshaft sensors; camshaft sensors; knock sensor; NOx sensors; oxygen sensors; mass air flow sensors; manifold absolute pressure (MAP) sensor; and wheel speed sensors.</p>
+<p class="num">5. Emission Control: EVAP emission control components; PCV valve; purge canister; and purge solenoid.</p>
+<p class="num">6. Ignition &amp; intake components: Electronic ignition components; ignition coils and coil packs; throttle body and actuators; and intake manifold actuators.</p>
+<h4 class="cmp">UNLIMITED KM OPTION</h4>
+<p>If the Unlimited Kilometres option is selected on the Application and Registration Page, the Service Contract term shall be governed solely by the time period (months or years) shown and shall not be subject to a kilometre limit. Unlimited Kilometres coverage is available only for vehicles used for personal use or approved light-duty commercial use, with annual usage not exceeding 30,000 kilometres throughout the term of the Service Contract. Vehicles exceeding 30,000 kilometres per year, or used for Commercial, Business, Fleet, Delivery, Ride-Share, Rental, Taxi, Emergency Services, or other high-mileage or commercial operations, are not eligible for Unlimited Kilometres coverage. If A-Protect determines, based on reasonable evidence of the vehicle's actual use, that the eligibility requirements are not met, the Service Contract may be reclassified to the corresponding kilometre-limited plan for the same time term (for example, a 48-Month Unlimited Kilometres plan may be converted to a 48-Month/80,000 km plan).</p>
+
+<c:DealerPortalWarrantyTermsTail /></body>
+</apex:page>

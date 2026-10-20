@@ -1,0 +1,39 @@
+<apex:component >
+
+<table class="runhead"><tr>
+  <td style="width:12px; border-left:2.2pt solid #b3121f;">&#160;</td>
+  <td style="width:34px; padding-left:6px;"><img src="{!$Resource.AProtectMark}" style="width:30px;" /></td>
+  <td style="padding-left:8px;">
+    <div class="rh1" style="color:#b3121f">A-Protect Tire &amp; Rim Protection Plan&#160;&#160;|&#160;&#160;Vehicle Service Contract</div>
+    <div class="rh2" style="color:#b3121f">TERMS AND CONDITIONS</div>
+  </td>
+</tr></table>
+<p>For this Service Contract, the following terms shall have the meanings set out below:</p>
+<p class="def"><b>&#8220;A-Protect&#8221;</b> means A-Protect Warranty Corporation, the administrator and service provider of this Service Contract.</p>
+<p class="def"><b>&#8220;Service Contract&#8221;</b> or &#8220;Contract&#8221; means the Terms and Conditions of this Service Contract entered into between the Customer and A-Protect.</p>
+<p class="def"><b>&#8220;A-Protect Authorized Repair Facility&#8221;</b> means a repair facility that has been approved by A-Protect to perform repair or replacement services under this Service Contract.</p>
+<p class="def"><b>&#8220;Alloy Wheels&#8221;</b> means road wheels manufactured from a combination of lightweight metals such as aluminum and magnesium, as opposed to wheels made entirely of steel.</p>
+<p class="def"><b>&#8220;Alloy Wheel Repair&#8221;</b> means the repair of an Alloy Wheel due to cosmetic damage such as scratches, scuffs, or curb rash.</p>
+<p class="def"><b>&#8220;Commercial/Business Use&#8221;</b> means use of the vehicle for purposes other than personal transportation, including but not limited to: taxis, limousines, ride-share or delivery vehicles, courier or rental vehicles, driving school vehicles, vehicles equipped with snowplows, emergency or service vehicles, and vehicles used for racing or competitive driving.</p>
+<p class="def"><b>&#8220;Curb Damage&#8221;</b> means cosmetic or structural damage resulting from accidental contact with a curb, including scrapes, scuffs, or curb rash.</p>
+<p class="def"><b>&#8220;Customer&#8221;</b> means the registered vehicle owner identified on the front page of this Service Contract, to whom this coverage applies.</p>
+<p class="def"><b>&#8220;Covered Vehicle&#8221;</b> means the vehicle identified on the front page of this Service Contract.</p>
+<p class="def"><b>&#8220;Eligible Keys and Remotes&#8221;</b> means up to two (2) keys and two (2) remotes originally provided by the selling dealer at the time of vehicle purchase.</p>
+<p class="def"><b>&#8220;Normal Wear and Tear&#8221;</b> means the gradual deterioration in operating performance resulting from age, mileage, corrosion, or rust.</p>
+<p class="def"><b>&#8220;Oversized Tires&#8221;</b> means any tires with an overall diameter greater than twenty (20) inches.</p>
+<p class="def"><b>&#8220;Paintless Dent Repair&#8221;</b> means a non-invasive repair technique used to remove minor dents or dings from a vehicle&#8217;s body panels without affecting the original paint finish. The process involves accessing the underside of the panel and using specialized tools to restore the metal to its original shape.</p>
+<p class="def"><b>&#8220;Pre-existing Condition(s)&#8221;</b> means any mechanical failure, defect, or operating problem that existed prior to the purchase date.</p>
+<p class="def"><b>&#8220;Road Hazard&#8221;</b> means a condition on a public roadway or parking lot that is not normally present, including but not limited to potholes, nails, glass, or other debris.</p>
+<p class="def"><b>&#8220;Selling Dealer&#8221;</b> means the authorized dealership or representative through whom the Customer purchased this Service Contract.</p>
+<p class="def"><b>&#8220;Unserviceable&#8221;</b> means any tire or wheel that has been punctured, damaged, or otherwise rendered irreparable in A-Protect&#8217;s sole discretion, including any alloy wheel that can no longer form an airtight seal with its tire.</p>
+<p class="def"><b>&#8220;Service Contract Coverage Limitations&#8221;</b> means the specific exclusions, restrictions, or conditions under which this Service Contract shall become null and void.</p>
+<p class="def"><b>&#8220;Commercial / Business Use&#8221;</b> means operation of the Covered Vehicle for purposes other than private passenger transportation, including but not limited to rideshare, delivery, service, courier, sales, or trade use, whether for compensation or incidental to business activity.</p>
+<p class="def"><b>&#8220;Light Commercial Use&#8221;</b> means limited business use where the Covered Vehicle is operated primarily for personal transportation and occasionally for commercial purposes (Many small business owners, Uber/Lyft drivers, or realtors drive vehicles), averaging no more than 35,000 kilometres per year.</p>
+<p class="def"><b>&#8220;Medium Commercial Use&#8221;</b> means frequent business or delivery use where the Covered Vehicle is operated primarily for commercial purposes, averaging between 35,000 and 60,000 kilometres per year (service vans, couriers, and delivery cars).</p>
+<p class="def"><b>&#8220;Heavy Commercial Use&#8221;</b> means continuous business use, including but not limited to fleet, towing, snowplow, fleet, or other intensive commercial operations exceeding 60,000 kilometres per year.</p>
+<p class="def"><b>&#8220;Heavy-Duty Vehicle&#8221;</b> means a vehicle with a Gross Vehicle Weight Rating (GVWR) greater than 6,350 kilograms (14,000 pounds), or any vehicle used for towing, hauling, or carrying specialized equipment such as snowplows, cargo boxes, or towing apparatus.</p>
+<h2 class="part">PART 2: TIRE &amp; RIM PROTECTION PLAN</h2>
+<p>The services available under this Service Contract are discretionary service benefits administered by A-Protect and depend on the selections made on the front page of the Application. Coverage applies only to the Registered Vehicle identified on the Application and only during the active Term of this Service Contract. All reimbursements or services are discretionary and are subject to prior authorization by A-Protect, verification of incident details, and submission of valid paid receipts within fourteen (14) days of the occurrence. A-Protect reserves the sole right to inspect the damage, request additional documentation (including photographs or inspection reports), and determine eligibility prior to any approval of reimbursement. Repairs or replacements performed without prior authorization may be denied. Eligibility Requirements: The vehicle must not exceed ten (10) model years prior to the current model year at the time of sale.</p>
+<p class="num">2.1 Maximum Liability Limits &#8211; This Service Contract shall carry a maximum liability limit which shall not exceed ten thousand dollars ($10,000 CAD) or the verified repair value of the Covered Vehicle, whichever amount is less, at the time of an approved covered repair. The per-claim maximum limit applicable to each individual covered service is outlined in Part 3 of this Service Contract. All reimbursements or approved repairs are subject to prior authorization by A-Protect and are provided at A-Protect&#8217;s sole discretion, in accordance with the terms of this Service Contract. Multiple repairs diagnosed at the same time constitute a single claim.</p>
+
+</apex:component>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ApexComponent xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>65.0</apiVersion>
+    <description>Parts 4-8 of the warranty document body, rendered inline by DealerPortalWarrantyPDF.</description>
+    <label>Dealer Portal Warranty Terms Tail</label>
+</ApexComponent>

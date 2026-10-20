@@ -3,5 +3,5 @@
     <apiVersion>62.0</apiVersion>
     <availableInTouch>false</availableInTouch>
     <confirmationTokenRequired>false</confirmationTokenRequired>
-    <label>DealerPortalVehicleApplicationPDFs</label>
+    <label>Dealer Portal Vehicle Application PDFs</label>
 </ApexPage>

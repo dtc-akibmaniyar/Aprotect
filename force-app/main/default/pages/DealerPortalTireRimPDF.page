@@ -1,0 +1,400 @@
+<apex:page standardController="Application__c" extensions="ApplicationPDFExtension"
+    renderAs="pdf" applyBodyTag="false" applyHtmlTag="false" showHeader="false"
+    standardStylesheets="false" cache="false" language="en-US">
+<body>
+<style>
+  @page { size: 8.5in 11in; }
+  body { margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; font-size: 6.7pt; color:#111111; line-height:1.22; }
+  p { margin: 0 0 3px 0; text-align: justify; }
+  .runhead { width:100%; border-bottom: 0.7pt solid #c9cfda; padding-bottom: 3px; margin-bottom: 6px; }
+  .runhead td { vertical-align: bottom; }
+  .rh1 { font-size: 5.4pt; letter-spacing: 0.9pt; color: #b3121f; font-weight: bold; text-transform: uppercase; }
+  .rh2 { font-size: 8.6pt; letter-spacing: 0.5pt; color: #b3121f; font-weight: bold; margin-top: 1px; }
+  .notice { background:#e2e6ee; border: 0.5pt solid #b9c0d0; padding: 5px 0; text-align:center;
+            font-size: 7.5pt; font-weight: bold; color:#b3121f; letter-spacing: 0.4pt; margin: 0 0 6px 0; }
+  h2.part { font-size: 8.1pt; font-weight: bold; color:#b3121f; margin: 8px 0 3px 0; padding-left: 6px;
+            border-left: 2.2pt solid #b3121f; line-height: 1.25; page-break-after: avoid; }
+  h3.ltr { font-size: 6.9pt; font-weight: bold; color:#111111; margin: 7px 0 3px 0; page-break-after: avoid; }
+  h4.cmp { font-size: 6.8pt; font-weight: bold; color:#111111; margin: 6px 0 2px 0; page-break-after: avoid; }
+  p.lead { margin-bottom: 3px; }
+  p.num { margin-bottom: 3px; }
+  p.sub { font-style: italic; margin-bottom: 2px; }
+  p.def { border-bottom: 0.5pt solid #dfe2e8; padding-bottom: 2.5px; margin-bottom: 2.5px; }
+  .bl { display:block; margin: 0 0 3px 0; }
+  .ind { padding-left: 10px; }
+  .ind2 { padding-left: 20px; }
+  .ind3 { padding-left: 34px; }
+  table.maint { width:100%; border-collapse: collapse; margin: 2px 0 6px 0; }
+  table.maint td { width:50%; vertical-align: top; padding: 3px 8px 3px 0; border-top: 0.5pt solid #c9cfda; }
+  table.contact { width:100%; border-collapse: collapse; border: 0.5pt solid #c9cfda; margin: 3px 0 7px 0; }
+  table.contact td { vertical-align: top; padding: 6px 8px; font-size: 6.5pt; }
+  table.contact td.c1 { border-right: 0.5pt solid #c9cfda; width: 26%; }
+  table.contact td.c2 { border-right: 0.5pt solid #c9cfda; width: 32%; }
+  .clab { font-size: 5.4pt; letter-spacing: 0.8pt; color:#b3121f; font-weight: bold; text-transform: uppercase; }
+  .cval { font-size: 9.2pt; font-weight: bold; color:#111111; }
+  .privacy { background:#e2e6ee; border-left: 2.2pt solid #b3121f; padding: 6px 8px; margin: 8px 0 8px 0; }
+  .privacy p { font-size: 6.1pt; margin: 0 0 2px 0; text-align: justify; }
+  .ack { font-size: 8.1pt; font-weight: bold; color:#111111; margin: 10px 0 3px 0; }
+  .rule { border-top: 0.7pt solid #c9cfda; margin: 0 0 5px 0; }
+  table.sig { width:100%; border-collapse: collapse; margin-top: 16px; }
+  table.sig td { width:50%; vertical-align: bottom; padding: 0 14px 0 0; }
+  .sigline { border-top: 0.6pt solid #111111; height: 15px; }
+  .siglab { font-size: 6.4pt; color:#3f4a5c; padding-top: 2px; }
+  .adminfoot { text-align:center; font-size: 6.2pt; color:#3f4a5c; margin-top: 12px; }
+  .adminfoot div { margin: 1px 0; }
+</style>
+<style>
+@page {
+  size: letter;
+  margin: 0.40in 0.50in 0.60in 0.50in;
+  @bottom-left {
+    content: "CONTRACT NUMBER: {!Application__c.Name}   |   APPLICATION NUMBER: {!Application__c.Name}   |   HST #: 83214 2467 RT0001";
+    font-family: Arial, Helvetica, sans-serif; font-size: 5.2pt; color: #3f4a5c;
+    vertical-align: top; border-top: 0.6pt solid #c9cfda; padding-top: 4px; width: 62%;
+  }
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages) "   |   Printed on: {!printedOn}";
+    font-family: Arial, Helvetica, sans-serif; font-size: 5.2pt; color: #3f4a5c;
+    vertical-align: top; border-top: 0.6pt solid #c9cfda; padding-top: 4px; text-align: right; width: 38%;
+  }
+}
+body { margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; font-size: 6.7pt; color:#111111; line-height:1.25; }
+table { border-collapse: collapse; }
+.hdr { width:100%; margin: 0 0 2px 0; table-layout: fixed; }
+.hdr td { vertical-align: top; }
+.doctitle { font-size: 11.5pt; font-weight: bold; color:#b3121f; letter-spacing: -0.1pt; line-height:1.12; }
+.doccontact { font-size: 5.9pt; color:#3f4a5c; margin-top: 2px; line-height:1.35; }
+.badge { background:#b3121f; color:#ffffff; padding: 4px 8px 5px 8px; text-align:center; }
+.badge .bl { font-size: 5.3pt; letter-spacing: 1.0pt; color:#eef1f6; }
+.badge .bv { font-size: 12.6pt; font-weight: bold; letter-spacing: 0.2pt; margin-top: 1px; }
+.hdrrule { border-top: 1.2pt solid #b3121f; margin: 4px 0 0 0; }
+.titlebar { background:#b3121f; color:#ffffff; text-align:center; font-size: 8.4pt; font-weight: bold;
+            letter-spacing: 3.2pt; padding: 3.5px 0 3.5px 0; margin: 4px 0 5px 0; }
+.sec { margin: 5px 0 1px 0; }
+.secnum { display:inline-block; width: 11px; height: 11px; background:#b3121f; color:#ffffff; border-radius: 6px;
+          text-align:center; font-size: 6.4pt; font-weight: bold; line-height: 11px; margin-right: 5px; }
+.sectitle { font-size: 8.4pt; font-weight: bold; color:#111111; letter-spacing: 0.2pt; }
+.secrule { border-top: 0.6pt solid #111111; margin: 2px 0 4px 0; }
+.note { font-size: 5.9pt; font-style: italic; color:#3f4a5c; margin: 3px 0 4px 0; }
+table.kv { width:100%; margin: 0; }
+table.kv td { vertical-align: top; padding: 2.3px 6px 2.3px 0; border-bottom: 0.5pt solid #dfe2e8; font-size: 6.7pt; }
+table.kv td.lb { color:#3f4a5c; width: 20%; }
+table.kv td.vl { font-weight: bold; width: 28%; }
+table.kv td.lb2 { color:#3f4a5c; width: 20%; }
+table.kv td.vl2 { font-weight: bold; width: 32%; }
+table.kv4 { width:100%; margin:0; }
+table.kv4 td { vertical-align: top; padding: 2.3px 6px 2.3px 0; border-bottom: 0.5pt solid #dfe2e8; font-size: 6.7pt; }
+table.kv4 td.lb { color:#3f4a5c; width: 10.5%; }
+table.kv4 td.vl { font-weight: bold; width: 15%; }
+table.kv6 { width:100%; margin:0; }
+table.kv6 td { vertical-align: top; padding: 2.3px 6px 2.3px 0; border-bottom: 0.5pt solid #dfe2e8; font-size: 6.7pt; }
+table.kv6 td.lb { color:#3f4a5c; width: 12%; }
+table.kv6 td.vl { font-weight: bold; width: 21%; }
+table.kv6 td.lb2 { color:#3f4a5c; width: 15%; }
+table.kv6 td.vl2 { font-weight: bold; width: 15%; }
+.premium { width:100%; margin: 5px 0 3px 0; border-top: 0.7pt solid #111111; border-bottom: 0.7pt solid #111111; }
+.premium td { padding: 3.4px 4px 3.4px 0; font-size: 6.7pt; }
+.premium td.total { text-align: right; font-weight: bold; font-size: 7.6pt; }
+.premium td.totlab { text-align: right; color:#111111; }
+div.box { background:#dcdcdc; padding: 3px 7px 4px 7px; margin: 2px 0 3px 0; }
+div.box .imp { color:#b42317; font-weight: bold; font-size: 6.7pt; }
+div.box p { margin: 0 0 2px 0; font-style: italic; font-size: 6.3pt; line-height:1.3; }
+div.box ol { margin: 2px 0 0 13px; padding: 0; }
+div.box li { font-size: 6.15pt; font-style: italic; line-height:1.3; margin-bottom: 1px; }
+.ck { font-size: 6.0pt; font-style: italic; color:#111111; margin: 3px 0 3px 0; line-height:1.27; }
+table.sig { width:100%; margin-top: 2px; }
+table.sig td { vertical-align: bottom; padding: 0 16px 0 0; }
+.sigline { border-top: 0.6pt solid #111111; height: 11px; }
+.siglab { font-size: 6.1pt; color:#3f4a5c; padding-top: 2px; letter-spacing: 0.3pt; }
+.ln2 { display:block; font-weight: normal; font-size: 6.1pt; color:#3f4a5c; line-height:1.25; }
+</style>
+<apex:repeat value="{!recordTypeWrappersList}" var="rw"><apex:repeat value="{!rw.packages}" var="w">
+
+<table class="hdr"><tr>
+  <td style="width:1.00in"><img src="{!$Resource.AProtectFullLogo}" style="width:0.93in" /></td>
+  <td>
+    <div class="doctitle">Tire &amp; Rim Vehicle Service Contract</div>
+    <div class="doccontact">1-866-660-6444 &#183; Tel: 416-661-7444 &#183; tireandrim@a-protectwarranty.com</div>
+    <div class="doccontact">8800 Dufferin St. Suite 302B, Concord, ON L4K 0C5 &#183; HST #: 832142467RT0001</div>
+  </td>
+  <td style="width:1.15in; text-align:right;"><img src="{!$Resource.TireRimHero}" style="width:1.00in" /></td>
+  <td style="width:1.75in; padding-left:10px;">
+    <div class="badge" style="background:#1a1a1a;"><div class="bl">CONTRACT NO.</div><div class="bv">{!Application__c.Name}</div></div>
+  </td>
+</tr></table>
+<div class="hdrrule"></div>
+<div class="titlebar">APPLICATION</div>
+
+<div class="sec"><span class="secnum">1</span><span class="sectitle">CONTRACT INFORMATION</span></div>
+<div class="secrule"></div>
+<div class="note">It is the responsibility of the Contract Holder to check that the coverage listed on this document agrees with the original Application given to You by the Selling Dealer. Any discrepancies must be reported to A-Protect immediately.</div>
+<table class="kv">
+  <tr><td class="lb">Contract Number</td><td class="vl">{!Application__c.Name}</td>
+      <td class="lb2">Status</td><td class="vl2">{!Application__c.Application_Status__c}</td></tr>
+  <tr><td class="lb">Protection Plan</td><td class="vl">{!w.renderedPlanName}<apex:outputText value=" (Sections 3.1-3.9)" rendered="{!CONTAINS(w.renderedPlanName, 'Superior')}" /><apex:outputText value=" (Sections 3.1-3.5)" rendered="{!CONTAINS(w.renderedPlanName, 'Extended')}" /><apex:outputText value=" (Sections 3.1-3.3)" rendered="{!CONTAINS(w.renderedPlanName, 'Essential')}" /></td>
+      <td class="lb2">Term (months)</td><td class="vl2">{!w.renderedTermName}</td></tr>
+  <tr><td class="lb">Vehicle Use Classification</td><td class="vl">{!IF(Application__c.Commercial_Business_Use__c, 'Commercial / Business Use', 'Standard (Private Passenger)')}</td>
+      <td class="lb2">&#160;</td><td class="vl2">&#160;</td></tr>
+  <tr><td class="lb">Contract Start Date</td><td class="vl">{!w.contractStartDateDisplay}</td>
+      <td class="lb2">Contract Expiration Date</td><td class="vl2">{!w.contractEndDateDisplay}</td></tr>
+  <tr><td class="lb">Contract Start Odometer</td><td class="vl">{!w.odometerStartDisplay}</td>
+      <td class="lb2">Contract Expiration Odometer</td><td class="vl2">{!w.odometerEndDisplay}</td></tr>
+</table>
+<table class="premium"><tr>
+  <td>Contract Premium <b>{!w.premiumWithoutTaxDisplay}</b></td>
+  <td>Surcharge / Add-Ons <b>$0.00</b></td>
+  <td>HST <b>{!w.taxDisplay}</b></td>
+  <td class="totlab">Total Premium</td><td class="total">{!w.totalPremiumDisplay}</td>
+</tr></table>
+<div class="note" style="font-style:normal;">Coverage begins on the Contract Start Date and odometer reading listed above, and ends on the Contract Expiration Date or when the vehicle reaches the Contract Expiration Odometer reading, whichever comes first.</div>
+
+<div class="sec"><span class="secnum">2</span><span class="sectitle">CUSTOMER / REGISTERED VEHICLE OWNER</span></div>
+<div class="secrule"></div>
+<table class="kv">
+  <tr><td class="lb">Customer Name</td>
+      <td class="vl"><apex:outputText value="{!UPPER(Application__c.Customer_Last_Name__c)}" /><apex:outputText value=", " rendered="{!NOT(ISBLANK(Application__c.Customer_First_Name__c))}" /><apex:outputText value="{!UPPER(Application__c.Customer_First_Name__c)}" /></td>
+      <td class="lb2">Company / Business Name</td><td class="vl2">{!Application__c.Company_Business__c}</td></tr>
+  <tr><td class="lb">Address</td><td colspan="3">{!Application__c.Customer_Address__c}</td></tr>
+  <tr><td class="lb">Primary Phone</td><td class="vl">{!Application__c.Customer_Phone__c}</td>
+      <td class="lb2">Secondary Phone</td><td class="vl2">{!Application__c.Customer_Business_Phone__c}</td></tr>
+  <tr><td class="lb">Email</td><td class="vl">{!Application__c.Customer_Email__c}</td>
+      <td class="lb2">Lienholder (if applicable)</td>
+      <td class="vl2">{!Application__c.Financial_Institution_Lender__c}<span class="ln2">{!Application__c.Lender_Address__c}</span></td></tr>
+  <tr><td class="lb">Secondary Owner Name</td><td class="vl">{!Application__c.Co_Buyer__r.Name}</td>
+      <td class="lb2">Secondary Owner Email</td><td class="vl2">&#160;</td></tr>
+</table>
+
+<div class="sec"><span class="secnum">3</span><span class="sectitle">VEHICLE</span></div>
+<div class="secrule"></div>
+<table class="kv4">
+  <tr><td class="lb">Year</td><td class="vl">{!Application__c.Vehicle_Year__c}</td>
+      <td class="lb">Make</td><td class="vl">{!Application__c.Vehicle_Make__c}</td>
+      <td class="lb">Model</td><td class="vl">{!Application__c.Vehicle_Model__c}</td>
+      <td class="lb">Trim</td><td class="vl">{!Application__c.Vehicle_Trim__c}</td></tr>
+  <tr><td class="lb">VIN</td><td class="vl">{!Application__c.Vehicle_VIN__c}</td>
+      <td class="lb">Odometer</td>
+      <td class="vl"><apex:outputText value="{!Application__c.Odometer__c}" /> <apex:outputText value="{!Application__c.Odometer_Unit__c}" /></td>
+      <td class="lb">New / Used</td><td class="vl">&#160;</td>
+      <td class="lb">Stock #</td><td class="vl">{!Application__c.Vehicle__r.Stock_Number__c}</td></tr>
+  <tr><td class="lb">Tire Size</td><td class="vl">{!w.pkg.Tire_Type__c}</td>
+      <td class="lb">Rim Size</td>
+      <td class="vl"><apex:outputText value="{!w.pkg.Rim_Size__c}" /> <apex:outputText value="{!w.pkg.Rim_Size_Unit__c}" /></td>
+      <td class="lb">Rim Type</td><td class="vl">{!w.pkg.Rim_Type__c}</td>
+      <td class="lb">Run-Flat Tires</td><td class="vl">&#160;</td></tr>
+</table>
+
+<div class="sec"><span class="secnum">4</span><span class="sectitle">CUSTOMER OBLIGATIONS &amp; ACKNOWLEDGEMENT</span></div>
+<div class="box">
+  <div class="imp">IMPORTANT: All repairs and replacements require prior authorization from A-Protect (1-866-660-6444). Repairs or replacements performed without prior authorization may be denied. Refer to the Terms and Conditions for full details.</div>
+  <p style="margin-top:3px;">To keep this Contract valid, the Customer must:</p>
+  <ol>
+    <li>Maintain the tires and wheels. Have regular tire rotations, proper inflation and timely wheel alignments performed by a licensed repair facility, and have any suspension, steering or wheel-balance issues inspected and repaired promptly. Routine maintenance costs are not covered.</li>
+    <li>Drive safely. Operate the vehicle lawfully and with reasonable care to avoid potholes, curbs and debris. Damage from reckless, negligent or improper operation is not covered.</li>
+    <li>Report damage promptly. Contact A-Protect as soon as possible after the occurrence (the next business day if outside business hours). A-Protect may request photos or video, sent to tireandrim@a-protectwarranty.com.</li>
+    <li>Submit receipts within 14 days. Valid paid receipts and proof of payment must be submitted within fourteen (14) days of the occurrence to be eligible for reimbursement.</li>
+  </ol>
+</div>
+<div class="ck">&#9744;&#160;&#160;I, the Customer acknowledge that I have read, reviewed, and understood all pages of the Terms and Conditions of this A-Protect Tire &amp; Rim Vehicle Service Agreement, including the exclusions, limitations, cancellations, and transfer provisions on the following page(s). I confirm that all information provided on this Application and Registration Page is true, complete, and accurate to the best of my knowledge, and I attest that this Application and Registration Page has been correctly and accurately completed by the selling dealer. I understand and agree that this Application and Registration Page, together with the following full Terms and Conditions, constitutes the entire Agreement between the parties. I understand that this Agreement is a Service Agreement, not an insurance product, and that all authorizations, approvals, and payments under it are administrative in nature and governed solely by the Terms and Conditions provided. I understand that this is an application only, and that coverage does not take effect until A-Protect has accepted this application and received payment of the Total Premium, including applicable taxes. I further acknowledge that no verbal promises or representations, other than those expressly stated in writing in this Agreement, shall be binding on A-Protect Warranty Corporation or its authorized representatives.</div>
+<table class="sig"><tr>
+  <td style="width:52%"><div class="sigline"></div><div class="siglab">CUSTOMER SIGNATURE</div></td>
+  <td><div class="sigline"></div><div class="siglab">SIGNED DATE</div></td>
+</tr></table>
+
+<div class="sec"><span class="secnum">5</span><span class="sectitle">DEALER INFORMATION &amp; ATTESTATION</span></div>
+<div class="secrule"></div>
+<table class="kv6">
+  <tr><td class="lb">Dealer Name</td><td class="vl">{!dealerName}</td>
+      <td class="lb2">Dealership Reg. #</td><td class="vl2">{!Application__c.Dealer_Name__r.Business_Registration__c}</td>
+      <td class="lb2">Salesperson</td><td class="vl2">{!Application__c.Sales_Person__r.Name}</td></tr>
+  <tr><td class="lb">Salesperson Reg. #</td><td class="vl">{!Application__c.Dealer_Sales_ID_License__c}</td>
+      <td class="lb2">Address</td><td colspan="3">{!dealerAddress}</td></tr>
+</table>
+<div class="ck" style="font-style:normal; margin-top:5px;"><b>DEALER ATTESTATION &#8211;</b> By signing this Agreement, the Dealership agrees to the following: This Application and Registration Page has been completed correctly and accurately on behalf of the Customer named above. The vehicle, coverage, and pricing details entered reflect what was disclosed to and selected by the customer. Together with the following full Terms and Conditions, this Application and Registration Page forms the entire Agreement between the parties. The Customer has been advised that this is an application only and coverage begins only once A-Protect accepts it and receives payment of the Total Premium, including applicable taxes.</div>
+<table class="sig" style="margin-top:10px;"><tr>
+  <td style="width:52%"><div class="sigline"></div><div class="siglab">DEALERSHIP REP. SIGNATURE</div></td>
+  <td><div class="sigline"></div><div class="siglab">SIGNED DATE</div></td>
+</tr></table>
+
+</apex:repeat></apex:repeat>
+<div style="page-break-before: always;"></div>
+
+<table class="runhead"><tr>
+  <td style="width:12px; border-left:2.2pt solid #b3121f;">&#160;</td>
+  <td style="width:34px; padding-left:6px;"><img src="{!$Resource.AProtectMark}" style="width:30px;" /></td>
+  <td style="padding-left:8px;">
+    <div class="rh1" style="color:#b3121f">A-Protect Tire &amp; Rim Protection Plan&#160;&#160;|&#160;&#160;Vehicle Service Contract</div>
+    <div class="rh2" style="color:#b3121f">TERMS AND CONDITIONS</div>
+  </td>
+</tr></table>
+<p>For this Service Contract, the following terms shall have the meanings set out below:</p>
+<p class="def"><b>“A-Protect”</b> means A-Protect Warranty Corporation, the administrator and service provider of this Service Contract.</p>
+<p class="def"><b>“Service Contract”</b> or “Contract” means the Terms and Conditions of this Service Contract entered into between the Customer and A-Protect.</p>
+<p class="def"><b>“A-Protect Authorized Repair Facility”</b> means a repair facility that has been approved by A-Protect to perform repair or replacement services under this Service Contract.</p>
+<p class="def"><b>“Alloy Wheels”</b> means road wheels manufactured from a combination of lightweight metals such as aluminum and magnesium, as opposed to wheels made entirely of steel.</p>
+<p class="def"><b>“Alloy Wheel Repair”</b> means the repair of an Alloy Wheel due to cosmetic damage such as scratches, scuffs, or curb rash.</p>
+<p class="def"><b>“Commercial/Business Use”</b> means use of the vehicle for purposes other than personal transportation, including but not limited to: taxis, limousines, ride-share or delivery vehicles, courier or rental vehicles, driving school vehicles, vehicles equipped with snowplows, emergency or service vehicles, and vehicles used for racing or competitive driving.</p>
+<p class="def"><b>“Curb Damage”</b> means cosmetic or structural damage resulting from accidental contact with a curb, including scrapes, scuffs, or curb rash.</p>
+<p class="def"><b>“Customer”</b> means the registered vehicle owner identified on the front page of this Service Contract, to whom this coverage applies.</p>
+<p class="def"><b>“Covered Vehicle”</b> means the vehicle identified on the front page of this Service Contract.</p>
+<p class="def"><b>“Eligible Keys and Remotes”</b> means up to two (2) keys and two (2) remotes originally provided by the selling dealer at the time of vehicle purchase.</p>
+<p class="def"><b>“Normal Wear and Tear”</b> means the gradual deterioration in operating performance resulting from age, mileage, corrosion, or rust.</p>
+<p class="def"><b>“Oversized Tires”</b> means any tires with an overall diameter greater than twenty (20) inches.</p>
+<p class="def"><b>“Paintless Dent Repair”</b> means a non-invasive repair technique used to remove minor dents or dings from a vehicle’s body panels without affecting the original paint finish. The process involves accessing the underside of the panel and using specialized tools to restore the metal to its original shape.</p>
+<p class="def"><b>“Pre-existing Condition(s)”</b> means any mechanical failure, defect, or operating problem that existed prior to the purchase date.</p>
+<p class="def"><b>“Road Hazard”</b> means a condition on a public roadway or parking lot that is not normally present, including but not limited to potholes, nails, glass, or other debris.</p>
+<p class="def"><b>“Selling Dealer”</b> means the authorized dealership or representative through whom the Customer purchased this Service Contract.</p>
+<p class="def"><b>“Unserviceable”</b> means any tire or wheel that has been punctured, damaged, or otherwise rendered irreparable in A-Protect’s sole discretion, including any alloy wheel that can no longer form an airtight seal with its tire.</p>
+<p class="def"><b>“Service Contract Coverage Limitations”</b> means the specific exclusions, restrictions, or conditions under which this Service Contract shall become null and void.</p>
+<p class="def"><b>“Commercial / Business Use”</b> means operation of the Covered Vehicle for purposes other than private passenger transportation, including but not limited to rideshare, delivery, service, courier, sales, or trade use, whether for compensation or incidental to business activity.</p>
+<p class="def"><b>“Light Commercial Use”</b> means limited business use where the Covered Vehicle is operated primarily for personal transportation and occasionally for commercial purposes (Many small business owners, Uber/Lyft drivers, or realtors drive vehicles), averaging no more than 35,000 kilometres per year.</p>
+<p class="def"><b>“Medium Commercial Use”</b> means frequent business or delivery use where the Covered Vehicle is operated primarily for commercial purposes, averaging between 35,000 and 60,000 kilometres per year (service vans, couriers, and delivery cars).</p>
+<p class="def"><b>“Heavy Commercial Use”</b> means continuous business use, including but not limited to fleet, towing, snowplow, fleet, or other intensive commercial operations exceeding 60,000 kilometres per year.</p>
+<p class="def"><b>“Heavy-Duty Vehicle”</b> means a vehicle with a Gross Vehicle Weight Rating (GVWR) greater than 6,350 kilograms (14,000 pounds), or any vehicle used for towing, hauling, or carrying specialized equipment such as snowplows, cargo boxes, or towing apparatus.</p>
+<h2 class="part">PART 2: TIRE &amp; RIM PROTECTION PLAN</h2>
+<p>The services available under this Service Contract are discretionary service benefits administered by A-Protect and depend on the selections made on the front page of the Application. Coverage applies only to the Registered Vehicle identified on the Application and only during the active Term of this Service Contract. All reimbursements or services are discretionary and are subject to prior authorization by A-Protect, verification of incident details, and submission of valid paid receipts within fourteen (14) days of the occurrence. A-Protect reserves the sole right to inspect the damage, request additional documentation (including photographs or inspection reports), and determine eligibility prior to any approval of reimbursement. Repairs or replacements performed without prior authorization may be denied. Eligibility Requirements: The vehicle must not exceed ten (10) model years prior to the current model year at the time of sale.</p>
+<p class="num">2.1 Maximum Liability Limits – This Service Contract shall carry a maximum liability limit which shall not exceed ten thousand dollars ($10,000 CAD) or the verified repair value of the Covered Vehicle, whichever amount is less, at the time of an approved covered repair. The per-claim maximum limit applicable to each individual covered service is outlined in Part 3 of this Service Contract. All reimbursements or approved repairs are subject to prior authorization by A-Protect and are provided at A-Protect’s sole discretion, in accordance with the terms of this Service Contract. Multiple repairs diagnosed at the same time constitute a single claim.</p>
+
+<h2 class="part">PART 3: PARTS &amp; SERVICES COVERED</h2>
+<p><b>Protection Plan Selected:</b> Refer to the Application Page for the Protection Plan (Essential, Extended or Superior), term, and any surcharges or add-ons selected.</p>
+<p class="lead">*All repairs and reimbursements are at the discretion of A-Protect. The Administrator may select parts that are new, rebuilt, or equivalent quality. All exchanged parts removed by A-Protect or the service centre will remain the property of A-Protect.</p>
+
+<h3 class="ltr">Essential Protection (Section 3.1&#8211;3.3) includes:</h3>
+<p class="num"><b>3.1 Tire &amp; Wheel Coverage</b></p>
+<p class="num ind"><b>a) Flat Tire Replacement:</b> A-Protect may reimburse the customer up to a maximum of $80 per occurrence for the repair of a flat tire caused by a road hazard, provided the covered vehicle was operated lawfully at the time of the incident.</p>
+<p class="num ind"><b>b) Tire Replacement:</b> A-Protect may, at its sole discretion, reimburse the Customer for the reasonable costs to replace up to two (2) tires per occurrence when a Covered Tire becomes Unserviceable as a direct result of a Road Hazard, as defined in this Service Contract. A tire is considered Unserviceable only when it cannot be safely repaired, as determined by A-Protect. Reimbursement may be made up to a maximum of two thousand dollars ($2,000 CAD) for the entire Term of this Service Contract. Replacement tires will be of &#8220;like kind and quality,&#8221; which may include new or used tires and may involve a prorated adjustment based on the remaining tread depth of the damaged tire. If the Covered Vehicle is equipped with factory-installed run-flat tires, the maximum reimbursement limit may increase by up to three thousand dollars ($3,000 CAD) for the Term of this Service Contract, due to the higher cost of run-flat tire replacements. <b>Note: Snow Tires included.</b></p>
+<p class="num ind"><b>c) Wheel Replacement:</b> A-Protect may, at its discretion, reimburse the Customer for reasonable costs to repair or replace an Alloy Wheel that has been rendered Unserviceable as a direct result of a Road Hazard, as defined in this Service Contract. Coverage is limited to the replacement of up to two (2) Alloy Wheels per occurrence, with a maximum of four (4) Alloy Wheels during the term of this Service Contract. A-Protect reserves the right to supply or authorize replacement wheels of like kind and quality, which may include new, refurbished, or used components, at A-Protect&#8217;s cost and discretion. Bent Alloy Wheels are eligible for consideration only when the damage was caused by a verified Road Hazard, and the wheel cannot properly seal with its tire as determined by an authorized technician and A-Protect.</p>
+<p class="num"><b>3.2 Tire &amp; Wheel Mounting and Balancing</b></p>
+<p class="num ind">A-Protect will reimburse the Customer for the reasonable costs for mounting, balancing, valve stems, and tire disposal related to Covered Tire replacements. Unspecified shop fees, environmental charges, and other miscellaneous supplies are excluded.</p>
+<p class="num"><b>3.3 Roadside Coverage</b></p>
+<p class="num ind">For the Registered Vehicle, A-Protect will reimburse the Customer up to $100 per occurrence for roadside assistance services, limited to: towing (to the nearest A-Protect approved service center), winching, flat tire change (installation of inflated spare; spare not included), fuel delivery (excluding cost of fuel), battery boost, lockout service (excluding locksmith fees). Roadside Assistance is limited to three (3) service calls per twelve (12) month period, and no more than one (1) service call within any twenty-four (24) hour period. Coverage is invalid following Termination of the Service Contract. Valid invoices and proof of payment must be submitted within fourteen (14) days of the occurrence to be eligible for reimbursement.</p>
+<p class="num ind">A-Protect does not arrange or dispatch roadside services, reimbursement only.</p>
+
+<h3 class="ltr">Extended Protection (Section 3.1&#8211;3.5) covers all of Essential Protection in addition to:</h3>
+<p class="num"><b>3.4 Key Replacement</b></p>
+<p class="num ind">In the event the original key (issued at the time of vehicle purchase) is lost, stolen, or destroyed, A-Protect will reimburse up to $800 per Covered Year and shall not exceed $1,600 over the Term of the Service Contract for the reasonable costs to replace a key/remote. Prior authorization from A-Protect is required before any replacement is made. Non-working keys must be available for inspection at A-Protect&#8217;s discretion. The Selling Dealership must provide two (2) keys and two (2) remotes at the time of vehicle delivery.</p>
+<p class="num"><b>3.5 Car Rental Coverage</b></p>
+<p class="num ind">In the event that a covered repair or replacement under this Service Contract requires more than one (1) business day to complete, A-Protect may, at its discretion, reimburse the Customer up to seventy dollars ($70 CAD) per day for reasonable rental-vehicle expenses. All reimbursements are subject to prior authorization by A-Protect and submission of valid paid receipts within fourteen (14) days of the occurrence.</p>
+<p class="num ind">This assistance is administrative in nature and does not constitute insurance coverage or indemnification for loss of use of the vehicle.</p>
+
+<h3 class="ltr">Superior Protection (Section 3.1&#8211;3.5) covers all of Essential and Extended Protection in addition to:</h3>
+<p class="num"><b>3.6 Windshield Repair and Replacement</b></p>
+<p class="num ind">A&#8209;Protect will reimburse the Customer for the cost of repairs to minor chips and cracks on the vehicle&#8217;s windshield that result directly from damage caused by road hazards, including but not limited to propelled rocks, wood, and metal debris. The maximum reimbursement under this coverage shall be three hundred dollars ($300) per occurrence, not to exceed a total aggregate limit of one thousand dollars ($1,000) over the term of this Service Contract. In the event that a full windshield replacement is required due to such damage, A&#8209;Protect will reimburse the Customer up to one thousand dollars ($1,000) toward the applicable windshield replacement deductible. This replacement coverage is limited to one (1) claim under the term of this Service Contract. Cracks exceeding fifteen (15) centimeters in length are expressly excluded from coverage.</p>
+<p class="num"><b>3.7 Headlight, Taillight, Fog Light/Driving Light Lens Repair</b></p>
+<p class="num ind">Reimbursement for headlight, taillight, fog light, and driving light lenses for minor chips and cracks only, as a direct result of damage due to road objects, such as propelled rocks or debris (wood, metal pieces/parts), A-Protect will cover up to $150.00 per occurrence or the maximum of $600.00 for the total term of the Service Contract. <b>Exclusions:</b> Cracks over 15 cm are not covered.</p>
+<p class="num"><b>3.8 Paintless Dent and Scratch Repair</b></p>
+<p class="num ind">A-Protect may, at its discretion, reimburse the Customer for reasonable costs up to two hundred fifty dollars ($250 CAD) per occurrence, to a maximum of one thousand dollars ($1,000 CAD) over the term of this Service Contract. Coverage applies only to minor dents up to five (5) centimetres in diameter or surface scratches up to thirty (30) centimetres in length on external body panels, when the damage is caused directly by public-lot or parking-area incidents, as determined by A&#8209;Protect. Repairs are performed using the Paintless Dent Repair method, where feasible, and are intended to restore the appearance as closely as possible to the original finish. Exact colour or texture matching is not guaranteed. A-Protect reserves the sole right to determine repair eligibility, select the repair facility, and authorize the reimbursement amount.</p>
+<p class="num"><b>3.9 Rip/Tear/Burn/Puncture</b></p>
+<p class="num ind">For the repair of accidental rips, tears, burns, or punctures up to 3 cm in length for the upholstered seats of the Covered vehicle, A-Protect will cover up to $150.00 per occurrence or the maximum of $600.00 for the total term of the Service Contract.</p>
+
+<h2 class="part">PART 4: CUSTOMER RESPONSIBILITY</h2>
+<p class="num">4.1 Regular Vehicle Maintenance – During the Coverage Term of this Service Contract, the Customer shall ensure that all services required to maintain the Covered Vehicle are performed by a licensed repair facility. This includes, but is not limited to, conducting regular tire rotations, maintaining proper inflation levels, and performing timely wheel alignments. The Customer shall also ensure that any mechanical or structural conditions that may affect the performance or integrity of the tires and rims, such as suspension, steering, or wheel balance issues are promptly inspected and repaired when identified. Regular maintenance expenses, including the cost of inspections, adjustments, alignments, balancing, tire rotations, or any other routine services, are expressly excluded from coverage under this Service Contract. Failure to perform, or delay in performing, such maintenance or repairs that results in damage to the tires, rims, or related components shall void coverage for such damage under this Service Contract.</p>
+<p class="num">4.2 Vehicle Operation/Safe Driving Practices – The Customer shall operate the Covered Vehicle in a safe, lawful, and prudent manner to prevent avoidable damage to covered components. The Customer shall exercise reasonable care to avoid contact with potholes, curbs, debris, and other road hazards that may cause damage to the tires or rims. Any damage resulting from reckless, negligent, or improper vehicle operation shall not be covered under this Service Contract.</p>
+<p class="num">4.3 Claim Reporting &amp; Procedure – The Customer shall comply with the claim procedures set forth under Part 5 of this Service Contract and shall promptly report any damage to the covered tires or rims to A-Protect within a reasonable time following the occurrence. Failure to provide timely notice or to follow the prescribed claim procedures may result in the denial of coverage. A-Protect reserves the right, at its sole discretion, to request photos/videos, or other supporting documentation evidencing the damage at the time of claim submission.</p>
+
+<h2 class="part">PART 5: CLAIMS PROCEDURE</h2>
+<p>All claims are subject to prior authorization and documentation review. Unauthorized repairs may be denied.</p>
+<table class="contact"><tr>
+  <td class="c1"><div class="clab">Contact A-Protect Warranty<br/>Corporation immediately</div>
+      <div class="cval" style="margin-top:4px;">1-866-660-6444</div>
+      <div style="font-size:6.3pt; color:#3f4a5c;">Local: 416-661-7444</div></td>
+  <td class="c2"><div class="clab">Hours of operation</div>
+      <div style="margin-top:5px; font-weight:bold;">9 AM to 5 PM EST<br/>(Monday to Friday)</div></td>
+  <td><div class="clab">Claim photos / videos</div>
+      <div style="margin-top:5px; font-weight:bold; color:#b3121f;">tireandrim@a-protectwarranty.com</div></td>
+</tr></table>
+<p><b>1&#160;&#160;Contact A-Protect to submit a claim.</b><span class="ind">The Customer must promptly contact A-Protect to obtain instructions regarding the delivery of the vehicle to an A-Protect Authorized Repair Facility. For covered repair occurring outside of regular business hours, the Customer must notify A-Protect on the next business day. A-Protect reserves the right to inspect or review the damage prior to the repair authorization and may request photographs, video evidence, or other supporting documentation at its sole discretion.</span></p>
+<p><b>2&#160;&#160;Obtain approval prior to repairs.</b><span class="ind">The Customer must obtain prior written or verbal authorization from A-Protect before commencing any repair or replacement of the tires, wheels, or rims covered under this Service Contract. Unauthorized repairs may result in the denial of the claim.</span></p>
+<p><b>3&#160;&#160;Deliver the vehicle to an A-Protect Authorized Repair Facility.</b><span class="ind">In the event the covered repair occurs within 200 km (one-way) of an A-Protect Authorized Repair Facility, A-Protect reserves the sole right to request to transfer the vehicle. The Customer may be responsible for any additional costs incurred.</span></p>
+<p><b>4&#160;&#160;Roadside Coverage (Reimbursement Only).</b><span class="ind">The Customer must contact a third-party roadside assistance service facility to coordinate and arrange all roadside services to be completed. To request reimbursement, a valid receipt (including proof of payment) must be provided to A-Protect within fourteen (14) days of the occurrence. A-Protect is not responsible for the arrangement of towing and/or roadside services and the delivery of the vehicle to an A-Protect authorized repair facility or otherwise.</span></p>
+<p><b>5&#160;&#160;Claims.</b><span class="ind">A-Protect will determine claim eligibility and any reimbursement amount in accordance with the applicable Designated Coverage, excluding diagnostic charges, consequential or secondary repairs, core charges, and miscellaneous fees. A-Protect reserves the exclusive right, in its sole discretion, to (i) reject any unreasonable repair costs or estimates in light of available alternatives, (ii) inspect or otherwise examine the Covered Vehicle, and (iii) select the parts or components to be used in any repair, consistent with Part 3 of this Service Contract. For any tire or rim repair claim, A-Protect may require photographic and/or video evidence of the reported damage. The Customer shall submit such materials to tireandrim@a-protectwarranty.com. Submission of documentation does not constitute approval of the claim or an agreement to issue a claim payout.</span></p>
+<p><b>6&#160;&#160;Territory.</b><span class="ind">This Service Contract applies to repairs in Canada, and the United States.</span></p>
+<p>Reimbursement decisions made by A-Protect are final and represent discretionary administrative assistance only.</p>
+
+<h2 class="part">PART 6: CANCELLATIONS &amp; TRANSFERS</h2>
+<p class="num">6.1 CANCELLATIONS – The Customer may request cancellation of this Service Contract through the original dealership within 10 days of the coverage purchase date, provided that no claims have been made (paid or pending). After this period, all purchases are non-refundable. A-Protect may agree to cancel the Service Contract, deducting non-recoverable costs, and issue a pro-rated refund to the Financial Institution upon the request of the dealership or lienholder, or in case of an accident or repossession.</p>
+<p class="num">6.2 TRANSFER OF SERVICE CONTRACT – This Service Contract may, at A-Protect’s sole discretion, be transferred to a new owner of the Covered Vehicle, provided that all terms and conditions of this Service Contract have been fully met and the original Customer has obtained prior written approval from A-Protect. A non-refundable transfer-application fee of one hundred fifty dollars ($150 CAD) plus applicable taxes must be submitted with the request, together with a copy of the bill of sale, proof of payment, and any required maintenance records. A-Protect may also request an oil-change receipt and/or vehicle-inspection report at the time of transfer, at the Customer’s expense. A-Protect reserves the sole right to accept or decline any transfer application at its discretion. All supporting documentation required under Part 4 of this Service Contract must be provided upon request. Failure to submit the required documentation and fee within twenty (20) days of the ownership transfer will result in automatic closure of the transfer request. If a transfer request is declined, any fees paid in connection with that request will be returned to the Customer.</p>
+
+<h2 class="part">PART 7: COVERAGE LIMITATIONS AND EXCLUSIONS</h2>
+<p>This Service Contract is a discretionary service program. All determinations of eligibility, repairability, and reimbursement are made solely at the discretion of A-Protect Warranty Corporation. Coverage is strictly limited to the services expressly listed in Part 3 of this Service Contract.</p>
+<p>The following limitations and exclusions apply:</p>
+
+<h3 class="ltr">A. GENERAL LIMITATIONS</h3>
+<p class="num ind2">Any representation or promise not expressly stated in this Service Contract.</p>
+<p class="num ind2">Customer non-compliance with any terms or conditions of this Service Contract, including maintenance and claim procedures.</p>
+<p class="num ind2">Services, parts, or conditions not specifically listed in Part 3.</p>
+<p class="num ind2">Failures or damage existing prior to the Effective Date of this Service Contract.</p>
+<p class="num ind2">Normal wear and tear, tread wear, corrosion, fading, or deterioration due to age or mileage.</p>
+<p class="num ind2">Labour, diagnostics, or materials relating to non-covered parts or systems.</p>
+<p class="num ind2">Loss of use, downtime, inconvenience, towing, storage, rental (unless provided elsewhere), or any incidental or consequential expense.</p>
+<p class="num ind2">Commercial and Heavy-Duty Use Eligibility: This Service Contract applies to privately operated passenger vehicles only, unless extended under an approved Commercial / Business Use classification. Coverage may, at A-Protect&#8217;s sole discretion, be extended to Light, Medium, or Heavy Commercial Use vehicles, subject to payment of the applicable surcharge as indicated on the front page or Add-On Schedule.</p>
+<p class="num ind3">a. Light Commercial Use vehicles are automatically eligible upon payment of the applicable surcharge.</p>
+<p class="num ind3">b. Medium Commercial Use vehicles are automatically eligible upon payment of the applicable surcharge.</p>
+<p class="num ind3">c. Heavy Commercial Use vehicles require prior written authorization and are subject to additional conditions or exclusions at A-Protect&#8217;s discretion.</p>
+<p>Vehicles classified as Heavy-Duty (GVWR exceeding 13,600 kilograms / 30,000 pounds) are not eligible for coverage under this Service Contract unless specifically approved in writing by A-Protect.</p>
+<p>Unauthorized Commercial or Heavy-Duty Use of a Covered Vehicle under a non-commercial Service Contract will render this coverage null and void, and no reimbursement shall be payable.</p>
+
+<h3 class="ltr">B. TIRE AND WHEEL DAMAGE EXCLUSIONS</h3>
+<p>Repairs or replacements for tires and/or Alloy Wheels are excluded when, in A-Protect&#8217;s sole discretion, the damage is determined to be:</p>
+<p class="num ind2">Not a direct result of a covered Road Hazard as defined in Part 1;</p>
+<p class="num ind2">Minor or cosmetic in nature and does not render the tire or wheel Unserviceable;</p>
+<p class="num ind2">Beyond the capacity to be safely repaired; or</p>
+<p class="num ind2">Pre-existing or resulting from a defect or condition that existed before the Effective Date.</p>
+<p>Additional exclusions include:</p>
+<p class="num ind2">Tires or wheels covered by a manufacturer&#8217;s Service Contract, goodwill adjustment, recall, or service campaign;</p>
+<p class="num ind2">Damage caused by improper inflation, alignment, suspension defects, or mechanical failure;</p>
+<p class="num ind2">Tires with tread depth of 3/32&quot; (2.4 mm) or less at the time of damage;</p>
+<p class="num ind2">Damage to tires or wheels transferred from another vehicle after the Effective Date;</p>
+<p class="num ind2">Vehicles with Gross Vehicle Weight Rating (GVWR) greater than 13,600 kg (30 000 lbs);</p>
+<p class="num ind2">Damage from collision, accident avoidance, or any impact affecting body, suspension, or frame components.</p>
+<p>If wheel damage is extensive but the wheel still seals properly with its tire, replacement may be considered at A-Protect&#8217;s discretion.</p>
+
+<h3 class="ltr">C. PAINTLESS DENT REPAIR (PDR) AND APPEARANCE LIMITATIONS</h3>
+<p class="num ind2">The PDR process is not applicable to edges or areas where manufacturer bracing prevents tool access.</p>
+<p class="num ind2">Repairs to creased metal or areas where the paint finish is cracked, chipped, or otherwise damaged.</p>
+<p class="num ind2">Repairs where the PDR process could further damage the paint or finish.</p>
+<p class="num ind2">Plastic panels, bumpers, or trim pieces are excluded.</p>
+<p class="num ind2">Cosmetic refinishing is limited to industry-standard reconditioning; exact colour or texture matching is not guaranteed.</p>
+
+<h3 class="ltr">D. GLASS, FABRIC AND INTERIOR EXCLUSIONS</h3>
+<p class="num ind2">Only minor, repairable chips or cracks caused directly by road-hazard debris are eligible.</p>
+<p class="num ind2">Stress cracks exceeding fifteen (15) centimetres are excluded.</p>
+<p class="num ind2">Rips, tears, burns, or punctures that cannot be safely repaired without further damage are excluded.</p>
+<p class="num ind2">Interior wear, fading, or discoloration due to age, sunlight, or chemical exposure is not covered.</p>
+
+<h3 class="ltr">E. OPERATIONAL AND ENVIRONMENTAL EXCLUSIONS</h3>
+<p class="num ind2">Damage resulting from improper maintenance, misuse, negligence, or abuse.</p>
+<p class="num ind2">Corrosion, rust, oxidation, or damage from salt, chemicals, or cleaning products.</p>
+<p class="num ind2">Damage occurring while the vehicle is used for commercial, rideshare, or delivery purposes (including Uber, Lyft, Skip the Dishes, taxi, courier, limousine, emergency, snowplow, racing, or driving school use).</p>
+<p class="num ind2">Damage caused by Acts of God such as hail, flood, freezing, lightning, or other natural disasters.</p>
+<p class="num ind2">Damage or loss due to collision, theft, vandalism, fire, or water intrusion.</p>
+
+<h3 class="ltr">F. ADMINISTRATIVE AND LEGAL EXCLUSIONS</h3>
+<p class="num ind2">False or fraudulent claims, misrepresentation, or submission of falsified documentation.</p>
+<p class="num ind2">Unauthorized or &#8220;Do-It-Yourself (DIY)&#8221; repairs or replacements.</p>
+<p class="num ind2">Misdiagnosis or improper repair by any facility not authorized by A-Protect.</p>
+<p class="num ind2">Damage, injury, or death to any person or entity, and all related legal or incidental costs.</p>
+<p class="num ind2">Vehicles not registered for private passenger use or any vehicle exceeding the GVWR limit above.</p>
+<p class="num ind2">Loss or damage resulting from confiscation, repossession, or seizure under legal authority.</p>
+<p class="num ind2">Claims occurring outside of Canada.</p>
+
+<h3 class="ltr">G. JURISDICTION AND GOVERNING LAW</h3>
+<p>This Service Contract shall be governed by and interpreted under the laws of the Province of Ontario and applicable Canadian law.</p>
+<p>All disputes shall be resolved pursuant to the Ontario Consumer Protection Act and the Motor Vehicle Dealers Act, 2002.</p>
+
+
+<div class="privacy"><p><b>PRIVACY NOTICE:</b> We will collect and retain all personal information concerning Your Contract and Claims. The information will be used for purposes of underwriting, marketing, administration and cancellation of Your Contract and investigation of Claims. We will only access Your file on a need to know basis and it will be kept at our secure location. It can be reviewed and/or rectified by written request. A-Protect Group, its affiliates and their agents may use and share Your personal information with each other so that You can benefit from personalized offers and improved products and services. If You do not wish Your information to be shared within the A-Protect Group, please contact the Administrator.</p></div>
+<div class="ack">ACKNOWLEDGEMENT</div>
+<div class="rule"></div>
+<p>By accepting this Contract, the Contract Holder acknowledges having received, read, and agreed to all Terms and Conditions set out herein.</p>
+
+<table class="sig"><tr>
+  <td><div class="sigline"></div><div class="siglab">Contract Holder Signature</div></td>
+  <td><div class="sigline"></div><div class="siglab">Date</div></td>
+</tr></table>
+<div class="adminfoot">
+  <div>A-Protect Warranty Corporation is the Administrator of this Tire &amp; Rim Vehicle Service Contract.</div>
+  <div>&#169; 2026 A-Protect Warranty Corporation. All rights reserved. Form version 2026-10-06.</div>
+</div>
+
+</body>
+</apex:page>

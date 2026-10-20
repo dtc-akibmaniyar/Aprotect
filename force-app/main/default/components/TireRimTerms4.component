@@ -1,0 +1,83 @@
+<apex:component >
+<h2 class="part">PART 7: COVERAGE LIMITATIONS AND EXCLUSIONS</h2>
+<p>This Service Contract is a discretionary service program. All determinations of eligibility, repairability, and reimbursement are made solely at the discretion of A-Protect Warranty Corporation. Coverage is strictly limited to the services expressly listed in Part 3 of this Service Contract.</p>
+<p>The following limitations and exclusions apply:</p>
+
+<h3 class="ltr">A. GENERAL LIMITATIONS</h3>
+<p class="num ind2">Any representation or promise not expressly stated in this Service Contract.</p>
+<p class="num ind2">Customer non-compliance with any terms or conditions of this Service Contract, including maintenance and claim procedures.</p>
+<p class="num ind2">Services, parts, or conditions not specifically listed in Part 3.</p>
+<p class="num ind2">Failures or damage existing prior to the Effective Date of this Service Contract.</p>
+<p class="num ind2">Normal wear and tear, tread wear, corrosion, fading, or deterioration due to age or mileage.</p>
+<p class="num ind2">Labour, diagnostics, or materials relating to non-covered parts or systems.</p>
+<p class="num ind2">Loss of use, downtime, inconvenience, towing, storage, rental (unless provided elsewhere), or any incidental or consequential expense.</p>
+<p class="num ind2">Commercial and Heavy-Duty Use Eligibility: This Service Contract applies to privately operated passenger vehicles only, unless extended under an approved Commercial / Business Use classification. Coverage may, at A-Protect&#8217;s sole discretion, be extended to Light, Medium, or Heavy Commercial Use vehicles, subject to payment of the applicable surcharge as indicated on the front page or Add-On Schedule.</p>
+<p class="num ind3">a. Light Commercial Use vehicles are automatically eligible upon payment of the applicable surcharge.</p>
+<p class="num ind3">b. Medium Commercial Use vehicles are automatically eligible upon payment of the applicable surcharge.</p>
+<p class="num ind3">c. Heavy Commercial Use vehicles require prior written authorization and are subject to additional conditions or exclusions at A-Protect&#8217;s discretion.</p>
+<p>Vehicles classified as Heavy-Duty (GVWR exceeding 13,600 kilograms / 30,000 pounds) are not eligible for coverage under this Service Contract unless specifically approved in writing by A-Protect.</p>
+<p>Unauthorized Commercial or Heavy-Duty Use of a Covered Vehicle under a non-commercial Service Contract will render this coverage null and void, and no reimbursement shall be payable.</p>
+
+<h3 class="ltr">B. TIRE AND WHEEL DAMAGE EXCLUSIONS</h3>
+<p>Repairs or replacements for tires and/or Alloy Wheels are excluded when, in A-Protect&#8217;s sole discretion, the damage is determined to be:</p>
+<p class="num ind2">Not a direct result of a covered Road Hazard as defined in Part 1;</p>
+<p class="num ind2">Minor or cosmetic in nature and does not render the tire or wheel Unserviceable;</p>
+<p class="num ind2">Beyond the capacity to be safely repaired; or</p>
+<p class="num ind2">Pre-existing or resulting from a defect or condition that existed before the Effective Date.</p>
+<p>Additional exclusions include:</p>
+<p class="num ind2">Tires or wheels covered by a manufacturer&#8217;s Service Contract, goodwill adjustment, recall, or service campaign;</p>
+<p class="num ind2">Damage caused by improper inflation, alignment, suspension defects, or mechanical failure;</p>
+<p class="num ind2">Tires with tread depth of 3/32&quot; (2.4 mm) or less at the time of damage;</p>
+<p class="num ind2">Damage to tires or wheels transferred from another vehicle after the Effective Date;</p>
+<p class="num ind2">Vehicles with Gross Vehicle Weight Rating (GVWR) greater than 13,600 kg (30 000 lbs);</p>
+<p class="num ind2">Damage from collision, accident avoidance, or any impact affecting body, suspension, or frame components.</p>
+<p>If wheel damage is extensive but the wheel still seals properly with its tire, replacement may be considered at A-Protect&#8217;s discretion.</p>
+
+<h3 class="ltr">C. PAINTLESS DENT REPAIR (PDR) AND APPEARANCE LIMITATIONS</h3>
+<p class="num ind2">The PDR process is not applicable to edges or areas where manufacturer bracing prevents tool access.</p>
+<p class="num ind2">Repairs to creased metal or areas where the paint finish is cracked, chipped, or otherwise damaged.</p>
+<p class="num ind2">Repairs where the PDR process could further damage the paint or finish.</p>
+<p class="num ind2">Plastic panels, bumpers, or trim pieces are excluded.</p>
+<p class="num ind2">Cosmetic refinishing is limited to industry-standard reconditioning; exact colour or texture matching is not guaranteed.</p>
+
+<h3 class="ltr">D. GLASS, FABRIC AND INTERIOR EXCLUSIONS</h3>
+<p class="num ind2">Only minor, repairable chips or cracks caused directly by road-hazard debris are eligible.</p>
+<p class="num ind2">Stress cracks exceeding fifteen (15) centimetres are excluded.</p>
+<p class="num ind2">Rips, tears, burns, or punctures that cannot be safely repaired without further damage are excluded.</p>
+<p class="num ind2">Interior wear, fading, or discoloration due to age, sunlight, or chemical exposure is not covered.</p>
+
+<h3 class="ltr">E. OPERATIONAL AND ENVIRONMENTAL EXCLUSIONS</h3>
+<p class="num ind2">Damage resulting from improper maintenance, misuse, negligence, or abuse.</p>
+<p class="num ind2">Corrosion, rust, oxidation, or damage from salt, chemicals, or cleaning products.</p>
+<p class="num ind2">Damage occurring while the vehicle is used for commercial, rideshare, or delivery purposes (including Uber, Lyft, Skip the Dishes, taxi, courier, limousine, emergency, snowplow, racing, or driving school use).</p>
+<p class="num ind2">Damage caused by Acts of God such as hail, flood, freezing, lightning, or other natural disasters.</p>
+<p class="num ind2">Damage or loss due to collision, theft, vandalism, fire, or water intrusion.</p>
+
+<h3 class="ltr">F. ADMINISTRATIVE AND LEGAL EXCLUSIONS</h3>
+<p class="num ind2">False or fraudulent claims, misrepresentation, or submission of falsified documentation.</p>
+<p class="num ind2">Unauthorized or &#8220;Do-It-Yourself (DIY)&#8221; repairs or replacements.</p>
+<p class="num ind2">Misdiagnosis or improper repair by any facility not authorized by A-Protect.</p>
+<p class="num ind2">Damage, injury, or death to any person or entity, and all related legal or incidental costs.</p>
+<p class="num ind2">Vehicles not registered for private passenger use or any vehicle exceeding the GVWR limit above.</p>
+<p class="num ind2">Loss or damage resulting from confiscation, repossession, or seizure under legal authority.</p>
+<p class="num ind2">Claims occurring outside of Canada.</p>
+
+<h3 class="ltr">G. JURISDICTION AND GOVERNING LAW</h3>
+<p>This Service Contract shall be governed by and interpreted under the laws of the Province of Ontario and applicable Canadian law.</p>
+<p>All disputes shall be resolved pursuant to the Ontario Consumer Protection Act and the Motor Vehicle Dealers Act, 2002.</p>
+
+
+<div class="privacy"><p><b>PRIVACY NOTICE:</b> We will collect and retain all personal information concerning Your Contract and Claims. The information will be used for purposes of underwriting, marketing, administration and cancellation of Your Contract and investigation of Claims. We will only access Your file on a need to know basis and it will be kept at our secure location. It can be reviewed and/or rectified by written request. A-Protect Group, its affiliates and their agents may use and share Your personal information with each other so that You can benefit from personalized offers and improved products and services. If You do not wish Your information to be shared within the A-Protect Group, please contact the Administrator.</p></div>
+<div class="ack">ACKNOWLEDGEMENT</div>
+<div class="rule"></div>
+<p>By accepting this Contract, the Contract Holder acknowledges having received, read, and agreed to all Terms and Conditions set out herein.</p>
+
+<table class="sig"><tr>
+  <td><div class="sigline"></div><div class="siglab">Contract Holder Signature</div></td>
+  <td><div class="sigline"></div><div class="siglab">Date</div></td>
+</tr></table>
+<div class="adminfoot">
+  <div>A-Protect Warranty Corporation is the Administrator of this Tire &amp; Rim Vehicle Service Contract.</div>
+  <div>&#169; 2026 A-Protect Warranty Corporation. All rights reserved. Form version 2026-10-06.</div>
+</div>
+</apex:component>

@@ -1,457 +1,463 @@
-<apex:page standardController="Application__c" extensions="ApplicationPDFExtension" renderAs="pdf" applyBodyTag="false" applyHtmlTag="false" showHeader="false" cache="false" standardStylesheets="false">
-<html>
-<head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
-    <style type="text/css">
-        @page {
-            size: letter;
-            margin: 0.45in 0.5in 0.55in 0.5in;
-            @bottom-left {
-                content: "{!$Label.Application_PDF_Footer_Contract_Number_Label} {!Application__c.Name}  |  {!$Label.Application_PDF_Footer_Application_Number_Label} {!Application__c.Name}  |  {!$Label.Application_PDF_Footer_GST_HST_Label} 832142467RT0001";
-                font-family: Arial, Helvetica, sans-serif;
-                font-size: 6.5pt;
-                color: #000;
-                border-top: 1px solid #999;
-                padding-top: 3px;
-                vertical-align: top;
-                width: 70%;
-            }
-            @bottom-right {
-                content: "{!$Label.Application_PDF_Footer_Page} " counter(page) " {!$Label.Application_PDF_Footer_Of} " counter(pages) "  |  {!$Label.Application_PDF_Footer_Printed_On} {!printedOn}";
-                font-family: Arial, Helvetica, sans-serif;
-                font-size: 6.5pt;
-                color: #000;
-                border-top: 1px solid #999;
-                padding-top: 3px;
-                vertical-align: top;
-                text-align: right;
-                width: 30%;
-            }
-        }
-        * { box-sizing: border-box; }
-        body { font-family: Arial, Helvetica, sans-serif; font-size: 8.5pt; line-height: 1.3; color: #000; margin: 0; padding: 0; }
-        .header-wrap { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-        .logo-cell { width: 50%; vertical-align: top; }
-        .logo-info { font-size: 7.5pt; margin-top: 5px; line-height: 1.5; }
-        .title-cell { width: 50%; vertical-align: top; text-align: right; }
-        .doc-title  { font-size: 12pt; font-weight: bold; color: #5184B8; }
-        .doc-notice { font-size: 7pt; margin-top: 5px; line-height: 1.4; }
-        .privacy { background: #f2f2f2; border: 1px solid #bbb; padding: 5px 7px; font-size: 6.8pt; line-height: 1.4; margin-bottom: 8px; }
-        .sec-hdr { background-color: #5184B8; color: #fff; font-weight: bold; font-size: 8.5pt; padding: 4px 7px; margin: 9px 0 3px 0; }
-        .sub-hdr { background-color: #5184B8; color: #fff; font-weight: bold; font-size: 8pt; padding: 3px 7px; margin: 7px 0 3px 0; }
-        .dtbl { width: 100%; border-collapse: collapse; margin-bottom: 5px; border: 1px solid #aaa; }
-        .dtbl td { border: 1px solid #aaa; padding: 3px 5px; vertical-align: top; font-size: 8pt; }
-        .lbl { font-weight: bold; background: #f5f5f5; width: 23%; white-space: nowrap; }
-        .val { width: 27%; }
-        .note { font-size: 7.5pt; margin: 4px 0; }
-        .bold { font-weight: bold; }
-        .ital { font-style: italic; }
-        ul { margin: 3px 0 3px 16px; padding: 0; }
-        ol { margin: 3px 0 3px 8px; padding: 0 0 0 20px; }
-        li { margin: 2px 0; font-size: 8pt; }
-        p  { margin: 4px 0; font-size: 8pt; }
-        .center { text-align: center; }
-        .tc-body { font-size: 7.8pt; line-height: 1.4; }
-        .cov-name { font-weight: bold; font-size: 8pt; margin-top: 5px; }
-        .indent { margin-left: 10px; }
-        .page-break { page-break-after: always; }
-    </style>
+<apex:page standardController="Application__c" extensions="ApplicationPDFExtension"
+    renderAs="pdf" applyBodyTag="false" applyHtmlTag="false" showHeader="false"
+    standardStylesheets="false" cache="false" language="en-US">
+<html><head>
+<style type="text/css">
+  @page { size: 8.5in 11in; }
+  body { margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; font-size: 6.7pt; color:#111111; line-height:1.22; }
+  p { margin: 0 0 3px 0; text-align: justify; }
+  .runhead { width:100%; border-bottom: 0.7pt solid #c9cfda; padding-bottom: 3px; margin-bottom: 6px; }
+  .runhead td { vertical-align: bottom; }
+  .rh1 { font-size: 5.4pt; letter-spacing: 0.9pt; color: #506590; font-weight: bold; text-transform: uppercase; }
+  .rh2 { font-size: 8.6pt; letter-spacing: 0.5pt; color: #506590; font-weight: bold; margin-top: 1px; }
+  .notice { background:#e2e6ee; border: 0.5pt solid #b9c0d0; padding: 5px 0; text-align:center;
+            font-size: 7.5pt; font-weight: bold; color:#506590; letter-spacing: 0.4pt; margin: 0 0 6px 0; }
+  h2.part { font-size: 8.1pt; font-weight: bold; color:#506590; margin: 8px 0 3px 0; padding-left: 6px;
+            border-left: 2.2pt solid #506590; line-height: 1.25; page-break-after: avoid; }
+  h3.ltr { font-size: 6.9pt; font-weight: bold; color:#111111; margin: 7px 0 3px 0; page-break-after: avoid; }
+  h4.cmp { font-size: 6.8pt; font-weight: bold; color:#111111; margin: 6px 0 2px 0; page-break-after: avoid; }
+  p.lead { margin-bottom: 3px; }
+  p.num { margin-bottom: 3px; }
+  p.sub { font-style: italic; margin-bottom: 2px; }
+  p.def { border-bottom: 0.5pt solid #dfe2e8; padding-bottom: 2.5px; margin-bottom: 2.5px; }
+  .bl { display:block; margin: 0 0 3px 0; }
+  .ind { padding-left: 10px; }
+  .ind2 { padding-left: 20px; }
+  .ind3 { padding-left: 34px; }
+  table.maint { width:100%; border-collapse: collapse; margin: 2px 0 6px 0; }
+  table.maint td { width:50%; vertical-align: top; padding: 3px 8px 3px 0; border-top: 0.5pt solid #c9cfda; }
+  table.contact { width:100%; border-collapse: collapse; border: 0.5pt solid #c9cfda; margin: 3px 0 7px 0; }
+  table.contact td { vertical-align: top; padding: 6px 8px; font-size: 6.5pt; }
+  table.contact td.c1 { border-right: 0.5pt solid #c9cfda; width: 26%; }
+  table.contact td.c2 { border-right: 0.5pt solid #c9cfda; width: 32%; }
+  .clab { font-size: 5.4pt; letter-spacing: 0.8pt; color:#506590; font-weight: bold; text-transform: uppercase; }
+  .cval { font-size: 9.2pt; font-weight: bold; color:#111111; }
+  .privacy { background:#e2e6ee; border-left: 2.2pt solid #506590; padding: 6px 8px; margin: 8px 0 8px 0; }
+  .privacy p { font-size: 6.1pt; margin: 0 0 2px 0; text-align: justify; }
+  .ack { font-size: 8.1pt; font-weight: bold; color:#111111; margin: 10px 0 3px 0; }
+  .rule { border-top: 0.7pt solid #c9cfda; margin: 0 0 5px 0; }
+  table.sig { width:100%; border-collapse: collapse; margin-top: 16px; }
+  table.sig td { width:50%; vertical-align: bottom; padding: 0 14px 0 0; }
+  .sigline { border-top: 0.6pt solid #111111; height: 15px; }
+  .siglab { font-size: 6.4pt; color:#3f4a5c; padding-top: 2px; }
+  .adminfoot { text-align:center; font-size: 6.2pt; color:#3f4a5c; margin-top: 12px; }
+  .adminfoot div { margin: 1px 0; }
+</style>
+<style type="text/css">
+@page {
+  size: letter;
+  margin: 0.40in 0.50in 0.60in 0.50in;
+  @bottom-left {
+    content: "CONTRACT NUMBER: {!Application__c.Name}   |   APPLICATION NUMBER: {!Application__c.Name}   |   HST #: 83214 2467 RT0001";
+    font-family: Arial, Helvetica, sans-serif; font-size: 5.2pt; color: #3f4a5c;
+    vertical-align: top; border-top: 0.6pt solid #c9cfda; padding-top: 4px; width: 62%;
+  }
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages) "   |   Printed on: {!printedOn}";
+    font-family: Arial, Helvetica, sans-serif; font-size: 5.2pt; color: #3f4a5c;
+    vertical-align: top; border-top: 0.6pt solid #c9cfda; padding-top: 4px; text-align: right; width: 38%;
+  }
+}
+body { margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; font-size: 6.7pt; color:#111111; line-height:1.25; }
+table { border-collapse: collapse; }
+.hdr { width:100%; margin: 0 0 2px 0; table-layout: fixed; }
+.hdr td { vertical-align: top; }
+.doctitle { font-size: 11.5pt; font-weight: bold; color:#506590; letter-spacing: -0.1pt; line-height:1.12; }
+.doccontact { font-size: 5.9pt; color:#3f4a5c; margin-top: 2px; line-height:1.35; }
+.badge { background:#506590; color:#ffffff; padding: 4px 8px 5px 8px; text-align:center; }
+.badge .bl { font-size: 5.3pt; letter-spacing: 1.0pt; color:#eef1f6; }
+.badge .bv { font-size: 12.6pt; font-weight: bold; letter-spacing: 0.2pt; margin-top: 1px; }
+.hdrrule { border-top: 1.2pt solid #506590; margin: 4px 0 0 0; }
+.titlebar { background:#506590; color:#ffffff; text-align:center; font-size: 8.4pt; font-weight: bold;
+            letter-spacing: 3.2pt; padding: 3.5px 0 3.5px 0; margin: 4px 0 5px 0; }
+.sec { margin: 5px 0 1px 0; }
+.secnum { display:inline-block; width: 11px; height: 11px; background:#506590; color:#ffffff; border-radius: 6px;
+          text-align:center; font-size: 6.4pt; font-weight: bold; line-height: 11px; margin-right: 5px; }
+.sectitle { font-size: 8.4pt; font-weight: bold; color:#111111; letter-spacing: 0.2pt; }
+.secrule { border-top: 0.6pt solid #111111; margin: 2px 0 4px 0; }
+.note { font-size: 5.9pt; font-style: italic; color:#3f4a5c; margin: 3px 0 4px 0; }
+table.kv { width:100%; margin: 0; }
+table.kv td { vertical-align: top; padding: 2.3px 6px 2.3px 0; border-bottom: 0.5pt solid #dfe2e8; font-size: 6.7pt; }
+table.kv td.lb { color:#3f4a5c; width: 20%; }
+table.kv td.vl { font-weight: bold; width: 28%; }
+table.kv td.lb2 { color:#3f4a5c; width: 20%; }
+table.kv td.vl2 { font-weight: bold; width: 32%; }
+table.kv4 { width:100%; margin:0; }
+table.kv4 td { vertical-align: top; padding: 2.3px 6px 2.3px 0; border-bottom: 0.5pt solid #dfe2e8; font-size: 6.7pt; }
+table.kv4 td.lb { color:#3f4a5c; width: 11%; }
+table.kv4 td.vl { font-weight: bold; width: 14%; }
+table.kv4 td.nw { white-space: nowrap; }
+table.kv6 { width:100%; margin:0; }
+table.kv6 td { vertical-align: top; padding: 2.3px 6px 2.3px 0; border-bottom: 0.5pt solid #dfe2e8; font-size: 6.7pt; }
+table.kv6 td.lb { color:#3f4a5c; width: 12%; }
+table.kv6 td.vl { font-weight: bold; width: 21%; }
+table.kv6 td.lb2 { color:#3f4a5c; width: 15%; }
+table.kv6 td.vl2 { font-weight: bold; width: 15%; }
+.premium { width:100%; margin: 5px 0 3px 0; border-top: 0.7pt solid #111111; border-bottom: 0.7pt solid #111111; }
+.premium td { padding: 3.4px 4px 3.4px 0; font-size: 6.7pt; }
+.premium td.total { text-align: right; font-weight: bold; font-size: 7.6pt; }
+.premium td.totlab { text-align: right; color:#111111; }
+div.box { background:#dcdcdc; padding: 3px 7px 4px 7px; margin: 2px 0 3px 0; }
+div.box .imp { color:#b42317; font-weight: bold; font-size: 6.7pt; }
+div.box p { margin: 0 0 2px 0; font-style: italic; font-size: 6.3pt; line-height:1.3; }
+div.box ol { margin: 2px 0 0 13px; padding: 0; }
+div.box li { font-size: 6.15pt; font-style: italic; line-height:1.3; margin-bottom: 1px; }
+.ck { font-size: 6.0pt; font-style: italic; color:#111111; margin: 3px 0 3px 0; line-height:1.27; }
+table.sig { width:100%; margin-top: 2px; }
+table.sig td { vertical-align: bottom; padding: 0 16px 0 0; }
+.sigline { border-top: 0.6pt solid #111111; height: 11px; }
+.siglab { font-size: 6.1pt; color:#3f4a5c; padding-top: 2px; letter-spacing: 0.3pt; }
+.ln2 { display:block; font-weight: normal; font-size: 6.1pt; color:#3f4a5c; line-height:1.25; }
+</style>
+<style type="text/css">
+  @page { size: 8.5in 11in; }
+.tr body{ margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; font-size: 6.7pt; color:#111111; line-height:1.22; }
+.tr p{ margin: 0 0 3px 0; text-align: justify; }
+.tr .runhead{ width:100%; border-bottom: 0.7pt solid #c9cfda; padding-bottom: 3px; margin-bottom: 6px; }
+.tr .runhead td{ vertical-align: bottom; }
+.tr .rh1{ font-size: 5.4pt; letter-spacing: 0.9pt; color: #b3121f; font-weight: bold; text-transform: uppercase; }
+.tr .rh2{ font-size: 8.6pt; letter-spacing: 0.5pt; color: #b3121f; font-weight: bold; margin-top: 1px; }
+.tr .notice{ background:#e2e6ee; border: 0.5pt solid #b9c0d0; padding: 5px 0; text-align:center;
+            font-size: 7.5pt; font-weight: bold; color:#b3121f; letter-spacing: 0.4pt; margin: 0 0 6px 0; }
+.tr h2.part{ font-size: 8.1pt; font-weight: bold; color:#b3121f; margin: 8px 0 3px 0; padding-left: 6px;
+            border-left: 2.2pt solid #b3121f; line-height: 1.25; page-break-after: avoid; }
+.tr h3.ltr{ font-size: 6.9pt; font-weight: bold; color:#111111; margin: 7px 0 3px 0; page-break-after: avoid; }
+.tr h4.cmp{ font-size: 6.8pt; font-weight: bold; color:#111111; margin: 6px 0 2px 0; page-break-after: avoid; }
+.tr p.lead{ margin-bottom: 3px; }
+.tr p.num{ margin-bottom: 3px; }
+.tr p.sub{ font-style: italic; margin-bottom: 2px; }
+.tr p.def{ border-bottom: 0.5pt solid #dfe2e8; padding-bottom: 2.5px; margin-bottom: 2.5px; }
+.tr .bl{ display:block; margin: 0 0 3px 0; }
+.tr .ind{ padding-left: 10px; }
+.tr .ind2{ padding-left: 20px; }
+.tr .ind3{ padding-left: 34px; }
+.tr table.maint{ width:100%; border-collapse: collapse; margin: 2px 0 6px 0; }
+.tr table.maint td{ width:50%; vertical-align: top; padding: 3px 8px 3px 0; border-top: 0.5pt solid #c9cfda; }
+.tr table.contact{ width:100%; border-collapse: collapse; border: 0.5pt solid #c9cfda; margin: 3px 0 7px 0; }
+.tr table.contact td{ vertical-align: top; padding: 6px 8px; font-size: 6.5pt; }
+.tr table.contact td.c1{ border-right: 0.5pt solid #c9cfda; width: 26%; }
+.tr table.contact td.c2{ border-right: 0.5pt solid #c9cfda; width: 32%; }
+.tr .clab{ font-size: 5.4pt; letter-spacing: 0.8pt; color:#b3121f; font-weight: bold; text-transform: uppercase; }
+.tr .cval{ font-size: 9.2pt; font-weight: bold; color:#111111; }
+.tr .privacy{ background:#e2e6ee; border-left: 2.2pt solid #b3121f; padding: 6px 8px; margin: 8px 0 8px 0; }
+.tr .privacy p{ font-size: 6.1pt; margin: 0 0 2px 0; text-align: justify; }
+.tr .ack{ font-size: 8.1pt; font-weight: bold; color:#111111; margin: 10px 0 3px 0; }
+.tr .rule{ border-top: 0.7pt solid #c9cfda; margin: 0 0 5px 0; }
+.tr table.sig{ width:100%; border-collapse: collapse; margin-top: 16px; }
+.tr table.sig td{ width:50%; vertical-align: bottom; padding: 0 14px 0 0; }
+.tr .sigline{ border-top: 0.6pt solid #111111; height: 15px; }
+.tr .siglab{ font-size: 6.4pt; color:#3f4a5c; padding-top: 2px; }
+.tr .adminfoot{ text-align:center; font-size: 6.2pt; color:#3f4a5c; margin-top: 12px; }
+.tr .adminfoot div{ margin: 1px 0; }</style>
+<style type="text/css">
+@page {
+  size: letter;
+  margin: 0.40in 0.50in 0.60in 0.50in;
+  @bottom-left {
+    content: "CONTRACT NUMBER: {!Application__c.Name}   |   APPLICATION NUMBER: {!Application__c.Name}   |   HST #: 83214 2467 RT0001";
+    font-family: Arial, Helvetica, sans-serif; font-size: 5.2pt; color: #3f4a5c;
+    vertical-align: top; border-top: 0.6pt solid #c9cfda; padding-top: 4px; width: 62%;
+  }
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages) "   |   Printed on:{!printedOn}";
+    font-family: Arial, Helvetica, sans-serif; font-size: 5.2pt; color: #3f4a5c;
+    vertical-align: top; border-top: 0.6pt solid #c9cfda; padding-top: 4px; text-align: right; width: 38%;
+  }
+}
+.tp body{ margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; font-size: 6.7pt; color:#111111; line-height:1.25; }
+.tp table{ border-collapse: collapse; }
+.tp .hdr{ width:100%; margin: 0 0 2px 0; table-layout: fixed; }
+.tp .hdr td{ vertical-align: top; }
+.tp .doctitle{ font-size: 11.5pt; font-weight: bold; color:#b3121f; letter-spacing: -0.1pt; line-height:1.12; }
+.tp .doccontact{ font-size: 5.9pt; color:#3f4a5c; margin-top: 2px; line-height:1.35; }
+.tp .badge{ background:#b3121f; color:#ffffff; padding: 4px 8px 5px 8px; text-align:center; }
+.tp .badge .bl{ font-size: 5.3pt; letter-spacing: 1.0pt; color:#eef1f6; }
+.tp .badge .bv{ font-size: 12.6pt; font-weight: bold; letter-spacing: 0.2pt; margin-top: 1px; }
+.tp .hdrrule{ border-top: 1.2pt solid #b3121f; margin: 4px 0 0 0; }
+.tp .titlebar{ background:#b3121f; color:#ffffff; text-align:center; font-size: 8.4pt; font-weight: bold;
+            letter-spacing: 3.2pt; padding: 3.5px 0 3.5px 0; margin: 4px 0 5px 0; }
+.tp .sec{ margin: 5px 0 1px 0; }
+.tp .secnum{ display:inline-block; width: 11px; height: 11px; background:#b3121f; color:#ffffff; border-radius: 6px;
+          text-align:center; font-size: 6.4pt; font-weight: bold; line-height: 11px; margin-right: 5px; }
+.tp .sectitle{ font-size: 8.4pt; font-weight: bold; color:#111111; letter-spacing: 0.2pt; }
+.tp .secrule{ border-top: 0.6pt solid #111111; margin: 2px 0 4px 0; }
+.tp .note{ font-size: 5.9pt; font-style: italic; color:#3f4a5c; margin: 3px 0 4px 0; }
+.tp table.kv{ width:100%; margin: 0; }
+.tp table.kv td{ vertical-align: top; padding: 2.3px 6px 2.3px 0; border-bottom: 0.5pt solid #dfe2e8; font-size: 6.7pt; }
+.tp table.kv td.lb{ color:#3f4a5c; width: 20%; }
+.tp table.kv td.vl{ font-weight: bold; width: 28%; }
+.tp table.kv td.lb2{ color:#3f4a5c; width: 20%; }
+.tp table.kv td.vl2{ font-weight: bold; width: 32%; }
+.tp table.kv4{ width:100%; margin:0; }
+.tp table.kv4 td{ vertical-align: top; padding: 2.3px 6px 2.3px 0; border-bottom: 0.5pt solid #dfe2e8; font-size: 6.7pt; }
+.tp table.kv4 td.lb{ color:#3f4a5c; width: 11%; }
+.tp table.kv4 td.vl{ font-weight: bold; width: 14%; }
+.tp table.kv4 td.nw{ white-space: nowrap; }
+.tp table.kv6{ width:100%; margin:0; }
+.tp table.kv6 td{ vertical-align: top; padding: 2.3px 6px 2.3px 0; border-bottom: 0.5pt solid #dfe2e8; font-size: 6.7pt; }
+.tp table.kv6 td.lb{ color:#3f4a5c; width: 12%; }
+.tp table.kv6 td.vl{ font-weight: bold; width: 21%; }
+.tp table.kv6 td.lb2{ color:#3f4a5c; width: 15%; }
+.tp table.kv6 td.vl2{ font-weight: bold; width: 15%; }
+.tp .premium{ width:100%; margin: 5px 0 3px 0; border-top: 0.7pt solid #111111; border-bottom: 0.7pt solid #111111; }
+.tp .premium td{ padding: 3.4px 4px 3.4px 0; font-size: 6.7pt; }
+.tp .premium td.total{ text-align: right; font-weight: bold; font-size: 7.6pt; }
+.tp .premium td.totlab{ text-align: right; color:#111111; }
+.tp div.box{ background:#dcdcdc; padding: 3px 7px 4px 7px; margin: 2px 0 3px 0; }
+.tp div.box .imp{ color:#b42317; font-weight: bold; font-size: 6.7pt; }
+.tp div.box p{ margin: 0 0 2px 0; font-style: italic; font-size: 6.3pt; line-height:1.3; }
+.tp div.box ol{ margin: 2px 0 0 13px; padding: 0; }
+.tp div.box li{ font-size: 6.15pt; font-style: italic; line-height:1.3; margin-bottom: 1px; }
+.tp .ck{ font-size: 6.0pt; font-style: italic; color:#111111; margin: 3px 0 3px 0; line-height:1.27; }
+.tp table.sig{ width:100%; margin-top: 2px; }
+.tp table.sig td{ vertical-align: bottom; padding: 0 16px 0 0; }
+.tp .sigline{ border-top: 0.6pt solid #111111; height: 11px; }
+.tp .siglab{ font-size: 6.1pt; color:#3f4a5c; padding-top: 2px; letter-spacing: 0.3pt; }
+.tp .ln2{ display:block; font-weight: normal; font-size: 6.1pt; color:#3f4a5c; line-height:1.25; }</style>
 </head>
 <body>
-<apex:repeat value="{!recordTypeWrappersList}" var="recordTypeWrapper">
-    <apex:repeat value="{!recordTypeWrapper.packages}" var="wrapper">
+<apex:repeat value="{!recordTypeWrappersList}" var="rw"><apex:repeat value="{!rw.packages}" var="w">
+<apex:outputPanel rendered="{!NOT(w.isTireRim)}">
 
-        <!-- ==================== HEADER ==================== -->
-        <table class="header-wrap">
-            <tr>
-                <td class="logo-cell">
-                    <apex:outputPanel layout="none" rendered="{!hasDealerLogo}">
-                        <img src="{!dealerLogoUrl}" style="width:133px; height:auto;" alt="{!dealerName}"/>
-                    </apex:outputPanel>
-                    <apex:outputPanel layout="none" rendered="{!NOT(hasDealerLogo)}">
-                        <img src="{!URLFOR($Resource.AProtectLogo)}" style="width:133px; height:auto;" alt="{!$Label.Application_PDF_Company_Name}"/>
-                    </apex:outputPanel>
-                    <div class="logo-info" style="margin-top:5px;">
-                        <apex:outputPanel layout="none" rendered="{!hasDealerLogo}">
-                            {!dealerName}<br/>
-                            {!dealerAddress}<br/>
-                            Tel: {!dealerPhone}<br/>
-                            {!dealerEmail}
-                        </apex:outputPanel>
-                        <apex:outputPanel layout="none" rendered="{!NOT(hasDealerLogo)}">
-                            {!$Label.Application_PDF_Company_Address_Line1}<br/>
-                            {!$Label.Application_PDF_Company_Address_Line2}<br/>
-                            {!$Label.Application_PDF_Company_Phone}<br/>
-                            {!$Label.Application_PDF_Company_Email}<br/>
-                            {!$Label.Application_PDF_HST_Label} 832142467RT0001
-                        </apex:outputPanel>
-                    </div>
-                </td>
-                <td class="title-cell">
-                    <div class="doc-title">{!$Label.Application_PDF_Document_Title}</div>
-                    <div class="doc-notice">
-                        {!$Label.Application_PDF_Document_Notice}
-                    </div>
-                </td>
-            </tr>
-        </table>
 
-        <div class="privacy">
-            <span class="bold">{!$Label.Application_PDF_Privacy_Notice_Title}</span> {!$Label.Application_PDF_Privacy_Notice_Body}
-        </div>
 
-        <!-- ==================== SECTION 1: CONTRACT INFORMATION ==================== -->
-        <div class="sec-hdr">{!$Label.Application_PDF_Section1_Title}</div>
-        <table class="dtbl">
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Contract_Number_Label}</td><td class="val">{!Application__c.Name}</td>
-                <td class="lbl">{!$Label.Application_PDF_Status_Label}</td><td class="val">{!Application__c.Application_Status__c}</td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Program_Label}</td><td class="val">{!wrapper.renderedPlanName}</td>
-                <td class="lbl">{!$Label.Application_PDF_Term_Label}</td><td class="val">{!wrapper.renderedTermName}</td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Mileage_Label}</td><td class="val">{!wrapper.mileageDisplay}</td>
-                <td class="lbl">{!$Label.Application_PDF_Deductible_Label}</td><td class="val">{!wrapper.deductibleDisplay}</td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Per_Claim_Limit_Label}</td><td class="val">{!wrapper.perClaimLimitDisplay}</td>
-                <td class="lbl">{!$Label.Application_PDF_Liability_Limit_Label}</td>
-                <td class="val">{!wrapper.liabilityDisplay} <span style="font-size:6.8pt;">{!$Label.Application_PDF_Liability_Note}</span></td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Premium_Label}</td><td class="val">{!wrapper.premiumWithoutTaxDisplay}</td>
-                <td class="lbl">{!$Label.Application_PDF_Premium_Plus_Tax_Label}</td><td class="val">{!wrapper.taxDisplay}</td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_PST_QST_RST_Label}</td><td class="val">$0.00</td>
-                <td class="lbl">{!$Label.Application_PDF_Total_Premium_Label}</td><td class="val"><span class="bold">{!wrapper.totalPremiumDisplay}</span></td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Commencement_Date_Label}</td><td class="val">{!wrapper.contractStartDateDisplay}</td>
-                <td class="lbl">{!$Label.Application_PDF_Expiration_Date_Label}</td><td class="val">{!wrapper.contractEndDateDisplay}</td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Commencement_Odometer_Label}</td><td class="val">{!wrapper.odometerStartDisplay}</td>
-                <td class="lbl">{!$Label.Application_PDF_Expiration_Odometer_Label}</td><td class="val">{!wrapper.odometerEndDisplay}</td>
-            </tr>
-        </table>
-        <div class="note">{!$Label.Application_PDF_Section1_Note}</div>
+<table class="hdr"><tr>
+  <td style="width:1.00in"><img src="{!$Resource.AProtectFullLogo}" style="width:0.93in" /></td>
+  <td>
+    <div class="doctitle">Extended Warranty Vehicle Service Contract</div>
+    <div class="doccontact">1-866-660-6444 &#183; Tel: 416-661-7444 &#183; info@a-protectwarranty.com</div>
+    <div class="doccontact">8800 Dufferin St. Suite 302B, Concord, ON L4K 0C5 &#183; HST #: 832142467RT0001</div>
+  </td>
+  <td style="width:1.15in; text-align:right;"><img src="{!$Resource.WarrantyHero}" style="width:1.05in" /></td>
+  <td style="width:1.75in; padding-left:10px;">
+    <div class="badge"><div class="bl">CONTRACT NO.</div><div class="bv">{!Application__c.Name}</div></div>
+  </td>
+</tr></table>
+<div class="hdrrule"></div>
+<div class="titlebar">APPLICATION</div>
 
-        <!-- ==================== SECTION 2: REGISTERED OWNER ==================== -->
-        <div class="sec-hdr">{!$Label.Application_PDF_Section2_Title}</div>
-        <table class="dtbl">
-            <tr><td class="lbl">{!$Label.Application_PDF_Owner_Name_Label}</td><td colspan="3">{!Application__c.Customer_Last_Name__c}, {!Application__c.Customer_First_Name__c}</td></tr>
-            <tr><td class="lbl">{!$Label.Application_PDF_Owner_Address_Label}</td><td colspan="3">{!Application__c.Customer_Address__c}</td></tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Owner_Primary_Phone_Label}</td><td class="val">{!Application__c.Customer_Phone__c}</td>
-                <td class="lbl">{!$Label.Application_PDF_Owner_Secondary_Phone_Label}</td><td>{!Application__c.Customer_Business_Phone__c}</td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Owner_Email_Label}</td><td class="val">{!Application__c.Customer_Email__c}</td>
-                <td class="lbl">{!$Label.Application_PDF_Owner_Lienholder_Label}</td><td>{!Application__c.Financial_Institution_Lender__c}</td>
-            </tr>
-        </table>
+<div class="sec"><span class="secnum">1</span><span class="sectitle">CONTRACT INFORMATION</span></div>
+<div class="secrule"></div>
+<div class="note">It is the responsibility of the Contract Holder to check that the coverage listed on this document agrees with the original Application given to You by the Selling Dealer. Any discrepancies must be reported to A-Protect immediately.</div>
+<table class="kv">
+  <tr><td class="lb">Contract Number</td><td class="vl">{!Application__c.Name}</td>
+      <td class="lb2">Status</td><td class="vl2">{!Application__c.Application_Status__c}</td></tr>
+  <tr><td class="lb">Program</td><td class="vl">{!w.renderedPlanName}</td>
+      <td class="lb2">Term (months)</td><td class="vl2">{!w.renderedTermName}</td></tr>
+  <tr><td class="lb">Per Claim Limit</td><td class="vl">{!w.perClaimLimitDisplay}</td>
+      <td class="lb2">Deductible</td><td class="vl2">{!w.deductibleDisplay}</td></tr>
+  <tr><td class="lb">Liability Limit</td><td class="vl">{!w.liabilityDisplay}</td>
+      <td class="lb2">&#160;</td><td class="vl2">&#160;</td></tr>
+  <tr><td class="lb">&#160;</td><td colspan="3" style="font-size:5.9pt; color:#3f4a5c; font-weight:normal;">Total liability equals the purchase price of the vehicle before taxes.</td></tr>
+  <tr><td class="lb">Contract Start Date</td><td class="vl">{!w.contractStartDateDisplay}</td>
+      <td class="lb2">Contract Expiration Date</td><td class="vl2">{!w.contractEndDateDisplay}</td></tr>
+  <tr><td class="lb">Contract Start Odometer</td><td class="vl">{!w.odometerStartDisplay}</td>
+      <td class="lb2">Contract Expiration Odometer</td><td class="vl2">{!w.odometerEndDisplay}</td></tr>
+</table>
+<table class="premium"><tr>
+  <td>Contract Premium <b>{!w.premiumWithoutTaxDisplay}</b></td>
+  <td>GST/HST <b>{!w.taxDisplay}</b></td>
+  <td>PST/QST/RST <b>$0.00</b></td>
+  <td class="totlab">Total Premium</td><td class="total">{!w.totalPremiumDisplay}</td>
+</tr></table>
+<div class="note" style="font-style:normal;">Coverage begins on the Contract Start Date and odometer reading listed above, and ends on the Contract Expiration Date or when the vehicle reaches the Contract Expiration Odometer reading, whichever comes first.</div>
 
-        <!-- ==================== SECTION 3: VEHICLE ==================== -->
-        <div class="sec-hdr">{!$Label.Application_PDF_Section3_Title}</div>
-        <table class="dtbl">
-            <tr><td class="lbl">{!$Label.Application_PDF_Vehicle_VIN_Label}</td><td colspan="3">{!Application__c.Vehicle_VIN__c}</td></tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Vehicle_Year_Label}</td><td class="val">{!Application__c.Vehicle_Year__c}</td>
-                <td class="lbl">{!$Label.Application_PDF_Vehicle_Make_Label}</td><td>{!Application__c.Vehicle_Make__c}</td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Vehicle_Model_Label}</td><td class="val">{!Application__c.Vehicle_Model__c}</td>
-                <td class="lbl">{!$Label.Application_PDF_Vehicle_Purchase_Price_Label}</td>
-                <td>$<apex:outputText value="{0,number,###,##0.00}"><apex:param value="{!Application__c.Vehicle_Purchase_Price__c}"/></apex:outputText></td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Vehicle_Odometer_Label}</td>
-                <td class="val"><apex:outputText value="{0,number,###,###}"><apex:param value="{!Application__c.Odometer__c}"/></apex:outputText>&#160;{!Application__c.Odometer_Unit__c}</td>
-                <td></td><td></td>
-            </tr>
-        </table>
-        <div class="note">{!$Label.Application_PDF_Section3_Note}</div>
+<div class="sec"><span class="secnum">2</span><span class="sectitle">CUSTOMER / REGISTERED VEHICLE OWNER</span></div>
+<div class="secrule"></div>
+<table class="kv">
+  <tr><td class="lb">Customer Name</td>
+      <td class="vl"><apex:outputText value="{!UPPER(Application__c.Customer_Last_Name__c)}" /><apex:outputText value=", " rendered="{!NOT(ISBLANK(Application__c.Customer_First_Name__c))}" /><apex:outputText value="{!UPPER(Application__c.Customer_First_Name__c)}" /></td>
+      <td class="lb2">Company / Business Name</td><td class="vl2">{!Application__c.Company_Business__c}</td></tr>
+  <tr><td class="lb">Address</td><td colspan="3">{!Application__c.Customer_Address__c}</td></tr>
+  <tr><td class="lb">Primary Phone</td><td class="vl">{!Application__c.Customer_Phone__c}</td>
+      <td class="lb2">Secondary Phone</td><td class="vl2">{!Application__c.Customer_Business_Phone__c}</td></tr>
+  <tr><td class="lb">Email</td><td class="vl">{!Application__c.Customer_Email__c}</td>
+      <td class="lb2">Lienholder (if applicable)</td>
+      <td class="vl2">{!Application__c.Financial_Institution_Lender__c}<span class="ln2">{!Application__c.Lender_Address__c}</span></td></tr>
+  <tr><td class="lb">Secondary Owner Name</td><td class="vl">{!Application__c.Co_Buyer__r.Name}</td>
+      <td class="lb2">Secondary Owner Email</td><td class="vl2">&#160;</td></tr>
+</table>
 
-        <!-- ==================== PACKAGE DETAILS (record-type branch) ==================== -->
-        <apex:outputPanel layout="none" rendered="{!NOT(wrapper.isTireRim)}">
-            <div class="sub-hdr">Manufacturer Warranty</div>
-            <table class="dtbl">
-                <tr>
-                    <td class="lbl">Warranty Type:</td><td class="val">{!Application__c.Vehicle__r.Manufacturer_Warranty_Type__c}</td>
-                    <td class="lbl">Warranty Term:</td><td>{!Application__c.Vehicle__r.Warranty_Term__c}</td>
-                </tr>
-                <tr>
-                    <td class="lbl">In-Service Date:</td>
-                    <td class="val"><apex:outputText value="{0,date,MMM d, yyyy}"><apex:param value="{!Application__c.Vehicle__r.In_Service_Date__c}"/></apex:outputText></td>
-                    <td class="lbl"></td><td></td>
-                </tr>
-            </table>
-        </apex:outputPanel>
-        <apex:outputPanel layout="none" rendered="{!wrapper.isTireRim}">
-            <div class="sub-hdr">Tire &amp; Rim Details</div>
-            <table class="dtbl">
-                <tr>
-                    <td class="lbl">Tire Brand:</td><td class="val">{!wrapper.pkg.Tire_Brand__c}</td>
-                    <td class="lbl">Tire Type:</td><td>{!wrapper.pkg.Tire_Type__c}</td>
-                </tr>
-                <tr>
-                    <td class="lbl">Tread Depth:</td><td class="val">{!wrapper.pkg.Tread_Depth__c}&#160;{!wrapper.pkg.Tread_Depth_Unit__c}</td>
-                    <td class="lbl">Rim Brand:</td><td>{!wrapper.pkg.Rim_Brand__c}</td>
-                </tr>
-                <tr>
-                    <td class="lbl">Rim Type:</td><td class="val">{!wrapper.pkg.Rim_Type__c}</td>
-                    <td class="lbl">Rim Size:</td><td>{!wrapper.pkg.Rim_Size__c}&#160;{!wrapper.pkg.Rim_Size_Unit__c}</td>
-                </tr>
-            </table>
-        </apex:outputPanel>
+<div class="sec"><span class="secnum">3</span><span class="sectitle">VEHICLE</span></div>
+<div class="secrule"></div>
+<table class="kv4">
+  <tr><td class="lb">Year</td><td class="vl">{!Application__c.Vehicle_Year__c}</td>
+      <td class="lb">Make</td><td class="vl">{!Application__c.Vehicle_Make__c}</td>
+      <td class="lb">Model</td><td class="vl">{!Application__c.Vehicle_Model__c}</td>
+      <td class="lb">Trim</td><td class="vl">{!Application__c.Vehicle_Trim__c}</td></tr>
+  <tr><td class="lb">VIN</td><td class="vl">{!Application__c.Vehicle_VIN__c}</td>
+      <td class="lb nw">Purchase Price</td><td class="vl"><apex:outputText value="{0,number,$#,##0.00}"><apex:param value="{!Application__c.Vehicle_Purchase_Price__c}" /></apex:outputText></td>
+      <td class="lb">Odometer</td>
+      <td class="vl"><apex:outputText value="{0,number,#,##0}"><apex:param value="{!Application__c.Odometer__c}" /></apex:outputText>&#160;<apex:outputText value="{!Application__c.Odometer_Unit__c}" /></td>
+      <td colspan="2">&#160;</td></tr>
+</table>
+<div class="note" style="font-size:5.7pt; margin:2px 0 0 0;">If your odometer is listed in miles, this reading reflects a conversion to kilometers.</div>
 
-        <!-- ==================== SECTION 4: CUSTOMER OBLIGATIONS ==================== -->
-        <div class="sec-hdr">{!$Label.Application_PDF_Section4_Title}</div>
-        <p><span class="bold ital">{!$Label.Application_PDF_Important_Notice}</span></p>
-        <p>{!$Label.Application_PDF_Maintenance_Intro}</p>
-        <ul>
-            <li><span class="bold">{!$Label.Application_PDF_Obligation_Oil_Change}</span></li>
-            <li><span class="bold">{!$Label.Application_PDF_Obligation_Fluid_Levels}</span><br/>
-                <span style="font-size:7.5pt;">{!$Label.Application_PDF_Obligation_Fluid_Note}</span>
-            </li>
-        </ul>
-        <p class="bold">{!$Label.Application_PDF_Maintenance_Reporting_Intro}</p>
-        <ul>
-            <li><span class="bold">{!$Label.Application_PDF_Website_Method_Label}</span> {!$Label.Application_PDF_Website_Method_Instruction}</li>
-            <li><span class="bold">{!$Label.Application_PDF_Email_Method_Label}</span> {!$Label.Application_PDF_Email_Method_Instruction}</li>
-            <li><span class="bold">{!$Label.Application_PDF_Mail_Method_Label}</span> {!$Label.Application_PDF_Mail_Method_Instruction}</li>
-        </ul>
-        <p>{!$Label.Application_PDF_Keep_Invoices_Notice}</p>
-        <p class="bold">{!$Label.Application_PDF_DIY_Oil_Change_Notice}</p>
-        <p class="bold">{!$Label.Application_PDF_Non_Compliance_Notice}</p>
-        <p><span class="bold">A.</span> {!$Label.Application_PDF_Certification_Line1}</p>
-        <p><span class="bold">B.</span> {!$Label.Application_PDF_Certification_Line2}</p>
-        <ol>
-            <li>{!$Label.Application_PDF_Certification_Item1}</li>
-            <li>{!$Label.Application_PDF_Certification_Item2}</li>
-            <li>{!$Label.Application_PDF_Certification_Item3}</li>
-            <li>{!$Label.Application_PDF_Certification_Item4}</li>
-            <li>{!$Label.Application_PDF_Certification_Item5}</li>
-        </ol>
-        <p class="bold">{!$Label.Application_PDF_Misleading_Info_Notice}</p>
-        <p>{!$Label.Application_PDF_Dealer_Certification}</p>
+<div class="sec"><span class="secnum">4</span><span class="sectitle">CUSTOMER OBLIGATIONS &amp; ACKNOWLEDGEMENT</span></div>
+<div class="box">
+  <div class="imp">IMPORTANT: Repairs to covered components require prior authorization from A-Protect (1-866-660-6444). Repairs performed without prior authorization will not be reimbursed. Refer to the Terms and Conditions for full details.</div>
+  <p style="margin-top:3px;">To keep this Contract valid, the Customer must:</p>
+  <ol>
+    <li>Maintain the vehicle. At the Customer's own expense, have the engine oil and filter changed and all other fluid levels checked by a licensed service provider, measured from the purchase or lease date: Conventional oil every 4 months or 8,000 km &#160;&#160; Synthetic oil every 8 months or 12,000 km whichever comes first. Oil changes done by the Customer are not accepted as proof of maintenance.</li>
+    <li>Report each service within 15 calendar days. Send a copy of the invoice, with the Contract number, by e-mail to maintenance@a-protectwarranty.com, or by mail to A-Protect Warranty Corporation, 8800 Dufferin St. Suite 302B, Concord, Ontario L4K 0C5.</li>
+    <li>Keep the original invoices. A-Protect may require them in support of a claim.</li>
+    <li>Stay within the grace period. A grace period of 1,000 km applies. Missing maintenance or reporting beyond this grace period is non-performance under this Contract and may void it.</li>
+  </ol>
+</div>
+<div class="ck">&#9744;&#160;&#160;I, the Customer acknowledge that I have read, reviewed, and understood all pages of the Terms and Conditions of this A-Protect Vehicle Service Agreement, including the exclusions, limitations, cancellations, and transfer provisions on the following page(s). I confirm that all information provided on this Application and Registration Page is true, complete, and accurate to the best of my knowledge, and I attest that this Application and Registration Page has been correctly and accurately completed by the selling dealer. I understand and agree that this Application and Registration Page, together with the following full Terms and Conditions, constitutes the entire Agreement between the parties. I understand that this Agreement is a Service Agreement, not an insurance product, and that all authorizations, approvals, and payments under it are administrative in nature and governed solely by the Terms and Conditions provided. I understand that this is an application only, and that coverage does not take effect until A-Protect has accepted this application and received payment of the Total Premium, including applicable taxes. I further acknowledge that no verbal promises or representations, other than those expressly stated in writing in this Agreement, shall be binding on A-Protect Warranty Corporation or its authorized representatives.</div>
+<table class="sig"><tr>
+  <td style="width:52%"><div class="sigline"></div><div class="siglab">CUSTOMER SIGNATURE</div></td>
+  <td><div class="sigline"></div><div class="siglab">SIGNED DATE</div></td>
+</tr></table>
 
-        <!-- ==================== DEALER INFORMATION ==================== -->
-        <div class="sub-hdr">{!$Label.Application_PDF_Dealer_Information_Title}</div>
-        <table class="dtbl">
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Dealer_Name_Label}</td><td class="val">{!Application__c.Dealer_Name__r.Name}</td>
-                <td class="lbl">{!$Label.Application_PDF_Dealership_Registration_Label}</td><td>&#160;</td>
-            </tr>
-            <tr><td class="lbl">{!$Label.Application_PDF_Dealer_Address_Label}</td><td colspan="3">{!dealerAddress}</td></tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Salesperson_Label}</td><td class="val">{!Application__c.Sales_Person__r.Name}</td>
-                <td class="lbl">{!$Label.Application_PDF_Salesperson_Registration_Label}</td><td>{!Application__c.Dealer_Sales_ID_License__c}</td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Dealer_Signature_Label}</td><td class="val">&#160;</td>
-                <td class="lbl">{!$Label.Application_PDF_Customer_Signature_Label}</td><td>&#160;</td>
-            </tr>
-        </table>
+<div class="sec"><span class="secnum">5</span><span class="sectitle">DEALER INFORMATION &amp; ATTESTATION</span></div>
+<div class="secrule"></div>
+<table class="kv6">
+  <tr><td class="lb">Dealer Name</td><td class="vl">{!dealerName}</td>
+      <td class="lb2">Dealership Reg. #</td><td class="vl2">{!Application__c.Dealer_Name__r.Business_Registration__c}</td>
+      <td class="lb2">Salesperson</td><td class="vl2">{!Application__c.Sales_Person__r.Name}</td></tr>
+  <tr><td class="lb">Salesperson Reg. #</td><td class="vl">{!Application__c.Dealer_Sales_ID_License__c}</td>
+      <td class="lb2">Address</td><td colspan="3">{!dealerAddress}</td></tr>
+</table>
+<div class="ck" style="font-style:normal; margin-top:5px;"><b>DEALER ATTESTATION &#8211;</b> By signing this Agreement, the Dealership agrees to the following: This Application and Registration Page has been completed correctly and accurately on behalf of the Customer named above. The vehicle, coverage, and pricing details entered reflect what was disclosed to and selected by the customer. Together with the following full Terms and Conditions, this Application and Registration Page forms the entire Agreement between the parties. The Customer has been advised that this is an application only and coverage begins only once A-Protect accepts it and receives payment of the Total Premium, including applicable taxes.</div>
+<table class="sig" style="margin-top:10px;"><tr>
+  <td style="width:52%"><div class="sigline"></div><div class="siglab">DEALERSHIP REP. SIGNATURE</div></td>
+  <td><div class="sigline"></div><div class="siglab">SIGNED DATE</div></td>
+</tr></table>
 
-        <!-- ==================== TERMS AND CONDITIONS ==================== -->
-        <div class="center" style="font-size:10pt;font-weight:bold;margin:10px 0 6px 0;text-decoration:underline;">{!$Label.Application_PDF_TC_Title}</div>
 
-        <!-- Dealer / package-specific Terms and Conditions -->
-        <apex:outputPanel layout="none" rendered="{!wrapper.hasTermsAndConditions}">
-            <div class="sub-hdr">Dealer Terms and Conditions</div>
-            <div class="tc-body">
-                <apex:outputText value="{!wrapper.termsAndConditions}" escape="false"/>
-            </div>
-        </apex:outputPanel>
 
-        <div class="tc-body">
-            <p>{!$Label.Application_PDF_TC_Intro1}</p>
-            <p>{!$Label.Application_PDF_TC_Intro2}</p>
-            <p>{!$Label.Application_PDF_TC_Intro3}</p>
-            <p>{!$Label.Application_PDF_TC_Intro4}</p>
-            <p>{!$Label.Application_PDF_TC_Intro5}</p>
-        </div>
+</apex:outputPanel>
+<apex:outputPanel rendered="{!w.isTireRim}">
+<div class="tp">
 
-        <div class="sub-hdr">{!$Label.Application_PDF_TC_Covered_Services_Title}</div>
-        <div class="tc-body">
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_AirBags_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_AirBags_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_Brakes_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Brakes_Includes}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Excludes_Label}</span> {!$Label.Application_PDF_Coverage_Brakes_Excludes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_BreakdownAwayFromHome_Title}</p>
-            <p class="indent">{!$Label.Application_PDF_Coverage_BreakdownAwayFromHome_Description}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_BreakdownAwayFromHome_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_CarRental_Title}</p>
-            <p class="indent">{!$Label.Application_PDF_Coverage_CarRental_Description}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_CarRental_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_CoolingSystem_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_CoolingSystem_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_Differential_Title}</p>
-            <p class="indent">{!$Label.Application_PDF_Coverage_Differential_Description}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Differential_Includes}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Excludes_Label}</span> {!$Label.Application_PDF_Coverage_Differential_Excludes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_Driveline_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Driveline_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_Electrical_Title}</p>
-            <p class="indent">{!$Label.Application_PDF_Coverage_Electrical_Description}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Electrical_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_Engine_Title}</p>
-            <p class="indent">{!$Label.Application_PDF_Coverage_Engine_Description}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Engine_Includes}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Excludes_Label}</span> {!$Label.Application_PDF_Coverage_Engine_Excludes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_EngineEmission_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_EngineEmission_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_FluidsFilters_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_FluidsFilters_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_FuelSystem_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_FuelSystem_Includes}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Excludes_Label}</span> {!$Label.Application_PDF_Coverage_FuelSystem_Excludes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_HVAC_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_HVAC_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_RoadsideAssistance_Title}</p>
-            <p class="indent">{!$Label.Application_PDF_Coverage_RoadsideAssistance_Description}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_RoadsideAssistance_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_SealsGaskets_Title}</p>
-            <p class="indent">{!$Label.Application_PDF_Coverage_SealsGaskets_Description}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_SealsGaskets_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_Steering_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Steering_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_SuspensionFront_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_SuspensionFront_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_SuspensionRear_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_SuspensionRear_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_TechnologyEquipment_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_TechnologyEquipment_Includes_Part1}, {!$Label.Application_PDF_Coverage_TechnologyEquipment_Includes_Part2}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_TransferCase_Title}</p>
-            <p class="indent">{!$Label.Application_PDF_Coverage_TransferCase_Description}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_TransferCase_Includes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_Transmission_Title}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_Transmission_Includes}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Excludes_Label}</span> {!$Label.Application_PDF_Coverage_Transmission_Excludes}</p>
-            <p class="cov-name">{!$Label.Application_PDF_Coverage_TurboSupercharger_Title}</p>
-            <p class="indent">{!$Label.Application_PDF_Coverage_TurboSupercharger_Description}</p>
-            <p class="indent"><span class="bold">{!$Label.Application_PDF_Coverage_Includes_Label}</span> {!$Label.Application_PDF_Coverage_TurboSupercharger_Includes}</p>
-        </div>
 
-        <div class="tc-body" style="margin-top:6px;font-style:italic;font-size:7.5pt;">
-            {!$Label.Application_PDF_TC_Coverage_Footer}
-        </div>
 
-        <div class="sub-hdr">{!$Label.Application_PDF_TC_Claim_Title}</div>
-        <div class="tc-body">
-            <p><span class="bold">{!$Label.Application_PDF_Claim_Call_Line}</span><br/>
-                {!$Label.Application_PDF_Claim_Hours}</p>
-            <p>{!$Label.Application_PDF_Claim_Para1}</p>
-            <p>{!$Label.Application_PDF_Claim_Para2}</p>
-            <p>{!$Label.Application_PDF_Claim_Para3}</p>
-            <p>{!$Label.Application_PDF_Claim_Para4}</p>
-            <p>{!$Label.Application_PDF_Claim_Para5}</p>
-            <p>{!$Label.Application_PDF_Claim_Para6}</p>
-        </div>
+<table class="hdr"><tr>
+  <td style="width:1.00in"><img src="{!$Resource.AProtectFullLogo}" style="width:0.93in" /></td>
+  <td>
+    <div class="doctitle">Tire &amp; Rim Vehicle Service Contract</div>
+    <div class="doccontact">1-866-660-6444 &#183; Tel: 416-661-7444 &#183; tireandrim@a-protectwarranty.com</div>
+    <div class="doccontact">8800 Dufferin St. Suite 302B, Concord, ON L4K 0C5 &#183; HST #: 832142467RT0001</div>
+  </td>
+  <td style="width:1.15in; text-align:right;"><img src="{!$Resource.TireRimHero}" style="width:1.00in" /></td>
+  <td style="width:1.75in; padding-left:10px;">
+    <div class="badge" style="background:#1a1a1a;"><div class="bl">CONTRACT NO.</div><div class="bv">{!Application__c.Name}</div></div>
+  </td>
+</tr></table>
+<div class="hdrrule"></div>
+<div class="titlebar">APPLICATION</div>
 
-        <div class="sub-hdr">{!$Label.Application_PDF_TC_Renewals_Title}</div>
-        <div class="tc-body">
-            <p><span class="bold">{!$Label.Application_PDF_Renewals_Inquiries_Label}</span> {!$Label.Application_PDF_Renewals_Inquiries_Text}</p>
-            <p><span class="bold">{!$Label.Application_PDF_Renewals_Renewals_Label}</span> {!$Label.Application_PDF_Renewals_Renewals_Text}</p>
-            <p><span class="bold">{!$Label.Application_PDF_Renewals_ClaimsFree_Label}</span> {!$Label.Application_PDF_Renewals_ClaimsFree_Text}</p>
-            <p><span class="bold">{!$Label.Application_PDF_Renewals_Transfers_Label}</span> {!$Label.Application_PDF_Renewals_Transfers_Text}</p>
-            <p><span class="bold">{!$Label.Application_PDF_Renewals_VehicleInspection_Label}</span> {!$Label.Application_PDF_Renewals_VehicleInspection_Text}</p>
-            <p><span class="bold">{!$Label.Application_PDF_Renewals_Storage_Label}</span> {!$Label.Application_PDF_Renewals_Storage_Text}</p>
-            <p><span class="bold">{!$Label.Application_PDF_Renewals_Cancellation_Label}</span> {!$Label.Application_PDF_Renewals_Cancellation_Text}</p>
-            <p><span class="bold">{!$Label.Application_PDF_Renewals_LegalRight_Label}</span> {!$Label.Application_PDF_Renewals_LegalRight_Text}</p>
-        </div>
+<div class="sec"><span class="secnum">1</span><span class="sectitle">CONTRACT INFORMATION</span></div>
+<div class="secrule"></div>
+<div class="note">It is the responsibility of the Contract Holder to check that the coverage listed on this document agrees with the original Application given to You by the Selling Dealer. Any discrepancies must be reported to A-Protect immediately.</div>
+<table class="kv">
+  <tr><td class="lb">Contract Number</td><td class="vl">{!Application__c.Name}</td>
+      <td class="lb2">Status</td><td class="vl2">{!Application__c.Application_Status__c}</td></tr>
+  <tr><td class="lb">Protection Plan</td><td class="vl">{!w.renderedPlanName}<apex:outputText value=" (Sections 3.1-3.9)" rendered="{!CONTAINS(w.renderedPlanName, 'Superior')}" /><apex:outputText value=" (Sections 3.1-3.5)" rendered="{!CONTAINS(w.renderedPlanName, 'Extended')}" /><apex:outputText value=" (Sections 3.1-3.3)" rendered="{!CONTAINS(w.renderedPlanName, 'Essential')}" /></td>
+      <td class="lb2">Term (months)</td><td class="vl2">{!w.renderedTermName}</td></tr>
+  <tr><td class="lb">Vehicle Use Classification</td><td class="vl">{!IF(Application__c.Commercial_Business_Use__c, 'Commercial / Business Use', 'Standard (Private Passenger)')}</td>
+      <td class="lb2">&#160;</td><td class="vl2">&#160;</td></tr>
+  <tr><td class="lb">Contract Start Date</td><td class="vl">{!w.contractStartDateDisplay}</td>
+      <td class="lb2">Contract Expiration Date</td><td class="vl2">{!w.contractEndDateDisplay}</td></tr>
+  <tr><td class="lb">Contract Start Odometer</td><td class="vl">{!w.odometerStartDisplay}</td>
+      <td class="lb2">Contract Expiration Odometer</td><td class="vl2">{!w.odometerEndDisplay}</td></tr>
+</table>
+<table class="premium"><tr>
+  <td>Contract Premium <b>{!w.premiumWithoutTaxDisplay}</b></td>
+  <td>Surcharge / Add-Ons <b>$0.00</b></td>
+  <td>HST <b>{!w.taxDisplay}</b></td>
+  <td class="totlab">Total Premium</td><td class="total">{!w.totalPremiumDisplay}</td>
+</tr></table>
+<div class="note" style="font-style:normal;">Coverage begins on the Contract Start Date and odometer reading listed above, and ends on the Contract Expiration Date or when the vehicle reaches the Contract Expiration Odometer reading, whichever comes first.</div>
 
-        <div class="sub-hdr">{!$Label.Application_PDF_TC_DNC_Title}</div>
-        <div class="tc-body">
-            <ol>
-                <li>{!$Label.Application_PDF_DNC_Item1}</li>
-                <li>{!$Label.Application_PDF_DNC_Item2}</li>
-                <li>{!$Label.Application_PDF_DNC_Item3}</li>
-                <li>{!$Label.Application_PDF_DNC_Item4}</li>
-                <li>{!$Label.Application_PDF_DNC_Item5}</li>
-                <li>{!$Label.Application_PDF_DNC_Item6}</li>
-                <li>{!$Label.Application_PDF_DNC_Item7}</li>
-                <li>{!$Label.Application_PDF_DNC_Item8}</li>
-                <li>{!$Label.Application_PDF_DNC_Item9}</li>
-                <li>{!$Label.Application_PDF_DNC_Item10}</li>
-                <li>{!$Label.Application_PDF_DNC_Item11}</li>
-                <li>{!$Label.Application_PDF_DNC_Item12}</li>
-                <li>{!$Label.Application_PDF_DNC_Item13}</li>
-                <li>{!$Label.Application_PDF_DNC_Item14}</li>
-                <li>{!$Label.Application_PDF_DNC_Item15}</li>
-                <li>{!$Label.Application_PDF_DNC_Item16}</li>
-                <li>{!$Label.Application_PDF_DNC_Item17}</li>
-                <li>{!$Label.Application_PDF_DNC_Item18}</li>
-                <li>{!$Label.Application_PDF_DNC_Item19}</li>
-                <li>{!$Label.Application_PDF_DNC_Item20}</li>
-                <li>{!$Label.Application_PDF_DNC_Item21}</li>
-                <li>{!$Label.Application_PDF_DNC_Item22}</li>
-                <li>{!$Label.Application_PDF_DNC_Item23}</li>
-                <li>{!$Label.Application_PDF_DNC_Item24}</li>
-                <li>{!$Label.Application_PDF_DNC_Item25}</li>
-                <li>{!$Label.Application_PDF_DNC_Item26}</li>
-                <li>{!$Label.Application_PDF_DNC_Item27}</li>
-                <li>{!$Label.Application_PDF_DNC_Item28}</li>
-                <li>{!$Label.Application_PDF_DNC_Item29}</li>
-            </ol>
-        </div>
+<div class="sec"><span class="secnum">2</span><span class="sectitle">CUSTOMER / REGISTERED VEHICLE OWNER</span></div>
+<div class="secrule"></div>
+<table class="kv">
+  <tr><td class="lb">Customer Name</td>
+      <td class="vl"><apex:outputText value="{!UPPER(Application__c.Customer_Last_Name__c)}" /><apex:outputText value=", " rendered="{!NOT(ISBLANK(Application__c.Customer_First_Name__c))}" /><apex:outputText value="{!UPPER(Application__c.Customer_First_Name__c)}" /></td>
+      <td class="lb2">Company / Business Name</td><td class="vl2">{!Application__c.Company_Business__c}</td></tr>
+  <tr><td class="lb">Address</td><td colspan="3">{!Application__c.Customer_Address__c}</td></tr>
+  <tr><td class="lb">Primary Phone</td><td class="vl">{!Application__c.Customer_Phone__c}</td>
+      <td class="lb2">Secondary Phone</td><td class="vl2">{!Application__c.Customer_Business_Phone__c}</td></tr>
+  <tr><td class="lb">Email</td><td class="vl">{!Application__c.Customer_Email__c}</td>
+      <td class="lb2">Lienholder (if applicable)</td>
+      <td class="vl2">{!Application__c.Financial_Institution_Lender__c}<span class="ln2">{!Application__c.Lender_Address__c}</span></td></tr>
+  <tr><td class="lb">Secondary Owner Name</td><td class="vl">{!Application__c.Co_Buyer__r.Name}</td>
+      <td class="lb2">Secondary Owner Email</td><td class="vl2">&#160;</td></tr>
+</table>
 
-        <div class="sub-hdr">{!$Label.Application_PDF_Contact_Info_Title}</div>
-        <table class="dtbl">
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Claims_Auth_Label}</td><td>{!$Label.Application_PDF_Claims_Auth_Value}</td>
-                <td class="lbl">{!$Label.Application_PDF_Inquiries_Label}</td><td>{!$Label.Application_PDF_Inquiries_Value}</td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Maintenance_Reporting_Label}</td><td>{!$Label.Application_PDF_Maintenance_Reporting_Value}</td>
-                <td class="lbl">{!$Label.Application_PDF_Maintenance_Web_Form_Label}</td><td>{!$Label.Application_PDF_Maintenance_Web_Form_Value}</td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_General_Website_Label}</td><td>{!$Label.Application_PDF_General_Website_Value}</td>
-                <td class="lbl">{!$Label.Application_PDF_Complaints_Label}</td><td>{!$Label.Application_PDF_Complaints_Value}</td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Mailing_Address_Label}</td>
-                <td colspan="3">{!$Label.Application_PDF_Mailing_Address_Value}</td>
-            </tr>
-            <tr>
-                <td class="lbl">{!$Label.Application_PDF_Business_Hours_Label}</td>
-                <td colspan="3">{!$Label.Application_PDF_Business_Hours_Value}</td>
-            </tr>
-        </table>
+<div class="sec"><span class="secnum">3</span><span class="sectitle">VEHICLE</span></div>
+<div class="secrule"></div>
+<table class="kv4">
+  <tr><td class="lb">Year</td><td class="vl">{!Application__c.Vehicle_Year__c}</td>
+      <td class="lb">Make</td><td class="vl">{!Application__c.Vehicle_Make__c}</td>
+      <td class="lb">Model</td><td class="vl">{!Application__c.Vehicle_Model__c}</td>
+      <td class="lb">Trim</td><td class="vl">{!Application__c.Vehicle_Trim__c}</td></tr>
+  <tr><td class="lb">VIN</td><td class="vl">{!Application__c.Vehicle_VIN__c}</td>
+      <td class="lb">Odometer</td>
+      <td class="vl"><apex:outputText value="{0,number,#,##0}"><apex:param value="{!Application__c.Odometer__c}" /></apex:outputText>&#160;<apex:outputText value="{!Application__c.Odometer_Unit__c}" /></td>
+      <td class="lb">New / Used</td><td class="vl">&#160;</td>
+      <td class="lb">Stock #</td><td class="vl">{!Application__c.Vehicle__r.Stock_Number__c}</td></tr>
+  <tr><td class="lb">Tire Size</td><td class="vl">{!w.pkg.Tire_Type__c}</td>
+      <td class="lb">Rim Size</td>
+      <td class="vl"><apex:outputText value="{!w.pkg.Rim_Size__c}" /> <apex:outputText value="{!w.pkg.Rim_Size_Unit__c}" /></td>
+      <td class="lb">Rim Type</td><td class="vl">{!w.pkg.Rim_Type__c}</td>
+      <td class="lb">Run-Flat Tires</td><td class="vl">&#160;</td></tr>
+</table>
 
-        <div class="sub-hdr" style="margin-top:8px;">{!$Label.Application_PDF_Acknowledgement_Title}</div>
-        <div class="tc-body">
-            <p>{!$Label.Application_PDF_Acknowledgement_Body}</p>
-        </div>
+<div class="sec"><span class="secnum">4</span><span class="sectitle">CUSTOMER OBLIGATIONS &amp; ACKNOWLEDGEMENT</span></div>
+<div class="box">
+  <div class="imp">IMPORTANT: All repairs and replacements require prior authorization from A-Protect (1-866-660-6444). Repairs or replacements performed without prior authorization may be denied. Refer to the Terms and Conditions for full details.</div>
+  <p style="margin-top:3px;">To keep this Contract valid, the Customer must:</p>
+  <ol>
+    <li>Maintain the tires and wheels. Have regular tire rotations, proper inflation and timely wheel alignments performed by a licensed repair facility, and have any suspension, steering or wheel-balance issues inspected and repaired promptly. Routine maintenance costs are not covered.</li>
+    <li>Drive safely. Operate the vehicle lawfully and with reasonable care to avoid potholes, curbs and debris. Damage from reckless, negligent or improper operation is not covered.</li>
+    <li>Report damage promptly. Contact A-Protect as soon as possible after the occurrence (the next business day if outside business hours). A-Protect may request photos or video, sent to tireandrim@a-protectwarranty.com.</li>
+    <li>Submit receipts within 14 days. Valid paid receipts and proof of payment must be submitted within fourteen (14) days of the occurrence to be eligible for reimbursement.</li>
+  </ol>
+</div>
+<div class="ck">&#9744;&#160;&#160;I, the Customer acknowledge that I have read, reviewed, and understood all pages of the Terms and Conditions of this A-Protect Tire &amp; Rim Vehicle Service Agreement, including the exclusions, limitations, cancellations, and transfer provisions on the following page(s). I confirm that all information provided on this Application and Registration Page is true, complete, and accurate to the best of my knowledge, and I attest that this Application and Registration Page has been correctly and accurately completed by the selling dealer. I understand and agree that this Application and Registration Page, together with the following full Terms and Conditions, constitutes the entire Agreement between the parties. I understand that this Agreement is a Service Agreement, not an insurance product, and that all authorizations, approvals, and payments under it are administrative in nature and governed solely by the Terms and Conditions provided. I understand that this is an application only, and that coverage does not take effect until A-Protect has accepted this application and received payment of the Total Premium, including applicable taxes. I further acknowledge that no verbal promises or representations, other than those expressly stated in writing in this Agreement, shall be binding on A-Protect Warranty Corporation or its authorized representatives.</div>
+<table class="sig"><tr>
+  <td style="width:52%"><div class="sigline"></div><div class="siglab">CUSTOMER SIGNATURE</div></td>
+  <td><div class="sigline"></div><div class="siglab">SIGNED DATE</div></td>
+</tr></table>
 
-        <table class="dtbl" style="margin-top:16px;">
-            <tr>
-                <td style="width:45%;height:36px;border:1px solid #aaa;vertical-align:bottom;padding:4px;">
-                    <span style="font-size:7pt;">{!$Label.Application_PDF_Owner_Signature_Label}</span>
-                </td>
-                <td style="width:10%;border:none;">&#160;</td>
-                <td style="width:45%;height:36px;border:1px solid #aaa;vertical-align:bottom;padding:4px;">
-                    <span style="font-size:7pt;">{!$Label.Application_PDF_Owner_Date_Label}</span>
-                </td>
-            </tr>
-        </table>
+<div class="sec"><span class="secnum">5</span><span class="sectitle">DEALER INFORMATION &amp; ATTESTATION</span></div>
+<div class="secrule"></div>
+<table class="kv6">
+  <tr><td class="lb">Dealer Name</td><td class="vl">{!dealerName}</td>
+      <td class="lb2">Dealership Reg. #</td><td class="vl2">{!Application__c.Dealer_Name__r.Business_Registration__c}</td>
+      <td class="lb2">Salesperson</td><td class="vl2">{!Application__c.Sales_Person__r.Name}</td></tr>
+  <tr><td class="lb">Salesperson Reg. #</td><td class="vl">{!Application__c.Dealer_Sales_ID_License__c}</td>
+      <td class="lb2">Address</td><td colspan="3">{!dealerAddress}</td></tr>
+</table>
+<div class="ck" style="font-style:normal; margin-top:5px;"><b>DEALER ATTESTATION &#8211;</b> By signing this Agreement, the Dealership agrees to the following: This Application and Registration Page has been completed correctly and accurately on behalf of the Customer named above. The vehicle, coverage, and pricing details entered reflect what was disclosed to and selected by the customer. Together with the following full Terms and Conditions, this Application and Registration Page forms the entire Agreement between the parties. The Customer has been advised that this is an application only and coverage begins only once A-Protect accepts it and receives payment of the Total Premium, including applicable taxes.</div>
+<table class="sig" style="margin-top:10px;"><tr>
+  <td style="width:52%"><div class="sigline"></div><div class="siglab">DEALERSHIP REP. SIGNATURE</div></td>
+  <td><div class="sigline"></div><div class="siglab">SIGNED DATE</div></td>
+</tr></table>
 
-        <div style="margin-top:12px;font-size:7.5pt;text-align:center;">
-            {!$Label.Application_PDF_Footer_Line1}<br/>
-            {!$Label.Application_PDF_Footer_Copyright}
-        </div>
 
-        <apex:outputPanel layout="none" rendered="{!NOT(wrapper.isLast)}">
-            <div class="page-break"></div>
-        </apex:outputPanel>
-    </apex:repeat>
-</apex:repeat>
-</body>
-</html>
+
+</div>
+</apex:outputPanel>
+<div style="page-break-before: always;"></div>
+<apex:outputPanel rendered="{!NOT(w.isTireRim)}">
+<c:WarrantyTerms1 />
+<c:ContractOptionsSection pkgId="{!w.pkg.Id}" />
+<c:WarrantyTerms2 />
+<c:WarrantyTerms3 />
+<c:WarrantyTerms4 />
+</apex:outputPanel>
+<apex:outputPanel rendered="{!w.isTireRim}">
+<div class="tr">
+<c:TireRimTerms1 />
+<c:TireRimTerms2 />
+<c:TireRimTerms3 />
+<c:TireRimTerms4 />
+</div>
+</apex:outputPanel>
+</apex:repeat></apex:repeat>
+</body></html>
 </apex:page>

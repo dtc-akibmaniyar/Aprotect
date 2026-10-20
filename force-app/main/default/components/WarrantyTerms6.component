@@ -1,0 +1,45 @@
+<apex:component >
+<h2 class="part">PART 8: WARRANTY COVERAGE EXCLUSIONS</h2>
+<p class="num">1. Any representations made other than what is expressly stated in this Contract are not covered.</p>
+<p class="num">2. Non-compliance with the Terms and Conditions of this Service Contract, including but not limited to Customer Obligations and Claims Procedures, shall render coverage void.</p>
+<p class="num">3. Parts that are not listed in this Contract, or that are expressly stated as exclusions, are not covered.</p>
+<p class="num">4. Pre-existing problems or conditions, at A-Protect&#8217;s sole discretion, are excluded from coverage. Mechanical defects existing before the commencement of the Service Contract, or any problems or conditions diagnosed by A-Protect as pre-existing, are not covered.</p>
+<p class="num">5. Parts or repairs that are covered in whole or in part by a Manufacturer&#8217;s Service Contract, or by any other Service Contract or insurance company, are excluded. This includes, but is not limited to, duplication of coverage, factory defects, recalls, and manufacturer campaigns or service bulletins.</p>
+<p class="num">6. Vehicles used for hire or for the purpose of generating income are not covered. This includes, but is not limited to, ridesharing or food delivery services such as Uber, Lyft, or SkipTheDishes, courier or taxi services, limousine or driving school vehicles, emergency vehicles, competitive or race driving, and vehicles equipped with a snowplow.</p>
+<p class="num">7. Vehicles with odometers that have been altered, tampered with, or not promptly repaired by the Customer are excluded from coverage.</p>
+<p class="num">8. Vehicles pulling or carrying a payload exceeding one ton capacity are excluded unless prior approval has been obtained at the time of sale.</p>
+<p class="num">9. Loss or damage resulting from after-factory modifications is not covered. Such modifications include, but are not limited to, installation of incorrect tires or rims, emission or exhaust alterations, fuel or ignition modifications, add-ons, high-performance parts or accessories, and snowplow additions.</p>
+<p class="num">10. Repairs or replacements performed on covered parts without prior authorization from A-Protect are not eligible for coverage or reimbursement.</p>
+<p class="num">11. Any repair or replacement of a part that has not exceeded the manufacturer&#8217;s field tolerances, or where a repair facility merely recommends, requires, or suggests replacement despite no actual failure, is not covered.</p>
+<p class="num">12. Damage or loss caused by the Customer&#8217;s failure to take reasonable steps to protect the vehicle from further damage after a mechanical breakdown, including continuing to drive the vehicle or delaying repairs, is not covered.</p>
+<p class="num">13. Miscellaneous or incidental costs necessary for a covered repair but not expressly listed in this Contract are excluded. This includes, but is not limited to, diagnostic charges, shop supplies, alignments, storage fees, computer or module programming, machine shop charges, fluid loss, adjustments, tune-ups, and regular servicing or maintenance.</p>
+<p class="num">14. Failures or damage to covered parts caused by non-covered parts are not covered.</p>
+<p class="num">15. Risks, losses, or damages resulting from unauthorized repairs, teardowns, or replacements are excluded, regardless of whether the affected component is a covered part.</p>
+<p class="num">16. A-Protect is not responsible for delays in completing repairs or for losses resulting from such delays. This includes, but is not limited to, loss of vehicle use, time, profit, inconvenience, unavailability of parts, claim processing delays, or any other incidental or consequential losses resulting from a covered mechanical breakdown or failure.</p>
+<p class="num">17. Clutch failure in manual or sequential transmissions is not classified as a transmission failure under this Service Contract.</p>
+<p class="num">18. The timing belt is not covered as a standalone repair.</p>
+<p class="num">19. The arrangement of third-party towing or roadside services for delivery of the vehicle to an A-Protect Authorized Repair Facility, or otherwise, is not covered.</p>
+<p class="num">20. Damage or loss resulting from the Customer&#8217;s failure to perform maintenance in accordance with the A-Protect Maintenance Schedule is excluded.</p>
+<p class="num">21. Any loss or damage caused by the lack of proper lubricants or coolants, including failure of water hoses, radiators, their connections, or transmission oil cooler lines, is not covered.</p>
+<p class="num">22. Normal wear and tear is excluded. This includes, but is not limited to, repair or replacement of valves, valve seals, or piston rings causing high oil consumption or low compression, stretched timing chains, noisy lifters, and worn bearings.</p>
+<p class="num">23. Repairs to carbonized or burned valves or seized piston rings are excluded.</p>
+<p class="num">24. Risks, losses, or damage resulting from rust, corrosion, contamination, loss of fluids, lubricants, antifreeze, or refrigerants, improper type of engine oil or fuel, or any failure caused by burning oil or overheating, regardless of cause, are not covered.</p>
+<p class="num">25. Gasoline exhaust systems and diesel exhaust components or fluids, including BlueTEC and AdBlue, are excluded from coverage.</p>
+<p class="num">26. Emission system components, including but not limited to the evaporative emission system, exhaust gas recirculation system, positive crankcase ventilation system, and catalytic converters, are excluded.</p>
+<p class="num">27. A-Protect shall not be liable for any damage, injury, or death, including any costs, expenses, or legal claims, suffered by any person, firm, or corporation, whether directly or indirectly caused by the vehicle or its components.</p>
+<p class="num">28. Risks, losses, or damages resulting from misdiagnosis, improper repair, abuse, negligence, acts of God, repossession, collision, fire, theft, water damage, or freezing are not covered.</p>
+
+<div class="privacy"><p><b>PRIVACY NOTICE:</b> We will collect and retain all personal information concerning Your Contract and Claims. The information will be used for purposes of underwriting, marketing, administration and cancellation of Your Contract and investigation of Claims. We will only access Your file on a need to know basis and it will be kept at our secure location. It can be reviewed and/or rectified by written request. A-Protect Group, its affiliates and their agents may use and share Your personal information with each other so that You can benefit from personalized offers and improved products and services. If You do not wish Your information to be shared within the A-Protect Group, please contact the Administrator.</p></div>
+<div class="ack">ACKNOWLEDGEMENT</div>
+<div class="rule"></div>
+<p>By accepting this Contract, the Contract Holder acknowledges having received, read, and agreed to all Terms and Conditions set out herein.</p>
+
+<table class="sig"><tr>
+  <td><div class="sigline"></div><div class="siglab">Contract Holder Signature</div></td>
+  <td><div class="sigline"></div><div class="siglab">Date</div></td>
+</tr></table>
+<div class="adminfoot">
+  <div>A-Protect Warranty Corporation is the Administrator of this Vehicle Service Contract.</div>
+  <div>&#169; 2026 A-Protect Warranty Corporation. All rights reserved. Form version 2026-10-06.</div>
+</div>
+</apex:component>
