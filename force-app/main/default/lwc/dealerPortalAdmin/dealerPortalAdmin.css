@@ -11,8 +11,8 @@
     margin-bottom: 0;
     text-transform: uppercase;
     padding: 12px;
-    background-color: #000;
-    color: #ffc107;
+    background-color: rgb(50,89, 122);
+    color: rgb(255, 255, 255);
     text-align: center;
     letter-spacing: 1px;
 }
