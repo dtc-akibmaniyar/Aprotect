@@ -19,6 +19,8 @@ import getInvoiceForApplication from '@salesforce/apex/ApplicationSummaryControl
 // P4 [L] summary viewer cutover: read the engine-snapshot gate through Apex
 // (Aprotect_Portal_Settings__c flags — never hardcoded client-side).
 import isSummaryEngineViewerActive from '@salesforce/apex/ApplicationSummaryController.isSummaryEngineViewerActive';
+// Submit gate: the server's own signature verdict (same rule the submit enforces)
+import getSignatureRequirements from '@salesforce/apex/SignaturePadController.getSignatureRequirements';
 export default class DealerPortalSummary extends NavigationMixin(LightningElement) {
     @api recordId;
     @api applicationId = '';
@@ -84,6 +86,10 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
     @track showInvoicePromptModal = false;
     @track invoicePromptLoading = false;
 
+    // Submit gate state (per-document signature requirements). null = not read
+    // yet, which the getters treat as "not signed" - submit stays disabled.
+    @track signatureRequirements = null;
+
     @track showSubmissionSuccess = false;
     @track submittedInvoiceId = null;
     @track _rawDueDate = null;
@@ -119,6 +125,26 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
 
     get isQuote() {
         return this.applicationStatus === 'Quote';
+    }
+
+    /**
+     * Which contract document the signature pad signs. Warranty wins when the
+     * application carries a warranty package; a Tire & Rim-only application
+     * signs the TireRim document.
+     */
+    get signatureDocumentType() {
+        const groups = (this.summaryData && this.summaryData.applicationPackages) || [];
+        let sawTire = false;
+        for (let i = 0; i < groups.length; i++) {
+            const name = ((groups[i] && groups[i].recordTypeName) || '').toLowerCase();
+            if (name.indexOf('warranty') > -1) {
+                return 'Warranty';
+            }
+            if (name.indexOf('tire') > -1) {
+                sawTire = true;
+            }
+        }
+        return sawTire ? 'TireRim' : 'Warranty';
     }
 
     get summaryHeaderTitle() {
@@ -197,6 +223,9 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
             };
             
             this.packageData = packageResult;
+
+            // Submit gate: read the signature requirements for this application.
+            this.loadSignatureRequirements();
             
             // Legacy display-only recalc (preserved byte-for-byte): recompute
             // customer totals from the stored fields. It runs for every package
@@ -349,9 +378,70 @@ export default class DealerPortalSummary extends NavigationMixin(LightningElemen
             );
     }
     
+    /**
+     * Reads the gate state (which contract documents this application carries
+     * and whether each is fully signed). Called on load and refreshed by the
+     * pad's `signaturestatuschange` event after every completed signing.
+     */
+    async loadSignatureRequirements() {
+        if (this.isQuote || !this.effectiveApplicationId) {
+            this.signatureRequirements = null;
+            return;
+        }
+        try {
+            this.signatureRequirements = await getSignatureRequirements({
+                applicationId: this.effectiveApplicationId
+            });
+        } catch (e) {
+            // Fail closed: an unreadable signature state is NOT a signed
+            // application. The server refuses the submit with the same rule.
+            this.signatureRequirements = {
+                allComplete: false,
+                hasRequiredDocuments: true,
+                documents: [],
+                missingMessage: 'Signature status could not be checked. Reload the page before submitting.'
+            };
+        }
+    }
+
+    /** The pad tells us signing finished - enable/disable without a reload. */
+    handleSignatureStatusChange(event) {
+        const detail = (event && event.detail) || {};
+        if (detail.requirements) {
+            this.signatureRequirements = detail.requirements;
+        } else {
+            this.loadSignatureRequirements();
+        }
+    }
+
+    get signatureGateSatisfied() {
+        if (this.isQuote) return true;
+        const req = this.signatureRequirements;
+        if (!req) return false;
+        if (req.hasRequiredDocuments === false) return true;
+        return req.allComplete === true;
+    }
+
+    get isSubmitGated() {
+        return !this.isQuote && !this.isApplicationSubmitted && !this.signatureGateSatisfied;
+    }
+
+    /** Names exactly the document(s) still unsigned - never a static lie. */
+    get submitGateMessage() {
+        if (!this.isSubmitGated) return '';
+        const req = this.signatureRequirements;
+        if (req && req.missingMessage) return req.missingMessage;
+        return 'Sign all contract documents before submitting.';
+    }
+
+    get submitGateClass() {
+        return this.isSubmitGated ? 'submit-gate submit-gate--blocked' : 'submit-gate';
+    }
+
     get isSubmitButtonDisabled() {
-        // Disable submit button if busy or already submitted
-        return this.isBusy || this.isApplicationSubmitted;
+        // Disable submit if busy, already submitted, or the contract documents
+        // this application carries are not all signed.
+        return this.isBusy || this.isApplicationSubmitted || this.isSubmitGated;
     }
     
     get hasInvoice() {

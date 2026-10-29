@@ -1,0 +1,88 @@
+<apex:page controller="ZZ_SigProbe_Controller" renderAs="pdf" applyHtmlTag="false" applyBodyTag="false" showHeader="false" standardStylesheets="false" cache="false" language="en-US">
+<html>
+<head>
+<style type="text/css">
+  @page { size: letter; margin: 0.45in 0.5in 0.5in 0.5in; }
+  @font-face { font-family: 'ZZSigCursive'; src: url('{!URLFOR($Resource.ZZ_SigProbe_Caveat)}'); }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color:#111111; margin:0; padding:0; }
+  .h1 { font-size: 12pt; font-weight:bold; margin: 0 0 8px 0; }
+  .blk { border: 0.5pt solid #c9cfda; padding: 6px 8px; margin: 0 0 8px 0; }
+  .lab { font-size: 7pt; color:#b3121f; font-weight:bold; letter-spacing:0.4pt; margin: 0 0 3px 0; }
+  .sub { font-size: 6.5pt; color:#3f4a5c; margin: 3px 0 0 0; }
+  .sig { width: 2.5in; }
+  .sizepx { width: 200px; }
+  .sizept { width: 180pt; }
+  .cursive { font-family: 'ZZSigCursive', cursive; font-size: 26pt; color:#101828; }
+  .genericcursive { font-family: cursive; font-size: 26pt; color:#101828; }
+</style>
+</head>
+<body>
+<div class="h1">ZZ_SigProbe - dynamic image embedding test (2.5in print width)</div>
+
+<div class="blk">
+  <div class="lab">(a) STATIC RESOURCE - transparent PNG - width:2.5in</div>
+  <img class="sig" src="{!$Resource.ZZ_SigProbe_Signature}" />
+  <div class="sub">control: $Resource reference, the pattern the header logo already uses</div>
+</div>
+
+<div class="blk">
+  <div class="lab">(a2) STATIC RESOURCE - white-background PNG - width:2.5in</div>
+  <img class="sig" src="{!$Resource.ZZ_SigProbe_SignatureWhite}" />
+  <div class="sub">alpha comparison variant</div>
+</div>
+
+<div class="blk">
+  <div class="lab">(b) DATA URI - transparent PNG from Apex - width:2.5in (b64 chars: {!b64Len})</div>
+  <img class="sig" src="{!dataUriTransparent}" />
+  <div class="sub">data URI built from EncodingUtil.base64Encode(StaticResource.Body)</div>
+</div>
+
+<div class="blk">
+  <div class="lab">(b2) DATA URI - white-background PNG from Apex - width:2.5in</div>
+  <img class="sig" src="{!dataUriWhite}" />
+</div>
+
+<div class="blk">
+  <div class="lab">(c1) CONTENTVERSION FILE - relative shepherd URL - width:2.5in</div>
+  <img class="sig" src="/sfc/servlet.shepherd/version/download/{!fileId}" />
+  <div class="sub">/sfc/servlet.shepherd/version/download/{!fileId}</div>
+</div>
+
+<div class="blk">
+  <div class="lab">(c2) CONTENTVERSION FILE - absolute instance URL - width:2.5in</div>
+  <img class="sig" src="{!instanceUrl}/sfc/servlet.shepherd/version/download/{!fileId}" />
+  <div class="sub">{!instanceUrl}/sfc/servlet.shepherd/version/download/{!fileId}</div>
+</div>
+
+<div class="blk">
+  <div class="lab">(d) @font-face CURSIVE FONT from StaticResource - typed name</div>
+  <div class="cursive">K. Dombrowski</div>
+  <div class="sub">font-face loaded from a StaticResource TTF</div>
+</div>
+
+<div class="blk">
+  <div class="lab">(d2) GENERIC CSS cursive family - typed name</div>
+  <div class="genericcursive">K. Dombrowski</div>
+  <div class="sub">font-family: cursive (no resource)</div>
+</div>
+
+<div class="blk">
+  <div class="lab">SIZE CONTROL - same transparent PNG at 2.5in / 180pt / 200px / no width</div>
+  <img class="sig" src="{!$Resource.ZZ_SigProbe_Signature}" />
+  <img class="sizept" src="{!$Resource.ZZ_SigProbe_Signature}" />
+  <img class="sizepx" src="{!$Resource.ZZ_SigProbe_Signature}" />
+  <img src="{!$Resource.ZZ_SigProbe_Signature}" />
+  <div class="sub">left to right: width:2.5in, width:180pt, width:200px, no width attribute</div>
+</div>
+
+<apex:outputPanel layout="none" rendered="{!payloadUri != null}">
+<div class="blk">
+  <div class="lab">PAYLOAD - data URI, padded blob, width:2.5in</div>
+  <img class="sig" src="{!payloadUri}" />
+  <div class="sub">{!payloadInfo}</div>
+</div>
+</apex:outputPanel>
+
+</body>
+</html>
+</apex:page>

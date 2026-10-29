@@ -1,0 +1,73 @@
+<apex:page controller="ZZ_SigProbe_ChainCtl" renderAs="pdf" showHeader="false" sidebar="false"
+           standardStylesheets="false" applyBodyTag="false" language="en-US">
+<html>
+<head>
+<style>
+  @page { size: Letter; margin: 0.7in 0.75in 0.7in 0.75in; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 9.5pt; color: #1c1c1c; line-height: 1.35; }
+  .brandbar { border-bottom: 2.5pt solid #0b3d6b; padding-bottom: 6pt; margin-bottom: 14pt; }
+  .brandname { font-size: 15pt; font-weight: bold; color: #0b3d6b; letter-spacing: 0.4pt; }
+  .brandsub { font-size: 7.5pt; color: #6b6b6b; }
+  h1 { font-size: 12pt; margin: 0 0 4pt 0; color: #0b3d6b; }
+  h2 { font-size: 9.5pt; margin: 12pt 0 4pt 0; color: #0b3d6b; }
+  .muted { color: #6b6b6b; font-size: 8pt; }
+  table.meta { width: 100%; border-collapse: collapse; margin: 8pt 0 12pt 0; }
+  table.meta td { border: 0.6pt solid #c9d3de; padding: 4pt 6pt; font-size: 8.5pt; }
+  table.meta td.k { background: #eef3f8; font-weight: bold; width: 28%; }
+  p { margin: 0 0 6pt 0; text-align: justify; }
+  .sigblock { margin-top: 22pt; page-break-inside: avoid; }
+  .sigtable { width: 100%; border-collapse: collapse; }
+  .sigtable td { vertical-align: bottom; padding: 0; }
+  .sigcell { width: 58%; }
+  img.sig { width: 2.5in; height: 0.833in; }
+  .sigline { border-bottom: 0.8pt solid #1c1c1c; height: 2pt; margin-top: -2pt; }
+  .siglabel { font-size: 7.5pt; color: #444; margin-top: 3pt; }
+  .datecell { width: 38%; padding-left: 12pt; }
+  .dateline { border-bottom: 0.8pt solid #1c1c1c; height: 12pt; }
+  .footer { position: absolute; bottom: 0; width: 100%; border-top: 0.6pt solid #c9d3de; padding-top: 4pt;
+            font-size: 6.8pt; color: #7a7a7a; }
+</style>
+</head>
+<body>
+
+<div class="brandbar">
+  <div class="brandname">A-PROTECT WARRANTY</div>
+  <div class="brandsub">Vehicle Service Contract &mdash; Dealer Copy</div>
+</div>
+
+<h1>Vehicle Application &amp; Signature</h1>
+
+<table class="meta">
+  <tr><td class="k">Application</td><td>{!appRef}</td></tr>
+  <tr><td class="k">Dealer</td><td>{!dealerName}</td></tr>
+  <tr><td class="k">Signed on</td><td>{!signedOn}</td></tr>
+</table>
+
+<h2>Declaration</h2>
+<p>The undersigned confirms that the information provided in this application is true and complete, that the
+vehicle described has been inspected, and that the purchaser has received and reviewed the terms and
+conditions of the service contract. The dealer is authorised to submit this application on the purchaser's
+behalf.</p>
+
+<div class="sigblock">
+  <table class="sigtable">
+    <tr>
+      <td class="sigcell">
+        <img class="sig" src="/resource/{!sigName}" alt="signature"/>
+        <div class="sigline"></div>
+        <div class="siglabel">Authorised Dealer Signature</div>
+      </td>
+      <td class="datecell">
+        <div class="dateline"></div>
+        <div class="siglabel">Date</div>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="footer">ZZ_SigProbe probe page &mdash; mirrors the DealerPortalVehicleApplicationPDFs signature block.
+Not a contract.</div>
+
+</body>
+</html>
+</apex:page>

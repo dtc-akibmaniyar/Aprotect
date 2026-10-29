@@ -302,12 +302,6 @@
                 <div class="package-header">
                     {packageWrapper.packageHeaderName}
                     <div class="package-header-actions">
-                        <template if:false={isQuote}>
-                            <button class="package-pdf-btn" data-recordtype={recordTypeWrapper.recordTypeName} onclick={handlePackagePdf} title="Generate PDF for this package">
-                                <lightning-icon icon-name="utility:pdf_ext" size="x-small"></lightning-icon>
-                                <span>PDF</span>
-                            </button>
-                        </template>
                         <template if:false={isLocked}>
                             <button class="edit-section-btn edit-section-btn--dark" data-recordtype={recordTypeWrapper.recordTypeName} onclick={handleEditSection} title="Edit this package">
                                 <lightning-icon icon-name="utility:edit" size="x-small"></lightning-icon>
@@ -466,13 +460,25 @@
                 onclick={handlePreviewPdf}
                 disabled={isBusy}
               >PREVIEW PDF</button>
+              <c-dealer-signature-pad
+                application-id={effectiveApplicationId}
+                document-type={signatureDocumentType}
+                onsignaturestatuschange={handleSignatureStatusChange}
+              ></c-dealer-signature-pad>
             </template>
 
-            <button
-              class="submit-button"
-              onclick={handleSubmitApplication}
-              disabled={isSubmitButtonDisabled}
-            >{submitButtonLabel}</button>
+            <!-- SUBMIT is wrapped: a disabled button swallows hover events, so
+                 the explanation lives on the wrapper (title + CSS tooltip). -->
+            <span class={submitGateClass} title={submitGateMessage}>
+              <button
+                class="submit-button"
+                onclick={handleSubmitApplication}
+                disabled={isSubmitButtonDisabled}
+              >{submitButtonLabel}</button>
+              <template if:true={isSubmitGated}>
+                <span class="submit-gate-tip" role="tooltip">{submitGateMessage}</span>
+              </template>
+            </span>
             <template if:true={hasInvoice}>
               <button
                 class="view-invoice-button"
@@ -493,6 +499,11 @@
               onclick={handlePreviewPdf}
               disabled={isBusy}
             >PREVIEW PDF</button>
+            <c-dealer-signature-pad
+              application-id={effectiveApplicationId}
+              document-type={signatureDocumentType}
+              onsignaturestatuschange={handleSignatureStatusChange}
+            ></c-dealer-signature-pad>
             <template if:true={hasInvoice}>
               <button
                 class="view-invoice-button"

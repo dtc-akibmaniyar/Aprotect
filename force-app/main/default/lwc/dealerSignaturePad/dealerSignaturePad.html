@@ -1,0 +1,131 @@
+<template>
+  <!-- Closed state: ONE button. No per-document chips, no download links. -->
+  <template if:false={showPad}>
+    <div class="sig-inline">
+      <button class={signatureButtonClass} onclick={handleOpenPad} title={signatureButtonTitle}>
+        <template if:true={allDocumentsSigned}>
+          <span class="sig-btn-tick" aria-hidden="true">&#10003;</span>
+        </template>
+        <span>{signatureButtonLabel}</span>
+      </button>
+      <template if:true={inlineError}>
+        <span class="sig-inline-error">{inlineError}</span>
+      </template>
+    </div>
+  </template>
+
+  <template if:true={showPad}>
+    <section class="sig-overlay" role="dialog" aria-modal="true" tabindex="-1" onkeydown={handleKeydown}>
+      <div class="sig-modal">
+        <div class="sig-modal-header">
+          <span class="sig-modal-title">SIGN DOCUMENTS</span>
+          <div class="sig-tabs" role="tablist">
+            <template for:each={tabs} for:item="t">
+              <button key={t.key} class={t.className} role="tab" data-key={t.key} onclick={handleTabClick}>
+                <span>{t.label}</span>
+                <template if:true={t.signed}>
+                  <span class="sig-tab-tick">&#10003;</span>
+                </template>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <div class="sig-split">
+          <div class="sig-pane sig-pane--preview">
+            <div class="sig-pane-head">
+              <span class="sig-pane-title">CONTRACT PREVIEW · {activeLabel}</span>
+              <button class="sig-link" onclick={handleOpenPreviewTab}>OPEN IN NEW TAB</button>
+            </div>
+            <div class="sig-preview-body">
+              <template if:true={previewLoading}>
+                <div class="sig-preview-state">Preparing the document…</div>
+              </template>
+              <template if:true={previewError}>
+                <div class="sig-preview-state sig-preview-state--error">{previewError}</div>
+              </template>
+              <template if:true={previewReady}>
+                <iframe class="sig-preview-frame" src={previewUrl} title="Contract preview"></iframe>
+              </template>
+            </div>
+          </div>
+
+          <div class="sig-pane sig-pane--signer">
+            <ol class="sig-checklist">
+              <template for:each={roleDefs} for:item="s">
+                <li key={s.role} class={s.className} data-index={s.index} onclick={selectStep}>
+                  <span class="sig-check">{s.number}</span>
+                  <span class="sig-check-label">{s.label}</span>
+                  <template if:true={s.captured}>
+                    <span class="sig-tick">&#10003;</span>
+                  </template>
+                </li>
+              </template>
+            </ol>
+
+            <div class="sig-step-head">
+              <span class="sig-step-count">{stepCountLabel}</span>
+              <span class="sig-step-name">{activeLabel}</span>
+            </div>
+            <p class="sig-hint">{activeHint}</p>
+
+            <label class="sig-field-label" for="sigSignerName">SIGNER NAME</label>
+            <input id="sigSignerName" class="sig-input" type="text" maxlength="80"
+                   value={activeName} oninput={handleNameChange} autocomplete="name" />
+
+            <div class="sig-canvas-wrap">
+              <canvas class="sig-canvas" width="750" height="250"
+                      onpointerdown={handlePointerDown}
+                      onpointermove={handlePointerMove}
+                      onpointerup={handlePointerUp}
+                      onpointercancel={handlePointerUp}
+                      onpointerleave={handlePointerUp}></canvas>
+              <template if:false={hasInk}>
+                <span class="sig-canvas-hint">Sign here</span>
+              </template>
+            </div>
+
+            <div class="sig-tools">
+              <button class="sig-btn sig-btn--ghost" onclick={handleClear} disabled={isSubmitting}>CLEAR</button>
+              <template if:true={hasPrev}>
+                <button class="sig-btn sig-btn--ghost" onclick={handlePrevStep} disabled={isSubmitting}>BACK</button>
+              </template>
+              <template if:false={isLastStep}>
+                <button class="sig-btn sig-btn--ghost" onclick={handleNextStep} disabled={isSubmitting}>NEXT SIGNER</button>
+              </template>
+            </div>
+
+            <template if:true={isSubmitting}>
+              <ul class="sig-progress">
+                <template for:each={steps} for:item="s">
+                  <li key={s.key} class={s.className}>
+                    <span class="sig-step-dot"></span>
+                    <span>{s.label}</span>
+                  </li>
+                </template>
+              </ul>
+            </template>
+
+            <template if:true={activeError}>
+              <div class="sig-alert" role="alert">{activeError}</div>
+            </template>
+            <template if:true={activeSuccess}>
+              <div class="sig-success" role="status">{activeSuccess}</div>
+            </template>
+          </div>
+        </div>
+
+        <div class="sig-modal-footer">
+          <span class="sig-footer-note">{footerNote}</span>
+          <template if:true={activeSigned}>
+            <button class="sig-btn sig-btn--ghost" onclick={handleSignAgain} disabled={isSubmitting}>SIGN AGAIN</button>
+          </template>
+          <button class="sig-btn sig-btn--ghost" onclick={handleCancel} disabled={isSubmitting}>CLOSE</button>
+          <template if:false={activeSigned}>
+            <button class="sig-btn sig-btn--primary" onclick={handleSubmit} disabled={submitDisabled}>{submitLabel}</button>
+          </template>
+        </div>
+      </div>
+    </section>
+  </template>
+</template>

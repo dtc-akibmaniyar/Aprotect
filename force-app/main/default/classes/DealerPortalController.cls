@@ -5416,6 +5416,21 @@ for (Integer i = 0; i < dmlEx.getNumDml(); i++) {
             app.Application_Status__c = status;
             
             if (status == 'Submitted') {
+                // SIGNATURE GATE (cannot be bypassed from the portal): every
+                // contract document this application actually carries must be
+                // signed by all three signers before it can be submitted.
+                // SignatureSubmitGuard also produces the exact sentence the
+                // dealer portal's SUBMIT button shows, so UI and server agree.
+                SignatureSubmitGuard.Requirements signatureGate =
+                    SignatureSubmitGuard.forApplication((Id) applicationId);
+                if (signatureGate.allComplete != true) {
+                    return new Map<String, Object>{
+                        'success' => false,
+                        'message' => String.isNotBlank(signatureGate.missingMessage)
+                            ? signatureGate.missingMessage
+                            : 'Sign all contract documents before submitting.'
+                    };
+                }
                 app.Application_Submission_Date__c = DateTime.now();
                 app.Application_Source_Submitted_By__c = 'Dealership User';
                 

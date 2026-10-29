@@ -1,0 +1,7 @@
+<apex:component controller="ContractAdditionalOptionsController">
+    <apex:attribute name="pkgId" type="String" assignTo="{!packageId}"
+        description="Application package whose purchased add-on labels are printed" />
+    <apex:outputPanel layout="none" rendered="{!hasOptions}">
+        <div style="font-size:6.7pt; color:#3f4a5c; line-height:1.25; margin:0 0 1px 0;">Additional Options:&#160;<span style="font-weight:bold; color:#111111;">{!optionsDisplay}</span></div>
+    </apex:outputPanel>
+</apex:component>

@@ -36,10 +36,12 @@
   .privacy p { font-size: 6.1pt; margin: 0 0 2px 0; text-align: justify; }
   .ack { font-size: 8.1pt; font-weight: bold; color:#111111; margin: 10px 0 3px 0; }
   .rule { border-top: 0.7pt solid #c9cfda; margin: 0 0 5px 0; }
-  table.sig { width:100%; border-collapse: collapse; margin-top: 16px; }
+  table.sig { width:100%; border-collapse: collapse; margin-top: 2px; }
   table.sig td { width:50%; vertical-align: bottom; padding: 0 14px 0 0; }
   .sigline { border-top: 0.6pt solid #111111; height: 15px; }
   .siglab { font-size: 6.4pt; color:#3f4a5c; padding-top: 2px; }
+  .sigimg { width:2.25in; height:0.75in; display:block; margin:0 0 1px 0; }
+  .sigdate { font-size: 5.6pt; color:#3f4a5c; padding:0; line-height:1.05; }
   .adminfoot { text-align:center; font-size: 6.2pt; color:#3f4a5c; margin-top: 12px; }
   .adminfoot div { margin: 1px 0; }
 </style>
@@ -143,7 +145,7 @@ table.sig td { vertical-align: bottom; padding: 0 16px 0 0; }
 .tr .privacy p{ font-size: 6.1pt; margin: 0 0 2px 0; text-align: justify; }
 .tr .ack{ font-size: 8.1pt; font-weight: bold; color:#111111; margin: 10px 0 3px 0; }
 .tr .rule{ border-top: 0.7pt solid #c9cfda; margin: 0 0 5px 0; }
-.tr table.sig{ width:100%; border-collapse: collapse; margin-top: 16px; }
+.tr table.sig{ width:100%; border-collapse: collapse; margin-top: 2px; }
 .tr table.sig td{ width:50%; vertical-align: bottom; padding: 0 14px 0 0; }
 .tr .sigline{ border-top: 0.6pt solid #111111; height: 15px; }
 .tr .siglab{ font-size: 6.4pt; color:#3f4a5c; padding-top: 2px; }
@@ -217,7 +219,7 @@ table.sig td { vertical-align: bottom; padding: 0 16px 0 0; }
 </head>
 <body>
 <apex:repeat value="{!recordTypeWrappersList}" var="rw"><apex:repeat value="{!rw.packages}" var="w">
-<apex:outputPanel rendered="{!NOT(w.isTireRim)}">
+<apex:outputPanel rendered="{!AND(NOT(w.isTireRim), OR(ISBLANK($CurrentPage.parameters.docType), $CurrentPage.parameters.docType == 'Warranty'))}">
 
 
 
@@ -254,6 +256,7 @@ table.sig td { vertical-align: bottom; padding: 0 16px 0 0; }
   <tr><td class="lb">Contract Start Odometer</td><td class="vl">{!w.odometerStartDisplay}</td>
       <td class="lb2">Contract Expiration Odometer</td><td class="vl2">{!w.odometerEndDisplay}</td></tr>
 </table>
+<c:ContractAdditionalOptionsSection pkgId="{!w.pkg.Id}" />
 <table class="premium"><tr>
   <td>Contract Premium <b>{!w.premiumWithoutTaxDisplay}</b></td>
   <td>GST/HST <b>{!w.taxDisplay}</b></td>
@@ -306,7 +309,7 @@ table.sig td { vertical-align: bottom; padding: 0 16px 0 0; }
 </div>
 <div class="ck">&#9744;&#160;&#160;I, the Customer acknowledge that I have read, reviewed, and understood all pages of the Terms and Conditions of this A-Protect Vehicle Service Agreement, including the exclusions, limitations, cancellations, and transfer provisions on the following page(s). I confirm that all information provided on this Application and Registration Page is true, complete, and accurate to the best of my knowledge, and I attest that this Application and Registration Page has been correctly and accurately completed by the selling dealer. I understand and agree that this Application and Registration Page, together with the following full Terms and Conditions, constitutes the entire Agreement between the parties. I understand that this Agreement is a Service Agreement, not an insurance product, and that all authorizations, approvals, and payments under it are administrative in nature and governed solely by the Terms and Conditions provided. I understand that this is an application only, and that coverage does not take effect until A-Protect has accepted this application and received payment of the Total Premium, including applicable taxes. I further acknowledge that no verbal promises or representations, other than those expressly stated in writing in this Agreement, shall be binding on A-Protect Warranty Corporation or its authorized representatives.</div>
 <table class="sig"><tr>
-  <td style="width:52%"><div class="sigline"></div><div class="siglab">CUSTOMER SIGNATURE</div></td>
+  <td style="width:52%"><c:DealerPortalSignatureBlock appId="{!Application__c.Id}" docType="Warranty" role="Customer" /><div class="sigline"></div><div class="siglab">CUSTOMER SIGNATURE</div></td>
   <td><div class="sigline"></div><div class="siglab">SIGNED DATE</div></td>
 </tr></table>
 
@@ -321,14 +324,14 @@ table.sig td { vertical-align: bottom; padding: 0 16px 0 0; }
 </table>
 <div class="ck" style="font-style:normal; margin-top:5px;"><b>DEALER ATTESTATION &#8211;</b> By signing this Agreement, the Dealership agrees to the following: This Application and Registration Page has been completed correctly and accurately on behalf of the Customer named above. The vehicle, coverage, and pricing details entered reflect what was disclosed to and selected by the customer. Together with the following full Terms and Conditions, this Application and Registration Page forms the entire Agreement between the parties. The Customer has been advised that this is an application only and coverage begins only once A-Protect accepts it and receives payment of the Total Premium, including applicable taxes.</div>
 <table class="sig" style="margin-top:10px;"><tr>
-  <td style="width:52%"><div class="sigline"></div><div class="siglab">DEALERSHIP REP. SIGNATURE</div></td>
+  <td style="width:52%"><c:DealerPortalSignatureBlock appId="{!Application__c.Id}" docType="Warranty" role="DealerRep" /><div class="sigline"></div><div class="siglab">DEALERSHIP REP. SIGNATURE</div></td>
   <td><div class="sigline"></div><div class="siglab">SIGNED DATE</div></td>
 </tr></table>
 
 
 
 </apex:outputPanel>
-<apex:outputPanel rendered="{!w.isTireRim}">
+<apex:outputPanel rendered="{!AND(w.isTireRim, OR(ISBLANK($CurrentPage.parameters.docType), BEGINS($CurrentPage.parameters.docType, 'Tire')))}">
 <div class="tp">
 
 
@@ -419,7 +422,7 @@ table.sig td { vertical-align: bottom; padding: 0 16px 0 0; }
 </div>
 <div class="ck">&#9744;&#160;&#160;I, the Customer acknowledge that I have read, reviewed, and understood all pages of the Terms and Conditions of this A-Protect Tire &amp; Rim Vehicle Service Agreement, including the exclusions, limitations, cancellations, and transfer provisions on the following page(s). I confirm that all information provided on this Application and Registration Page is true, complete, and accurate to the best of my knowledge, and I attest that this Application and Registration Page has been correctly and accurately completed by the selling dealer. I understand and agree that this Application and Registration Page, together with the following full Terms and Conditions, constitutes the entire Agreement between the parties. I understand that this Agreement is a Service Agreement, not an insurance product, and that all authorizations, approvals, and payments under it are administrative in nature and governed solely by the Terms and Conditions provided. I understand that this is an application only, and that coverage does not take effect until A-Protect has accepted this application and received payment of the Total Premium, including applicable taxes. I further acknowledge that no verbal promises or representations, other than those expressly stated in writing in this Agreement, shall be binding on A-Protect Warranty Corporation or its authorized representatives.</div>
 <table class="sig"><tr>
-  <td style="width:52%"><div class="sigline"></div><div class="siglab">CUSTOMER SIGNATURE</div></td>
+  <td style="width:52%"><c:DealerPortalSignatureBlock appId="{!Application__c.Id}" docType="TireRim" role="Customer" /><div class="sigline"></div><div class="siglab">CUSTOMER SIGNATURE</div></td>
   <td><div class="sigline"></div><div class="siglab">SIGNED DATE</div></td>
 </tr></table>
 
@@ -434,7 +437,7 @@ table.sig td { vertical-align: bottom; padding: 0 16px 0 0; }
 </table>
 <div class="ck" style="font-style:normal; margin-top:5px;"><b>DEALER ATTESTATION &#8211;</b> By signing this Agreement, the Dealership agrees to the following: This Application and Registration Page has been completed correctly and accurately on behalf of the Customer named above. The vehicle, coverage, and pricing details entered reflect what was disclosed to and selected by the customer. Together with the following full Terms and Conditions, this Application and Registration Page forms the entire Agreement between the parties. The Customer has been advised that this is an application only and coverage begins only once A-Protect accepts it and receives payment of the Total Premium, including applicable taxes.</div>
 <table class="sig" style="margin-top:10px;"><tr>
-  <td style="width:52%"><div class="sigline"></div><div class="siglab">DEALERSHIP REP. SIGNATURE</div></td>
+  <td style="width:52%"><c:DealerPortalSignatureBlock appId="{!Application__c.Id}" docType="TireRim" role="DealerRep" /><div class="sigline"></div><div class="siglab">DEALERSHIP REP. SIGNATURE</div></td>
   <td><div class="sigline"></div><div class="siglab">SIGNED DATE</div></td>
 </tr></table>
 
@@ -442,20 +445,21 @@ table.sig td { vertical-align: bottom; padding: 0 16px 0 0; }
 
 </div>
 </apex:outputPanel>
+<apex:outputPanel rendered="{!AND(NOT(w.isTireRim), OR(ISBLANK($CurrentPage.parameters.docType), $CurrentPage.parameters.docType == 'Warranty'))}">
 <div style="page-break-before: always;"></div>
-<apex:outputPanel rendered="{!NOT(w.isTireRim)}">
 <c:WarrantyTerms1 />
 <c:ContractOptionsSection pkgId="{!w.pkg.Id}" />
 <c:WarrantyTerms2 />
 <c:WarrantyTerms3 />
-<c:WarrantyTerms4 />
+<c:WarrantyTerms4 appId="{!Application__c.Id}" docType="Warranty" />
 </apex:outputPanel>
-<apex:outputPanel rendered="{!w.isTireRim}">
+<apex:outputPanel rendered="{!AND(w.isTireRim, OR(ISBLANK($CurrentPage.parameters.docType), BEGINS($CurrentPage.parameters.docType, 'Tire')))}">
+<div style="page-break-before: always;"></div>
 <div class="tr">
 <c:TireRimTerms1 />
 <c:TireRimTerms2 />
 <c:TireRimTerms3 />
-<c:TireRimTerms4 />
+<c:TireRimTerms4 appId="{!Application__c.Id}" docType="TireRim" />
 </div>
 </apex:outputPanel>
 </apex:repeat></apex:repeat>

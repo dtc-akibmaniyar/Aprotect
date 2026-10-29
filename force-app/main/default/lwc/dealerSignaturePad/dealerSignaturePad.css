@@ -1,0 +1,77 @@
+/* Portal palette: brand blue #5184B7, deep #31587F / #235E80, text #333,
+   borders #C1C1C1, card radius 8px, button radius 9px, 13px body. */
+.sig-inline{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sig-muted{font-size:12px;color:#666}
+.sig-inline-error{font-size:12px;color:#b3261e;max-width:320px}
+.sig-chip{display:inline-flex;align-items:center;border-radius:12px;padding:5px 12px;font-size:11px;font-weight:600;white-space:nowrap}
+.sig-chip--done{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0}
+.sig-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:9px;font-size:13px;font-weight:600;padding:11px 16px;cursor:pointer;text-transform:uppercase;letter-spacing:.2px;box-shadow:0 4px 6px rgba(0,0,0,.2);text-decoration:none;line-height:1;transition:background-color .2s}
+.sig-btn:disabled{opacity:.55;cursor:not-allowed}
+.sig-btn--primary{background:#5184B7;color:#fff}
+.sig-btn--primary:hover:not(:disabled){background:#3f6d9b}
+.sig-btn--ghost{background:#fff;color:#3a5a8c;border:1px solid #c9d0de;box-shadow:none}
+.sig-btn--ghost:hover:not(:disabled){background:#f0f4fb;border-color:#3a5a8c}
+.sig-overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:14px}
+.sig-modal{background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.18);width:100%;max-width:1180px;max-height:96vh;display:flex;flex-direction:column;overflow:hidden}
+.sig-modal-header{background:#5184B7;color:#fff;padding:9px 16px;font-size:15px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;display:flex;align-items:center;justify-content:space-between}
+.sig-doctype-pill{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);border-radius:12px;padding:2px 10px;font-size:11px;letter-spacing:.5px}
+.sig-split{display:flex;flex:1;min-height:0}
+.sig-pane{display:flex;flex-direction:column;min-height:0}
+.sig-pane--preview{flex:0 0 60%;border-right:1px solid #e0e0e0;background:#f4f6f9}
+.sig-pane--signer{flex:0 0 40%;padding:14px 16px;overflow-y:auto}
+.sig-pane-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid #e0e0e0;background:#fff}
+.sig-pane-title{font-size:11px;font-weight:700;letter-spacing:.8px;color:#525252}
+.sig-link{background:none;border:none;color:#2E75B5;font-size:11px;font-weight:700;letter-spacing:.4px;cursor:pointer;padding:2px 0;text-transform:uppercase}
+.sig-preview-body{flex:1;min-height:0;display:flex}
+.sig-preview-frame{flex:1;width:100%;border:0;background:#fff}
+.sig-preview-state{margin:auto;padding:24px;font-size:12px;color:#666;text-align:center}
+.sig-preview-state--error{color:#b3261e}
+.sig-checklist{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:4px}
+.sig-step-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;background:#fff}
+.sig-step-item--active{border-color:#5184B7;background:#f2f6fb}
+.sig-step-item--done .sig-check{background:#22C55E;border-color:#22C55E;color:#fff}
+.sig-check{width:18px;height:18px;border-radius:50%;border:1px solid #c9d0de;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#6b7280}
+.sig-check-label{font-size:11px;font-weight:700;letter-spacing:.4px;color:#333;flex:1}
+.sig-tick{color:#065f46;font-weight:700}
+.sig-step-head{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.sig-step-count{font-size:10px;font-weight:700;letter-spacing:.8px;color:#2E75B5}
+.sig-step-name{font-size:11px;font-weight:700;letter-spacing:.4px;color:#333}
+.sig-hint{font-size:12px;color:#666;margin:0 0 10px}
+.sig-field-label{display:block;font-size:11px;font-weight:700;color:#333;letter-spacing:.3px;margin-bottom:5px}
+.sig-input{width:100%;box-sizing:border-box;border:1px solid #C1C1C1;border-radius:8px;padding:8px 10px;font-size:13px;color:#333;margin-bottom:10px;background:#fff}
+.sig-input:focus{outline:none;border-color:#5184B7;box-shadow:0 0 0 2px rgba(81,132,183,.22)}
+.sig-canvas-wrap{position:relative;border:1px solid #C1C1C1;border-radius:8px;background:#fff;overflow:hidden}
+.sig-canvas{display:block;width:100%;height:auto;aspect-ratio:3/1;touch-action:none;cursor:crosshair;background:#fff}
+.sig-canvas-hint{position:absolute;left:12px;bottom:8px;font-size:11px;color:#9aa3ad;pointer-events:none}
+.sig-tools{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.sig-progress{list-style:none;margin:12px 0 0;padding:8px 10px;background:#f4f6f9;border:1px solid #e0e0e0;border-radius:8px}
+.sig-step{display:flex;align-items:center;gap:8px;font-size:11px;color:#6b7280;padding:2px 0}
+.sig-step-dot{width:7px;height:7px;border-radius:50%;background:#c9d0de}
+.sig-step--active{color:#31587F;font-weight:600}
+.sig-step--active .sig-step-dot{background:#5184B7}
+.sig-step--done{color:#065f46}
+.sig-step--done .sig-step-dot{background:#22C55E}
+.sig-alert{margin-top:10px;border:1px solid #fecaca;border-left:6px solid #ef4444;border-radius:8px;padding:9px 11px;font-size:12px;color:#7f1d1d}
+.sig-success{margin-top:10px;border:1px solid #d1fae5;border-left:6px solid #22C55E;border-radius:8px;padding:9px 11px;font-size:12px;color:#166534}
+.sig-modal-footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:11px 16px;border-top:4px solid #235E80;background:#fff}
+.sig-footer-note{margin-right:auto;font-size:11px;color:#666}
+@media (max-width:900px){
+  .sig-split{flex-direction:column}
+  .sig-pane--preview{flex:0 0 40%;border-right:0;border-bottom:1px solid #e0e0e0}
+  .sig-pane--signer{flex:1}
+}
+
+/* Two documents side by side: per-document tab strip in the header, one row per
+   document in the closed state. Same palette as the rest of the pad. */
+.sig-modal-title{font-size:15px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.sig-tabs{display:flex;gap:6px;align-items:center}
+.sig-tab{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:9px;padding:6px 12px;font-size:12px;font-weight:600;letter-spacing:.3px;cursor:pointer;text-transform:uppercase;line-height:1}
+.sig-tab:hover{background:rgba(255,255,255,.26)}
+.sig-tab--active{background:#fff;color:#31587F;border-color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.sig-tab-tick{font-weight:700;color:#86efac}
+.sig-tab--active .sig-tab-tick{color:#16a34a}
+/* Closed state is ONE button. Signed state is quieter (secondary) with a tick,
+   so it still lines up with PREVIEW PDF next to it. */
+.sig-btn--review{color:#31587F;border-color:#c9d0de}
+.sig-btn--review:hover:not(:disabled){background:#f0f4fb;border-color:#31587F}
+.sig-btn-tick{color:#15803d;font-weight:800;line-height:1}

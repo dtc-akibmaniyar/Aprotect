@@ -683,6 +683,64 @@
     cursor: not-allowed;
 }
 
+/* ── SUBMIT gate: wrapper carries the hover/focus explanation, because a
+   disabled <button> fires no pointer events of its own. ───────────────── */
+.submit-gate {
+    position: relative;
+    display: inline-flex;
+    margin-left: auto;
+}
+
+.submit-gate--blocked {
+    cursor: not-allowed;
+}
+
+/* let the wrapper own the pointer so :hover and title still resolve */
+.submit-gate--blocked .submit-button {
+    pointer-events: none;
+}
+
+.submit-gate .submit-button {
+    margin-left: 0;
+}
+
+.submit-gate-tip {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    right: 0;
+    min-width: 240px;
+    max-width: 340px;
+    background: #1f2937;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+    text-align: left;
+    padding: 9px 12px;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.submit-gate-tip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    right: 26px;
+    border: 6px solid transparent;
+    border-top-color: #1f2937;
+}
+
+.submit-gate--blocked:hover .submit-gate-tip,
+.submit-gate--blocked:focus-within .submit-gate-tip {
+    opacity: 1;
+    visibility: visible;
+}
+
 .submit-button {
     background: #5D89B1;
     border: none;

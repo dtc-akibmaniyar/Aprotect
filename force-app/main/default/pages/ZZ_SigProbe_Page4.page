@@ -1,0 +1,26 @@
+<apex:page renderAs="pdf" applyHtmlTag="false" applyBodyTag="false" showHeader="false" standardStylesheets="false" cache="false" language="en-US">
+<html>
+<head>
+<style type="text/css">
+  @page { size: letter; margin: 0.45in 0.5in 0.5in 0.5in; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color:#111111; margin:0; padding:0; }
+  .lab { font-size: 7pt; color:#b3121f; font-weight:bold; margin: 0 0 3px 0; }
+  .blk { border: 0.5pt solid #c9cfda; padding: 6px 8px; margin: 0 0 7px 0; }
+  .sig { width: 2.5in; }
+</style>
+</head>
+<body>
+
+<div class="blk">
+  <div class="lab">P4-1 PUBLIC LINK URL (ContentDistribution) 2.5in</div>
+  <img class="sig" src="{!$CurrentPage.parameters.u}" />
+</div>
+
+<div class="blk">
+  <div class="lab">P4-2 PUBLIC DOWNLOAD URL 2.5in</div>
+  <img class="sig" src="{!$CurrentPage.parameters.u2}" />
+</div>
+
+</body>
+</html>
+</apex:page>

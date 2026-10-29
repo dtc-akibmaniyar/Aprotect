@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ApexComponent xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <description>Labels of the package&apos;s optional (purchased) add-ons, page 1 of the warranty PDF</description>
+    <label>Contract Additional Options Section</label>
+</ApexComponent>

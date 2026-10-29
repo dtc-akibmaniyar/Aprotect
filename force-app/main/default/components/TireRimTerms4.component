@@ -1,4 +1,8 @@
 <apex:component >
+    <apex:attribute name="appId" type="String" required="false"
+        description="Application__c Id; lets the acknowledgement page carry the contract holder signature." />
+    <apex:attribute name="docType" type="String" required="false"
+        description="Warranty or TireRim." />
 <h2 class="part">PART 7: COVERAGE LIMITATIONS AND EXCLUSIONS</h2>
 <p>This Service Contract is a discretionary service program. All determinations of eligibility, repairability, and reimbursement are made solely at the discretion of A-Protect Warranty Corporation. Coverage is strictly limited to the services expressly listed in Part 3 of this Service Contract.</p>
 <p>The following limitations and exclusions apply:</p>
@@ -73,7 +77,7 @@
 <p>By accepting this Contract, the Contract Holder acknowledges having received, read, and agreed to all Terms and Conditions set out herein.</p>
 
 <table class="sig"><tr>
-  <td><div class="sigline"></div><div class="siglab">Contract Holder Signature</div></td>
+  <td><c:DealerPortalSignatureBlock appId="{!appId}" docType="{!docType}" role="ContractHolder" /><div class="sigline"></div><div class="siglab">Contract Holder Signature</div></td>
   <td><div class="sigline"></div><div class="siglab">Date</div></td>
 </tr></table>
 <div class="adminfoot">

@@ -1,0 +1,45 @@
+<apex:page controller="ZZ_SigProbe_Controller2" renderAs="pdf" applyHtmlTag="false" applyBodyTag="false" showHeader="false" standardStylesheets="false" cache="false" language="en-US">
+<html>
+<head>
+<style type="text/css">
+  @page { size: letter; margin: 0.45in 0.5in 0.5in 0.5in; }
+  @font-face { font-family: 'ZZSigAbs'; src: url('{!instanceUrl}/resource/ZZ_SigProbe_Caveat') format('truetype'); }
+  @font-face { font-family: 'ZZSigRel'; src: url('/resource/ZZ_SigProbe_Caveat'); }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color:#111111; margin:0; padding:0; }
+  .lab { font-size: 7pt; color:#b3121f; font-weight:bold; margin: 0 0 3px 0; }
+  .blk { border: 0.5pt solid #c9cfda; padding: 6px 8px; margin: 0 0 7px 0; }
+  .sig { width: 2.5in; }
+  .fabs { font-family: 'ZZSigAbs', Helvetica; font-size: 26pt; color:#101828; }
+  .frel { font-family: 'ZZSigRel', Helvetica; font-size: 26pt; color:#101828; }
+</style>
+</head>
+<body>
+
+<div class="blk">
+  <div class="lab">P3-1 TINY 1x1 data URI hardcoded in markup</div>
+  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==" style="width:1in;height:0.4in;border:0.5pt solid #999999;" />
+</div>
+
+<div class="blk">
+  <div class="lab">P3-2 ABSOLUTE /resource/ URL 2.5in</div>
+  <img class="sig" src="{!instanceUrl}/resource/ZZ_SigProbe_SignatureWhite" />
+</div>
+
+<div class="blk">
+  <div class="lab">P3-3 URLFOR($Resource) 2.5in</div>
+  <img class="sig" src="{!URLFOR($Resource.ZZ_SigProbe_SignatureWhite)}" />
+</div>
+
+<div class="blk">
+  <div class="lab">P3-4 @font-face absolute URL with format hint</div>
+  <div class="fabs">K. Dombrowski</div>
+</div>
+
+<div class="blk">
+  <div class="lab">P3-5 @font-face relative /resource URL</div>
+  <div class="frel">K. Dombrowski</div>
+</div>
+
+</body>
+</html>
+</apex:page>

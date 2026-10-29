@@ -1,0 +1,23 @@
+<apex:component controller="SignatureBlockController" selfClosing="false">
+    <apex:attribute name="appId" type="String" required="true"
+        description="Application__c Id whose signature should be shown."
+        assignTo="{!applicationId}" />
+    <apex:attribute name="docType" type="String" required="true"
+        description="Warranty or TireRim."
+        assignTo="{!signatureDocType}" />
+    <apex:attribute name="role" type="String" required="false" default="Customer"
+        description="Customer, DealerRep or ContractHolder. Blank means Customer."
+        assignTo="{!signatureRole}" />
+
+    <apex:outputPanel layout="none" rendered="{!hasSignature}">
+        <!-- The "Signed ..." date sits on the SAME line box as the signature image
+             (inline-block, bottom-aligned) instead of below it. That removes one
+             8.4 pt line from the signature cell, which is what pushed the
+             dealer-rep signature row onto page 2 on the warranty contract.
+             The image is sized per role by the controller: the customer line has
+             room for 162px (1.69in); the rep and contract-holder lines are
+             tighter and must not add a page. -->
+        <img class="sigimg" src="/resource/{!resourceName}" width="{!imageWidth}" height="{!imageHeight}" alt="signature"
+             style="display:inline-block;vertical-align:bottom;margin:0 8px 0 0" /><apex:outputPanel layout="none" rendered="{!hasSignedOn}"><span class="sigdate">Signed {!signedOnDisplay}</span></apex:outputPanel>
+    </apex:outputPanel>
+</apex:component>
