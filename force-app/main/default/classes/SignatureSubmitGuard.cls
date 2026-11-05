@@ -1,8 +1,8 @@
 /**
  * SignatureSubmitGuard
  * ONE rule, enforced on the server: an application cannot move to Submitted
- * until every contract document it actually carries has been signed by all
- * three signers (Customer, Dealership Rep, Contract Holder).
+ * until every contract document it actually carries has been signed by both
+ * signers (Customer and Dealership Rep).
  *
  * "The documents it actually carries" = the ACTIVE Application_Package__c record
  * types on the application:
@@ -23,8 +23,8 @@ public without sharing class SignatureSubmitGuard {
     public static final String RT_TIRE_RIM = 'Tire_Rim_Protection_Plan';
 
     /** Suffix both the button tooltip and the refused submit share. */
-    public static final String THREE_SIGNER_NOTE =
-        ' — all three signatures (customer, dealership rep and contract holder) are required on each document.';
+    public static final String MISSING_SIGNER_NOTE =
+        ' — both signatures (customer and dealership rep) are required on each document.';
 
     public class DocumentRequirement {
         @AuraEnabled public String documentType;   // Warranty | TireRim
@@ -82,13 +82,13 @@ public without sharing class SignatureSubmitGuard {
             req.missingLabels = joinLabels(missing);
             req.missingMessage = 'Sign the ' + req.missingLabels
                 + (missing.size() > 1 ? ' documents' : ' document')
-                + ' before submitting' + THREE_SIGNER_NOTE;
+                + ' before submitting' + MISSING_SIGNER_NOTE;
             return req;
         } catch (Exception e) {
             req.allComplete = false;
             req.hasRequiredDocuments = true;
             req.missingMessage = 'Signature status could not be checked'
-                + THREE_SIGNER_NOTE;
+                + MISSING_SIGNER_NOTE;
             return req;
         }
     }

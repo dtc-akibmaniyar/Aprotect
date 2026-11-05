@@ -96,8 +96,7 @@ private class SignatureBlockControllerTest {
 
     /** Legacy rows with a blank role still print on the customer line. */
     @isTest
-    static void blankRoleIsTreatedAsCustomer() {
-        Id appId = newApplication();
+    static void blankRoleIsTreatedAsCustomer() {        Id appId = newApplication();
         insert new Application_Signature__c(
             Application__c = appId,
             Document_Type__c = 'Warranty',
@@ -132,5 +131,56 @@ private class SignatureBlockControllerTest {
         done.signatureDocType = 'Warranty';
         done.signatureRole = 'Customer';
         System.assertEquals(false, done.getHasSignature());
+    }
+
+    /**
+     * The acknowledgement page re-uses the customer block in the Contract Holder
+     * cell and pins its footprint with widthPx / heightPx.
+     */
+    @isTest
+    static void customerBlockHonoursTheExplicitSizeOverride() {
+        Id appId = newApplication();
+        addSignature(appId, 'Warranty', 'Customer', 'SIGTMP_blk_override');
+        addSignature(appId, 'Warranty', 'DealerRep', 'SIGTMP_blk_override_rep');
+
+        SignatureBlockController customer = new SignatureBlockController();
+        customer.applicationId = String.valueOf(appId);
+        customer.signatureDocType = 'Warranty';
+        customer.signatureRole = 'Customer';
+        customer.imageWidthPx = '120';
+        customer.imageHeightPx = '40';
+
+        System.assertEquals(true, customer.getHasSignature());
+        System.assertEquals('SIGTMP_blk_override', customer.getResourceName(),
+            'the Contract Holder cell carries the CUSTOMER stroke');
+        System.assertEquals('120', customer.getImageWidth());
+        System.assertEquals('40', customer.getImageHeight());
+    }
+
+    /** An unusable override fails closed to the per-role default, never to 0. */
+    @isTest
+    static void invalidSizeOverrideFallsBackToTheRoleDefault() {
+        Id appId = newApplication();
+        addSignature(appId, 'Warranty', 'Customer', 'SIGTMP_blk_fallback');
+
+        for (String bad : new List<String>{ 'abc', '0', '19', '201', '120px', '-5', ' ' }) {
+            SignatureBlockController c = new SignatureBlockController();
+            c.applicationId = String.valueOf(appId);
+            c.signatureDocType = 'Warranty';
+            c.signatureRole = 'Customer';
+            c.imageWidthPx = bad;
+            c.imageHeightPx = bad;
+            System.assertEquals('90', c.getImageWidth(), 'width default kept for: ' + bad);
+            System.assertEquals('30', c.getImageHeight(), 'height default kept for: ' + bad);
+        }
+
+        // a valid height may be overridden on its own while the width defaults
+        SignatureBlockController mixed = new SignatureBlockController();
+        mixed.applicationId = String.valueOf(appId);
+        mixed.signatureDocType = 'Warranty';
+        mixed.signatureRole = 'Customer';
+        mixed.imageHeightPx = '40';
+        System.assertEquals('90', mixed.getImageWidth());
+        System.assertEquals('40', mixed.getImageHeight());
     }
 }

@@ -24,6 +24,10 @@ public without sharing class SignatureBlockController {
     public String applicationId { get; set; }
     public String signatureDocType { get; set; }
     public String signatureRole { get; set; }
+    /* optional explicit size in px, set by the page via the widthPx / heightPx
+       attributes; falls back to the per-role defaults when absent or invalid */
+    public String imageWidthPx { get; set; }
+    public String imageHeightPx { get; set; }
 
     private Boolean loaded = false;
     private Boolean found = false;
@@ -134,19 +138,26 @@ public without sharing class SignatureBlockController {
     }
 
     /**
-     * The three signature lines have different amounts of room left on their
-     * page, so the image is sized per role. Widths are in px, which this renderer
-     * converts at 96 dpi (162px = 1.69in).
+     * The signature lines have different amounts of room left on their page, so
+     * the image is sized per role unless the page passes an explicit size via the
+     * widthPx / heightPx component attributes. Widths are in px, which this
+     * renderer converts at 96 dpi (162px = 1.69in).
      *
-     * With all three signatures present the customer and rep images share the
+     * With both signatures present the customer and rep images share the
      * free space at the foot of the application page (45.3 pt on APP000517),
      * so both lines are smaller than in the single-signature build:
      * 90x30 px (0.94x0.31 in) + 72x24 px (0.75x0.25 in) = 40.5 pt, which keeps
-     * the warranty application page at one page. The contract-holder line sits
-     * at the foot of the terms with room to spare and keeps 120x40 px.
+     * the warranty application page at one page. The contract-holder line at the
+     * foot of the terms (which now carries the customer's stroke) has room to
+     * spare and keeps 120x40 px.
+     *
+     * An override must be a plain integer 20..200; anything else fails closed to
+     * the per-role default so a bad attribute can never break the render.
      */
     public String getImageWidth() {
         load();
+        String pxOverride = validSizeOverride(imageWidthPx);
+        if (pxOverride != null) return pxOverride;
         if (role == 'DealerRep') return '72';
         if (role == 'ContractHolder') return '120';
         return '90';
@@ -154,8 +165,20 @@ public without sharing class SignatureBlockController {
 
     public String getImageHeight() {
         load();
+        String pxOverride = validSizeOverride(imageHeightPx);
+        if (pxOverride != null) return pxOverride;
         if (role == 'DealerRep') return '24';
         if (role == 'ContractHolder') return '40';
         return '30';
+    }
+
+    /** A plain integer 20..200 px, or null when the override is absent / odd. */
+    private static String validSizeOverride(String raw) {
+        if (String.isBlank(raw)) return null;
+        String v = raw.trim();
+        if (!Pattern.matches('[0-9]{1,3}', v)) return null;
+        Integer px = Integer.valueOf(v);
+        if (px < 20 || px > 200) return null;
+        return String.valueOf(px);
     }
 }

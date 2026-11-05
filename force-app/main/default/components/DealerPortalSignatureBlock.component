@@ -8,6 +8,12 @@
     <apex:attribute name="role" type="String" required="false" default="Customer"
         description="Customer, DealerRep or ContractHolder. Blank means Customer."
         assignTo="{!signatureRole}" />
+    <apex:attribute name="widthPx" type="String" required="false"
+        description="Optional image width in px (20..200). Blank keeps the per-role default."
+        assignTo="{!imageWidthPx}" />
+    <apex:attribute name="heightPx" type="String" required="false"
+        description="Optional image height in px (20..200). Blank keeps the per-role default."
+        assignTo="{!imageHeightPx}" />
 
     <apex:outputPanel layout="none" rendered="{!hasSignature}">
         <!-- The "Signed ..." date sits on the SAME line box as the signature image

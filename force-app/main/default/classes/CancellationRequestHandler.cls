@@ -34,12 +34,32 @@ public class CancellationRequestHandler {
 
         List<Id> recordsToSubmit = new List<Id>();
 
+        // Human-readable request number: the AutoNumber field's value copied onto
+        // Name. Name is a plain text field that nothing populated, so a new request
+        // was named after its own record id ("a2vG1000005vuPB"). Names that already
+        // carry a CR- number (seeded data) are left alone.
+        Map<Id, String> requestNumbers = new Map<Id, String>();
+        for (App_Cancellation_Request__c row : [
+            SELECT Id, Request_Number__c FROM App_Cancellation_Request__c WHERE Id IN :newList
+        ]) {
+            if (String.isNotBlank(row.Request_Number__c)) {
+                requestNumbers.put(row.Id, row.Request_Number__c);
+            }
+        }
+
         for (App_Cancellation_Request__c req : newList) {
             App_Cancellation_Request__c upd = new App_Cancellation_Request__c(Id = req.Id);
             Boolean needsUpdate = false;
 
             upd.SLA_Due_Date__c = addBusinessDays(Date.today(), slaDays);
             needsUpdate = true;
+
+            String requestNumber = requestNumbers.get(req.Id);
+            if (String.isNotBlank(requestNumber)
+                    && (String.isBlank(req.Name) || !req.Name.startsWith('CR-'))) {
+                upd.Name = requestNumber;
+                needsUpdate = true;
+            }
 
             if (req.Status__c == 'Pending Sales Review') {
                 if (salesQueueId != null) {
@@ -291,6 +311,30 @@ public class CancellationRequestHandler {
         }
         if (!requestsToUpdate.isEmpty()) {
             update requestsToUpdate;
+        }
+    }
+
+    public static void handleServiceAfterInsert(List<Cancellation_Service__c> newList) {
+        try {
+            List<Cancellation_Service__c> toUpdate = [
+                SELECT Id, Name, Service_Number__c
+                FROM Cancellation_Service__c
+                WHERE Id IN :newList
+            ];
+            List<Cancellation_Service__c> changed = new List<Cancellation_Service__c>();
+            for (Cancellation_Service__c svc : toUpdate) {
+                if (svc.Name == null || !svc.Name.startsWith('CS-')) {
+                    if (svc.Service_Number__c != null) {
+                        svc.Name = svc.Service_Number__c;
+                        changed.add(svc);
+                    }
+                }
+            }
+            if (!changed.isEmpty()) {
+                Database.update(changed, false);
+            }
+        } catch (Exception e) {
+            System.debug(LoggingLevel.WARN, 'Service numbering failed (non-fatal): ' + e.getMessage());
         }
     }
 }

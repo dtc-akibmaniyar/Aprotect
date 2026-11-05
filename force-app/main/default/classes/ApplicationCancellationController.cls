@@ -20,6 +20,7 @@ public without sharing class ApplicationCancellationController {
         try {
             Application__c app = [
                 SELECT Id, 
+                    Dealer_Name__c,
                     Vehicle__r.Year__c, 
                     Vehicle__r.Make__c, 
                     Vehicle__r.Model__c, 
@@ -92,6 +93,8 @@ public static List<Policy__c> getPolicies() {
             throw new AuraHandledException('Application Id is required');
         }
 
+        assertDealerAccess(applicationId);
+
         try {
             List<Application_Policy__c> toInsert = new List<Application_Policy__c>();
             if (policies != null) {
@@ -142,4 +145,26 @@ public static List<Policy__c> getPolicies() {
         @AuraEnabled public Boolean privacyTermsAccepted { get; set; }
     }
 
+
+    /**
+     * Portal users may only cancel their own dealership's application.
+     * Internal users are unaffected.
+     */
+    private static void assertDealerAccess(Id applicationId) {
+        if (UserInfo.getUserType() != 'PowerPartner') {
+            return;
+        }
+        List<User> me = [SELECT ContactId FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
+        if (me.isEmpty() || me[0].ContactId == null) {
+            throw new AuraHandledException('Your portal user is not linked to a dealership.');
+        }
+        List<Contact> contacts = [SELECT AccountId FROM Contact WHERE Id = :me[0].ContactId LIMIT 1];
+        if (contacts.isEmpty() || contacts[0].AccountId == null) {
+            throw new AuraHandledException('Your portal user is not linked to a dealership.');
+        }
+        List<Application__c> apps = [SELECT Dealer_Name__c FROM Application__c WHERE Id = :applicationId LIMIT 1];
+        if (apps.isEmpty() || apps[0].Dealer_Name__c != contacts[0].AccountId) {
+            throw new AuraHandledException('This application belongs to another dealership.');
+        }
+    }
 }

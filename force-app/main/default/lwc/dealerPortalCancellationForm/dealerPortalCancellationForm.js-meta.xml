@@ -1,11 +1,18 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
-	<apiVersion>63.0</apiVersion>
-	<isExposed>true</isExposed>
-	<targets>
-		<target>lightningCommunity__Default</target>
-		<target>lightningCommunity__Page</target>
-		<target>lightningCommunity__Page_Layout</target>
-		<target>lightningCommunity__Theme_Layout</target>
-	</targets>
+    <apiVersion>63.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Dealer Portal Cancellation Form</masterLabel>
+    <description>Full dealer-facing cancellation request form with server-side refund estimates, six-value reason list, terms from Cancellation_Settings, and canvas signature capture.</description>
+    <targets>
+        <target>lightningCommunity__Default</target>
+        <target>lightningCommunity__Page</target>
+        <target>lightningCommunity__Page_Layout</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightningCommunity__Default">
+            <property name="applicationId" type="String" label="Application Id" />
+            <property name="showBackButton" type="Boolean" label="Show Back Button" default="false" />
+        </targetConfig>
+    </targetConfigs>
 </LightningComponentBundle>

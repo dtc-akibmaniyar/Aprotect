@@ -76,16 +76,12 @@ private class SignaturePadControllerTest {
             appId, PNG_1x1, 'Customer Person', 'pad-cust-1', 'Warranty', 'Customer');
         SignatureService.SaveResult rep = SignaturePadController.saveSignature(
             appId, PNG_1x1, 'Sales Person', 'pad-rep-1', 'Warranty', 'DealerRep');
-        SignatureService.SaveResult holder = SignaturePadController.saveSignature(
-            appId, PNG_1x1, 'Customer Person', 'pad-holder-1', 'Warranty', 'ContractHolder');
 
         System.assertEquals(true, cust.created);
         System.assertEquals(true, rep.created);
-        System.assertEquals(true, holder.created);
         System.assertEquals('Customer', cust.signerRole);
         System.assertEquals('DealerRep', rep.signerRole);
-        System.assertEquals('ContractHolder', holder.signerRole);
-        System.assertEquals(3, [
+        System.assertEquals(2, [
             SELECT COUNT() FROM Application_Signature__c WHERE Application__c = :appId
         ]);
 
@@ -95,13 +91,13 @@ private class SignaturePadControllerTest {
         System.assertEquals(rep.signatureId, replay.signatureId);
         System.assertEquals(false, replay.created);
 
-        // A NEW gesture for the same role -> reuses the row, still three rows.
+        // A NEW gesture for the same role -> reuses the row, still two rows.
         SignatureService.SaveResult resigned = SignaturePadController.saveSignature(
             appId, PNG_1x1, 'Sales Person', 'pad-rep-2', 'Warranty', 'DealerRep');
         System.assertEquals(rep.signatureId, resigned.signatureId);
         System.assertEquals(false, resigned.created);
         System.assertEquals('CAPTURED', resigned.status);
-        System.assertEquals(3, [
+        System.assertEquals(2, [
             SELECT COUNT() FROM Application_Signature__c WHERE Application__c = :appId
         ]);
         System.assertEquals('pad-rep-2', [
@@ -109,29 +105,28 @@ private class SignaturePadControllerTest {
         ].IdemKey__c);
     }
 
-    /** Signed is reported only when all three roles carry ink. */
+    /** Signed is reported only when both roles carry ink. */
     @IsTest
-    static void statusRequiresAllThreeRoles() {
+    static void statusRequiresBothRoles() {
         Id appId = newApplication();
 
-        SignaturePadController.saveSignature(appId, PNG_1x1, 'A', 'three-1', 'Warranty', 'Customer');
-        SignaturePadController.saveSignature(appId, PNG_1x1, 'B', 'three-2', 'Warranty', 'DealerRep');
+        SignaturePadController.saveSignature(appId, PNG_1x1, 'A', 'two-1', 'Warranty', 'Customer');
 
         SignatureService.SignatureStatus partial = SignaturePadController.getStatus(appId, 'Warranty');
-        System.assertEquals(false, partial.hasSignature, 'two of three is not signed');
+        System.assertEquals(false, partial.hasSignature, 'one of two is not signed');
         System.assertEquals(false, partial.allRolesCaptured);
-        System.assertEquals(3, partial.roles.size());
+        System.assertEquals(2, partial.roles.size());
         System.assertEquals(true, partial.roles[0].captured, 'Customer captured');
-        System.assertEquals(true, partial.roles[1].captured, 'DealerRep captured');
-        System.assertEquals(false, partial.roles[2].captured, 'ContractHolder still missing');
-        System.assertEquals('ContractHolder', partial.roles[2].role);
+        System.assertEquals('Customer', partial.roles[0].role);
+        System.assertEquals(false, partial.roles[1].captured, 'DealerRep still missing');
+        System.assertEquals('DealerRep', partial.roles[1].role);
 
-        SignaturePadController.saveSignature(appId, PNG_1x1, 'A', 'three-3', 'Warranty', 'ContractHolder');
+        SignaturePadController.saveSignature(appId, PNG_1x1, 'B', 'two-2', 'Warranty', 'DealerRep');
 
         SignatureService.SignatureStatus full = SignaturePadController.getStatus(appId, 'Warranty');
         System.assertEquals(true, full.hasSignature);
         System.assertEquals(true, full.allRolesCaptured);
-        System.assertEquals(3, full.roles.size());
+        System.assertEquals(2, full.roles.size());
         System.assertEquals(false, full.hasPdf, 'no PDF has been rendered yet');
 
         // the other document type is untouched
@@ -144,8 +139,8 @@ private class SignaturePadControllerTest {
         Id appId = newApplication();
 
         ContentVersion cv = new ContentVersion(
-            Title = 'three-signer contract',
-            PathOnClient = 'three-signer.pdf',
+            Title = 'two-signer contract',
+            PathOnClient = 'two-signer.pdf',
             VersionData = Blob.valueOf('%PDF-1.4 test')
         );
         insert cv;
@@ -181,12 +176,12 @@ private class SignaturePadControllerTest {
         }
 
         System.assertNotEquals(null, s);
-        System.assertEquals(true, s.hasSignature, 'all three roles captured');
+        System.assertEquals(true, s.hasSignature, 'both roles captured');
         System.assertEquals(true, s.hasPdf);
         System.assertEquals(String.valueOf(cv.Id), s.pdfDocumentId);
         System.assertEquals(String.valueOf(cv.ContentDocumentId), s.pdfContentDocumentId);
-        System.assertEquals('three-signer contract', s.pdfFileName, 'the file name the dealer sees');
-        System.assertEquals(3, s.roles.size());
+        System.assertEquals('two-signer contract', s.pdfFileName, 'the file name the dealer sees');
+        System.assertEquals(2, s.roles.size());
     }
 
     /**
@@ -240,7 +235,7 @@ private class SignaturePadControllerTest {
 
     /**
      * Warranty and Tire & Rim are separate documents: signing one must leave the
-     * other untouched, and each gets its own three rows.
+     * other untouched, and each gets its own two rows.
      */
     @IsTest
     static void documentsAreSignedSeparately() {
@@ -253,12 +248,12 @@ private class SignaturePadControllerTest {
 
         SignatureService.SignatureStatus w = SignaturePadController.getStatus(appId, 'Warranty');
         SignatureService.SignatureStatus t = SignaturePadController.getStatus(appId, 'TireRim');
-        System.assertEquals(true, w.hasSignature, 'warranty carries all three');
+        System.assertEquals(true, w.hasSignature, 'warranty carries both signatures');
         System.assertEquals(false, t.hasSignature, 'tire & rim is untouched by the warranty signing');
-        System.assertEquals(3, w.roles.size());
-        System.assertEquals(3, t.roles.size());
+        System.assertEquals(2, w.roles.size());
+        System.assertEquals(2, t.roles.size());
         System.assertEquals(false, t.roles[0].captured);
-        System.assertEquals(3, [
+        System.assertEquals(2, [
             SELECT COUNT() FROM Application_Signature__c
             WHERE Application__c = :appId AND Document_Type__c = 'Warranty'
         ]);
@@ -276,16 +271,20 @@ private class SignaturePadControllerTest {
         t = SignaturePadController.getStatus(appId, 'TireRim');
         System.assertEquals(true, w.hasSignature);
         System.assertEquals(true, t.hasSignature, 'tire & rim is signable on its own');
-        System.assertEquals(6, [
+        System.assertEquals(4, [
             SELECT COUNT() FROM Application_Signature__c WHERE Application__c = :appId
         ]);
-        System.assertEquals(3, [
+        System.assertEquals(2, [
             SELECT COUNT() FROM Application_Signature__c
             WHERE Application__c = :appId AND Document_Type__c = 'TireRim'
         ]);
 
         // the same role name exists once per document type
         System.assertEquals(2, [
+            SELECT COUNT() FROM Application_Signature__c
+            WHERE Application__c = :appId AND Signer_Role__c = 'DealerRep'
+        ]);
+        System.assertEquals(0, [
             SELECT COUNT() FROM Application_Signature__c
             WHERE Application__c = :appId AND Signer_Role__c = 'ContractHolder'
         ]);

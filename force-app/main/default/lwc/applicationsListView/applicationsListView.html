@@ -1,5 +1,6 @@
 <template>
     <div class="dp-container">
+        <template if:false={showCancellationForm}>
         <!-- Enhanced Header -->
         <div class="dp-header">
             <!-- Branded left strip accent -->
@@ -369,20 +370,6 @@
             </div>
         </div>
 
-        <!-- Cancellation Request Modal — uses cancellationModal LWC flow -->
-        <template if:true={showCancellationModal}>
-            <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="cancel-modal-heading" class="slds-modal slds-fade-in-open slds-modal_large">
-                <div class="slds-modal__container">
-                    <div class="slds-modal__content slds-p-around_none" style="overflow: visible;">
-                        <c-cancellation-modal
-                            record-id={cancellationApplicationId}
-                            onclose={handleCloseCancellationModal}>
-                        </c-cancellation-modal>
-                    </div>
-                </div>
-            </section>
-            <div class="slds-backdrop slds-backdrop_open" onclick={handleCloseCancellationModal}></div>
-        </template>
 
         <!-- New Application Modal -->
         <template if:true={showNewApplicationModal}>
@@ -417,6 +404,18 @@
                 onclose={handleCloseMakePaymentModal}
                 oncreateremittance={handleCreateRemittanceFromModal}>
             </c-dealer-make-payment-modal>
+        </template>
+        </template>
+
+        <!-- Cancellation Form — full-screen inline dealer portal form -->
+        <template if:true={showCancellationForm}>
+            <section class="dp-cancel-form-wrap" aria-label="Cancel application services">
+                <c-dealer-portal-cancellation-form
+                    application-id={cancellationApplicationId}
+                    show-back-button={showCancelFormBack}
+                    onback={handleCloseCancellationForm}>
+                </c-dealer-portal-cancellation-form>
+            </section>
         </template>
     </div>
 </template>

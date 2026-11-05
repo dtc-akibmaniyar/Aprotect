@@ -14,7 +14,7 @@ private class SignatureServiceTest {
         return app.Id;
     }
 
-    private static List<Id> captureAllThree(Id appId, String docType, String keyPrefix) {
+    private static List<Id> captureAllRoles(Id appId, String docType, String keyPrefix) {
         List<Id> ids = new List<Id>();
         Integer i = 0;
         for (String role : SignatureService.ROLES) {
@@ -64,13 +64,13 @@ private class SignatureServiceTest {
         System.assertEquals(1, [SELECT COUNT() FROM Application_Signature__c WHERE Application__c = :appId]);
     }
 
-    /** Three roles -> three rows; re-signing a role reuses its row. */
+    /** Two roles -> two rows; re-signing a role reuses its row. */
     @isTest
     static void oneRowPerRoleAndReSignReusesTheRow() {
         Id appId = newApplication();
-        List<Id> ids = captureAllThree(appId, 'Warranty', 'ROLE');
+        List<Id> ids = captureAllRoles(appId, 'Warranty', 'ROLE');
 
-        System.assertEquals(3, [
+        System.assertEquals(2, [
             SELECT COUNT() FROM Application_Signature__c WHERE Application__c = :appId
         ]);
 
@@ -80,17 +80,18 @@ private class SignatureServiceTest {
         ]) {
             roles.add(r.Signer_Role__c);
         }
-        System.assertEquals(3, roles.size());
+        System.assertEquals(2, roles.size());
         System.assertEquals(true, roles.contains('Customer'));
         System.assertEquals(true, roles.contains('DealerRep'));
-        System.assertEquals(true, roles.contains('ContractHolder'));
+        System.assertEquals(false, roles.contains('ContractHolder'),
+            'the Contract Holder is no longer a signing step');
 
         // New gesture, same role -> same row, reset to CAPTURED, no duplicate.
         SignatureService.SaveResult again = SignatureService.saveSignature(
             appId, PNG_1x1, 'Rep Again', 'ROLE-again', 'Warranty', 'DealerRep');
         System.assertEquals(ids[1], again.signatureId);
         System.assertEquals(false, again.created);
-        System.assertEquals(3, [
+        System.assertEquals(2, [
             SELECT COUNT() FROM Application_Signature__c WHERE Application__c = :appId
         ]);
 
@@ -149,31 +150,31 @@ private class SignatureServiceTest {
         }
     }
 
-    /** issuePdf refuses until every role has a committed staged image. */
+    /** issuePdf refuses until both roles have a committed staged image. */
     @isTest
-    static void renderNeedsAllThreeStagedRoles() {
+    static void renderNeedsBothStagedRoles() {
         Id appId = newApplication();
-        List<Id> ids = captureAllThree(appId, 'Warranty', 'STAGE');
-        System.assertEquals(3, ids.size());
-        System.assertEquals(3, new Set<Id>(ids).size(), 'each role gets its own row');
+        List<Id> ids = captureAllRoles(appId, 'Warranty', 'STAGE');
+        System.assertEquals(2, ids.size());
+        System.assertEquals(2, new Set<Id>(ids).size(), 'each role gets its own row');
         stage(ids[0], 'SIGTMP_stage_customer');
-        stage(ids[1], 'SIGTMP_stage_rep');
 
         try {
             SignatureService.issuePdf(ids[0]);
-            System.assert(false, 'two staged images must not be rendered');
+            System.assert(false, 'only one staged image must not be rendered');
         } catch (SignatureService.SignatureServiceException e) {
-            System.assert(e.getMessage().contains('ContractHolder'), e.getMessage());
-            System.assert(e.getMessage().contains('all three signers'), e.getMessage());
+            System.assert(e.getMessage().contains('DealerRep'), e.getMessage());
+            System.assert(e.getMessage().contains('both signers'), e.getMessage());
+            System.assert(e.getMessage().contains('missing staged image for'), e.getMessage());
         }
 
-        stage(ids[2], 'SIGTMP_stage_holder');
+        stage(ids[1], 'SIGTMP_stage_rep');
 
         SignatureService.SignatureStatus st = SignatureService.getStatus(appId, 'Warranty');
         System.assertEquals(true, st.hasSignature);
         System.assertEquals(true, st.allRolesCaptured);
         System.assertEquals(false, st.hasPdf, 'nothing rendered yet');
-        System.assertEquals(3, st.roles.size());
+        System.assertEquals(2, st.roles.size());
     }
 
     /** An already-rendered contract returns the stored PDF without touching the renderer. */
@@ -205,14 +206,14 @@ private class SignatureServiceTest {
         insert rows;
 
         System.assertEquals(String.valueOf(cv.Id), SignatureService.issuePdf(rows[0].Id));
-        System.assertEquals(String.valueOf(cv.Id), SignatureService.issuePdf(rows[2].Id));
+        System.assertEquals(String.valueOf(cv.Id), SignatureService.issuePdf(rows[1].Id));
     }
 
     /** A row with no staged image closes cleanly; drop is idempotent on the pointer. */
     @isTest
     static void dropClosesEveryRoleRow() {
         Id appId = newApplication();
-        List<Id> ids = captureAllThree(appId, 'TireRim', 'DROP');
+        List<Id> ids = captureAllRoles(appId, 'TireRim', 'DROP');
         for (Id sigId : ids) {
             SignatureService.dropResource(sigId);
         }

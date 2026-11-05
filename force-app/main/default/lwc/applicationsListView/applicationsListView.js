@@ -20,6 +20,7 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 	@track totalCount = 0;
 	@track applications = [];
 	@track showCancellationModal = false;
+	@track showCancellationForm = false;
 	@track cancellationApplicationId = null;
 	@track cancellationVehicleName = '';
 	@track cancellationVIN = '';
@@ -529,6 +530,10 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 		return Array(this.totalCount).fill(null);
 	}
 
+	get showCancelFormBack() {
+		return true;
+	}
+
 	get isSubmittedStatus() {
 		return this.cancellationApplicationStatus && this.cancellationApplicationStatus.toLowerCase() === 'submitted';
 	}
@@ -593,12 +598,27 @@ export default class ApplicationsListView extends NavigationMixin(LightningEleme
 		this.cancellationVehicleName = app.vehicle.name;
 		this.cancellationVIN = app.vehicle.vin;
 		this.cancellationApplicationStatus = app.applicationStatus;
-		this.showCancellationModal = true;
+		// Open the full-screen dealer portal cancellation form (replaces the legacy modal)
+		this.showCancellationForm = true;
+	}
+
+	handleCloseCancellationForm(event) {
+		if (event && typeof event.preventDefault === 'function') {
+			event.preventDefault();
+		}
+		this.showCancellationForm = false;
+		this.cancellationApplicationId = null;
+		this.cancellationVehicleName = '';
+		this.cancellationVIN = '';
+		this.cancellationApplicationStatus = '';
+		// Reload list to pick up any status change made from the form
+		this.loadInitial();
 	}
 
 	handleCloseCancellationModal() {
 		// Close the cancellation modal and reload the list to reflect any changes
 		this.showCancellationModal = false;
+		this.showCancellationForm = false;
 		this.cancellationApplicationId = null;
 		this.cancellationVehicleName = '';
 		this.cancellationVIN = '';

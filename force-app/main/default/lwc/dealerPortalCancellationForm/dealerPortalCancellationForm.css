@@ -1,220 +1,575 @@
-* {
-    box-sizing: border-box;
+/* dealerPortalCancellationForm.css
+   Values copied verbatim from the approved prototype (cancellation_form_prototype).
+   Do not "improve" these numbers — they are the design. */
+
+:host {
+  --navy: #1e3a5f;
+  --navy-dark: #16304f;
+  --field-bg: #e7e7e7;
+  --field-border: #cfcfcf;
+  --green: #3d8b3d;
+  --green-dark: #2f6e2f;
+  --text: #1f2429;
+  --muted: #5a6472;
+
+  /* Neutralise SLDS typography that would otherwise win over the prototype. */
+  --lwc-fontFamily: 'Segoe UI', Arial, sans-serif;
+  --lwc-fontSizeMedium: 14px;
+  --lwc-colorTextDefault: #1f2429;
+  --sds-c-button-font-family: 'Segoe UI', Arial, sans-serif;
+
+  display: block;
+  margin: 0;
+  padding: 32px 16px 80px;
+  background: #f4f5f7;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--text);
+  line-height: normal;
+  text-align: left;
+  box-sizing: border-box;
+  -webkit-font-smoothing: auto;
 }
 
-.cancellation-container {
-    width: 100%;
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 32px 24px;
+:host h1,
+:host h2,
+:host h3,
+:host h4,
+:host p,
+:host label {
+  font-family: 'Segoe UI', Arial, sans-serif;
 }
 
-/* Main Two-Column Layout */
-.main-layout {
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 24px;
-    align-items: start;
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-/* Left Column */
-.left-column {
-    position: sticky;
-    top: 24px;
+.header {
+  background: var(--navy);
+  color: #fff;
+  padding: 22px 28px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+.header h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: normal;
+  color: #fff;
 }
 
-/* Right Column */
-.right-column {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+.notice {
+  font-weight: 600;
+  font-size: 13.5px;
+  margin: 0 0 20px 4px;
+  color: var(--text);
+  line-height: normal;
 }
 
-/* Vehicle Info Card */
-.vehicle-card {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 16px;
-    padding: 20px;
-    background: #EAF4FF;
-    border: 1px solid #d9dde3;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1.7fr;
+  gap: 16px;
+  align-items: start;
 }
 
-.vehicle-icon {
-    flex-shrink: 0;
+.section-title {
+  background: var(--navy);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 5px;
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
 }
 
-.vehicle-details {
-    width: 100%;
-    text-align: left;
+.card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 16px;
+  border: 1px solid #e2e4e8;
+  box-sizing: border-box;
 }
 
-.vehicle-name {
-    font-size: 14px;
-    font-weight: 700;
-    color: #000;
-    margin-bottom: 4px;
+.field-label {
+  display: block;
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: .2px;
+  margin: 14px 0 6px;
+  color: #333;
+}
+.field-label:first-of-type {
+  margin-top: 0;
+}
+.req {
+  color: #b3261e;
 }
 
-.vehicle-info {
-    font-size: 12px;
-    color: #2D3748;
-    margin-bottom: 2px;
-    line-height: 1.4;
+.field {
+  width: 100%;
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  font-family: inherit;
+  box-sizing: border-box;
+  display: block;
+}
+.field:focus {
+  outline: 2px solid var(--navy);
+  outline-offset: 1px;
+  background: #fff;
 }
 
-/* Policy Sections */
-/* .policy-section {
-    background: white;
-    border: 1px solid #d9dde3;
-    border-radius: 8px;
-    padding: 24px;
-    margin-bottom: 24px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-} */
-
-
-.policy-section{
-    /* border: 1px solid #d9dde3; */
-    padding: 24px;
-    margin-bottom: 0;
-    background: #FDFDFD;
-	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+.service-block {
+  background: #eceef0;
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  box-sizing: border-box;
+}
+.service-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.service-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.svc-check {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--navy);
+  cursor: pointer;
+}
+.opt-text {
+  font-size: 13.5px;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--text);
+}
+.opt-text b {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 2px;
+  font-weight: 700;
 }
 
-.policy-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: #000;
-    margin: 0 0 16px 0;
+.reason-wrap {
+  margin-top: 14px;
+}
+.reason-label {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 8px;
+  display: block;
+  color: var(--text);
+}
+.reason-select {
+  width: 100%;
+  max-width: 280px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--field-border);
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+  font-family: inherit;
+  box-sizing: border-box;
+  display: block;
+}
+.other-textarea {
+  margin-top: 10px;
+  min-height: 70px;
+  resize: vertical;
+  font-family: inherit;
 }
 
-.policy-text {
-    font-size: 12px;
-    line-height: 1.6;
-    color: #2D3748;
-    margin: 0 0 20px 0;
-    text-align: justify;
+.services-section-title-row {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 10px;
+  color: var(--text);
 }
 
-/* Checkbox Container */
-.checkbox-container {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 0;
-    background: transparent;
-    border: none;
-    border-radius: 0;
+.confirm-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #e9f4ea;
+  border: 1px solid #bfe0c2;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-top: 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #245a26;
+  box-sizing: border-box;
+}
+.confirm-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
 }
 
-.policy-checkbox,
-.privacy-checkbox {
-    margin-top: 2px;
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-    flex-shrink: 0;
+.terms-card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 20px 24px;
+  border: 1px solid #e2e4e8;
+  box-sizing: border-box;
+}
+.terms-card p {
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 4px 0 14px;
+  color: #333;
+}
+.terms-card h3 {
+  font-size: 14px;
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: normal;
+}
+.terms-block:last-of-type p {
+  margin-bottom: 0;
+}
+.terms-accept {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #eceef0;
+}
+.terms-check {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+.terms-accept label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
 }
 
-.checkbox-label {
-    font-size: 12px;
-    line-height: 1.5;
-    color: #2D3748;
-    cursor: pointer;
-    user-select: none;
+.auth-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+}
+.auth-box {
+  background: var(--field-bg);
+  border-radius: 6px;
+  padding: 14px 16px;
+  box-sizing: border-box;
+}
+.auth-box h4 {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: normal;
+}
+.auth-box p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--text);
 }
 
-.checkbox-label:hover {
-    color: #000;
+.sig-wrap {
+  background: #fff;
+  border: 1px solid var(--field-border);
+  border-radius: 4px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.sig-canvas {
+  display: block;
+  width: 100%;
+  height: 64px;
+  touch-action: none;
+  cursor: crosshair;
+  background: #fff;
+}
+.sig-clear {
+  margin-top: 8px;
+  background: #eceef0;
+  color: var(--text);
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 11.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.sig-clear:hover {
+  background: #e0e2e5;
 }
 
-/* Spinner Container */
-.spinner-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 400px;
-    width: 100%;
+.refund-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #e5e5e5;
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin-top: 16px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+  box-sizing: border-box;
+}
+.refund-bar .amount {
+  font-size: 17px;
 }
 
-/* Error Message */
-.error-message {
-    padding: 20px;
-    background: #fee;
-    border: 1px solid #fcc;
-    border-radius: 4px;
-    color: #c00;
-    text-align: center;
+.submit-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
 }
-.button-group {
-    display: flex;
-    gap: 15px;
-    margin-top: 20px;
-    justify-content: center;
+button.submit {
+  background: var(--green);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 16px 40px;
+  border-radius: 6px;
+  cursor: pointer;
+  letter-spacing: .3px;
+  font-family: inherit;
+  transition: background .15s ease, transform .1s ease;
 }
-.loading-indicator {
-    margin-top: 0.75rem;
-    display: flex;
-    justify-content: center;
+button.submit:hover {
+  background: var(--green-dark);
 }
-
-
-.action-buttons-container {
-    padding: 7px 0px;
-    background-color: #ffffff;
-    text-align: left;
-    display: flex;
-    gap: 20px;
-    justify-content: flex-start;
-    border-top: 4px solid #235E80;
+button.submit:active {
+  transform: scale(0.98);
 }
-.save-button {
-    background: #F89E43;
-    border: none;
-    border-radius: 9px;
-    color: white;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 12px 40px;
-    cursor: pointer;
-    text-transform: uppercase;
-    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
-    transition: background-color 0.2s ease;
+button.submit:disabled {
+  background: #a9b0ad;
+  cursor: not-allowed;
 }
 
-.save-button:hover:not(:disabled) {
-    background: #e68a2e;
+/* Secondary action (Cancel) beside Submit. In the prototype .btn-secondary only
+   ever appears inside .modal-actions, which supplies padding / radius / weight /
+   border. Standalone in .submit-wrap it had none of those, so it fell back to the
+   browser's default control. These rules add the structural half at the same
+   values, so the button reads as the prototype's secondary button. */
+.submit-wrap .btn-secondary {
+  background: #eceef0;
+  color: var(--text);
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .3px;
+  padding: 16px 32px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.submit-wrap .btn-secondary:hover {
+  background: #e0e2e5;
+}
+.submit-wrap .btn-secondary:active {
+  transform: scale(0.98);
 }
 
-.save-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+.submit-hint {
+  color: var(--muted, #5a6472);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 10px;
+  min-height: 16px;
 }
 
-.cancel-button {
-    background: #5D89B1;
-    border: none;
-    border-radius: 8px;
-    color: white;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 12px 60px;
-    cursor: pointer;
-    text-transform: uppercase;
-    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
-    transition: background-color 0.2s ease;
-    margin-left: 400px;
+.error-text {
+  color: #b3261e;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: center;
+  margin-top: 10px;
+  min-height: 16px;
 }
 
-.cancel-button:hover:not(:disabled) {
-    background: #4a6f8f;
+.no-rows-msg {
+  padding: 18px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  font-style: italic;
+  margin: 0;
+}
+.notice-text-error {
+  color: #b3261e;
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0;
 }
 
-.cancel-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+.loading-wrap {
+  padding: 60px 0;
+  text-align: center;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 24, 30, .55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+.modal-overlay.show {
+  display: flex;
+}
+.modal-box {
+  background: #fff;
+  border-radius: 10px;
+  max-width: 460px;
+  width: 100%;
+  padding: 28px 26px 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+  box-sizing: border-box;
+  text-align: left;
+}
+.modal-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #e9f4ea;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+.modal-box h2 {
+  margin: 0 0 10px;
+  font-size: 19px;
+  color: var(--text);
+  font-weight: 700;
+  line-height: normal;
+}
+.modal-box p {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #333;
+}
+.modal-summary {
+  background: #f4f5f7;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 14px 0;
+  font-size: 13px;
+  line-height: 1.7;
+  box-sizing: border-box;
+}
+.modal-summary b {
+  color: var(--navy);
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+.modal-actions button {
+  flex: 1;
+  padding: 11px 14px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+.btn-secondary {
+  background: #eceef0;
+  color: var(--text);
+}
+.btn-secondary:hover {
+  background: #e0e2e5;
+}
+.btn-primary {
+  background: var(--navy);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--navy-dark);
+}
+
+.view-modal-box {
+  max-width: 520px;
+}
+.view-summary-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.view-summary-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.readonly-badge {
+  background: #8ef0a8;
+  color: #1a5c2a;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 4px;
+  letter-spacing: .3px;
+  display: inline-block;
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .auth-grid {
+    grid-template-columns: 1fr;
+  }
 }

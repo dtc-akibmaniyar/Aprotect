@@ -38,6 +38,7 @@ public class DealerPackageRollupHandler {
                    SUM(Owed_To_Dealer__c) sumOwed
             FROM Application_Package__c
             WHERE Dealer_Package__c IN :dpIds
+              AND Active__c = true
             GROUP BY Dealer_Package__c
         ]) {
             Id dpId = (Id) ar.get('dpId');

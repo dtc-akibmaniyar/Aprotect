@@ -5,7 +5,7 @@
  *   - one document unsigned          -> refused, message names only that one
  *   - warranty-only application      -> allowed without a Tire & Rim document
  *   - warranty-only, unsigned        -> refused naming the warranty only
- *   - two of three signers           -> still refused (all three required)
+ *   - one of two signers             -> still refused (both required)
  *   - no contract packages           -> not gated
  *   - a non-Submitted status         -> not gated (Quote -> Convert path)
  */
@@ -61,7 +61,7 @@ private class SignatureSubmitGuardTest {
         insert pkg;
     }
 
-    /** All three signers sign one document. */
+    /** Both signers sign one document. */
     private static void signDocument(Id applicationId, String documentType) {
         Integer i = 0;
         for (String role : SignatureService.ROLES) {
@@ -181,22 +181,23 @@ private class SignatureSubmitGuardTest {
     }
 
     @IsTest
-    static void allThreeSignersAreRequired() {
+    static void bothSignersAreRequired() {
         Id dealerId = newDealer();
         Id appId = newApplication(dealerId);
         addPackage(appId, dealerId, SignatureSubmitGuard.RT_WARRANTY);
 
-        SignatureService.saveSignature(appId, PNG_1x1, 'Customer', 'two-of-three-1', 'Warranty', 'Customer');
-        SignatureService.saveSignature(appId, PNG_1x1, 'Rep', 'two-of-three-2', 'Warranty', 'DealerRep');
+        SignatureService.saveSignature(appId, PNG_1x1, 'Customer', 'one-of-two-1', 'Warranty', 'Customer');
 
         SignatureSubmitGuard.Requirements req = SignatureSubmitGuard.forApplication(appId);
         System.assertEquals(false, req.allComplete);
-        System.assertEquals(2, req.documents[0].rolesCaptured);
-        System.assertEquals(3, req.documents[0].rolesRequired);
+        System.assertEquals(1, req.documents[0].rolesCaptured);
+        System.assertEquals(2, req.documents[0].rolesRequired);
 
         Map<String, Object> res = submit(appId);
-        System.assertEquals(false, res.get('success'), 'two of three signers is not signed');
+        System.assertEquals(false, res.get('success'), 'one of two signers is not signed');
         System.assert(((String) res.get('message')).contains('Extended Warranty'),
+            (String) res.get('message'));
+        System.assert(((String) res.get('message')).contains('both signatures'),
             (String) res.get('message'));
     }
 

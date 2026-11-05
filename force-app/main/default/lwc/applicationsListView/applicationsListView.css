@@ -1207,3 +1207,11 @@
 }
 
 /* ── End compact buttons ─────────────────────────────────── */
+
+/* Full-screen dealer portal cancellation form */
+.dp-cancel-form-wrap {
+    display: block;
+    min-height: 100vh;
+    background: #ffffff;
+    padding: 8px 0 40px 0;
+}

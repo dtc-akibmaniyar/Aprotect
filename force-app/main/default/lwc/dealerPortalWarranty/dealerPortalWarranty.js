@@ -1882,7 +1882,18 @@ export default class DealerPortalWarranty extends LightningElement {
         this._premiumPreviewWired = result;
         const { data, error } = result;
         if (data) {
-            this.isPremiumVehicle = data.isPremiumVehicle === true;
+            // The badge reflects VEHICLE eligibility, not the price source.
+            // getPremiumPreview deliberately suppresses the premium when a
+            // custom (dealer-entered) price is in force and answers
+            // isPremiumVehicle=false with premiumFee=0 (priceOverrideActive).
+            // Copying that false would clear the PREMIUM VEHICLE badge the
+            // moment a custom price is typed, even though the vehicle, plan and
+            // term are unchanged. While an override is active keep the last
+            // resolved eligibility and refresh only the fee, which the server
+            // still returns as 0 because the override replaces the charge.
+            if (!this.isPriceOverridden) {
+                this.isPremiumVehicle = data.isPremiumVehicle === true;
+            }
             this.livePremiumFee = data.premiumFee != null ? data.premiumFee : 0;
             this.premiumWaived = data.waived === true;
             // Mandatory Diesel Fee — same rule the save path uses; 0 when the

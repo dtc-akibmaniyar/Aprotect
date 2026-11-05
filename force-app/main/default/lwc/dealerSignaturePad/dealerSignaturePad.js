@@ -8,11 +8,14 @@ import currentUserName from '@salesforce/apex/SignaturePadController.currentUser
 import getPreview from '@salesforce/apex/SignaturePadController.getPreview';
 import getSignatureRequirements from '@salesforce/apex/SignaturePadController.getSignatureRequirements';
 
-/** The three signatures that go on EACH contract document. */
+/** The two signatures that go on EACH contract document. */
 const SIG_ROLES = [
-    { role: 'Customer', label: 'CUSTOMER', hint: 'The customer named on this contract' },
-    { role: 'DealerRep', label: 'DEALERSHIP REP.', hint: 'The salesperson signing for the dealership' },
-    { role: 'ContractHolder', label: 'CONTRACT HOLDER', hint: 'Acknowledges the terms and conditions' }
+    {
+        role: 'Customer',
+        label: 'CUSTOMER',
+        hint: 'The customer named on this contract — this signature also signs as the Contract Holder'
+    },
+    { role: 'DealerRep', label: 'DEALERSHIP REP.', hint: 'The salesperson signing for the dealership' }
 ];
 
 /**
@@ -276,8 +279,7 @@ export default class DealerSignaturePad extends LightningElement {
             successMessage: null,
             names: {
                 Customer: this.customerName || '',
-                DealerRep: this.salesPersonName || '',
-                ContractHolder: this.customerName || ''
+                DealerRep: this.salesPersonName || ''
             }
         });
         this.showPad = true;
@@ -546,7 +548,8 @@ export default class DealerSignaturePad extends LightningElement {
                 captured: {},
                 idem: {},
                 activeIndex: 0,
-                successMessage: doc.label + ' signed. The PDF carries all three signatures.'
+                successMessage:
+                    doc.label + ' signed. The PDF carries the customer and dealership rep signatures.'
             });
         } catch (e) {
             this.patch(key, { errorMessage: this.msg(e) });

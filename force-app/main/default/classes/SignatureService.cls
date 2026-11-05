@@ -3,12 +3,14 @@
  * Entry points, each its own transaction:
  *   saveSignature -> DML only (safe to call from a trigger / LWC imperative call)
  *   stageImage    -> callout FIRST, then DML. MUST be its own transaction.
- *   issuePdf      -> render only; requires all three staged images COMMITTED.
+ *   issuePdf      -> render only; requires both staged images COMMITTED.
  *   dropResource  -> callout, then DML.
  *
- * Three signers, one sitting: a contract carries a Customer, a Dealership Rep
- * and a Contract Holder signature. One row per application + document type +
- * signer role, and ONE PDF that carries all three.
+ * Two signers, one sitting: a contract carries a Customer and a Dealership Rep
+ * signature. One row per application + document type + signer role, and ONE PDF
+ * that carries both. The Customer signature also stands for the Contract Holder
+ * line on the acknowledgement page, so no separate Contract Holder signing step
+ * exists any more.
  *
  * Never chain saveSignature + stageImage inside one Apex transaction: the
  * callout after DML raises "uncommitted work pending". Let the LWC call them
@@ -21,11 +23,16 @@ public without sharing class SignatureService {
 
     public static final String ROLE_CUSTOMER = 'Customer';
     public static final String ROLE_DEALER_REP = 'DealerRep';
+    /**
+     * Legacy role: no longer in ROLES and no longer part of the signing flow.
+     * Retained so historical rows still normalise - removing this branch would
+     * make effectiveRole() throw on legacy rows and fail the submit gate closed.
+     */
     public static final String ROLE_CONTRACT_HOLDER = 'ContractHolder';
 
     /** Render order on the page, and the order the pad walks the dealer through. */
     public static final List<String> ROLES = new List<String>{
-        ROLE_CUSTOMER, ROLE_DEALER_REP, ROLE_CONTRACT_HOLDER
+        ROLE_CUSTOMER, ROLE_DEALER_REP
     };
 
     public static final String ST_CAPTURED = 'CAPTURED';
@@ -56,11 +63,11 @@ public without sharing class SignatureService {
     }
 
     public class SignatureStatus {
-        /** True only when all three signer roles have captured ink. */
+        /** True only when both signer roles have captured ink. */
         @AuraEnabled public Boolean hasSignature;
         @AuraEnabled public Boolean allRolesCaptured;
         @AuraEnabled public Boolean hasPdf;
-        /** Customer row, kept for callers written before the three-role build. */
+        /** Customer row, kept for callers written before the two-role build. */
         @AuraEnabled public Id signatureId;
         @AuraEnabled public String signedBy;
         @AuraEnabled public Datetime signedAt;
@@ -224,9 +231,9 @@ public without sharing class SignatureService {
      * Renders the contract page to PDF ONCE and stores it as a ContentVersion on
      * the application. Returns the ContentVersion id.
      *
-     * The page resolves all three signature blocks by role, so every role's image
+     * The page resolves both signature blocks by role, so every role's image
      * must already be staged and committed. The id argument only selects the
-     * application + document type (any one of the three rows will do).
+     * application + document type (either one of the two rows will do).
      *
      * Failure: Status=RENDER_FAILED + Render_Error__c, no PDF, resource ids kept
      * so SignatureCleanup can sweep the orphan images.
@@ -277,7 +284,7 @@ public without sharing class SignatureService {
             }
         }
         if (!missing.isEmpty()) {
-            throw new SignatureServiceException('all three signers must be staged before rendering;'
+            throw new SignatureServiceException('both signers must be staged before rendering;'
                 + ' missing staged image for: ' + String.join(missing, ', '));
         }
 
@@ -316,7 +323,7 @@ public without sharing class SignatureService {
             );
             insert cv;
 
-            // Every role points at the ONE PDF that carries all three signatures.
+            // Every role points at the ONE PDF that carries both signatures.
             List<Application_Signature__c> toUpdate = new List<Application_Signature__c>();
             for (String role : ROLES) {
                 toUpdate.add(new Application_Signature__c(
@@ -375,7 +382,7 @@ public without sharing class SignatureService {
     // ---------------------------------------------------------------------- read
 
     /**
-     * Signed means all THREE roles captured their ink. Per-role state is exposed
+     * Signed means BOTH roles captured their ink. Per-role state is exposed
      * so the pad can tick off each signer as they go.
      *
      * "Captured" is the stored PNG payload, not the transient staged resource:

@@ -1,0 +1,197 @@
+<apex:page controller="CancellationRequestPdfController" renderAs="pdf" language="en-US" showChat="false" sidebar="false" showHeader="false" standardStylesheets="false" applyHtmlTag="false" applyBodyTag="false" cache="false">
+<html>
+<head>
+<style type="text/css">
+    @page { size: letter; margin: 0.45in 0.45in 0.5in 0.45in; }
+    body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; font-size: 9pt; color: #1f2429; margin: 0; padding: 0; }
+    div, p, td, th, h1, h2, h3, h4, span { font-family: "Segoe UI", Arial, Helvetica, sans-serif; color: #1f2429; }
+    p { margin: 0 0 8pt 0; }
+
+    .header { background-color: #1e3a5f; color: #ffffff; padding: 14pt 16pt; margin: 0 0 8pt 0; }
+    .header h1 { margin: 0; padding: 0; font-size: 16pt; font-weight: bold; color: #ffffff; }
+
+    .notice { font-size: 8.5pt; font-weight: bold; margin: 0 0 10pt 2pt; color: #1f2429; }
+
+    .section-title { background-color: #1e3a5f; color: #ffffff; padding: 5pt 9pt; font-weight: bold; font-size: 10pt; margin: 10pt 0 7pt 0; }
+
+    .card { background-color: #ffffff; border: 1pt solid #e2e4e8; padding: 9pt 11pt; }
+
+    .field-label { font-weight: bold; font-size: 7.5pt; color: #333333; padding: 6pt 0 2pt 0; }
+    .field-label.first { padding-top: 0; }
+    .req { color: #b3261e; }
+    .field { background-color: #e7e7e7; border: 1pt solid #cfcfcf; padding: 5pt 6pt; font-size: 9pt; font-weight: bold; color: #1f2429; }
+
+    .services-intro { font-weight: bold; font-size: 8.5pt; margin: 0 0 7pt 0; }
+    .service-block { background-color: #eceef0; padding: 8pt 10pt; margin: 0 0 7pt 0; }
+    .service-title { font-weight: bold; font-size: 9pt; margin: 0 0 4pt 0; }
+    .service-name { font-weight: bold; font-size: 9pt; margin: 0 0 1pt 0; }
+    .service-line { font-size: 8.5pt; color: #1f2429; margin: 0; }
+    .service-amount { font-size: 8.5pt; font-weight: bold; text-align: right; }
+    .cb { border: 1pt solid #5a6472; background-color: #ffffff; padding: 0 2pt; font-size: 7pt; font-weight: bold; }
+
+    .reason-label { font-weight: bold; font-size: 8.5pt; margin: 8pt 0 3pt 0; }
+    .reason-value { background-color: #e7e7e7; border: 1pt solid #cfcfcf; padding: 5pt 6pt; font-size: 9pt; font-weight: bold; }
+    .reason-detail { background-color: #ffffff; border: 1pt solid #cfcfcf; padding: 5pt 6pt; font-size: 8.5pt; margin-top: 4pt; }
+
+    .refund-bar { background-color: #e5e5e5; padding: 10pt 12pt; margin: 10pt 0 0 0; }
+    .refund-bar td { background-color: #e5e5e5; font-weight: bold; font-size: 10pt; }
+    .refund-amount { font-size: 11.5pt; font-weight: bold; text-align: right; }
+
+    .terms-card { background-color: #ffffff; border: 1pt solid #e2e4e8; padding: 10pt 13pt; }
+    .terms-lead { font-size: 8.5pt; font-weight: bold; margin: 0 0 8pt 0; }
+    .terms-block { margin: 0 0 6pt 0; }
+    .terms-heading { font-size: 9pt; font-weight: bold; margin: 0 0 2pt 0; }
+    .terms-body { font-size: 8pt; line-height: 135%; margin: 0; color: #333333; }
+    .terms-accept { border-top: 1pt solid #eceef0; margin-top: 8pt; padding-top: 7pt; font-size: 8.5pt; font-weight: bold; }
+    .terms-meta { font-size: 7.5pt; font-weight: normal; color: #5a6472; }
+
+    .auth-box { background-color: #e7e7e7; padding: 8pt 10pt; vertical-align: top; }
+    .auth-box h4 { margin: 0 0 5pt 0; padding: 0; font-size: 8pt; font-weight: bold; color: #1f2429; }
+    .auth-box p { margin: 0; font-size: 8.5pt; font-weight: bold; line-height: 135%; }
+    .sig-wrap { background-color: #ffffff; border: 1pt solid #cfcfcf; padding: 3pt; }
+    .sig-img { width: 100%; height: 46pt; }
+
+    .doc-footer { margin-top: 12pt; border-top: 1pt solid #e2e4e8; padding-top: 5pt; font-size: 7pt; color: #5a6472; }
+    .error-box { border: 1pt solid #b3261e; padding: 10pt; color: #b3261e; font-weight: bold; font-size: 10pt; }
+</style>
+</head>
+<body>
+
+<apex:outputPanel rendered="{!NOT(hasRequest)}">
+    <div class="error-box">{!errorMessage}</div>
+</apex:outputPanel>
+
+<apex:outputPanel rendered="{!hasRequest}">
+
+    <div class="header">
+        <h1>Service Contract Cancellation Form</h1>
+    </div>
+
+    <p class="notice">This form constitutes a cancellation request only. Once approved by A-Protect, the applicable refund will be issued and confirmation of the cancellation will be provided.</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+            <td width="34%" valign="top" style="padding-right: 10pt;">
+                <div class="section-title">Section 1: Contract Information</div>
+                <div class="card">
+                    <div class="field-label first">DATE OF REQUEST: <span class="req">*</span></div>
+                    <div class="field">{!dateRequested}</div>
+
+                    <div class="field-label">CANCELLATION REQUEST #:</div>
+                    <div class="field">{!requestName}</div>
+
+                    <div class="field-label">APPLICATION #:</div>
+                    <div class="field">{!applicationNumber}</div>
+
+                    <div class="field-label">CUSTOMER NAME:</div>
+                    <div class="field">{!customerName}</div>
+
+                    <div class="field-label">VEHICLE YEAR/MAKE/MODEL:</div>
+                    <div class="field">{!vehicle}</div>
+
+                    <div class="field-label">VIN #:</div>
+                    <div class="field">{!vin}</div>
+                </div>
+            </td>
+
+            <td width="66%" valign="top">
+                <div class="section-title">Section 2: Services Cancellation</div>
+                <div class="card">
+                    <div class="services-intro">The following service(s) are submitted for cancellation.</div>
+
+                    <apex:outputPanel rendered="{!hasServices}">
+                        <apex:repeat value="{!serviceBlocks}" var="svc">
+                            <div class="service-block">
+                                <div class="service-title">{!svc.category}</div>
+                                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                    <tr>
+                                        <td valign="top">
+                                            <div class="service-name"><span class="cb">X</span>&#160;{!svc.name}</div>
+                                            <div class="service-line">{!svc.termLine}</div>
+                                            <div class="service-line">{!svc.options}</div>
+                                        </td>
+                                        <td width="22%" valign="top">
+                                            <div class="service-amount">{!svc.amount}</div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </apex:repeat>
+                    </apex:outputPanel>
+
+                    <apex:outputPanel rendered="{!NOT(hasServices)}">
+                        <p class="service-line">No active services were recorded for this request.</p>
+                    </apex:outputPanel>
+
+                    <div class="reason-label">REASON FOR CANCELLATION: <span class="req">*</span></div>
+                    <div class="reason-value">{!reasonLabel}</div>
+                    <apex:outputPanel rendered="{!hasReasonDetail}">
+                        <div class="reason-detail">{!reasonDetail}</div>
+                    </apex:outputPanel>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="refund-bar">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+                <td>Refund Estimate&#160;&#160;-&#160;Request Amount:</td>
+                <td class="refund-amount">{!refundAmount}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section-title">Section 3: Cancellation Terms &amp; Conditions</div>
+    <div class="terms-card">
+        <p class="terms-lead">By signing and submitting this form, the dealership acknowledges and agrees to the following:</p>
+
+        <apex:repeat value="{!termsBlocks}" var="b">
+            <div class="terms-block">
+                <apex:outputPanel rendered="{!b.hasHeading}">
+                    <div class="terms-heading">{!b.heading}</div>
+                </apex:outputPanel>
+                <div class="terms-body">{!b.body}</div>
+            </div>
+        </apex:repeat>
+
+        <div class="terms-accept">
+            <span class="cb">X</span>&#160;I have read and accept the cancellation terms and conditions.
+            <span class="terms-meta">&#160;&#160;Terms version {!termsVersion}{!termsAcceptedNote}</span>
+        </div>
+    </div>
+
+    <div class="section-title">Section 4: Dealership Authorization</div>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+            <td width="33%" valign="top" style="padding-right: 8pt;">
+                <div class="auth-box">
+                    <h4>Dealership Name:</h4>
+                    <p>{!dealerName}<br />{!dealerAddress}<br />{!dealerContact}</p>
+                </div>
+            </td>
+            <td width="33%" valign="top" style="padding-right: 8pt;">
+                <div class="auth-box">
+                    <h4>Authorized Dealer Representative</h4>
+                    <p>{!dealerRepName}<br />{!dealerRepTitle}</p>
+                </div>
+            </td>
+            <td width="34%" valign="top">
+                <div class="auth-box">
+                    <h4>Signature</h4>
+                    <div class="sig-wrap">
+                        <img class="sig-img" src="{!signatureDataUriValue}" />
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="doc-footer">
+        Cancellation request {!requestName} &#183; Application {!applicationNumber} &#183; Status {!statusLabel} &#183; Generated {!generatedOn} &#183; A-Protect dealer portal
+    </div>
+
+</apex:outputPanel>
+</body>
+</html>
+</apex:page>
