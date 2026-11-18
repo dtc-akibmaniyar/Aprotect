@@ -18,6 +18,7 @@ import saveDealerCommercialPrice from '@salesforce/apex/DealerPackageSyncControl
 import saveDealerPremiumSettings from '@salesforce/apex/DealerPackageSyncController.saveDealerPremiumSettings';
 import setDealerPackageActive from '@salesforce/apex/DealerPackageSyncController.setDealerPackageActive';
 import refreshDealerPriceAnchors from '@salesforce/apex/DealerPackageSyncController.refreshDealerPriceAnchors';
+import setDealerPackagesActive from '@salesforce/apex/DealerPackageBulkActiveController.setDealerPackagesActive';
 import getMasterPackageDetail from '@salesforce/apex/DealerPackageSyncController.getMasterPackageDetail';
 
 /**
@@ -278,7 +279,7 @@ export default class DealerPortalPackageSync extends LightningElement {
     /** LIVE master-package count per service, from the loaded inventory. */
     get serviceCounts() {
         const counts = { ew: 0, tr: 0 };
-        (this.masterRows || []).forEach((r) => {
+        (this.masterEligibleRows || []).forEach((r) => {
             const key = this.serviceKeyForRow(r);
             if (key !== null) counts[key] += 1;
         });
@@ -446,16 +447,18 @@ export default class DealerPortalPackageSync extends LightningElement {
             : '';
     }
 
+    // The three header chips are derived from the SAME eligible set the master
+    // pane renders, so a hidden package is never counted in the console either.
     get updateCount() {
-        return this.inventory !== null ? this.inventory.updateAvailableCount : 0;
+        return this.masterEligibleRows.filter((r) => r.status === 'UpdateAvailable').length;
     }
 
     get toAddCount() {
-        return this.inventory !== null ? this.inventory.availableToAddCount : 0;
+        return this.masterEligibleRows.filter((r) => r.status === 'AvailableToAdd').length;
     }
 
     get uptodateCount() {
-        return this.inventory !== null ? this.inventory.alreadyAvailableCount : 0;
+        return this.masterEligibleRows.filter((r) => r.status === 'AlreadyAvailable').length;
     }
 
     // ---------------------------------------------------------------------
@@ -463,14 +466,42 @@ export default class DealerPortalPackageSync extends LightningElement {
     // ---------------------------------------------------------------------
 
     get masterRows() {
+        // The FULL catalogue as the server sent it — deliberately unfiltered.
+        // The dealer pane's staleness lookup (masterByMasterId) and the copy
+        // flow's "already in the plan" detection need every master row,
+        // including the ones the Master Packages pane hides.
         return this.inventory !== null && this.inventory.packages
             ? this.inventory.packages
             : [];
     }
 
+    /**
+     * Master-pane eligibility — ALL THREE must hold:
+     *   1. the package's catalogue release is Published,
+     *   2. its package group is Active,
+     *   3. the package itself is Active.
+     * (3) is already enforced server-side before a row reaches this payload, so
+     * every row here is Active by construction. A null release or null group
+     * fails (1)/(2) and the package is hidden — its release status cannot be
+     * confirmed, so it is not offered.
+     */
+    isMasterEligible(row) {
+        return !!row && row.releasePublished === true && row.planTypeActive === true;
+    }
+
+    /** Eligible master rows only — the master pane, counts and grouping. */
+    get masterEligibleRows() {
+        return this.masterRows.filter((r) => this.isMasterEligible(r));
+    }
+
+    /** Every eligible master package id (selection is scoped to these). */
+    get masterEligibleIds() {
+        return this.masterEligibleRows.map((r) => r.masterPackageId);
+    }
+
     /** Master rows for the active service, in the server's shape (fetch-only). */
     get masterRaw() {
-        return this.masterRows.filter((r) => this.showService && this.matchesActiveService(r));
+        return this.masterEligibleRows.filter((r) => this.showService && this.matchesActiveService(r));
     }
 
     /** Release → Group → Package tree for the master pane. */
@@ -602,6 +633,48 @@ export default class DealerPortalPackageSync extends LightningElement {
     }
     get dealerEnabledLabel() {
         return this.dealerSelectedCount + ' of ' + this.dealerTotalCount + ' enabled';
+    }
+
+    /** Saved-Active ids of every dealer package in the payload (all services). */
+    dealerActiveIds(auth) {
+        const ids = [];
+        ((auth && auth.packages) || []).forEach((p) => {
+            if (p.isActive === true && p.dealerPackageId) ids.push(p.dealerPackageId);
+        });
+        return ids;
+    }
+
+    /**
+     * The DEALER pane's pending diff: one entry per visible row whose checkbox
+     * no longer matches its saved Active state. This — not the absolute
+     * selection — is what a save writes, so an untouched pane saves nothing.
+     */
+    get dealerPendingChanges() {
+        const changes = [];
+        this.dealerRows.forEach((row) => {
+            const selected = this.dealerSelected.indexOf(row.dealerPackageId) !== -1;
+            if (selected !== row.isActive) {
+                changes.push({
+                    dealerPackageId: row.dealerPackageId,
+                    active: selected,
+                    name: row.name
+                });
+            }
+        });
+        return changes;
+    }
+
+    get dealerPendingCount() {
+        return this.dealerPendingChanges.length;
+    }
+
+    get dealerSaveDisabled() {
+        return this.flagOff || this.busy || this.dealerPendingCount === 0;
+    }
+
+    get dealerSaveLabel() {
+        const n = this.dealerPendingCount;
+        return n > 0 ? 'Save changes (' + n + ')' : 'Save changes';
     }
 
     isSelected(list, id) {
@@ -828,6 +901,36 @@ export default class DealerPortalPackageSync extends LightningElement {
     handleClearAll(event) {
         const pane = event.currentTarget.dataset.pane;
         this.setSelection(pane, this.idsInPane(pane), false);
+    }
+
+    handleSaveDealerSelection() {
+        if (this.busy || this.flagOff) return;
+        const changes = this.dealerPendingChanges;
+        if (!changes.length) return;
+
+        const activating = changes.filter((c) => c.active).length;
+        const deactivating = changes.length - activating;
+        const parts = [];
+        if (activating > 0) parts.push(activating + ' will be marked Active');
+        if (deactivating > 0) parts.push(deactivating + ' will be marked Inactive');
+
+        this.openConfirm({
+            kind: 'saveDealerSelection',
+            params: {
+                accountId: this.recordId,
+                toggles: changes.map((c) => ({
+                    dealerPackageId: c.dealerPackageId,
+                    active: c.active
+                }))
+            },
+            title: changes.length === 1
+                ? 'Save 1 package change?'
+                : 'Save ' + changes.length + ' package changes?',
+            summary: 'Only the packages whose selection changed will be updated: ' + parts.join(', ') + '.',
+            note: 'This is a soft state — the packages stay in the dealer\u2019s plan, keep their terms and add-ons, '
+                + 'and keep syncing. Nothing is deleted and no pricing changes. A package with no dealer copy is left alone.',
+            confirmLabel: 'Save changes'
+        });
     }
 
     handleRefresh(event) {
@@ -1057,13 +1160,24 @@ export default class DealerPortalPackageSync extends LightningElement {
     // Copy Selected to Dealer Plan — the mock's flow arrow (confirm-gated)
     // ---------------------------------------------------------------------
 
+    /**
+     * The selected ids that are allowed to travel: any id the pane no longer
+     * offers (hidden by the eligibility filter, or dropped from the catalogue)
+     * is discarded here, so a stale selection can neither be counted nor copied.
+     */
+    get masterSelectedEligible() {
+        const ids = this.masterEligibleIds;
+        return this.masterSelected.filter((id) => ids.indexOf(id) !== -1);
+    }
+
     get copyDisabled() {
-        return this.flagOff || this.busy || this.masterSelected.length === 0;
+        return this.flagOff || this.busy || this.masterSelectedEligible.length === 0;
     }
 
     get copyLabel() {
-        return this.masterSelected.length
-            ? 'Copy Selected to Dealer Plan (' + this.masterSelected.length + ')'
+        const n = this.masterSelectedEligible.length;
+        return n
+            ? 'Copy Selected to Dealer Plan (' + n + ')'
             : 'Copy Selected to Dealer Plan';
     }
 
@@ -1072,9 +1186,13 @@ export default class DealerPortalPackageSync extends LightningElement {
             this.toast(this.flagOffMessage, 'error');
             return;
         }
-        const selected = this.masterSelected.slice();
+        // Only eligible (visible) master packages may be copied — a selection
+        // left over from before a package was hidden never reaches the server.
+        const selected = this.masterSelectedEligible.slice();
         if (!selected.length) {
-            this.toast('Select at least one master package first.', 'info');
+            this.toast(this.masterSelected.length
+                ? 'The selected packages are no longer available in the master catalogue.'
+                : 'Select at least one master package first.', 'info');
             return;
         }
         const masters = this.masterByMasterId;
@@ -1296,12 +1414,19 @@ export default class DealerPortalPackageSync extends LightningElement {
         try {
             const inv = await getSyncInventory({ accountId: this.recordId });
             this.inventory = inv;
+            // Drop any selection that is no longer eligible (e.g. its release
+            // went back to Draft or its group was deactivated between loads).
+            this.masterSelected = this.masterSelectedEligible;
             if (!inv.isDealerAccount) {
                 this.viewState = 'notDealer';
                 return;
             }
             const auth = await getDealerAuthoring({ accountId: this.recordId });
             this.authoring = auth;
+            // Checkboxes show the SAVED Active state, so "pending" only ever means
+            // "differs from what is stored". Seeding here (and after each save,
+            // which reloads) keeps the counter truthful and makes save a no-op.
+            this.dealerSelected = this.dealerActiveIds(auth);
             this.viewState = 'ready';
         } catch (err) {
             this.viewState = 'error';
@@ -1775,6 +1900,13 @@ export default class DealerPortalPackageSync extends LightningElement {
             const result = await this.runAction(action);
             this.dialogOpen = false;
             this.pending = null;
+            if (action.kind === 'saveDealerSelection') {
+                // Always reload: checkboxes must show saved truth even on a
+                // partial result, and that reload clears the pending diff.
+                await this.loadAll();
+                this.dealerSelectionToast(result);
+                return;
+            }
             if (result && result.success) {
                 this.toast(result.message || 'Done.', 'success');
                 await this.loadAll();
@@ -1788,6 +1920,23 @@ export default class DealerPortalPackageSync extends LightningElement {
         } finally {
             this.dialogBusy = false;
         }
+    }
+
+    dealerSelectionToast(result) {
+        if (!result) {
+            this.toast('The changes could not be saved.', 'error');
+            return;
+        }
+        if (result.success) {
+            this.toast(result.message || 'Saved.', 'success');
+            return;
+        }
+        const failed = (result.results || []).filter((r) => r && r.success === false);
+        const detail = failed
+            .slice(0, 3)
+            .map((r) => (r.name ? r.name + ' — ' : '') + r.message)
+            .join(' ');
+        this.toast(result.message || 'Some changes were not saved.', 'warning', detail);
     }
 
     runAction(action) {
@@ -1813,6 +1962,8 @@ export default class DealerPortalPackageSync extends LightningElement {
                 return refreshDealerPriceAnchors(action.params);
             case 'toggleActive':
                 return setDealerPackageActive(action.params);
+            case 'saveDealerSelection':
+                return setDealerPackagesActive(action.params);
             case 'bulkDiscount':
                 return applyDealerPackageTermDiscount(action.params);
             case 'clearBulkDiscount':

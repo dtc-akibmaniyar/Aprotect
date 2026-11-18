@@ -437,6 +437,14 @@
                                     <span class="pane__sep" aria-hidden="true">·</span>
                                     <button type="button" class="link-btn" data-pane="dealer" onclick={handleSelectAll}>Select all</button>
                                     <button type="button" class="link-btn" data-pane="dealer" onclick={handleClearAll}>Clear all</button>
+                                    <span class="pane__sep" aria-hidden="true">
+                                        ·
+                                    </span>
+                                    <button type="button" class="act-btn act-btn_save"
+                                                onclick={handleSaveDealerSelection} disabled={dealerSaveDisabled}
+                                                title="Save the Active / Inactive state of the changed packages">
+                                        {dealerSaveLabel}
+                                    </button>
                                 </div>
                             </div>
 

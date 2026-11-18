@@ -742,6 +742,18 @@
 .act-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .act-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.act-btn_save {
+    color: #ffffff;
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.act-btn_save:hover:not(:disabled) {
+    color: #ffffff;
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
 /* ── Flat sections (Dealer Portal Preview / Commissions) ────────────── */
 .flat-section { margin-top: 0.75rem; }
 

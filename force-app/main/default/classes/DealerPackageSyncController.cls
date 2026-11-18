@@ -254,6 +254,12 @@ public without sharing class DealerPackageSyncController {
         @AuraEnabled public String primaryAction;     // add | sync | none
         @AuraEnabled public String primaryActionLabel;// button text ('' when none)
         @AuraEnabled public ChangeSummary changes;
+        // Master-pane eligibility flags (additive). The console filters the
+        // MASTER pane on these two plus the package's own Is_Active__c, which
+        // the query already enforces (shouldShowInCatalogue), so the dealer pane
+        // and the mirror staleness comparison keep the full catalogue.
+        @AuraEnabled public Boolean releasePublished; // release != null && Status__c == 'Published'
+        @AuraEnabled public Boolean planTypeActive;   // package group != null && Active__c == true
 
         public UnifiedPackageRow() {
             changes = new ChangeSummary();
@@ -446,6 +452,9 @@ public without sharing class DealerPackageSyncController {
                 u.releaseLabel = releaseLabel(m);
                 u.releaseName = releaseNameOf(m);
                 u.releaseStatus = releaseStatusOf(m);
+                u.releasePublished = isReleasePublished(m);
+                u.planTypeActive = m.Package_Group__r != null
+                    && m.Package_Group__r.Active__c == true;
                 u.perClaimLimitLabel = perClaimLimitLabel(m.Coverage_per_claim__c);
                 u.deductibleLabel = deductibleLabel(m.Deductible__c);
                 u.countsLabel = countsLabel(m, tiersByPackage, termsByPackage, optionsByPackage);
@@ -1888,6 +1897,7 @@ public without sharing class DealerPackageSyncController {
                    Commercial_Business_Use__c, Commercial_Vehicle_Surcharge_Fee__c,
                    LastModifiedDate,
                    Package_Group__r.Name,
+                   Package_Group__r.Active__c,
                    Package_Group__r.Catalogue_Release__r.Name,
                    Package_Group__r.Catalogue_Release__r.Status__c,
                    Package_Group__r.Catalogue_Release__r.Effective_Date__c
@@ -2062,6 +2072,13 @@ public without sharing class DealerPackageSyncController {
         return (m != null && m.Package_Group__r != null
             && m.Package_Group__r.Catalogue_Release__r != null)
             ? m.Package_Group__r.Catalogue_Release__r.Name : '';
+    }
+
+    /** True only when the package's catalogue release is literally 'Published'. */
+    private static Boolean isReleasePublished(Package__c m) {
+        return m != null && m.Package_Group__r != null
+            && m.Package_Group__r.Catalogue_Release__r != null
+            && m.Package_Group__r.Catalogue_Release__r.Status__c == 'Published';
     }
 
     /** The catalogue release STATUS alone: Draft | Published | Superseded | ''. */

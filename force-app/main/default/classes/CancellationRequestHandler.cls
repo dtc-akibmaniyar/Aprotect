@@ -4,12 +4,16 @@ public class CancellationRequestHandler {
     private static Id accountingQueueId;
 
     static {
-        List<Group> queues = [SELECT Id, DeveloperName FROM Group 
-                              WHERE Type = 'Queue' 
-                              AND DeveloperName IN ('Sales_Review_Queue', 'Accounting_Review_Queue')];
-        for (Group q : queues) {
-            if (q.DeveloperName == 'Sales_Review_Queue') salesQueueId = q.Id;
-            if (q.DeveloperName == 'Accounting_Review_Queue') accountingQueueId = q.Id;
+        try {
+            List<Group> queues = [SELECT Id, DeveloperName FROM Group
+                                  WHERE Type = 'Queue'
+                                  AND DeveloperName IN ('Sales_Review_Queue', 'Accounting_Review_Queue')];
+            for (Group q : queues) {
+                if (q.DeveloperName == 'Sales_Review_Queue') salesQueueId = q.Id;
+                if (q.DeveloperName == 'Accounting_Review_Queue') accountingQueueId = q.Id;
+            }
+        } catch (Exception e) {
+            System.debug(LoggingLevel.WARN, 'Cancellation queue lookup failed (non-fatal): ' + e.getMessage());
         }
     }
 
@@ -25,42 +29,21 @@ public class CancellationRequestHandler {
     private static void handleAfterInsert(List<App_Cancellation_Request__c> newList) {
         List<App_Cancellation_Request__c> toUpdate = new List<App_Cancellation_Request__c>();
         Map<Id, String> appStatusMap = new Map<Id, String>();
-
         Integer slaDays = 5;
         Cancellation_Settings__mdt settings = Cancellation_Settings__mdt.getInstance('Default');
         if (settings != null && settings.SLA_Business_Days__c != null) {
             slaDays = (Integer) settings.SLA_Business_Days__c;
         }
-
         List<Id> recordsToSubmit = new List<Id>();
-
-        // Human-readable request number: the AutoNumber field's value copied onto
-        // Name. Name is a plain text field that nothing populated, so a new request
-        // was named after its own record id ("a2vG1000005vuPB"). Names that already
-        // carry a CR- number (seeded data) are left alone.
-        Map<Id, String> requestNumbers = new Map<Id, String>();
-        for (App_Cancellation_Request__c row : [
-            SELECT Id, Request_Number__c FROM App_Cancellation_Request__c WHERE Id IN :newList
-        ]) {
-            if (String.isNotBlank(row.Request_Number__c)) {
-                requestNumbers.put(row.Id, row.Request_Number__c);
+        Set<Id> newIds = new Set<Id>();
+        for (App_Cancellation_Request__c req : newList) {
+            if (req.Id != null) {
+                newIds.add(req.Id);
             }
         }
-
         for (App_Cancellation_Request__c req : newList) {
             App_Cancellation_Request__c upd = new App_Cancellation_Request__c(Id = req.Id);
-            Boolean needsUpdate = false;
-
             upd.SLA_Due_Date__c = addBusinessDays(Date.today(), slaDays);
-            needsUpdate = true;
-
-            String requestNumber = requestNumbers.get(req.Id);
-            if (String.isNotBlank(requestNumber)
-                    && (String.isBlank(req.Name) || !req.Name.startsWith('CR-'))) {
-                upd.Name = requestNumber;
-                needsUpdate = true;
-            }
-
             if (req.Status__c == 'Pending Sales Review') {
                 if (salesQueueId != null) {
                     upd.OwnerId = salesQueueId;
@@ -70,15 +53,64 @@ public class CancellationRequestHandler {
                 }
                 recordsToSubmit.add(req.Id);
             }
-
-            if (needsUpdate) {
-                toUpdate.add(upd);
-            }
+            toUpdate.add(upd);
         }
-
         if (!toUpdate.isEmpty()) {
-            update toUpdate;
+            Database.update(toUpdate, AccessLevel.SYSTEM_MODE);
         }
+
+        // ------------------------------------------------------------------
+        // Request numbering.
+        //
+        // Name is a plain Text(80) that nothing populates, so a new request is
+        // named after its own record id ("a2vG1000005xSlb"). The AutoNumber
+        // Request_No__c (CR-{00000}) is the number the dealer must see, so it is
+        // copied onto Name here.
+        //
+        // Both fields are presence-checked through describe and read with
+        // dynamic SOQL: the legacy Request_Number__c has been deleted from the
+        // org, and a hard reference to either field would break compilation of
+        // this class - and therefore the whole portal submit - if one is absent.
+        // Request_Number__c is kept only as a harmless fallback and is a no-op
+        // while it does not exist.
+        //
+        // Never fatal: the request row has already been written by the time this
+        // runs, so a naming failure must not roll the dealer's submission back.
+        // ------------------------------------------------------------------
+        try {
+            Map<String, Schema.SObjectField> fieldMap =
+                App_Cancellation_Request__c.SObjectType.getDescribe().fields.getMap();
+            String numberField = null;
+            if (hasField(fieldMap, 'Request_No__c')) {
+                numberField = 'Request_No__c';
+            } else if (hasField(fieldMap, 'Request_Number__c')) {
+                numberField = 'Request_Number__c';
+            }
+            Map<Id, String> requestNumbers = new Map<Id, String>();
+            if (!newIds.isEmpty() && numberField != null) {
+                for (SObject row : Database.query(
+                    'SELECT Id, ' + numberField + ' FROM App_Cancellation_Request__c WHERE Id IN :newIds')) {
+                    String foundNumber = (String) row.get(numberField);
+                    if (String.isNotBlank(foundNumber)) {
+                        requestNumbers.put(row.Id, foundNumber);
+                    }
+                }
+            }
+            List<App_Cancellation_Request__c> renames = new List<App_Cancellation_Request__c>();
+            for (App_Cancellation_Request__c req : newList) {
+                String requestNumber = requestNumbers.get(req.Id);
+                if (String.isNotBlank(requestNumber)
+                    && (String.isBlank(req.Name) || !req.Name.startsWith('CR-'))) {
+                    renames.add(new App_Cancellation_Request__c(Id = req.Id, Name = requestNumber));
+                }
+            }
+            if (!renames.isEmpty()) {
+                Database.update(renames, false, AccessLevel.SYSTEM_MODE);
+            }
+        } catch (Exception e) {
+            System.debug(LoggingLevel.WARN, 'Request numbering skipped (non-fatal): ' + e.getMessage());
+        }
+
         if (!appStatusMap.isEmpty()) {
             syncApplicationStatus(appStatusMap, true);
         }
@@ -87,14 +119,28 @@ public class CancellationRequestHandler {
         }
     }
 
-    private static void submitForApproval(List<Id> recordIds) {
-        // Get an admin user to act as submitter (portal users can't submit approvals)
-        Id adminUserId;
-        List<User> admins = [SELECT Id FROM User WHERE Profile.Name = 'System Administrator' AND IsActive = true LIMIT 1];
-        if (!admins.isEmpty()) {
-            adminUserId = admins[0].Id;
+    private static Id findApprovalSubmitter() {
+        try {
+            List<User> admins = [SELECT Id FROM User WHERE Profile.Name = 'System Administrator' AND IsActive = true LIMIT 1];
+            if (!admins.isEmpty()) {
+                return admins[0].Id;
+            }
+        } catch (Exception e) {
+            System.debug(LoggingLevel.WARN, 'Admin submitter lookup by profile failed (non-fatal): ' + e.getMessage());
         }
+        try {
+            for (SObject row : Database.query(
+                'SELECT Id FROM User WHERE Profile.Name = \'System Administrator\' AND IsActive = true WITH SYSTEM_MODE LIMIT 1')) {
+                return (Id) row.get('Id');
+            }
+        } catch (Exception e) {
+            System.debug(LoggingLevel.WARN, 'Admin submitter lookup in system mode failed (non-fatal): ' + e.getMessage());
+        }
+        return null;
+    }
 
+    private static void submitForApproval(List<Id> recordIds) {
+        Id adminUserId = findApprovalSubmitter();
         List<Approval.ProcessSubmitRequest> requests = new List<Approval.ProcessSubmitRequest>();
         for (Id recId : recordIds) {
             Approval.ProcessSubmitRequest req = new Approval.ProcessSubmitRequest();
@@ -140,14 +186,11 @@ public class CancellationRequestHandler {
         Set<Id> appsToClear = new Set<Id>();
         List<App_Cancellation_Request__c> approvedWithRefund = new List<App_Cancellation_Request__c>();
         List<App_Cancellation_Request__c> approvedRequests = new List<App_Cancellation_Request__c>();
-
         for (App_Cancellation_Request__c req : newList) {
             App_Cancellation_Request__c oldReq = oldMap.get(req.Id);
             String newStatus = req.Status__c;
             String oldStatus = oldReq.Status__c;
-
             if (newStatus == oldStatus) continue;
-
             if (oldStatus == 'Pending Sales Review' && newStatus == 'Pending Accounting Review') {
                 if (accountingQueueId != null) {
                     toReassign.add(new App_Cancellation_Request__c(Id = req.Id, OwnerId = accountingQueueId));
@@ -155,36 +198,29 @@ public class CancellationRequestHandler {
                 if (req.Application__c != null) {
                     appStatusMap.put(req.Application__c, 'Pending Accounting Review');
                 }
-            }
-            else if (oldStatus == 'Pending Sales Review' && newStatus == 'Approved') {
+            } else if (oldStatus == 'Pending Sales Review' && newStatus == 'Approved') {
                 approvedRequests.add(req);
-                // Update app cancellation status — cancelSelectedPackages handles Application_Status__c
                 if (req.Application__c != null) {
                     appStatusMap.put(req.Application__c, 'Approved');
                 }
-            }
-            else if (oldStatus == 'Pending Accounting Review' && newStatus == 'Approved') {
+            } else if (oldStatus == 'Pending Accounting Review' && newStatus == 'Approved') {
                 approvedWithRefund.add(req);
                 approvedRequests.add(req);
-                // Update app cancellation status — cancelSelectedPackages handles Application_Status__c
                 if (req.Application__c != null) {
                     appStatusMap.put(req.Application__c, 'Approved');
                 }
-            }
-            else if (newStatus == 'Rejected') {
+            } else if (newStatus == 'Rejected') {
                 if (req.Application__c != null) {
                     appStatusMap.put(req.Application__c, 'Rejected');
                 }
-            }
-            else if (newStatus == 'Withdrawn') {
+            } else if (newStatus == 'Withdrawn') {
                 if (req.Application__c != null) {
                     appsToClear.add(req.Application__c);
                 }
             }
         }
-
         if (!toReassign.isEmpty()) {
-            update toReassign;
+            Database.update(toReassign, AccessLevel.SYSTEM_MODE);
         }
         if (!appStatusMap.isEmpty()) {
             syncApplicationStatus(appStatusMap, false);
@@ -205,16 +241,12 @@ public class CancellationRequestHandler {
         for (App_Cancellation_Request__c req : approvedRequests) {
             requestIds.add(req.Id);
         }
-        
-        // Query Cancellation_Service__c records for the approved requests
         List<Cancellation_Service__c> cancServices = [
-            SELECT Id, App_Cancellation_Request__c, Application_Package__c, 
+            SELECT Id, App_Cancellation_Request__c, Application_Package__c,
                    App_Cancellation_Request__r.Application__c
             FROM Cancellation_Service__c
             WHERE App_Cancellation_Request__c IN :requestIds
         ];
-        
-        // Group package IDs by application
         Map<Id, List<Id>> appToPackageIds = new Map<Id, List<Id>>();
         for (Cancellation_Service__c cs : cancServices) {
             Id appId = cs.App_Cancellation_Request__r.Application__c;
@@ -224,8 +256,6 @@ public class CancellationRequestHandler {
             }
             appToPackageIds.get(appId).add(cs.Application_Package__c);
         }
-        
-        // Cancel packages for each application
         for (Id appId : appToPackageIds.keySet()) {
             CancellationModalController.cancelSelectedPackages(appId, appToPackageIds.get(appId));
         }
@@ -242,7 +272,7 @@ public class CancellationRequestHandler {
             appsToUpdate.add(app);
         }
         if (!appsToUpdate.isEmpty()) {
-            update appsToUpdate;
+            Database.update(appsToUpdate, AccessLevel.SYSTEM_MODE);
         }
     }
 
@@ -255,7 +285,7 @@ public class CancellationRequestHandler {
             appsToUpdate.add(app);
         }
         if (!appsToUpdate.isEmpty()) {
-            update appsToUpdate;
+            Database.update(appsToUpdate, AccessLevel.SYSTEM_MODE);
         }
     }
 
@@ -266,11 +296,9 @@ public class CancellationRequestHandler {
             requestIds.add(req.Id);
             if (req.Application__c != null) applicationIds.add(req.Application__c);
         }
-
         Map<Id, Application__c> appMap = new Map<Id, Application__c>(
             [SELECT Id, Dealer_Name__c FROM Application__c WHERE Id IN :applicationIds]
         );
-
         Map<Id, Decimal> requestRefundMap = new Map<Id, Decimal>();
         for (AggregateResult ar : [
             SELECT App_Cancellation_Request__c reqId, SUM(Refund_Amount__c) totalRefund
@@ -280,17 +308,13 @@ public class CancellationRequestHandler {
         ]) {
             requestRefundMap.put((Id) ar.get('reqId'), (Decimal) ar.get('totalRefund'));
         }
-
         List<Credit__c> creditsToInsert = new List<Credit__c>();
         List<App_Cancellation_Request__c> requestsToUpdate = new List<App_Cancellation_Request__c>();
-
         for (App_Cancellation_Request__c req : approvedRequests) {
             Decimal refundAmount = requestRefundMap.containsKey(req.Id) ? requestRefundMap.get(req.Id) : 0;
             if (refundAmount == null || refundAmount <= 0) continue;
-
             Application__c app = req.Application__c != null ? appMap.get(req.Application__c) : null;
             if (app == null || app.Dealer_Name__c == null) continue;
-
             Credit__c credit = new Credit__c();
             credit.Amount__c = refundAmount;
             credit.Credit_Type__c = 'Cancellation Credit';
@@ -299,13 +323,11 @@ public class CancellationRequestHandler {
             credit.Cancellation_Request__c = req.Id;
             credit.Notes__c = 'Auto-generated cancellation refund credit';
             creditsToInsert.add(credit);
-
             requestsToUpdate.add(new App_Cancellation_Request__c(
                 Id = req.Id,
                 Total_Refund_Amount__c = refundAmount
             ));
         }
-
         if (!creditsToInsert.isEmpty()) {
             insert creditsToInsert;
         }
@@ -314,12 +336,36 @@ public class CancellationRequestHandler {
         }
     }
 
+    private static Boolean hasField(Map<String, Schema.SObjectField> fieldMap, String fieldName) {
+        if (fieldMap == null || String.isBlank(fieldName)) {
+            return false;
+        }
+        for (String key : fieldMap.keySet()) {
+            if (key != null && key.equalsIgnoreCase(fieldName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static void handleServiceAfterInsert(List<Cancellation_Service__c> newList) {
         try {
+            if (newList == null || newList.isEmpty()) {
+                return;
+            }
+            Set<Id> newIds = new Set<Id>();
+            for (Cancellation_Service__c svc : newList) {
+                if (svc.Id != null) {
+                    newIds.add(svc.Id);
+                }
+            }
+            if (newIds.isEmpty()) {
+                return;
+            }
             List<Cancellation_Service__c> toUpdate = [
                 SELECT Id, Name, Service_Number__c
                 FROM Cancellation_Service__c
-                WHERE Id IN :newList
+                WHERE Id IN :newIds
             ];
             List<Cancellation_Service__c> changed = new List<Cancellation_Service__c>();
             for (Cancellation_Service__c svc : toUpdate) {
@@ -331,7 +377,12 @@ public class CancellationRequestHandler {
                 }
             }
             if (!changed.isEmpty()) {
-                Database.update(changed, false);
+                for (Database.SaveResult sr : Database.update(changed, false, AccessLevel.SYSTEM_MODE)) {
+                    if (!sr.isSuccess()) {
+                        System.debug(LoggingLevel.WARN,
+                            'Service numbering skipped for ' + sr.getId() + ': ' + String.valueOf(sr.getErrors()));
+                    }
+                }
             }
         } catch (Exception e) {
             System.debug(LoggingLevel.WARN, 'Service numbering failed (non-fatal): ' + e.getMessage());
