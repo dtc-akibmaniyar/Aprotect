@@ -190,10 +190,13 @@ public class DealerPortalRemittanceHandler {
                     invoiceIds.add(invoice.Id);
                 }
 
-                // Query unpaid line items
+                // Query unpaid line items. Amount__c carries the invoice's own
+                // charge (option lines have Contract_Cost_Price__c = 0), and
+                // Balance_Amount__c is that charge net of anything already paid —
+                // the figure the invoice's TOTAL DUE is built from.
                 List<Invoice_Line_Item__c> lineItems = [
                     SELECT Id, Invoice__c, Application_Package__c,
-                           Contract_Cost_Price__c
+                           Contract_Cost_Price__c, Amount__c, Balance_Amount__c, Paid_Amount__c
                     FROM Invoice_Line_Item__c
                     WHERE Invoice__c IN :invoiceIds
                     AND Status__c != 'Paid'
@@ -213,7 +216,17 @@ public class DealerPortalRemittanceHandler {
                 List<Remittance_Line_Item_Junction__c> newJunctionRecords = new List<Remittance_Line_Item_Junction__c>();
                 for (Invoice_Line_Item__c lineItem : lineItems) {
                     if (!existingLineItemIds.contains(lineItem.Id)) {
-                        Decimal displayPrice = lineItem.Contract_Cost_Price__c != null ? lineItem.Contract_Cost_Price__c : 0;
+                        // Bill what the invoice charges, net of payments already
+                        // applied, so the junction sum equals TOTAL DUE.
+                        Decimal displayPrice = lineItem.Balance_Amount__c;
+                        if (displayPrice == null) {
+                            Decimal gross = lineItem.Amount__c != null ? lineItem.Amount__c : 0;
+                            Decimal paid = lineItem.Paid_Amount__c != null ? lineItem.Paid_Amount__c : 0;
+                            displayPrice = gross - paid;
+                        }
+                        if (displayPrice == null || displayPrice < 0) {
+                            displayPrice = 0;
+                        }
                         newJunctionRecords.add(new Remittance_Line_Item_Junction__c(
                             Remittance_Form__c   = newRemittanceForm.Id,
                             Invoice__c           = lineItem.Invoice__c,

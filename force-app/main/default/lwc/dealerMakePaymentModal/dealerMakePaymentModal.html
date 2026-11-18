@@ -111,9 +111,10 @@
                                                     class="expand-btn"
                                                     data-id={app.id}
                                                     onclick={handleToggleExpand}
-                                                    aria-label="Toggle products"
+                                                    aria-label="Toggle product detail"
+                                                    title={app.productLabel}
                                                 >
-                                                    {app.packageCountLabel}
+                                                    <span class="product-btn-label">{app.productLabel}</span>
                                                     <lightning-icon
                                                         icon-name={app.expandIcon}
                                                         size="x-small"
@@ -130,11 +131,59 @@
                                         <template if:true={app.isExpanded}>
                                             <div class="products-drawer">
                                                 <template for:each={app.packages} for:item="pkg">
-                                                    <div key={pkg.id} class="product-row">
-                                                        <span class="product-name">{pkg.name}</span>
-                                                        <span class="product-price">{pkg.formattedPrice}</span>
+                                                    <div key={pkg.id} class="pkg-block">
+                                                        <div class="pkg-head">
+                                                            <div class="pkg-ident">
+                                                                <span class="pkg-cat">{pkg.recordTypeName}</span>
+                                                                <span class="pkg-name">{pkg.displayName}</span>
+                                                                <template if:true={pkg.hasTerm}>
+                                                                    <span class="pkg-term">{pkg.termName}</span>
+                                                                </template>
+                                                            </div>
+                                                            <span class="pkg-price">{pkg.formattedBasePrice}</span>
+                                                        </div>
+
+                                                        <template if:true={pkg.hasOptions}>
+                                                            <template for:each={pkg.options} for:item="opt">
+                                                                <div key={opt.optionId} class="opt-row">
+                                                                    <span class="opt-name">
+                                                                        {opt.name}
+                                                                        <span class="opt-tag">({opt.selectionType})</span>
+                                                                    </span>
+                                                                    <span class="opt-price">{opt.formattedAmount}</span>
+                                                                </div>
+                                                            </template>
+                                                        </template>
+
+                                                        <template if:true={pkg.hasTax}>
+                                                            <div class="opt-row pkg-tax-row">
+                                                                <span class="opt-name">Tax</span>
+                                                                <span class="opt-price">{pkg.formattedTax}</span>
+                                                            </div>
+                                                        </template>
+
+                                                        <div class="pkg-total-row">
+                                                            <span class="pkg-total-label">Package total</span>
+                                                            <span class="pkg-total-value">{pkg.formattedTotal}</span>
+                                                        </div>
                                                     </div>
                                                 </template>
+
+                                                <!-- Invoice-style totals: sub-total + HST = TOTAL DUE -->
+                                                <div class="drawer-totals">
+                                                    <div class="drawer-totals-row">
+                                                        <span class="drawer-totals-label">SUB-TOTAL</span>
+                                                        <span class="drawer-totals-value">{app.formattedSubTotal}</span>
+                                                    </div>
+                                                    <div class="drawer-totals-row">
+                                                        <span class="drawer-totals-label">{app.hstLabel}</span>
+                                                        <span class="drawer-totals-value">{app.formattedTax}</span>
+                                                    </div>
+                                                    <div class="drawer-totals-row drawer-totals-due">
+                                                        <span class="drawer-totals-label">TOTAL DUE</span>
+                                                        <span class="drawer-totals-value">{app.formattedTotal}</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </template>
                                     </div>

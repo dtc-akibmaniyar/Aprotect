@@ -1065,6 +1065,16 @@ export default class DealerPortalWarranty extends LightningElement {
         this.selectedPerClaimLimit = Number(event.currentTarget.dataset.limit);
         // Clear term selection when per-claim limit changes
         this.selectedWarrantyTerm = null;
+        this.savedWarrantyTermId = null;
+        // Clear any manual price override together with the term, otherwise the
+        // sidebar keeps showing the old custom price and the "Custom Price" badge
+        // with no term selected.
+        this.isPriceOverridden = false;
+        this.isPriceEditMode = false;
+        this.priceOverrideInput = '';
+        this._overridePreTaxPrice = null;
+        this._overrideTaxAmount = null;
+        this.updatePrice();
     }
     
     async handleWarrantyTermSelection(event) {
@@ -1126,6 +1136,14 @@ export default class DealerPortalWarranty extends LightningElement {
     }
 
     async applySelectedWarrantyTerm(selectedTerm) {
+        // Re-clicking the term that is already applied must not wipe a custom
+        // price override. savedWarrantyTermId is the term currently in effect
+        // (selectedWarrantyTerm is already reassigned by the caller), so an
+        // identical term here is a no-op.
+        if (selectedTerm && selectedTerm.Id && this.savedWarrantyTermId === selectedTerm.Id) {
+            return;
+        }
+
         const hasSelectedOptions = this.selectedNewOptions.length > 0;
 
         if (hasSelectedOptions) {
@@ -2078,6 +2096,7 @@ export default class DealerPortalWarranty extends LightningElement {
         setTimeout(() => {
             const input = this.template.querySelector('.price-override-input');
             if (input) {
+                input.value = this.priceOverrideInput;
                 input.focus();
                 input.select();
             }
@@ -2085,7 +2104,9 @@ export default class DealerPortalWarranty extends LightningElement {
     }
 
     handlePriceOverrideChange(event) {
-        this.priceOverrideInput = event.target.value;
+        // Track every keystroke, not just the change event. keydown (Enter) fires
+        // before change, so the state must already hold the typed value.
+         this.priceOverrideInput = event.target.value;
     }
 
     handlePriceOverrideBlur() {
@@ -2102,7 +2123,13 @@ export default class DealerPortalWarranty extends LightningElement {
     }
 
     _applyPriceOverride() {
-        const val = parseFloat(this.priceOverrideInput);
+        //const val = parseFloat(this.priceOverrideInput);
+        // Prefer the live field value: on Enter the keydown handler runs before the
+        // value is committed anywhere else, so the state property can be one edit behind.
+        const box = this.template.querySelector('.price-override-input');
+        const raw = box ? box.value : this.priceOverrideInput;
+        this.priceOverrideInput = raw;
+        const val = parseFloat(raw);
         if (!isNaN(val) && val >= 0) {
             // Price floor validation removed - dealers can enter any custom price
             this.priceValidationMessage = '';
@@ -2326,7 +2353,15 @@ export default class DealerPortalWarranty extends LightningElement {
      * Saves the current warranty selection and then converts the application to a quote
      */
     async handleSaveAsQuote() {
-        
+        // ✅ FIX: Commit any in-progress custom price override before saving.
+        // If the user typed a custom price and clicked Save As Quote without
+        // tabbing away, onblur fires AFTER onclick in LWC. Calling
+        // _applyPriceOverride() here ensures isPriceOverridden and
+        // _overridePreTaxPrice are set before packageData is constructed below.
+        if (this.isPriceEditMode) {
+            this._applyPriceOverride();
+        }
+
         // Check if applicationId is missing
         if (!this.applicationId) {
             // Try to get application ID from URL as fallback
@@ -2353,7 +2388,8 @@ export default class DealerPortalWarranty extends LightningElement {
                     dealerId: this.selectedDealerPackage.DealerId,
                     dealerPackageId: this.selectedDealerPackage.Id,
                     packageName: this.selectedDealerPackage.PackageName,
-                    selectedTermId: this.selectedWarrantyTerm.Id
+                    selectedTermId: this.selectedWarrantyTerm.Id,
+                    dealerPriceOverride: this.isPriceOverridden ? (this._overridePreTaxPrice || this.price) : null
                 };
                 
                 packageData.recordType = 'Extended_Limited_Warranty';

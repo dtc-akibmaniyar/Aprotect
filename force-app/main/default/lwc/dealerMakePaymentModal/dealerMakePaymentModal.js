@@ -42,7 +42,7 @@ export default class DealerMakePaymentModal extends LightningElement {
         if (b === '60plus') return 'aging-badge aging-60';
         return 'aging-badge aging-90';
     }
-
+    
     _formatCurrency(amount) {
         if (amount == null) return '$0.00';
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -54,11 +54,44 @@ export default class DealerMakePaymentModal extends LightningElement {
         return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
+    // ── Package decoration (products cell + drawer) ──────────
+    _decoratePackage(pkg) {
+        const options = (pkg.options || []).map(opt => ({
+            ...opt,
+            formattedAmount: this._formatCurrency(opt.amount)
+        }));
+        const displayName = pkg.packageName || pkg.name || 'Package';
+        const total = pkg.displayTotal != null ? pkg.displayTotal : (pkg.price || 0);
+        return {
+            ...pkg,
+            displayName: displayName,
+            recordTypeName: pkg.recordTypeName || pkg.name || '',
+            termName: pkg.termName || '',
+            hasTerm: !!(pkg.termName && pkg.termName.length),
+            hasTax: pkg.hasTax === true,
+            formattedTax: this._formatCurrency(pkg.taxAmount || 0),
+            options: options,
+            hasOptions: options.length > 0,
+            formattedPrice: this._formatCurrency(pkg.price),
+            formattedBasePrice: this._formatCurrency(
+                pkg.basePrice != null ? pkg.basePrice : pkg.price
+            ),
+            formattedTotal: this._formatCurrency(total)
+        };
+    }
+
+    // The products cell is a fixed affordance: it reads "Detail" whatever the
+    // package count, and the substance lives in the expanded drawer.
+    _productLabel() {
+        return 'Detail';
+    }
+
     // ── Enriched apps (add computed display fields) ──────────
     get enrichedApps() {
         return (this.unpaidApplications || []).map(app => {
             const isSelected = this.selectedAppIds.includes(app.id);
             const isExpanded = this.expandedAppIds.has(app.id);
+            const packages = (app.packages || []).map(pkg => this._decoratePackage(pkg));
             return {
                 ...app,
                 agingLabel: this._agingLabel(app.agingDays),
@@ -66,13 +99,12 @@ export default class DealerMakePaymentModal extends LightningElement {
                 agingBucket: this._agingBucket(app.agingDays),
                 formattedDate: this._formatDate(app.appCreatedDate),
                 formattedTotal: this._formatCurrency(app.total),
-                packages: (app.packages || []).map(pkg => ({
-                    ...pkg,
-                    formattedPrice: this._formatCurrency(pkg.price)
-                })),
-                packageCountLabel: (app.packages || []).length === 1
-                    ? '(1) Product'
-                    : `(${(app.packages || []).length}) Products`,
+                packages: packages,
+                productLabel: this._productLabel(),
+                // Invoice-style totals, straight from the invoice the app bills against
+                formattedSubTotal: this._formatCurrency(app.subTotal || 0),
+                formattedTax: this._formatCurrency(app.taxAmount || 0),
+                hstLabel: `HST (ON) ${app.taxPercentage || 0}%:`,
                 isExpanded: isExpanded,
                 isSelected: isSelected,
                 appRowClass: isSelected ? 'app-row selected' : 'app-row',
@@ -198,7 +230,7 @@ export default class DealerMakePaymentModal extends LightningElement {
     get formattedSubtotal() { return this._formatCurrency(this.summarySubtotal); }
     get formattedTax() { return this._formatCurrency(this.taxAmount); }
     get formattedTotal() { return this._formatCurrency(this.totalDue); }
-    get taxLabel() { return `Tax (${this.taxPercentage}%)`; }
+    get taxLabel() { return `HST (ON) ${this.taxPercentage}%:`; }
 
     // Aging bucket subtotals for selected apps
     get summaryCurrentSubtotal() {

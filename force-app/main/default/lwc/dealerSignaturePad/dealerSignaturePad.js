@@ -119,8 +119,98 @@ export default class DealerSignaturePad extends LightningElement {
         return !!this.active.previewUrl && this.active.previewBlocked !== true;
     }
 
+    // ------------------------------------------------------- document presence
+
+    /**
+     * The document types this application actually carries, taken from the
+     * server's own verdict (SignatureSubmitGuard.Requirements.documents).
+     *
+     * Fail-open contract: `null` means UNKNOWN - the requirements have not been
+     * read yet, or the read failed. Unknown never hides anything, so a failed or
+     * slow call can never hide a section the deal really carries. An empty array
+     * means the server positively said "this application carries no contract
+     * document", and only then is a section hidden.
+     */
+    get presentDocumentTypes() {
+        const req = this.requirements;
+        if (!req || !Array.isArray(req.documents)) return null;
+        const keys = [];
+        req.documents.forEach((d) => {
+            const k = d && d.documentType;
+            if (k && keys.indexOf(k) === -1) {
+                keys.push(k);
+            }
+        });
+        return keys;
+    }
+
+    /** True when this application carries that contract document. Unknown => true. */
+    hasDocument(key) {
+        const present = this.presentDocumentTypes;
+        if (present === null) return true; // fail-open: no verdict available
+        return present.indexOf(key) > -1;
+    }
+
+    get hasWarrantyDocument() {
+        return this.hasDocument('Warranty');
+    }
+
+    get hasTireRimDocument() {
+        return this.hasDocument('TireRim');
+    }
+
+    /** False only when the server positively says there is nothing to sign. */
+    get hasAnyDocument() {
+        const present = this.presentDocumentTypes;
+        if (present === null) return true; // fail-open: no verdict available
+        return present.length > 0;
+    }
+
+    /** First document this application carries, in DOCS order; null when none. */
+    get firstPresentKey() {
+        const present = this.presentDocumentTypes;
+        if (present === null) return null;
+        for (let i = 0; i < DOCS.length; i++) {
+            if (present.indexOf(DOCS[i].key) > -1) return DOCS[i].key;
+        }
+        return null;
+    }
+
+    /**
+     * A tab key this application can actually sign. An unknown verdict returns
+     * the key unchanged (fail-open); a known verdict clamps to the first present
+     * document, or null when the deal carries no document at all.
+     */
+    resolvedKey(key) {
+        const present = this.presentDocumentTypes;
+        if (present === null) return key;
+        if (present.indexOf(key) > -1) return key;
+        return this.firstPresentKey;
+    }
+
+    /**
+     * Keeps `activeTab` - the document handleSubmit signs - inside the set this
+     * application actually carries, so a hidden section can never stay active.
+     */
+    applyTabClamp() {
+        const present = this.presentDocumentTypes;
+        if (present === null) return; // fail-open: nothing known yet
+        if (present.indexOf(this.activeTab) > -1) return;
+        const next = this.firstPresentKey;
+        if (!next) {
+            // The deal carries no contract document: there is nothing to sign.
+            if (!this.isSubmitting) this.showPad = false;
+            return;
+        }
+        this.activeTab = next;
+        if (this.showPad && !this.isSubmitting) {
+            setTimeout(() => this.resetCanvas(), 0);
+            this.loadPreview(next);
+        }
+    }
+
     get tabs() {
-        return DOCS.map((d) => {
+        return DOCS.filter((d) => this.hasDocument(d.key)).map((d) => {
             const st = this.docs[d.key];
             return {
                 key: d.key,
@@ -268,7 +358,12 @@ export default class DealerSignaturePad extends LightningElement {
     }
 
     openPad(key) {
-        this.activeTab = DOCS.some((d) => d.key === key) ? key : 'Warranty';
+        const requested = DOCS.some((d) => d.key === key) ? key : 'Warranty';
+        const target = this.resolvedKey(requested);
+        // A known verdict that lists no document means there is nothing to
+        // sign; never open the pad on a section this application does not carry.
+        if (!target) return;
+        this.activeTab = target;
         this.isSubmitting = false;
         this.steps = [];
         this.patch(this.activeTab, {
@@ -502,7 +597,14 @@ export default class DealerSignaturePad extends LightningElement {
 
     async handleSubmit() {
         if (this.isSubmitting || !this.allCaptured) return;
-        const key = this.activeTab;
+        const key = this.resolvedKey(this.activeTab);
+        if (key !== this.activeTab) {
+            // The verdict moved or retired the active document between opening
+            // the pad and submitting: never sign a document this application
+            // does not carry. Re-clamp and let the user sign the right one.
+            this.applyTabClamp();
+            return;
+        }
         const doc = this.active;
         this.isSubmitting = true;
         this.patch(key, { errorMessage: null, successMessage: null });
@@ -569,6 +671,9 @@ export default class DealerSignaturePad extends LightningElement {
         try {
             const req = await getSignatureRequirements({ applicationId: this.applicationId });
             this.requirements = req;
+            // The verdict has just arrived: clamp the active/submitted document
+            // to one this application actually carries before anyone signs.
+            this.applyTabClamp();
             this.dispatchEvent(new CustomEvent('signaturestatuschange', {
                 detail: { requirements: req },
                 bubbles: true,

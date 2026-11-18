@@ -1,9 +1,39 @@
 public without sharing class DealerActionBoardController {
 
+    /** Suffix the invoice uses to mark a package option line. */
+    private static final String OPTIONAL_SUFFIX = ' (Optional)';
+    /** The package's own tax row — surfaced separately, never as an option. */
+    private static final String TAX_LINE_NAME = 'tax';
+
     public class UnpaidPackageItem {
+        // ── Original contract (unchanged) ────────────────────────────────
         @AuraEnabled public String id;
+        @AuraEnabled public String name;      // package record type, as before
+        @AuraEnabled public Decimal price;    // billed package cost, as before
+
+        // ── Additive: product detail for the products cell ───────────────
+        @AuraEnabled public String packageName;   // resolved package name
+        @AuraEnabled public String recordTypeName;
+        @AuraEnabled public String termName;
+
+        // ── Additive: priced breakdown for the expanded drawer ───────────
+        @AuraEnabled public Decimal basePrice;
+        @AuraEnabled public Decimal taxAmount;
+        @AuraEnabled public Boolean hasTax;
+        @AuraEnabled public Decimal optionsTotal;
+        @AuraEnabled public Decimal displayTotal;
+        @AuraEnabled public Decimal billedAmount;
+        @AuraEnabled public Boolean hasBillingVariance;
+        @AuraEnabled public Integer optionCount;
+        @AuraEnabled public List<UnpaidPackageOption> options;
+    }
+
+    public class UnpaidPackageOption {
+        @AuraEnabled public String optionId;
         @AuraEnabled public String name;
-        @AuraEnabled public Decimal price;
+        @AuraEnabled public Decimal amount;
+        @AuraEnabled public String selectionType;
+        @AuraEnabled public Boolean isBilled;
     }
 
     public class UnpaidApplicationRow {
@@ -31,6 +61,85 @@ public without sharing class DealerActionBoardController {
         @AuraEnabled public DateTime appCreatedDate;
     }
 
+    // ── Package / option resolution (mirrors the invoice renderers) ──────
+
+    /** Same precedence the invoice uses to label a package. */
+    private static String resolvePackageName(Application_Package__c pkg) {
+        if (pkg.Package__r != null && String.isNotBlank(pkg.Package__r.Name)) {
+            return pkg.Package__r.Name;
+        }
+        if (pkg.Dealer_Package__r != null && pkg.Dealer_Package__r.Package__r != null
+                && String.isNotBlank(pkg.Dealer_Package__r.Package__r.Name)) {
+            return pkg.Dealer_Package__r.Package__r.Name;
+        }
+        if (pkg.Dealer_Package__r != null && String.isNotBlank(pkg.Dealer_Package__r.Name)) {
+            return pkg.Dealer_Package__r.Name;
+        }
+        return pkg.RecordType != null ? pkg.RecordType.Name : '';
+    }
+
+    /** Same precedence the invoice uses to label a package term. */
+    private static String resolveTermName(Application_Package__c pkg) {
+        if (pkg.Package_Term__r != null && String.isNotBlank(pkg.Package_Term__r.Name)) {
+            return pkg.Package_Term__r.Name;
+        }
+        if (pkg.Dealer_Package_Term__r != null && pkg.Dealer_Package_Term__r.Package_Term__r != null
+                && String.isNotBlank(pkg.Dealer_Package_Term__r.Package_Term__r.Name)) {
+            return pkg.Dealer_Package_Term__r.Package_Term__r.Name;
+        }
+        if (pkg.Dealer_Package_Term__r != null && String.isNotBlank(pkg.Dealer_Package_Term__r.Name)) {
+            return pkg.Dealer_Package_Term__r.Name;
+        }
+        return '';
+    }
+
+    /** Case/space-insensitive key — same normalisation the invoice uses. */
+    private static String normalize(String value) {
+        return value == null ? '' : value.trim().toLowerCase();
+    }
+
+    private static String stripOptionalSuffix(String value) {
+        if (value == null) {
+            return '';
+        }
+        String trimmed = value.trim();
+        if (trimmed.endsWith(OPTIONAL_SUFFIX)) {
+            return trimmed.substring(0, trimmed.length() - OPTIONAL_SUFFIX.length());
+        }
+        return trimmed;
+    }
+
+    /**
+     * The term is normally carried by the package term lookup, but many packages
+     * in this org have no term lookup — the chosen term survives only as a
+     * Application_Package_Line_Item__c row ("24 Months/Unlimited KM"). When the
+     * lookup is blank, fall back to the line that is not a billed option so the
+     * drawer can still show the term next to the package name.
+     */
+    private static String deriveTermName(List<Application_Package_Line_Item__c> lines,
+                                         Map<String, Decimal> optionPrices) {
+        if (lines == null || lines.isEmpty()) {
+            return '';
+        }
+        String fallback = '';
+        for (Application_Package_Line_Item__c line : lines) {
+            String key = normalize(line.Name);
+            if (String.isBlank(key) || key == TAX_LINE_NAME) {
+                continue;
+            }
+            if (optionPrices != null && optionPrices.containsKey(key)) {
+                continue;   // this line is a priced option, never the term
+            }
+            if (key.contains('month') || key.contains('km') || key.contains('mile')) {
+                return line.Name.trim();
+            }
+            if (String.isBlank(fallback)) {
+                fallback = line.Name.trim();
+            }
+        }
+        return fallback;
+    }
+
     @AuraEnabled
     public static List<UnpaidApplicationRow> getUnpaidApplications() {
         Id userId = UserInfo.getUserId();
@@ -56,14 +165,17 @@ public without sharing class DealerActionBoardController {
                    Odometer__c,
                    Payment_Status__c,
                    (SELECT Id, RecordType.Name, Contract_Cost_Price__c,
-                           Contract_Cost_Price_Without_Tax__c, Tax_Amount_Cost__c, Tax_Percentage__c
+                           Contract_Cost_Price_Without_Tax__c, Tax_Amount_Cost__c, Tax_Percentage__c,
+                           Package__r.Name, Dealer_Package__r.Name, Dealer_Package__r.Package__r.Name,
+                           Package_Term__r.Name, Dealer_Package_Term__r.Name,
+                           Dealer_Package_Term__r.Package_Term__r.Name,
+                           Dealer_Package_Price__c, Add_Ons_Price__c
                     FROM Application_Packages__r
                     WHERE Active__c = true
                     ORDER BY RecordType.Name ASC),
                    (SELECT Id, Status__c, Invoice_Due_Date__c, Total_Balance_Amount__c, Amount__c
                     FROM Invoice__r
-                    ORDER BY CreatedDate DESC
-                    LIMIT 1)
+                    ORDER BY CreatedDate DESC)
             FROM Application__c
             WHERE Dealer_Name__c = :dealerAccountId
               AND Application_Status__c = 'Submitted'
@@ -71,6 +183,110 @@ public without sharing class DealerActionBoardController {
             ORDER BY CreatedDate DESC
             LIMIT 200
         ];
+
+        // ── Pre-load what the drawer needs, in two bulk queries ──────────
+        Set<Id> pkgIds = new Set<Id>();
+        Set<Id> invoiceIds = new Set<Id>();
+        for (Application__c app : apps) {
+            for (Application_Package__c pkg : app.Application_Packages__r) {
+                pkgIds.add(pkg.Id);
+            }
+            for (Invoice__c inv : app.Invoice__r) {
+                invoiceIds.add(inv.Id);
+            }
+        }
+
+        // Option selections recorded on the application package, by line name.
+        // (Application_Package_Line_Item__c carries the chosen option and term names.)
+        Map<Id, List<Application_Package_Line_Item__c>> linesByPkg =
+            new Map<Id, List<Application_Package_Line_Item__c>>();
+        if (!pkgIds.isEmpty()) {
+            for (Application_Package_Line_Item__c line : [
+                    SELECT Id, Name, Application_Package__c
+                    FROM Application_Package_Line_Item__c
+                    WHERE Application_Package__c IN :pkgIds
+                    ORDER BY Application_Package__c, Name]) {
+                if (line.Application_Package__c == null) {
+                    continue;
+                }
+                if (!linesByPkg.containsKey(line.Application_Package__c)) {
+                    linesByPkg.put(line.Application_Package__c,
+                        new List<Application_Package_Line_Item__c>());
+                }
+                linesByPkg.get(line.Application_Package__c).add(line);
+            }
+        }
+
+        // Billed option amounts: the invoice materialises each priced option as a
+        // line named "<Option Name> (Optional)" with no package link. That is the
+        // amount actually charged, so it wins over catalogue pricing.
+        Map<Id, Map<String, Decimal>> optionPriceByInvoice =
+            new Map<Id, Map<String, Decimal>>();
+        if (!invoiceIds.isEmpty()) {
+            for (Invoice_Line_Item__c li : [
+                    SELECT Id, Name, Description__c, Amount__c, Invoice__c
+                    FROM Invoice_Line_Item__c
+                    WHERE Invoice__c IN :invoiceIds
+                      AND Application_Package__c = null
+                      AND Amount__c != null
+                      AND Amount__c != 0
+                    ORDER BY Invoice__c, Id]) {
+                String label = String.isNotBlank(li.Description__c) ? li.Description__c : li.Name;
+                if (label == null || !label.trim().endsWith(OPTIONAL_SUFFIX)) {
+                    continue;
+                }
+                String key = normalize(stripOptionalSuffix(label));
+                if (String.isBlank(key)) {
+                    continue;
+                }
+                Map<String, Decimal> byName = optionPriceByInvoice.get(li.Invoice__c);
+                if (byName == null) {
+                    byName = new Map<String, Decimal>();
+                    optionPriceByInvoice.put(li.Invoice__c, byName);
+                }
+                if (!byName.containsKey(key)) {
+                    byName.put(key, li.Amount__c);
+                }
+            }
+        }
+
+        // Invoice-style tax. The invoice puts the tax INSIDE each line's
+        // Amount__c, so the sub-total is the invoice balance minus this tax and
+        // sub-total + HST always reconciles to the invoice's own TOTAL DUE.
+        Map<Id, Decimal> invTaxByInvoice = new Map<Id, Decimal>();
+        Map<Id, Decimal> invTaxPctByInvoice = new Map<Id, Decimal>();
+        if (!invoiceIds.isEmpty()) {
+            for (Invoice_Line_Item__c li : [
+                    SELECT Invoice__c, Amount__c, Balance_Amount__c, Paid_Amount__c,
+                           Tax_Amount__c, Tax_Percentage__c
+                    FROM Invoice_Line_Item__c
+                    WHERE Invoice__c IN :invoiceIds]) {
+                Decimal gross = li.Amount__c != null ? li.Amount__c : 0;
+                Decimal bal = li.Balance_Amount__c;
+                if (bal == null) {
+                    Decimal paid = li.Paid_Amount__c != null ? li.Paid_Amount__c : 0;
+                    bal = gross - paid;
+                }
+                if (bal < 0) {
+                    bal = 0;
+                }
+                Decimal tax = li.Tax_Amount__c != null ? li.Tax_Amount__c : 0;
+                if (tax > 0 && gross > 0 && bal != gross) {
+                    // partially paid line: keep only the unpaid share of its tax
+                    tax = (tax * bal / gross).setScale(2, System.RoundingMode.HALF_UP);
+                }
+                if (tax > bal) {
+                    tax = bal;
+                }
+                Decimal taxRunning = invTaxByInvoice.containsKey(li.Invoice__c)
+                    ? invTaxByInvoice.get(li.Invoice__c) : 0;
+                invTaxByInvoice.put(li.Invoice__c, taxRunning + tax);
+                if (li.Tax_Percentage__c != null && li.Tax_Percentage__c > 0
+                        && !invTaxPctByInvoice.containsKey(li.Invoice__c)) {
+                    invTaxPctByInvoice.put(li.Invoice__c, li.Tax_Percentage__c);
+                }
+            }
+        }
 
         List<UnpaidApplicationRow> result = new List<UnpaidApplicationRow>();
         for (Application__c app : apps) {
@@ -101,6 +317,11 @@ public without sharing class DealerActionBoardController {
             row.vin = app.Vehicle_VIN__c;
             row.paymentStatus = app.Payment_Status__c;
 
+            Map<String, Decimal> optPrices = null;
+            if (!app.Invoice__r.isEmpty()) {
+                optPrices = optionPriceByInvoice.get(app.Invoice__r[0].Id);
+            }
+
             List<UnpaidPackageItem> pkgList = new List<UnpaidPackageItem>();
             Decimal subTotal = 0;
             Decimal totalAmt = 0;
@@ -112,6 +333,90 @@ public without sharing class DealerActionBoardController {
                 item.id = pkg.Id;
                 item.name = pkg.RecordType != null ? pkg.RecordType.Name : '';
                 item.price = pkg.Contract_Cost_Price__c != null ? pkg.Contract_Cost_Price__c : 0;
+                item.recordTypeName = item.name;
+                item.packageName = resolvePackageName(pkg);
+                List<Application_Package_Line_Item__c> lines = linesByPkg.get(pkg.Id);
+                // Prefer the package term lookup; fall back to the recorded term line.
+                String resolvedTerm = resolveTermName(pkg);
+                item.termName = String.isNotBlank(resolvedTerm)
+                    ? resolvedTerm
+                    : deriveTermName(lines, optPrices);
+                item.billedAmount = item.price;
+                item.optionCount = 0;
+                item.optionsTotal = 0;
+                item.options = new List<UnpaidPackageOption>();
+
+                Decimal addOns = pkg.Add_Ons_Price__c != null ? pkg.Add_Ons_Price__c : 0;
+                Decimal base = 0;
+                if (pkg.Dealer_Package_Price__c != null && pkg.Dealer_Package_Price__c > 0) {
+                    base = pkg.Dealer_Package_Price__c;
+                } else if (item.price - addOns > 0) {
+                    base = item.price - addOns;
+                } else {
+                    base = item.price;
+                }
+                item.basePrice = base;
+
+                // Tax already carried inside the billed package cost. It is shown
+                // separately so base + options + tax reconciles to the package
+                // amount the remittance charges.
+                Decimal tax = 0;
+                if (pkg.Contract_Cost_Price_Without_Tax__c != null
+                        && item.price > pkg.Contract_Cost_Price_Without_Tax__c) {
+                    Decimal taxDelta = item.price - pkg.Contract_Cost_Price_Without_Tax__c;
+                    tax = taxDelta.setScale(2, System.RoundingMode.HALF_UP);
+                }
+                item.taxAmount = tax;
+                item.hasTax = tax > 0;
+
+                // Option rows: every recorded line that is not the term itself.
+                String termKey = normalize(item.termName);
+                Decimal optsTotal = 0;
+                Boolean allPriced = true;
+                if (lines != null) {
+                    Set<String> seen = new Set<String>();
+                    for (Application_Package_Line_Item__c line : lines) {
+                        String lineKey = normalize(line.Name);
+                        if (String.isBlank(lineKey) || lineKey == termKey || lineKey == TAX_LINE_NAME) {
+                            continue;   // neither the term nor the tax row is an option
+                        }
+                        if (seen.contains(lineKey)) {
+                            continue;
+                        }
+                        seen.add(lineKey);
+
+                        UnpaidPackageOption opt = new UnpaidPackageOption();
+                        opt.optionId = line.Id;
+                        opt.name = line.Name.trim();
+                        opt.selectionType = 'Optional';
+                        Decimal amt = null;
+                        if (optPrices != null) {
+                            amt = optPrices.get(lineKey);
+                        }
+                        opt.amount = amt;
+                        opt.isBilled = amt != null;
+                        if (amt == null) {
+                            allPriced = false;
+                        } else {
+                            optsTotal += amt;
+                        }
+                        item.options.add(opt);
+                    }
+                }
+
+                item.optionCount = item.options.size();
+                item.optionsTotal = optsTotal;
+                // The drawer total is the honest sum: base + every priced option.
+                // When an option carries no billed price we cannot itemise, so the
+                // billed package cost is shown instead and no variance is claimed.
+                if (!item.options.isEmpty() && allPriced) {
+                    item.displayTotal = (base + optsTotal + tax).setScale(2, System.RoundingMode.HALF_UP);
+                } else {
+                    item.displayTotal = item.price;
+                }
+                item.hasBillingVariance = item.displayTotal.setScale(2, System.RoundingMode.HALF_UP)
+                    != item.price.setScale(2, System.RoundingMode.HALF_UP);
+
                 pkgList.add(item);
 
                 if (pkg.Contract_Cost_Price_Without_Tax__c != null) {
@@ -129,10 +434,58 @@ public without sharing class DealerActionBoardController {
             }
 
             row.packages = pkgList;
-            row.subTotal = subTotal;
-            row.total = totalAmt;
-            row.taxAmount = taxAmt;
-            row.taxPercentage = taxPct;
+
+            // The invoice is the source of truth: the TOTAL column, the aging
+            // tiles and the summary must equal what the invoice asks the dealer
+            // to pay, not the package contract price.
+            Boolean hasInvoice = !app.Invoice__r.isEmpty();
+            Decimal invoiceDue = 0;
+            Decimal invTax = 0;
+            Decimal invPct = 0;
+            Boolean anyUnpaidInvoice = false;
+            for (Invoice__c inv : app.Invoice__r) {
+                if (inv.Status__c == 'Paid') {
+                    continue;
+                }
+                anyUnpaidInvoice = true;
+                // an application can carry more than one open invoice: sum them,
+                // never take the first one and drop the rest
+                invoiceDue += inv.Total_Balance_Amount__c != null
+                    ? inv.Total_Balance_Amount__c
+                    : (inv.Amount__c != null ? inv.Amount__c : 0);
+                if (invTaxByInvoice.containsKey(inv.Id)) {
+                    invTax += invTaxByInvoice.get(inv.Id);
+                }
+                if (invPct == 0 && invTaxPctByInvoice.containsKey(inv.Id)) {
+                    invPct = invTaxPctByInvoice.get(inv.Id);
+                }
+            }
+
+            if (hasInvoice) {
+                Decimal due = invoiceDue;
+                if (!anyUnpaidInvoice) {
+                    due = 0;
+                }
+                due = due.setScale(2, System.RoundingMode.HALF_UP);
+                Decimal tax = invTax.setScale(2, System.RoundingMode.HALF_UP);
+                if (tax > due) {
+                    tax = due;
+                }
+                if (tax < 0) {
+                    tax = 0;
+                }
+                row.subTotal = (due - tax).setScale(2, System.RoundingMode.HALF_UP);
+                row.taxAmount = tax;
+                row.taxPercentage = invPct;
+                row.total = due;
+            } else {
+                // No invoice yet: createRemittanceForm raises one from the package
+                // contract price, so that is what the drawer must show.
+                row.subTotal = subTotal;
+                row.taxAmount = taxAmt;
+                row.taxPercentage = taxPct;
+                row.total = totalAmt;
+            }
 
             // Invoice fields from subquery
             if (!app.Invoice__r.isEmpty()) {

@@ -2,12 +2,16 @@
   <!-- Closed state: ONE button. No per-document chips, no download links. -->
   <template if:false={showPad}>
     <div class="sig-inline">
-      <button class={signatureButtonClass} onclick={handleOpenPad} title={signatureButtonTitle}>
-        <template if:true={allDocumentsSigned}>
-          <span class="sig-btn-tick" aria-hidden="true">&#10003;</span>
-        </template>
-        <span>{signatureButtonLabel}</span>
-      </button>
+      <!-- Fail-open: hasAnyDocument is only false once the server positively
+           says this application carries no contract document. -->
+      <template if:true={hasAnyDocument}>
+        <button class={signatureButtonClass} onclick={handleOpenPad} title={signatureButtonTitle}>
+          <template if:true={allDocumentsSigned}>
+            <span class="sig-btn-tick" aria-hidden="true">&#10003;</span>
+          </template>
+          <span>{signatureButtonLabel}</span>
+        </button>
+      </template>
       <template if:true={inlineError}>
         <span class="sig-inline-error">{inlineError}</span>
       </template>

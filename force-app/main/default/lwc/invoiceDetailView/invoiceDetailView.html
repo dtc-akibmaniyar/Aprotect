@@ -165,10 +165,7 @@
 
                                 </td>
                                 <td class="li-td li-td-term">{pkg.packageTerm}</td>
-                                <td class="li-td li-td-price">
-                                    <template if:false={pkg.isOptionRow}>{pkg.formattedWarrantyPackageCost}</template>
-                                    <template if:true={pkg.isOptionRow}>—</template>
-                                </td>
+                                <td class="li-td li-td-price">{pkg.formattedWarrantyPackageCost}</td>
                                 <td class="li-td li-td-sub">
                                     <template if:false={pkg.isOptionRow}>{pkg.formattedLineTotal}</template>
                                     <template if:true={pkg.isOptionRow}>—</template>
@@ -182,10 +179,7 @@
                                         <span class="opt-tag">({opt.selectionType})</span>
                                     </td>
                                     <td class="li-td li-td-term">-</td>
-                                    <td class="li-td li-td-price">
-                                        <template if:false={opt.isBilledOption}>{opt.formattedCostPrice}</template>
-                                        <template if:true={opt.isBilledOption}>—</template>
-                                    </td>
+                                    <td class="li-td li-td-price">{opt.formattedCostPrice}</td>
                                     <td class="li-td li-td-sub">
                                         <template if:true={opt.isBilledOption}>—</template>
                                     </td>

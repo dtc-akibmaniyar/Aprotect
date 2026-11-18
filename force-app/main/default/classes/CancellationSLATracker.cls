@@ -34,6 +34,10 @@ public class CancellationSLATracker implements Schedulable {
         
         List<Task> tasksToCreate = new List<Task>();
         for (App_Cancellation_Request__c req : overdueRequests) {
+            if (req.Id == null) {
+                System.debug(LoggingLevel.WARN, 'CancellationSLATracker: skipped overdue request with null Id (' + req.Name + ')');
+                continue;
+            }
             if (alreadyTasked.contains(req.Id)) continue;
             
             Task t = new Task();
@@ -44,17 +48,61 @@ public class CancellationSLATracker implements Schedulable {
             t.ActivityDate = Date.today();
             t.WhatId = req.Id;
             t.Description = 'This cancellation request has been pending for more than 7 days. Please review and take action.';
+            
+            // Skip any row whose required inputs are missing instead of letting the insert fail
+            if (t.WhatId == null || t.OwnerId == null || t.Subject == null) {
+                System.debug(LoggingLevel.WARN, 'CancellationSLATracker: skipped SLA task for request ' 
+                    + req.Id + ' (' + req.Name + ') - required field missing');
+                continue;
+            }
             tasksToCreate.add(t);
         }
         
         if (!tasksToCreate.isEmpty()) {
-            insert tasksToCreate;
+            // Partial-save insert: one bad row must not abort the whole batch
+            Database.SaveResult[] results = Database.insert(tasksToCreate, false);
+            Integer createdCount = 0;
+            for (Integer i = 0; i < results.size(); i++) {
+                Database.SaveResult sr = results[i];
+                if (sr.isSuccess()) {
+                    createdCount++;
+                } else {
+                    Id failedRequestId = (i < tasksToCreate.size()) ? tasksToCreate[i].WhatId : null;
+                    String errorText = '';
+                    for (Database.Error err : sr.getErrors()) {
+                        errorText += err.getStatusCode() + ': ' + err.getMessage() + '; ';
+                    }
+                    System.debug(LoggingLevel.ERROR, 'CancellationSLATracker: failed to create SLA task for cancellation request ' 
+                        + failedRequestId + ' - ' + errorText);
+                }
+            }
+            System.debug(LoggingLevel.INFO, 'CancellationSLATracker: created ' + createdCount 
+                + ' of ' + tasksToCreate.size() + ' SLA task(s)');
         }
     }
     
-    // Call this to schedule: runs daily at 8 AM
+    // Schedules the tracker to run daily at 08:00 org time (America/New_York).
+    // Idempotent: System.schedule creates a NEW job on every call, so check for an
+    // existing CronTrigger for this tracker first and skip instead of double-scheduling.
     public static void scheduleDaily() {
         String cronExp = '0 0 8 * * ?';
-        System.schedule('Cancellation SLA Tracker - Daily', cronExp, new CancellationSLATracker());
+        String jobName = 'Cancellation SLA Tracker - Apex';
+        
+        for (CronTrigger existing : [
+            SELECT Id, State, CronExpression, NextFireTime, CronJobDetail.Name
+            FROM CronTrigger
+        ]) {
+            String existingName = existing.CronJobDetail.Name;
+            if (existingName != null && existingName.startsWithIgnoreCase('Cancellation SLA Tracker')) {
+                System.debug(LoggingLevel.WARN, 'CancellationSLATracker.scheduleDaily(): job already scheduled ('
+                    + existingName + ', state=' + existing.State + ', cron=' + existing.CronExpression
+                    + ') - skipping to avoid a duplicate');
+                return;
+            }
+        }
+        
+        String jobId = System.schedule(jobName, cronExp, new CancellationSLATracker());
+        System.debug(LoggingLevel.INFO, 'CancellationSLATracker.scheduleDaily(): scheduled "'
+            + jobName + '" id=' + jobId + ' cron=' + cronExp);
     }
 }
